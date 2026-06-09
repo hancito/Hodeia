@@ -1,0 +1,19 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Resources/ai-solid-svgrepo-com.svg</file>
+        <file>Resources/ai-svgrepo-com.svg</file>
+        <file>Resources/align-justify.svg</file>
+        <file>Resources/arrow-right-to-file.svg</file>
+        <file>Resources/edit.svg</file>
+        <file>Resources/file-export.svg</file>
+        <file>Resources/folder-open.svg</file>
+        <file>Resources/gear.svg</file>
+        <file>Resources/list.svg</file>
+        <file>Resources/paperize.ico</file>
+        <file>Resources/paperize.png</file>
+        <file>Resources/refresh.svg</file>
+        <file>Resources/save.svg</file>
+        <file>Resources/share-square.svg</file>
+        <file>Resources/trash-can.svg</file>
+    </qresource>
+</RCC>
