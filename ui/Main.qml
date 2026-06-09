@@ -2,14 +2,15 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Effects
 
 ApplicationWindow {
     id: root
-    width: 1140
-    height: 757
+    width: 1920
+    height: 1080
     title: qsTr("Paperize")
     visible: true
-    //icon.source: "qrc:/Ressources/paperize.png"
+    //icon.source: "qrc:/Resources/paperize.png"
 
     menuBar: MyMenuBar {
         id: topNavigation
@@ -17,38 +18,36 @@ ApplicationWindow {
     }
 
     SplitView {
-        anchors.top: topNavigation.bottom
-        anchors.bottom: theFooter.top
+        id: mainSplitView
+        anchors.fill: parent
+        anchors.top: parent.top
+        anchors.topMargin: 10
         anchors.left: parent.left
+        anchors.leftMargin: 10
         anchors.right: parent.right
-        orientation: Qt.Horizontal
-        
+        anchors.rightMargin: 10
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 10
+        spacing: 10
+
         LeftPane {
             id: leftPaneItem
-            SplitView.preferredWidth: 400
+            SplitView.minimumWidth: 200
             SplitView.maximumWidth: 400
-            width: SplitView.preferredWidth
-            height: parent.height
         }
 
         CentralPane {
             id: centralPaneItem
-            SplitView.preferredWidth: 800
-            SplitView.maximumWidth: 1000
-            width: SplitView.preferredWidth
-            height: parent.height
+            SplitView.minimumWidth: 600
         }
 
         RightPane {
             id: rightPaneItem
-            SplitView.preferredWidth: 300
-            SplitView.maximumWidth: 1000
-            width: SplitView.preferredWidth
-            height: parent.height
+            SplitView.minimumWidth: 300
         }
     }
 
-// Status bar
+    // Status bar
     footer: ToolBar {
         id: theFooter
         height: 30

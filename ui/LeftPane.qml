@@ -7,73 +7,114 @@ Rectangle {
     border.color: "black"
     border.width: 1
     radius: 10
-    color: "#f5f5f5"
-    opacity: 1.0
+    color: "#FFFFFF"
+    opacity: 0.5
+    // gradient: Colors.invertedGreyBorder
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 20
-            
-            // Add buttons section
-            Row {
-                spacing: 10
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 10
+        spacing: 15
+
+        // Add buttons section
+        RowLayout {
+            spacing: 10
+            Layout.fillWidth: true
+
+            Button {
+                ToolTip.text: "Add a file"
+                icon.width: 40
+                icon.height: 40
+                icon.source: "qrc:/Resources/arrow-right-to-file.svg"
                 Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                Button {
-                    ToolTip.text: "Add a file"
-                    icon.width: 40
-                    icon.height: 40
-                    icon.source: "qrc:/Resources/arrow-right-to-file.svg"
-                    onClicked: console.log("Add Paper")
-                }
-
-                Button {
-                    ToolTip.text: "Add a folder"
-                    icon.width: 40
-                    icon.height: 40
-                    icon.source: "qrc:/Resources/folder-open.svg"
-                    onClicked: console.log("Add Folder")
-                }
+                Layout.minimumHeight: 50
+                onClicked: console.log("Add Paper")
             }
 
-            // Query section
-            Column {
-                width: parent.width
-                spacing: 10
+            Button {
+                ToolTip.text: "Add a folder"
+                icon.width: 40
+                icon.height: 40
+                icon.source: "qrc:/Resources/folder-open.svg"
+                Layout.fillWidth: true
+                Layout.minimumHeight: 50
+                onClicked: console.log("Add Folder")
+            }
+        }
 
-                Button {
-                    text: qsTr("Query your library")
-                    width: parent.width
-                    onClicked: console.log("Query Library")
-                }
+        // Progress section
+        ColumnLayout {
+            spacing: 10
+            Layout.fillWidth: true
 
-                Label {
-                    text: "Context Window"
-                }
+            ProgressBar {
+                id: ingestionProgress
+                value: 0
+                visible: true
+                Layout.fillWidth: true
+                Layout.minimumHeight: 10
+            }
+            Label {
+                text: "Ingesting ..."
+                visible: ingestionProgress.visible
+            }
+            Label {
+                text: "Mass Ingestion Status"
+                wrapMode: Text.WordWrap
+            }
+        }
 
-                SpinBox {
-                    id: contextWindowSpinner
-                    from: 1000
-                    to: 256000
-                    value: 4000
-                    stepSize: 1000
-                    width: parent.width
-                }
+        // Content area - takes available space
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 200
+        }
 
-                Label {
-                    text: "Model"
-                    horizontalAlignment: Text.AlignHCenter
-                }
+        // Query section
+        ColumnLayout {
+            spacing: 10
+            Layout.fillWidth: true
 
-                ComboBox {
-                    id: modelComboBox
-                    width: parent.width
-                    // Model options would be populated here
-                }
+            Button {
+                text: qsTr("Query your library")
+                Layout.fillWidth: true
+                Layout.minimumHeight: 40
+                onClicked: console.log("Query Library")
             }
 
-           
+            Label {
+                text: "Context Window"
+                Layout.fillWidth: true
+                font.pixelSize: Math.max(12, Math.round(leftPane.height * 0.015))
+            }
+
+            SpinBox {
+                id: contextWindowSpinner
+                from: 1000
+                to: 256000
+                value: 4000
+                stepSize: 1000
+                Layout.fillWidth: true
+            }
+
+            Label {
+                text: "Model"
+                horizontalAlignment: Text.AlignHCenter
+                Layout.fillWidth: true
+                font.pixelSize: Math.max(12, Math.round(leftPane.height * 0.015))
+            }
+
+            ComboBox {
+                id: modelComboBox
+                Layout.fillWidth: true
+                // Model options would be populated here
+            }
+        }
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: 200
+        }
     }
 }
-

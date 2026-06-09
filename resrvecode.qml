@@ -1,4 +1,40 @@
 
+LeftPane {
+    id: leftPaneItem
+    anchors.top: parent.top
+    anchors.topMargin: 10
+    anchors.left: parent.left
+    anchors.leftMargin: 10
+    width: parent.width * 0.10
+    height: parent.height - 10
+}
+
+CentralPane {
+    id: centralPaneItem
+    anchors.top: parent.top
+    anchors.topMargin: 10
+    anchors.left: leftPaneItem.right
+    anchors.leftMargin: 10
+    width: parent.width * 0.50
+    height: parent.height - 10
+}
+
+RightPane {
+    id: rightPaneItem
+    anchors.top: parent.top
+    anchors.topMargin: 10
+    anchors.left: centralPaneItem.right
+    anchors.leftMargin: 10
+    anchors.right: parent.right
+    anchors.rightMargin: 10
+    width: parent.width * 0.40
+    height: parent.height - 10
+}
+
+
+
+
+
 Rectangle {
     id: leftPane
     border.color: "black"
