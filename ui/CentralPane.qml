@@ -39,6 +39,8 @@ Rectangle {
                 id: textTab
                 ColumnLayout {
                     anchors.fill: parent
+                    anchors.rightMargin: 5
+                    anchors.leftMargin: 5
                     spacing: 10
                     ScrollView {
                         Layout.fillWidth: true
@@ -86,6 +88,8 @@ Rectangle {
                 id: latexTab
                 ColumnLayout {
                     anchors.fill: parent
+                    anchors.rightMargin: 5
+                    anchors.leftMargin: 5
                     spacing: 10
                     ScrollView {
                         Layout.fillWidth: true
@@ -129,12 +133,6 @@ Rectangle {
 
             Item {
                 id: pdfTab
-                PdfScrollablePageView {
-                    anchors.fill: parent
-                    document: PdfDocument {
-                        source: "file:///home/hancitog/Developpement/Paperize_CPP/attention.pdf"
-                    }
-                }
             }
         }
     }

@@ -50,7 +50,7 @@ Rectangle {
             ProgressBar {
                 id: ingestionProgress
                 value: 0
-                visible: true
+                visible: false
                 Layout.fillWidth: true
                 Layout.minimumHeight: 10
             }
@@ -61,6 +61,7 @@ Rectangle {
             Label {
                 text: "Mass Ingestion Status"
                 wrapMode: Text.WordWrap
+                visible: ingestionProgress.visible
             }
         }
 

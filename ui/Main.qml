@@ -17,8 +17,7 @@ ApplicationWindow {
         // You can customize properties or add menus here
     }
 
-    SplitView {
-        id: mainSplitView
+    GridLayout {
         anchors.fill: parent
         anchors.top: parent.top
         anchors.topMargin: 10
@@ -28,25 +27,31 @@ ApplicationWindow {
         anchors.rightMargin: 10
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 10
-        spacing: 10
-        handle: Item {
-        implicitWidth: 10
-    }
 
-        LeftPane {
-            id: leftPaneItem
-            SplitView.minimumWidth: 200
-            SplitView.maximumWidth: 400
-        }
+        SplitView {
+            id: mainSplitView
+            Layout.fillHeight: true
+            Layout.fillWidth: true
+            spacing: 10
+            handle: Item {
+                implicitWidth: 10
+            }
 
-        CentralPane {
-            id: centralPaneItem
-            SplitView.minimumWidth: 600
-        }
+            LeftPane {
+                id: leftPaneItem
+                SplitView.minimumWidth: 200
+                SplitView.maximumWidth: 400
+            }
 
-        RightPane {
-            id: rightPaneItem
-            SplitView.minimumWidth: 300
+            CentralPane {
+                id: centralPaneItem
+                SplitView.minimumWidth: 600
+            }
+
+            RightPane {
+                id: rightPaneItem
+                SplitView.minimumWidth: 400
+            }
         }
     }
 
