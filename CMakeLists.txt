@@ -4,7 +4,7 @@ project(Paperize_CPP VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick Pdf)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -53,7 +53,9 @@ set_target_properties(Paperize PROPERTIES
 )
 
 target_link_libraries(Paperize
-    PRIVATE Qt6::Quick
+    PRIVATE 
+    Qt6::Quick
+    Qt6::Pdf
 )
 
 install(TARGETS Paperize

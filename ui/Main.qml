@@ -29,6 +29,9 @@ ApplicationWindow {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 10
         spacing: 10
+        handle: Item {
+        implicitWidth: 10
+    }
 
         LeftPane {
             id: leftPaneItem
