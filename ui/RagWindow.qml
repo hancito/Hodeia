@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -11,6 +12,7 @@ ApplicationWindow {
     visible: true
     //icon.source: "qrc:/Resources/paperize.png"
     // Signal to notify the main app that this window is closing
+    readonly property var activeTheme: themeManager.activeTheme || {}
     signal closed()
 
     onClosing: {
@@ -22,7 +24,10 @@ ApplicationWindow {
         id: topNavigation
         // You can customize properties or add menus here
     }
-
+// Apply theme to the entire window content
+    background: Rectangle {
+        color: ragwindow.activeTheme.base ||  ragwindow.activeTheme.background || "#1e1e1e"
+    }
     GridLayout {
         anchors.fill: parent
         anchors.top: parent.top

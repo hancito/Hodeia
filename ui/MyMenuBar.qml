@@ -1,7 +1,12 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
+
+
 MenuBar {
+    // 1. Create a property that main.qml can look at
+
     id: menuBar
         Menu {
             title: "File"
@@ -26,7 +31,18 @@ MenuBar {
             title: "Settings"
             Menu {
                 title: "Themes"
-                // Theme actions would be added here
+                Repeater {
+                    id: themesRepeater
+                    model: themeManager.themes
+                    delegate: MenuItem {
+                        required property int index
+                        required property var modelData
+                        text: modelData.name
+                        checkable: true
+                        checked: themeManager.activeTheme.name === modelData.name
+                        onTriggered: themeManager.setThemeIndex(index)
+                    }
+                }
             }
             MenuItem {
                 text: "Add Backend"
@@ -34,9 +50,7 @@ MenuBar {
             }
             Menu {
                 title: "Change Backend"
-                // Backend actions would be added here
             }
         }
     }
 
-    

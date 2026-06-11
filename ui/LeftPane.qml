@@ -1,20 +1,24 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {
     id: leftPane
-    border.color: "black"
+    property var activeTheme: ({})
+    border.color: activeTheme.overlay0 || "#626573"
     border.width: 1
     radius: 10
-    color: "#FFFFFF"
-    opacity: 0.5
+    color: activeTheme.surface0 || "#313442"
+    opacity: 1.0
     signal openRagWindow
 
+    
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 15
+
         // Add buttons section
         RowLayout {
             spacing: 10
@@ -55,11 +59,13 @@ Rectangle {
             Label {
                 text: "Ingesting ..."
                 visible: ingestionProgress.visible
+                color: leftPane.activeTheme.text || "#f8f8f2"
             }
             Label {
                 text: "Mass Ingestion Status"
                 wrapMode: Text.WordWrap
                 visible: ingestionProgress.visible
+                color: leftPane.activeTheme.text || "#f8f8f2"
             }
         }
 
@@ -84,6 +90,7 @@ Rectangle {
             Label {
                 text: "Context Window"
                 Layout.fillWidth: true
+                color: leftPane.activeTheme.text || "#f8f8f2"
             }
 
             SpinBox {
@@ -99,6 +106,7 @@ Rectangle {
                 text: "Model"
                 horizontalAlignment: Text.AlignHCenter
                 Layout.fillWidth: true
+                color: leftPane.activeTheme.text || "#f8f8f2"
             }
 
             ComboBox {
@@ -114,3 +122,4 @@ Rectangle {
         }
     }
 }
+

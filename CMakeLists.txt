@@ -23,6 +23,9 @@ qt_add_qml_module(Paperize
         ui/RagWindow.qml
         ui/RagDbPane.qml
         ui/QueryPane.qml
+        SOURCES 
+        headers/thememanager.h
+        src/thememanager.cpp
 )
 
 # Add resources separately
@@ -44,6 +47,13 @@ qt_add_resources(Paperize "resources" PREFIX "/" FILES
     Resources/trash-can.svg
 )
 
+# Copy themes folder to build directory
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/ui/themes
+    $<TARGET_FILE_DIR:Paperize>/ui/themes
+)
+
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
 # explicit, fixed bundle identifier manually though.
@@ -63,7 +73,8 @@ target_link_libraries(Paperize
 
 install(TARGETS Paperize
     BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
 

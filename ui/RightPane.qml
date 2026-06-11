@@ -1,14 +1,18 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {
     id: rightPane
-    border.color: "black"
-    border.width: 5
+    property var activeTheme: ({})
+    border.color: activeTheme.overlay0 || "#626573"
+    border.width: 1
     radius: 10
-    opacity: 0.5
+    color: activeTheme.surface0 || "#313442"
+    opacity: 1.0
 
+    
     ColumnLayout {
         anchors.fill: parent
         anchors.bottomMargin: 5
@@ -21,7 +25,7 @@ Rectangle {
             id: paperSearch
             Layout.fillWidth: true
             placeholderText: "Search paper"
-            //clearButtonEnabled: true
+            color: rightPane.activeTheme.text || "#f8f8f2"
         }
 
         RowLayout {
@@ -80,12 +84,14 @@ Rectangle {
                 text: "Summarize"
                 Layout.fillWidth: true
                 visible: summarizeProgress.visible
+                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             Label {
                 text: "Elapsed Time"
                 Layout.fillWidth: true
                 visible: summarizeProgress.visible
+                color: rightPane.activeTheme.text || "#f8f8f2"
             }
         }
 
@@ -103,6 +109,7 @@ Rectangle {
 
             Label {
                 text: "Paper Number:"
+                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             Item {
@@ -116,6 +123,7 @@ Rectangle {
 
             Label {
                 text: "Sort by"
+                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             ComboBox {
@@ -142,3 +150,5 @@ Rectangle {
         }
     }
 }
+
+
