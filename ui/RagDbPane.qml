@@ -1,14 +1,17 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {
     id: dbPane
-    border.color: "black"
+    property var activeTheme: ({})
+    border.color: activeTheme.overlay0 || "#626573"
     border.width: 1
     radius: 10
-    color: "#FFFFFF"
-    opacity: 0.5
+    color: activeTheme.surface0 || "#313442"
+    opacity: 1.0
+
     // gradient: Colors.invertedGreyBorder
 
     ColumnLayout {
@@ -19,6 +22,7 @@ Rectangle {
             Layout.fillWidth: true
             Label {
                 text: qsTr("Query History")
+                color: dbPane.activeTheme.text || "#f8f8f2"
                 Layout.fillWidth: true
                 font.pointSize: 16
                 font.weight: Font.Bold
@@ -54,13 +58,9 @@ Rectangle {
                 id: queryView
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                
 
                 // Add bounds behavior for responsiveness
                 boundsBehavior: Flickable.DragAndOvershootBounds
-
-                // Ensure it takes remaining space
-                Layout.minimumHeight: parent.height * 0.3
             }
 
             RowLayout {

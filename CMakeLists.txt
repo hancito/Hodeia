@@ -25,7 +25,9 @@ qt_add_qml_module(Paperize
         ui/QueryPane.qml
         SOURCES 
         headers/thememanager.h
+        headers/configmanager.h
         src/thememanager.cpp
+        src/configmanager.cpp
 )
 
 # Add resources separately

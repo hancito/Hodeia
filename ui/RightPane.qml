@@ -12,7 +12,6 @@ Rectangle {
     color: activeTheme.surface0 || "#313442"
     opacity: 1.0
 
-    
     ColumnLayout {
         anchors.fill: parent
         anchors.bottomMargin: 5
@@ -150,5 +149,3 @@ Rectangle {
         }
     }
 }
-
-

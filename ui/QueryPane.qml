@@ -1,15 +1,16 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
 Rectangle {
     id: queryPane
-    border.color: "black"
+    property var activeTheme: ({})
+    border.color: activeTheme.overlay0 || "#626573"
     border.width: 1
     radius: 10
-    color: "#FFFFFF"
-    opacity: 0.5
-    // gradient: Colors.invertedGreyBorder
+    color: activeTheme.surface0 || "#313442"
+    opacity: 1.0
 
     ColumnLayout {
         anchors.fill: parent
@@ -20,6 +21,7 @@ Rectangle {
                 id: queryLlm
                 Layout.fillWidth: true
                 placeholderText: "Query your library"
+                color: queryPane.activeTheme.text || "#f8f8f2"
                 //clearButtonEnabled: true
             }
             Button {
@@ -44,6 +46,7 @@ Rectangle {
                 TextArea {
                     id: textEditor
                     readOnly: true
+                    color: queryPane.activeTheme.text || "#f8f8f2"
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
                     text: "# TextArea Markdown\n\n" + "1. This is a scrollable area.\n" + "2. You can select this text.\n" + "3. **Bold** and *italics* work perfectly"
@@ -56,6 +59,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Label {
                     text: qsTr("Context Window")
+                    color: queryPane.activeTheme.text || "#f8f8f2"
                 }
                 SpinBox {
                     id: contextRagWindowSpinner
@@ -67,6 +71,7 @@ Rectangle {
 
                 Label {
                     text: qsTr("Max Pages")
+                    color: queryPane.activeTheme.text || "#f8f8f2"
                 }
                 SpinBox {
                     id: maxPagesSpinner
@@ -84,6 +89,10 @@ Rectangle {
                     text: qsTr("Export")
                     icon.width: 24
                     icon.height: 24
+                    background: Rectangle {
+                        color: queryPane.activeTheme.secondary || "#ff6188"
+                        radius: 5
+                    }
                     icon.source: "qrc:/Resources/share-square.svg"
                     onClicked: console.log("Export Text")
                 }

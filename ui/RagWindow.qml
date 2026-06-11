@@ -13,20 +13,20 @@ ApplicationWindow {
     //icon.source: "qrc:/Resources/paperize.png"
     // Signal to notify the main app that this window is closing
     readonly property var activeTheme: themeManager.activeTheme || {}
-    signal closed()
+    signal closed
 
     onClosing: {
-        ragwindow.closed() // Fire our custom signal
-        ragwindow.destroy() // Free memory
+        ragwindow.closed(); // Fire our custom signal
+        ragwindow.destroy(); // Free memory
     }
 
     menuBar: MyMenuBar {
         id: topNavigation
         // You can customize properties or add menus here
     }
-// Apply theme to the entire window content
+    // Apply theme to the entire window content
     background: Rectangle {
-        color: ragwindow.activeTheme.base ||  ragwindow.activeTheme.background || "#1e1e1e"
+        color: ragwindow.activeTheme.base || ragwindow.activeTheme.background || "#1e1e1e"
     }
     GridLayout {
         anchors.fill: parent
@@ -51,13 +51,14 @@ ApplicationWindow {
             RagDbPane {
                 id: dbPaneItem
                 SplitView.minimumWidth: 400
+                activeTheme: ragwindow.activeTheme
             }
 
             QueryPane {
                 id: queryPaneItem
                 SplitView.minimumWidth: 500
+                activeTheme: ragwindow.activeTheme
             }
-
         }
     }
 
