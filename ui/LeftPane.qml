@@ -9,13 +9,12 @@ Rectangle {
     radius: 10
     color: "#FFFFFF"
     opacity: 0.5
-    // gradient: Colors.invertedGreyBorder
+    signal openRagWindow
 
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 15
-
         // Add buttons section
         RowLayout {
             spacing: 10
@@ -46,7 +45,6 @@ Rectangle {
         ColumnLayout {
             spacing: 10
             Layout.fillWidth: true
-
             ProgressBar {
                 id: ingestionProgress
                 value: 0
@@ -76,18 +74,16 @@ Rectangle {
         ColumnLayout {
             spacing: 10
             Layout.fillWidth: true
-
             Button {
                 text: qsTr("Query your library")
                 Layout.fillWidth: true
                 Layout.minimumHeight: 40
-                onClicked: console.log("Query Library")
+                onClicked: leftPane.openRagWindow()
             }
 
             Label {
                 text: "Context Window"
                 Layout.fillWidth: true
-                font.pixelSize: Math.max(12, Math.round(leftPane.height * 0.015))
             }
 
             SpinBox {
@@ -103,7 +99,6 @@ Rectangle {
                 text: "Model"
                 horizontalAlignment: Text.AlignHCenter
                 Layout.fillWidth: true
-                font.pixelSize: Math.max(12, Math.round(leftPane.height * 0.015))
             }
 
             ComboBox {

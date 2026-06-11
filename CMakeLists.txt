@@ -20,6 +20,9 @@ qt_add_qml_module(Paperize
         ui/LeftPane.qml
         ui/CentralPane.qml
         ui/RightPane.qml
+        ui/RagWindow.qml
+        ui/RagDbPane.qml
+        ui/QueryPane.qml
 )
 
 # Add resources separately
