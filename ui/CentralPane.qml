@@ -1,21 +1,22 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Pdf
 
 Rectangle {
     id: centralPane
-     property var activeTheme: ({})
-    color: "transparent"
-    opacity: 0.8
-    border.color: activeTheme.overlay0 || "#626573"
+    property var activeTheme: ({})
+    color: Colors.surface0
+    opacity: 1
     border.width: 1
-    radius: 10
+    radius: 5
 
-   
     ColumnLayout {
         anchors.fill: parent
+        anchors.rightMargin: 5
+        anchors.leftMargin: 5
+        anchors.topMargin: 5
         anchors.bottomMargin: 5
         spacing: 15
 
@@ -54,7 +55,6 @@ Rectangle {
                             readOnly: true
                             textFormat: TextEdit.MarkdownText
                             wrapMode: TextEdit.WordWrap
-                            color: centralPane.activeTheme.text || "#f8f8f2"
 
                             text: "# TextArea Markdown\n\n" + "1. This is a scrollable area.\n" + "2. You can select this text.\n" + "3. **Bold** and *italics* work perfectly"
                         }
@@ -103,7 +103,6 @@ Rectangle {
                             id: latexEditor
                             readOnly: true
                             wrapMode: TextEdit.WordWrap
-                            color: centralPane.activeTheme.text || "#f8f8f2"
                             placeholderText: "Latex will be here"
                         }
                     }
@@ -142,5 +141,3 @@ Rectangle {
         }
     }
 }
-
-

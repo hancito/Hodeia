@@ -1,12 +1,13 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
 ApplicationWindow {
     id: ragwindow
-    width: 1000
+    width: 1200
     height: 800
     title: qsTr("Paperize")
     visible: true
@@ -20,13 +21,50 @@ ApplicationWindow {
         ragwindow.destroy(); // Free memory
     }
 
+    // Global palette applied to all QtQuick.Controls
+    palette.base: Colors.crust
+    palette.alternateBase: Colors.base
+    palette.window: Colors.base
+    palette.windowText: Colors.text
+    palette.button: Colors.base
+    palette.buttonText: Colors.text
+    palette.brightText: Colors.mantle
+    palette.text: Colors.text
+    palette.placeholderText: Colors.overlay1
+    palette.light: Colors.crust
+    palette.midlight: Colors.mantle
+    palette.mid: Colors.surface0
+    palette.dark: Colors.surface1
+    palette.shadow: Colors.overlay0
+    palette.highlight: Colors.primary
+    palette.highlightedText: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
+
+    // Inactive
+    palette.inactive.highlight: Colors.surface1
+    palette.inactive.link: Colors.surface1
+    palette.inactive.linkVisited: Colors.surface1
+
+    // Disabled
+    palette.disabled.windowText: Colors.overlay1
+    palette.disabled.base: Colors.base
+    palette.disabled.alternateBase: Colors.base
+    palette.disabled.text: Colors.overlay1
+    palette.disabled.placeholderText: Colors.overlay1
+    palette.disabled.button: Colors.base
+    palette.disabled.buttonText: Colors.overlay1
+    palette.disabled.brightText: Colors.mantle
+    palette.disabled.highlight: Colors.surface2
+    palette.disabled.highlightedText: Colors.surface0
+    palette.disabled.link: Colors.surface0
+    palette.disabled.linkVisited: Colors.surface0
+
     menuBar: MyMenuBar {
         id: topNavigation
         // You can customize properties or add menus here
     }
     // Apply theme to the entire window content
     background: Rectangle {
-        color: ragwindow.activeTheme.base || ragwindow.activeTheme.background || "#1e1e1e"
+        color: Colors.base || Colors.background || "#1e1e1e"
     }
     GridLayout {
         anchors.fill: parent
@@ -51,13 +89,11 @@ ApplicationWindow {
             RagDbPane {
                 id: dbPaneItem
                 SplitView.minimumWidth: 400
-                activeTheme: ragwindow.activeTheme
             }
 
             QueryPane {
                 id: queryPaneItem
-                SplitView.minimumWidth: 500
-                activeTheme: ragwindow.activeTheme
+                SplitView.minimumWidth: 600
             }
         }
     }
@@ -68,7 +104,8 @@ ApplicationWindow {
         height: 30
         Label {
             anchors.fill: parent
-            verticalAlignment: Text.AlignVCenter
+            verticalAlignment: Text.AlignLeft
+            horizontalAlignment: Text.AlignLeft
             text: "Ready"
         }
     }

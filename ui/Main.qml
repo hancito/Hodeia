@@ -1,6 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
@@ -20,7 +20,10 @@ ApplicationWindow {
     readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
 
     // Global palette applied to all QtQuick.Controls
+    palette.base: Colors.crust
+    palette.alternateBase: Colors.base
     palette.window: Colors.base
+
     palette.windowText: Colors.text
     palette.button: Colors.base
     palette.buttonText: Colors.text
@@ -34,6 +37,25 @@ ApplicationWindow {
     palette.shadow: Colors.overlay0
     palette.highlight: Colors.primary
     palette.highlightedText: highlightedTextColor
+
+    // Inactive
+    palette.inactive.highlight: Colors.surface1
+    palette.inactive.link: Colors.surface1
+    palette.inactive.linkVisited: Colors.surface1
+
+    // Disabled
+    palette.disabled.windowText: Colors.overlay1
+    palette.disabled.base: Colors.base
+    palette.disabled.alternateBase: Colors.base
+    palette.disabled.text: Colors.overlay1
+    palette.disabled.placeholderText: Colors.overlay1
+    palette.disabled.button: Colors.base
+    palette.disabled.buttonText: Colors.overlay1
+    palette.disabled.brightText: Colors.mantle
+    palette.disabled.highlight: Colors.surface2
+    palette.disabled.highlightedText: Colors.surface0
+    palette.disabled.link: Colors.surface0
+    palette.disabled.linkVisited: Colors.surface0
 
     Component.onCompleted: {
         // Load the QML file as a component
@@ -51,7 +73,7 @@ ApplicationWindow {
 
     // Apply theme to the entire window content
     background: Rectangle {
-        color: root.activeTheme.base || root.activeTheme.background || "#1e1e1e"
+        color: Colors.base || Colors.background || "#1e1e1e"
     }
 
     GridLayout {
@@ -71,7 +93,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 10
             handle: Rectangle {
-                implicitWidth: 10
+                implicitWidth: 5
                 color: "transparent"
                 opacity: 0
             }
@@ -80,7 +102,6 @@ ApplicationWindow {
                 id: leftPaneItem
                 SplitView.minimumWidth: 200
                 SplitView.maximumWidth: 400
-                activeTheme: root.activeTheme
                 onOpenRagWindow: {
                     // Check if the window instance already exists and is valid
                     if (root.secondaryWindow !== null) {
@@ -111,13 +132,11 @@ ApplicationWindow {
             CentralPane {
                 id: centralPaneItem
                 SplitView.minimumWidth: 1000
-                activeTheme: root.activeTheme
             }
 
             RightPane {
                 id: rightPaneItem
                 SplitView.minimumWidth: 600
-                activeTheme: root.activeTheme
             }
         }
     }
@@ -126,15 +145,11 @@ ApplicationWindow {
     footer: ToolBar {
         id: theFooter
         height: 30
-        background: Rectangle {
-            color: root.activeTheme.surface0 || root.activeTheme.mantle || "#2d2d2d"
-        }
         Label {
             anchors.fill: parent
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
             text: "Ready"
-            color: root.activeTheme.text || "#ffffff"
         }
     }
 }

@@ -1,15 +1,14 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
     id: rightPane
     property var activeTheme: ({})
-    border.color: activeTheme.overlay0 || "#626573"
     border.width: 1
-    radius: 10
-    color: activeTheme.surface0 || "#313442"
+    radius: 5
+    color: Colors.surface0
     opacity: 1.0
 
     ColumnLayout {
@@ -24,13 +23,13 @@ Rectangle {
             id: paperSearch
             Layout.fillWidth: true
             placeholderText: "Search paper"
-            color: rightPane.activeTheme.text || "#f8f8f2"
         }
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 5
             Button {
+                ToolTip.visible: hovered
                 ToolTip.text: "Summarize"
                 icon.width: 24
                 icon.height: 24
@@ -40,6 +39,7 @@ Rectangle {
             }
 
             Button {
+                ToolTip.visible: hovered
                 ToolTip.text: "Refresh"
                 icon.width: 24
                 icon.height: 24
@@ -49,6 +49,7 @@ Rectangle {
             }
 
             Button {
+                ToolTip.visible: hovered
                 ToolTip.text: "Generate Report from selection"
                 icon.width: 24
                 icon.height: 24
@@ -58,6 +59,7 @@ Rectangle {
             }
 
             Button {
+                ToolTip.visible: hovered
                 ToolTip.text: "Delete"
                 icon.width: 24
                 icon.height: 24
@@ -83,14 +85,12 @@ Rectangle {
                 text: "Summarize"
                 Layout.fillWidth: true
                 visible: summarizeProgress.visible
-                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             Label {
                 text: "Elapsed Time"
                 Layout.fillWidth: true
                 visible: summarizeProgress.visible
-                color: rightPane.activeTheme.text || "#f8f8f2"
             }
         }
 
@@ -108,7 +108,6 @@ Rectangle {
 
             Label {
                 text: "Paper Number:"
-                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             Item {
@@ -122,7 +121,6 @@ Rectangle {
 
             Label {
                 text: "Sort by"
-                color: rightPane.activeTheme.text || "#f8f8f2"
             }
 
             ComboBox {

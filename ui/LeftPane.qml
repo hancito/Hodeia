@@ -1,15 +1,14 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
     id: leftPane
     property var activeTheme: ({})
-    border.color: activeTheme.overlay0 || "#626573"
+    color: Colors.surface0
     border.width: 1
-    radius: 10
-    color: activeTheme.surface0 || "#313442"
+    radius: 5
     opacity: 1.0
     signal openRagWindow
 
@@ -24,22 +23,26 @@ Rectangle {
             Layout.fillWidth: true
 
             Button {
+
                 ToolTip.text: "Add a file"
+                ToolTip.visible: hovered
+                display: AbstractButton.IconOnly
+                padding: 0
                 icon.width: 40
                 icon.height: 40
                 icon.source: "qrc:/Resources/arrow-right-to-file.svg"
                 Layout.fillWidth: true
-                Layout.minimumHeight: 50
                 onClicked: console.log("Add Paper")
             }
 
             Button {
                 ToolTip.text: "Add a folder"
+                ToolTip.visible: hovered
+                padding: 0
                 icon.width: 40
                 icon.height: 40
                 icon.source: "qrc:/Resources/folder-open.svg"
                 Layout.fillWidth: true
-                Layout.minimumHeight: 50
                 onClicked: console.log("Add Folder")
             }
         }
@@ -58,13 +61,11 @@ Rectangle {
             Label {
                 text: "Ingesting ..."
                 visible: ingestionProgress.visible
-                color: leftPane.activeTheme.text || "#f8f8f2"
             }
             Label {
                 text: "Mass Ingestion Status"
                 wrapMode: Text.WordWrap
                 visible: ingestionProgress.visible
-                color: leftPane.activeTheme.text || "#f8f8f2"
             }
         }
 
@@ -89,7 +90,6 @@ Rectangle {
             Label {
                 text: "Context Window"
                 Layout.fillWidth: true
-                color: leftPane.activeTheme.text || "#f8f8f2"
             }
 
             SpinBox {
@@ -105,7 +105,6 @@ Rectangle {
                 text: "Model"
                 horizontalAlignment: Text.AlignHCenter
                 Layout.fillWidth: true
-                color: leftPane.activeTheme.text || "#f8f8f2"
             }
 
             ComboBox {

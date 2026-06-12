@@ -1,18 +1,16 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
     id: dbPane
     property var activeTheme: ({})
-    border.color: activeTheme.overlay0 || "#626573"
-    border.width: 1
-    radius: 10
-    color: activeTheme.surface0 || "#313442"
-    opacity: 1.0
 
-    // gradient: Colors.invertedGreyBorder
+    border.width: 1
+    radius: 5
+    color: Colors.surface0
+    opacity: 1.0
 
     ColumnLayout {
         anchors.fill: parent
@@ -22,7 +20,6 @@ Rectangle {
             Layout.fillWidth: true
             Label {
                 text: qsTr("Query History")
-                color: dbPane.activeTheme.text || "#f8f8f2"
                 Layout.fillWidth: true
                 font.pointSize: 16
                 font.weight: Font.Bold
