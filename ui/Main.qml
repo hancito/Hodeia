@@ -16,6 +16,25 @@ ApplicationWindow {
 
     readonly property var activeTheme: themeManager.activeTheme || {}
 
+    // Derived colors (mirrors _theme.py update_palette logic)
+    readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
+
+    // Global palette applied to all QtQuick.Controls
+    palette.window: Colors.base
+    palette.windowText: Colors.text
+    palette.button: Colors.base
+    palette.buttonText: Colors.text
+    palette.brightText: Colors.mantle
+    palette.text: Colors.text
+    palette.placeholderText: Colors.overlay1
+    palette.light: Colors.crust
+    palette.midlight: Colors.mantle
+    palette.mid: Colors.surface0
+    palette.dark: Colors.surface1
+    palette.shadow: Colors.overlay0
+    palette.highlight: Colors.primary
+    palette.highlightedText: highlightedTextColor
+
     Component.onCompleted: {
         // Load the QML file as a component
         windowComponent = Qt.createComponent("RagWindow.qml");
@@ -32,7 +51,7 @@ ApplicationWindow {
 
     // Apply theme to the entire window content
     background: Rectangle {
-        color: root.activeTheme.base ||  root.activeTheme.background || "#1e1e1e"
+        color: root.activeTheme.base || root.activeTheme.background || "#1e1e1e"
     }
 
     GridLayout {
@@ -108,16 +127,14 @@ ApplicationWindow {
         id: theFooter
         height: 30
         background: Rectangle {
-            color:  root.activeTheme.surface0 ||  root.activeTheme.mantle || "#2d2d2d"
+            color: root.activeTheme.surface0 || root.activeTheme.mantle || "#2d2d2d"
         }
         Label {
             anchors.fill: parent
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
-                        text: "Ready"
-            color:  root.activeTheme.text || "#ffffff"
+            text: "Ready"
+            color: root.activeTheme.text || "#ffffff"
         }
     }
-
 }
-

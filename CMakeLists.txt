@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(Paperize_CPP VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick Pdf)
 
@@ -12,9 +13,12 @@ qt_add_executable(Paperize
     src/main.cpp
 )
 
+set_source_files_properties(ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(Paperize
     URI Paperize_CPP
     QML_FILES
+        ui/Colors.qml
         ui/Main.qml
         ui/MyMenuBar.qml
         ui/LeftPane.qml
@@ -23,7 +27,7 @@ qt_add_qml_module(Paperize
         ui/RagWindow.qml
         ui/RagDbPane.qml
         ui/QueryPane.qml
-        SOURCES 
+    SOURCES
         headers/thememanager.h
         headers/configmanager.h
         src/thememanager.cpp
@@ -68,7 +72,7 @@ set_target_properties(Paperize PROPERTIES
 )
 
 target_link_libraries(Paperize
-    PRIVATE 
+    PRIVATE
     Qt6::Quick
     Qt6::Pdf
 )
@@ -78,5 +82,3 @@ install(TARGETS Paperize
     LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
-

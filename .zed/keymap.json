@@ -1,0 +1,13 @@
+// Project-local keymap overrides
+//
+// For documentation on Zed keymaps, see:
+// https://zed.dev/docs/key-bindings
+[
+  {
+    "context": "Terminal",
+    "bindings": {
+      "ctrl-shift-r": "task::Run",
+      "ctrl-b": "task_runner::RunLast",
+    },
+  },
+]

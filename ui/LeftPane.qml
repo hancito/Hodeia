@@ -13,7 +13,6 @@ Rectangle {
     opacity: 1.0
     signal openRagWindow
 
-    
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
@@ -122,4 +121,3 @@ Rectangle {
         }
     }
 }
-
