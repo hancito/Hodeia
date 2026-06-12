@@ -3,18 +3,24 @@
 #include <QIcon>
 #include <QQmlContext>
 #include "headers/thememanager.h"
-
+#include "headers/configmanager.h"
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     app.setWindowIcon(QIcon(":/Resources/paperize.png"));
+
+    // Create ConfigManager
+    ConfigManager configManager;
+
+    // Create ThemeManager and adjust path to where your JSON folder sits relative to the executable
     ThemeManager themeManager;
-    // Adjust path to where your JSON folder sits relative to the executable
     themeManager.loadThemesFromFolder(app.applicationDirPath() + "/ui/themes");
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("themeManager", &themeManager);
+    engine.rootContext()->setContextProperty("configManager", &configManager);
+
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,

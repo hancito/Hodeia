@@ -19,6 +19,11 @@ ApplicationWindow {
     Component.onCompleted: {
         // Load the QML file as a component
         windowComponent = Qt.createComponent("RagWindow.qml");
+
+        // Apply saved theme index from config
+        if (configManager.activeThemeIndex !== undefined && configManager.activeThemeIndex >= 0) {
+            themeManager.setThemeIndex(configManager.activeThemeIndex);
+        }
     }
     menuBar: MyMenuBar {
         id: topNavigation

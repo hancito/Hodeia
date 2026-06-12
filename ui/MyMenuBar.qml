@@ -2,8 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 
-
-
 MenuBar {
     // 1. Create a property that main.qml can look at
 
@@ -40,7 +38,10 @@ MenuBar {
                         text: modelData.name
                         checkable: true
                         checked: themeManager.activeTheme.name === modelData.name
-                        onTriggered: themeManager.setThemeIndex(index)
+                        onTriggered: {
+                            themeManager.setThemeIndex(index);
+                            configManager.activeThemeIndex = index;
+                        }
                     }
                 }
             }
