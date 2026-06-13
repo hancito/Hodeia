@@ -15,10 +15,13 @@ qt_add_executable(Paperize
 
 set_source_files_properties(ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
+set_source_files_properties(ui/Fonts.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(Paperize
     URI Paperize_CPP
     QML_FILES
         ui/Colors.qml
+        ui/Fonts.qml
         ui/Main.qml
         ui/MyMenuBar.qml
         ui/LeftPane.qml
@@ -58,6 +61,13 @@ add_custom_command(TARGET Paperize POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/ui/themes
     $<TARGET_FILE_DIR:Paperize>/ui/themes
+)
+
+# Copy fonts folder to build directory
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/Fonts
+    $<TARGET_FILE_DIR:Paperize>/Fonts
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

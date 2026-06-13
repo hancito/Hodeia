@@ -10,6 +10,7 @@ ApplicationWindow {
     height: 1080
     title: qsTr("Paperize")
     visible: true
+    font.family: Fonts.ui
     //icon.source: "qrc:/Resources/paperize.png"
     property var secondaryWindow: null
     property var windowComponent: null

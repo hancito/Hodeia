@@ -9,7 +9,7 @@ Rectangle {
     color: Colors.surface0
     border.width: 1
     radius: 5
-    opacity: 1.0
+    opacity: 1
     signal openRagWindow
 
     ColumnLayout {

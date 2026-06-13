@@ -11,6 +11,7 @@ ApplicationWindow {
     height: 800
     title: qsTr("Paperize")
     visible: true
+    font.family: Fonts.ui
     //icon.source: "qrc:/Resources/paperize.png"
     // Signal to notify the main app that this window is closing
     readonly property var activeTheme: themeManager.activeTheme || {}

@@ -9,7 +9,7 @@ Rectangle {
     border.width: 1
     radius: 5
     color: Colors.surface0
-    opacity: 1.0
+    opacity: 1
 
     ColumnLayout {
         anchors.fill: parent

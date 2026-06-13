@@ -55,6 +55,7 @@ Rectangle {
                             readOnly: true
                             textFormat: TextEdit.MarkdownText
                             wrapMode: TextEdit.WordWrap
+                            font.family: Fonts.display
 
                             text: "# TextArea Markdown\n\n" + "1. This is a scrollable area.\n" + "2. You can select this text.\n" + "3. **Bold** and *italics* work perfectly"
                         }
