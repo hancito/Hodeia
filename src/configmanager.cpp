@@ -1,6 +1,8 @@
 #include "headers/configmanager.h"
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -8,6 +10,14 @@
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   loadConfig(); // Automatically load the file when instantiated
+
+  // Create "Default" project if no projects exist yet
+  QDir projRoot(projectsRoot());
+  if (!projRoot.exists() ||
+      projRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty()) {
+    createProject("Default");
+  }
+  refreshProjectList();
 }
 
 ConfigManager::~ConfigManager() { saveConfig(); }
@@ -114,4 +124,183 @@ void ConfigManager::setBackendList(const QStringList &backends) {
     emit backendListChanged();
     saveConfig();
   }
+}
+
+QString ConfigManager::projectsRoot() const {
+  QString dirPath =
+      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  QDir().mkpath(dirPath);
+  return dirPath + "/Projects";
+}
+
+bool ConfigManager::createProject(const QString &projectName) {
+  if (projectName.trimmed().isEmpty())
+    return false;
+
+  QString projectDir = projectsRoot() + "/" + projectName.trimmed();
+
+  // Check if project already exists
+  if (QDir(projectDir).exists()) {
+    qWarning() << "Project already exists:" << projectDir;
+    return false;
+  }
+
+  QDir rootDir;
+  rootDir.mkpath(projectDir);
+  rootDir.mkpath(projectDir + "/IMG");
+  rootDir.mkpath(projectDir + "/PDF");
+
+  // Create project database file
+  QString dbPath = projectDir + "/" + projectName.trimmed() + ".db";
+  QFile dbFile(dbPath);
+  if (!dbFile.open(QIODevice::WriteOnly)) {
+    qWarning() << "Failed to create database file:" << dbPath;
+    return false;
+  }
+  dbFile.close();
+
+  setLastProject(projectName.trimmed());
+  saveConfig();
+  refreshProjectList();
+
+  emit projectCreated(projectName.trimmed());
+  qDebug() << "Project created:" << projectDir << "(DB:" << dbPath << ")";
+  return true;
+}
+
+bool ConfigManager::switchToProject(const QString &projectName) {
+  if (projectName.trimmed().isEmpty())
+    return false;
+
+  QString projectDir = projectsRoot() + "/" + projectName.trimmed();
+  if (!QDir(projectDir).exists()) {
+    qWarning() << "Project does not exist:" << projectDir;
+    return false;
+  }
+
+  setLastProject(projectName.trimmed());
+  return true;
+}
+
+bool ConfigManager::deleteProjects(const QStringList &projectNames) {
+  if (projectNames.isEmpty())
+    return false;
+
+  // Check if active project is among those to delete
+  bool activeWillBeDeleted = false;
+  for (const QString &name : projectNames) {
+    if (name.trimmed() == m_lastProject.trimmed()) {
+      activeWillBeDeleted = true;
+      break;
+    }
+  }
+
+  for (const QString &projectName : projectNames) {
+    if (projectName.trimmed().isEmpty())
+      continue;
+
+    QString projectDir = projectsRoot() + "/" + projectName.trimmed();
+    QDir dir(projectDir);
+    if (!dir.exists()) {
+      qWarning() << "Project does not exist, skipping:" << projectDir;
+      continue;
+    }
+
+    // Remove all contents and the project folder itself
+    dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
+    const QFileInfoList entries = dir.entryInfoList();
+    for (const QFileInfo &entry : entries) {
+      if (entry.isDir()) {
+        QDir(entry.absoluteFilePath()).removeRecursively();
+      } else {
+        QFile::remove(entry.absoluteFilePath());
+      }
+    }
+    dir.rmdir(projectDir);
+
+    emit projectDeleted(projectName.trimmed());
+    qDebug() << "Project deleted:" << projectDir;
+  }
+
+  refreshProjectList();
+
+  // If the active project was deleted, switch to another
+  if (activeWillBeDeleted) {
+    if (!m_projectList.isEmpty()) {
+      switchToProject(m_projectList.first());
+    } else {
+      createProject("Default");
+    }
+  }
+
+  return true;
+}
+
+bool ConfigManager::resetActiveProject() {
+  QString name = m_lastProject.trimmed();
+  if (name.isEmpty()) {
+    qWarning() << "No active project to reset";
+    return false;
+  }
+
+  QString projectDir = projectsRoot() + "/" + name;
+  QDir dir(projectDir);
+  if (!dir.exists()) {
+    qWarning() << "Active project directory does not exist:" << projectDir;
+    return false;
+  }
+
+  // Remove all contents
+  dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
+  const QFileInfoList entries = dir.entryInfoList();
+  for (const QFileInfo &entry : entries) {
+    if (entry.isDir()) {
+      QDir(entry.absoluteFilePath()).removeRecursively();
+    } else {
+      QFile::remove(entry.absoluteFilePath());
+    }
+  }
+
+  // Recreate subdirectories
+  dir.mkpath(projectDir + "/IMG");
+  dir.mkpath(projectDir + "/PDF");
+
+  // Recreate empty database
+  QString dbPath = projectDir + "/" + name + ".db";
+  QFile dbFile(dbPath);
+  if (!dbFile.open(QIODevice::WriteOnly)) {
+    qWarning() << "Failed to recreate database file:" << dbPath;
+    return false;
+  }
+  dbFile.close();
+
+  refreshProjectList();
+  qDebug() << "Project reset:" << projectDir;
+  return true;
+}
+
+void ConfigManager::refreshProjectList() {
+  QDir projectsDir(projectsRoot());
+  if (!projectsDir.exists()) {
+    m_projectList.clear();
+    return;
+  }
+  projectsDir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
+  m_projectList = projectsDir.entryList();
+  emit projectListChanged();
+}
+
+QString ConfigManager::projectPath(const QString &projectName) const {
+  return projectsRoot() + "/" + projectName;
+}
+
+QString ConfigManager::projectDbPath(const QString &projectName) const {
+  return projectsRoot() + "/" + projectName + "/" + projectName + ".db";
+}
+
+QString ConfigManager::projectImgPath(const QString &projectName) const {
+  return projectsRoot() + "/" + projectName + "/" + "IMG";
+}
+QString ConfigManager::projectPdfPath(const QString &projectName) const {
+  return projectsRoot() + "/" + projectName + "/" + "PDF";
 }

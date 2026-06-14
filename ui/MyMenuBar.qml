@@ -1,24 +1,77 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Fusion
+import QtQuick.Controls
+import QtQuick.Layouts
 
 MenuBar {
-    // 1. Create a property that main.qml can look at
-
     id: menuBar
+    property var mainWin: null
+    signal requestNewProject
+    signal requestSwitchProject(string projectName)
+    signal requestDeleteProject
+    signal requestCleanProject
     Menu {
         title: "File"
         MenuItem {
             text: "New Project"
-            onTriggered: console.log("New Project")
+            onTriggered: menuBar.requestNewProject()
         }
         Menu {
-            title: "Open Project"
-            MenuItem {
-                text: "Default"
-                onTriggered: console.log("Open Default Project")
+            title: "Open Project..."
+            Repeater {
+                model: configManager.projectList
+                delegate: MenuItem {
+                    required property var modelData
+                    text: modelData
+                    checkable: true
+                    checked: configManager.lastProject === modelData
+                    onTriggered: {
+                        menuBar.requestSwitchProject(modelData);
+                    }
+                }
             }
         }
+        Menu {
+            id: deleteProjectMenu
+            title: "Delete Project..."
+            Repeater {
+                model: configManager.projectList
+                delegate: Item {
+                    required property var modelData
+                    width: deleteProjectMenu.width
+                    height: 32
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        CheckBox {
+                            checked: mainWin.selectedProjects.includes(modelData)
+                            onClicked: {
+                                if (mainWin.selectedProjects.includes(modelData)) {
+                                    mainWin.selectedProjects = mainWin.selectedProjects.filter(p => p !== modelData);
+                                } else {
+                                    mainWin.selectedProjects = mainWin.selectedProjects.concat([modelData]);
+                                }
+                            }
+                        }
+                        Label {
+                            text: modelData
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+            MenuItem {
+                text: "Delete Selected"
+                enabled: mainWin.selectedProjects.length > 0
+                onTriggered: menuBar.requestDeleteProject()
+            }
+        }
+        MenuItem {
+            text: "Clean Project"
+            onTriggered: menuBar.requestCleanProject()
+        }
+        MenuSeparator {}
         MenuItem {
             text: "Exit"
             onTriggered: Qt.quit()

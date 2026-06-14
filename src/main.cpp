@@ -1,4 +1,5 @@
 #include "headers/configmanager.h"
+#include "headers/database.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -7,6 +8,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 
+// Register the custom Fonts
 static void registerApplicationFonts(const QString &fontsDir) {
   QDir dir(fontsDir);
   if (!dir.exists()) {
@@ -35,6 +37,7 @@ static void registerApplicationFonts(const QString &fontsDir) {
   }
 }
 
+// Main app section. The entry point
 int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
   app.setWindowIcon(QIcon(":/Resources/paperize.png"));
@@ -45,14 +48,18 @@ int main(int argc, char *argv[]) {
   // Create ConfigManager
   ConfigManager configManager;
 
-  // Create ThemeManager and adjust path to where your JSON folder sits relative
-  // to the executable
+  // Create ThemeManager and adjust path to the JSON themes folder (relative
+  // to the executable)
   ThemeManager themeManager;
   themeManager.loadThemesFromFolder(app.applicationDirPath() + "/ui/themes");
+
+  // Create DatabaseManager with config reference for project DB resolution
+  DatabaseManager databaseManager(&configManager);
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
+  engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
 
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

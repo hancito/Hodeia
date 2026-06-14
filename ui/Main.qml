@@ -8,15 +8,17 @@ ApplicationWindow {
     id: root
     width: 1920
     height: 1080
-    title: qsTr("Paperize")
+
     visible: true
     font.family: Fonts.ui
     //icon.source: "qrc:/Resources/paperize.png"
     property var secondaryWindow: null
     property var windowComponent: null
+    property var selectedProjects: []
 
     readonly property var activeTheme: themeManager.activeTheme || {}
-
+    readonly property var activeProject: configManager.lastProject || {}
+    title: qsTr("Paperize - " + activeProject)
     // Derived colors (mirrors _theme.py update_palette logic)
     readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
 
@@ -74,7 +76,17 @@ ApplicationWindow {
     }
     menuBar: MyMenuBar {
         id: topNavigation
-        // You can customize properties or add menus here
+        mainWin: root
+        onRequestNewProject: newProjectDialog.open()
+        onRequestSwitchProject: function (projectName) {
+            let ok = configManager.switchToProject(projectName);
+            if (ok) {
+                let dbPath = configManager.projectDbPath(projectName);
+                databaseManager.switchDatabase(dbPath);
+            }
+        }
+        onRequestDeleteProject: deleteConfirmDialog.open()
+        onRequestCleanProject: cleanProjectDialog.open()
     }
 
     // Apply theme to the entire window content
@@ -147,10 +159,130 @@ ApplicationWindow {
         }
     }
 
+    // New Project input dialog
+    Dialog {
+        id: newProjectDialog
+        anchors.centerIn: parent
+        modal: true
+        title: "New Project"
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+            Label {
+                text: "Enter the Project Name"
+            }
+            TextField {
+                id: nameField
+                Layout.fillWidth: true
+                placeholderText: "Type here..."
+                focus: true
+                onAccepted: doCreateProject()
+            }
+            Label {
+                id: messageProjectName
+                text: "Please enter a name or cancel"
+                visible: false
+                horizontalAlignment: Text.AlignHCenter
+                color: Colors.red
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Button {
+                    text: "Create"
+                    highlighted: true
+                    onClicked: root.doCreateProject()
+                }
+                Item {
+                    Layout.fillWidth: true
+                }
+                Button {
+                    text: "Cancel"
+                    onClicked: {
+                        newProjectDialog.close();
+                        nameField.clear();
+                        messageProjectName.visible = false;
+                    }
+                }
+            }
+        }
+        onClosed: {
+            nameField.clear();
+            messageProjectName.visible = false;
+        }
+    }
+
+    function doCreateProject() {
+        let name = nameField.text.trim();
+        if (name === "") {
+            messageProjectName.visible = true;
+            return;
+        }
+        let ok = configManager.createProject(name);
+        if (ok) {
+            let dbPath = configManager.projectDbPath(name);
+            databaseManager.switchDatabase(dbPath);
+            newProjectDialog.close();
+        }
+    }
+
+    // Clean project confirmation dialog
+    Dialog {
+        id: cleanProjectDialog
+        anchors.centerIn: parent
+        modal: true
+        title: "Clean Project"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            text: "Clean project \"" + activeProject + "\"? All files and data will be permanently removed."
+            wrapMode: Text.WordWrap
+        }
+        onAccepted: {
+            let ok = configManager.resetActiveProject();
+            if (ok) {
+                let dbPath = configManager.projectDbPath(activeProject);
+                databaseManager.switchDatabase(dbPath);
+            }
+        }
+    }
+
+    // Delete project confirmation dialog
+    Dialog {
+        id: deleteConfirmDialog
+        anchors.centerIn: parent
+        modal: true
+        title: "Delete Projects"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        ColumnLayout {
+            spacing: 5
+            Label {
+                text: "Delete the selected project(s)? This cannot be undone."
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: root.selectedProjects
+                delegate: Label {
+                    required property var modelData
+                    text: "  • " + modelData
+                    font.weight: Font.Bold
+                }
+            }
+        }
+        onAccepted: {
+            configManager.deleteProjects(root.selectedProjects);
+            // Switch DB to the new active project (set automatically by C++)
+            let newActive = configManager.lastProject;
+            let dbPath = configManager.projectDbPath(newActive);
+            databaseManager.switchDatabase(dbPath);
+            root.selectedProjects = [];
+        }
+        onRejected: {
+            root.selectedProjects = [];
+        }
+    }
+
     // Backend setup modal
     BackendWindow {
         id: backendDialog
-        parent: root
         onAccepted: {
             // Save backend configuration when user clicks Ok
             if (backendComboBox.currentIndex >= 0) {

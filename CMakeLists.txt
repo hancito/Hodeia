@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Paperize_CPP VERSION 0.1 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Pdf)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Pdf Sql)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -34,8 +34,14 @@ qt_add_qml_module(Paperize
     SOURCES
         headers/thememanager.h
         headers/configmanager.h
+        headers/database.h
+        headers/summary.h
+        headers/query.h
         src/thememanager.cpp
         src/configmanager.cpp
+        src/database.cpp
+        src/summary.cpp
+        src/query.cpp
 )
 
 # Add resources separately
@@ -87,6 +93,7 @@ target_link_libraries(Paperize
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf
+    Qt6::Sql
 )
 
 install(TARGETS Paperize
