@@ -45,12 +45,27 @@ MenuBar {
                 }
             }
         }
-        MenuItem {
-            text: "Add Backend"
-            onTriggered: console.log("Add Backend")
-        }
         Menu {
-            title: "Change Backend"
+            title: "Backend"
+            MenuItem {
+                text: "Add Backend..."
+                onTriggered: backendDialog.open()
+            }
+            Menu {
+                title: "Change Backend"
+                Repeater {
+                    model: configManager.backendList
+                    delegate: MenuItem {
+                        required property var modelData
+                        text: modelData
+                        checkable: true
+                        checked: configManager.activeBackend === modelData
+                        onTriggered: {
+                            configManager.setActiveBackend(modelData);
+                        }
+                    }
+                }
+            }
         }
     }
 }

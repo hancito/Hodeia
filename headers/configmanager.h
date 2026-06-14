@@ -10,18 +10,20 @@ class ConfigManager : public QObject {
   // Expose your configuration fields directly to QML
   Q_PROPERTY(unsigned short activeThemeIndex READ activeThemeIndex WRITE
                  setActiveThemeIndex NOTIFY activeThemeIndexChanged)
-  Q_PROPERTY(QString lastProject READ lastProject WRITE
-                 setLastProject NOTIFY lastProjectChanged)
+  Q_PROPERTY(QString lastProject READ lastProject WRITE setLastProject NOTIFY
+                 lastProjectChanged)
   Q_PROPERTY(QString activeBackend READ activeBackend WRITE setActiveBackend
                  NOTIFY activeBackendChanged)
-  Q_PROPERTY(unsigned int contextWindow READ contextWindow WRITE setContextWindow NOTIFY
-                 contextWindowChanged)
-  Q_PROPERTY(double modelTemperature READ modelTemperature WRITE setModelTemperature
-                 NOTIFY modelTemperatureChanged)
-  Q_PROPERTY(QStringList backendList READ backendList WRITE setBackendList NOTIFY backendListChanged)
+  Q_PROPERTY(unsigned int contextWindow READ contextWindow WRITE
+                 setContextWindow NOTIFY contextWindowChanged)
+  Q_PROPERTY(double modelTemperature READ modelTemperature WRITE
+                 setModelTemperature NOTIFY modelTemperatureChanged)
+  Q_PROPERTY(QStringList backendList READ backendList WRITE setBackendList
+                 NOTIFY backendListChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
+  ~ConfigManager() override;
 
   // Getters
   unsigned short activeThemeIndex() const { return m_activeThemeIndex; }

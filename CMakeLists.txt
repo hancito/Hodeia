@@ -30,6 +30,7 @@ qt_add_qml_module(Paperize
         ui/RagWindow.qml
         ui/RagDbPane.qml
         ui/QueryPane.qml
+        ui/BackendWindow.qml
     SOURCES
         headers/thememanager.h
         headers/configmanager.h
