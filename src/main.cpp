@@ -1,5 +1,6 @@
 #include "headers/configmanager.h"
 #include "headers/database.h"
+#include "headers/enginemanager.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -56,10 +57,19 @@ int main(int argc, char *argv[]) {
   // Create DatabaseManager with config reference for project DB resolution
   DatabaseManager databaseManager(&configManager);
 
+  // Create EngineController with multithreaded PdfWorker
+  EngineController engineController(&configManager);
+
+  // Store summaryModel reference for worker lookup
+  app.setProperty("summaryModel", QVariant::fromValue<SummaryModel *>(
+                                      databaseManager.summaryModel()));
+
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
+  engine.rootContext()->setContextProperty("ingestionEngine",
+                                           &engineController);
 
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

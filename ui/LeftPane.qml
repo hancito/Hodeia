@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 Rectangle {
     id: leftPane
@@ -11,6 +12,52 @@ Rectangle {
     radius: 5
     opacity: 1
     signal openRagWindow
+
+    // File dialog for selecting PDFs
+    FileDialog {
+        id: pdfFileDialog
+        title: "Select PDF files"
+        nameFilters: ["PDF files (*.pdf)"]
+        fileMode: FileDialog.OpenFiles
+        onAccepted: {
+            ingestionEngine.ingestFiles(selectedFiles);
+            ingestionProgress.visible = true;
+            addfilebtn.enabled = false;
+            addfolderbtn.enabled = false;
+        }
+    }
+
+    // Folder dialog for selecting a directory
+    FolderDialog {
+        id: pdfFolderDialog
+        title: "Select a folder containing PDFs"
+        onAccepted: {
+            ingestionEngine.ingestFolder(selectedFolder.toString());
+            ingestionProgress.visible = true;
+            addfilebtn.enabled = false;
+            addfolderbtn.enabled = false;
+        }
+    }
+
+    // Bind ingestion signals
+    Connections {
+        target: ingestionEngine
+        function onProgress(value) {
+            ingestionProgress.value = value / 100;
+        }
+        function onStatus(text) {
+            statusLabel.text = text;
+        }
+        function onStatus2(text) {
+            massStatusLabel.text = text;
+        }
+        function onFinished() {
+            ingestionProgress.visible = false;
+            ingestionProgress.value = 0;
+            addfilebtn.enabled = true;
+            addfolderbtn.enabled = true;
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -23,7 +70,7 @@ Rectangle {
             Layout.fillWidth: true
 
             Button {
-
+                id: addfilebtn
                 ToolTip.text: "Add a file"
                 ToolTip.visible: hovered
                 display: AbstractButton.IconOnly
@@ -32,10 +79,11 @@ Rectangle {
                 icon.height: 40
                 icon.source: "qrc:/Resources/arrow-right-to-file.svg"
                 Layout.fillWidth: true
-                onClicked: console.log("Add Paper")
+                onClicked: pdfFileDialog.open()
             }
 
             Button {
+                id: addfolderbtn
                 ToolTip.text: "Add a folder"
                 ToolTip.visible: hovered
                 padding: 0
@@ -43,7 +91,7 @@ Rectangle {
                 icon.height: 40
                 icon.source: "qrc:/Resources/folder-open.svg"
                 Layout.fillWidth: true
-                onClicked: console.log("Add Folder")
+                onClicked: pdfFolderDialog.open()
             }
         }
 
@@ -59,13 +107,16 @@ Rectangle {
                 Layout.minimumHeight: 10
             }
             Label {
-                text: "Ingesting ..."
+                id: statusLabel
+                text: ""
                 visible: ingestionProgress.visible
+                elide: Text.ElideMiddle
             }
             Label {
-                text: "Mass Ingestion Status"
-                wrapMode: Text.WordWrap
+                id: massStatusLabel
+                text: ""
                 visible: ingestionProgress.visible
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -110,7 +161,6 @@ Rectangle {
             ComboBox {
                 id: modelComboBox
                 Layout.fillWidth: true
-                // Model options would be populated here
             }
         }
         Item {

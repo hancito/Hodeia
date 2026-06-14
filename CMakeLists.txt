@@ -37,11 +37,15 @@ qt_add_qml_module(Paperize
         headers/database.h
         headers/summary.h
         headers/query.h
+        headers/ingestionengine.h
+        headers/enginemanager.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
         src/summary.cpp
         src/query.cpp
+        src/ingestionengine.cpp
+        src/enginemanager.cpp
 )
 
 # Add resources separately
@@ -88,12 +92,22 @@ set_target_properties(Paperize PROPERTIES
     WIN32_EXECUTABLE TRUE
 )
 
-target_link_libraries(Paperize
-    PRIVATE
+target_include_directories(Paperize PRIVATE
+    ${CMAKE_SOURCE_DIR}/external/include
+)
+
+target_link_directories(Paperize PRIVATE
+    ${CMAKE_SOURCE_DIR}/external/lib
+)
+
+target_link_libraries(Paperize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf
     Qt6::Sql
+    mupdf
+    mupdf-third
+    mupdf-threads
 )
 
 install(TARGETS Paperize
