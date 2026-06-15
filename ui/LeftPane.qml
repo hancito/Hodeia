@@ -20,10 +20,16 @@ Rectangle {
         nameFilters: ["PDF files (*.pdf)"]
         fileMode: FileDialog.OpenFiles
         onAccepted: {
-            ingestionEngine.ingestFiles(selectedFiles);
             ingestionProgress.visible = true;
+            statusLabel.visible = true;
+            massStatusLabel.visible = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
+            console.log(pdfWorker.getFileHash(selectedFile));
+            console.log(pdfWorker.extractText(selectedFile));
+        }
+        onRejected: {
+            console.log("Canceled");
         }
     }
 
@@ -32,30 +38,10 @@ Rectangle {
         id: pdfFolderDialog
         title: "Select a folder containing PDFs"
         onAccepted: {
-            ingestionEngine.ingestFolder(selectedFolder.toString());
+            console.log("Open a folder");
             ingestionProgress.visible = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
-        }
-    }
-
-    // Bind ingestion signals
-    Connections {
-        target: ingestionEngine
-        function onProgress(value) {
-            ingestionProgress.value = value / 100;
-        }
-        function onStatus(text) {
-            statusLabel.text = text;
-        }
-        function onStatus2(text) {
-            massStatusLabel.text = text;
-        }
-        function onFinished() {
-            ingestionProgress.visible = false;
-            ingestionProgress.value = 0;
-            addfilebtn.enabled = true;
-            addfolderbtn.enabled = true;
         }
     }
 
@@ -108,13 +94,13 @@ Rectangle {
             }
             Label {
                 id: statusLabel
-                text: ""
+                text: "Status will be here"
                 visible: ingestionProgress.visible
                 elide: Text.ElideMiddle
             }
             Label {
                 id: massStatusLabel
-                text: ""
+                text: "Mass status will be here"
                 visible: ingestionProgress.visible
                 wrapMode: Text.WordWrap
             }

@@ -1,156 +1,128 @@
 #include "headers/ingestionengine.h"
-#include "headers/summary.h"
-#include <QCoreApplication>
-#include <QCryptographicHash>
-#include <QDateTime>
-#include <QDir>
-#include <QDirIterator>
 #include <QFile>
-#include <QFileInfo>
-#include <QImage>
-#include <QMetaObject>
+#include <QCryptographicHash>
 extern "C" {
 #include <mupdf/fitz.h>
 }
 
-PdfWorker::PdfWorker(SummaryModel *summaryModel, QObject *parent)
-    : QObject(parent), m_summaryModel(summaryModel), m_totalFiles(0),
-      m_completedFiles(0) {}
+
+PdfWorker::PdfWorker(QObject *parent)
+    : QObject(parent) {}
 
 PdfWorker::~PdfWorker() = default;
 
-void PdfWorker::processFiles(const QStringList &files, const QString &imgDir) {
-  if (files.isEmpty()) {
-    emit status("No PDF files to ingest.");
-    return;
-  }
+void PdfWorker::processPDF(const QString &filePath,
+                           const QString &dbPath) const {}
 
-  m_cancelled.store(false);
-  m_files = files;
-  m_totalFiles = files.size();
-  m_completedFiles = 0;
+QString PdfWorker::getFileHash(const QUrl &filePath) const {
+    QString localPath = filePath.toLocalFile();
+        if (localPath.isEmpty()) {
+            return QString("Error: Invalid local file path.");
+        }
+        QFile file(localPath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return QString("Error: Could not open file.");
+        }
 
-  for (int i = 0; i < m_totalFiles; ++i) {
-    if (m_cancelled.load()) {
-      emit status("Ingestion cancelled.");
-      emit finished();
-      return;
+        // Calculate MD5 hash (you can change this to Sha256 if preferred)
+        QCryptographicHash decrypter(QCryptographicHash::Md5);
+        if (decrypter.addData(&file)) {
+            return QString(decrypter.result().toHex());
+        }
+        return QString("Error: Hash calculation failed.");
+}
+
+QString PdfWorker::extractText(const QUrl &fileUrl)
+{
+    QString localPath = fileUrl.toLocalFile();
+    if (localPath.isEmpty()) return "Error: Invalid path.";
+
+    fz_context *ctx = nullptr;
+    fz_document *doc = nullptr;
+    QString extractedText = "";
+
+    // 1. Create MuPDF context
+    ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
+    if (!ctx) {
+        return "Error: Cannot register MuPDF context.";
     }
-    ingestPdf(files[i], imgDir, i);
-  }
 
-  emit progress(100);
-  emit status("Ingestion complete.");
-  emit finished();
-}
+    // Register default document handlers (PDF, XPS, CBZ, etc.)
+    fz_try(ctx) {
+        fz_register_document_handlers(ctx);
+    }
+    fz_catch(ctx) {
+        fz_drop_context(ctx);
+        return "Error: Failed to register document handlers.";
+    }
 
-void PdfWorker::processFolder(const QString &folder, const QString &imgDir) {
-  processFiles(findPdfFiles(folder), imgDir);
-}
+    // 2. Open the PDF document
+    fz_try(ctx) {
+        doc = fz_open_document(ctx, localPath.toUtf8().constData());
+    }
+    fz_catch(ctx) {
+        fz_drop_context(ctx);
+        return "Error: Cannot open document " + localPath;
+    }
 
-void PdfWorker::cancel() { m_cancelled.store(true); }
+    // 3. Count total pages and loop through them
+    int pageCount = 0;
+    fz_try(ctx) {
+        pageCount = fz_count_pages(ctx, doc);
+    }
+    fz_catch(ctx) {
+        fz_drop_document(ctx, doc);
+        fz_drop_context(ctx);
+        return "Error: Cannot count pages.";
+    }
 
-void PdfWorker::ingestPdf(const QString &pdfPath, const QString &imgDir,
-                          int index) {
-  QFileInfo fi(pdfPath);
-  QString baseName = fi.baseName();
+    for (int i = 0; i < pageCount; ++i) {
+        fz_page *page = nullptr;
+        fz_stext_page *textPage = nullptr;
+        fz_device *dev = nullptr;
 
-  fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_UNLIMITED);
-  if (!ctx) {
-    emit status("[ERROR] Cannot create MuPDF context");
-    return;
-  }
-  fz_register_document_handlers(ctx);
+        fz_try(ctx) {
+            // Load the page
+            page = fz_load_page(ctx, doc, i);
 
-  fz_document *doc = fz_open_document(ctx, pdfPath.toUtf8().constData());
-  if (!doc) {
-    emit status("[ERROR] Cannot open " + pdfPath);
+            // Create a structure to hold extracted text
+            textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
+
+            // Create a text-extracting device that feeds into our textPage structure
+            dev = fz_new_stext_device(ctx, textPage, nullptr);
+
+            // Run the page through the device to extract text
+            fz_run_page(ctx, page, dev, fz_identity, nullptr);
+
+            // Close the device immediately after use
+            fz_close_device(ctx, dev);
+
+            // Fetch the layout text from MuPDF as a string block
+            fz_buffer *buf = fz_new_buffer(ctx, 256);
+            fz_print_stext_page_as_text(ctx, buf, textPage);
+
+            // Append page content to our return variable
+            const char *pageText = fz_string_from_buffer(ctx, buf);
+            extractedText.append(QString::fromUtf8(pageText));
+            extractedText.append("\n--- Page Break ---\n");
+
+            // Clean up buffers for this specific page loop
+            fz_drop_buffer(ctx, buf);
+        }
+        fz_always(ctx) {
+            // Clean up structures safely even if exceptions occurred
+            if (dev) fz_drop_device(ctx, dev);
+            if (textPage) fz_drop_stext_page(ctx, textPage);
+            if (page) fz_drop_page(ctx, page);
+        }
+        fz_catch(ctx) {
+            qWarning() << "Error extracting page " << i;
+        }
+    }
+
+    // 4. Final Cleanup
+    fz_drop_document(ctx, doc);
     fz_drop_context(ctx);
-    return;
-  }
 
-  int pageCount = fz_count_pages(ctx, doc);
-  emit status("Processing " + baseName + " (" + QString::number(pageCount) +
-              " pages)");
-
-  QDir(imgDir).mkpath(".");
-
-  QString paperHash = computeFileHash(pdfPath);
-
-  for (int i = 0; i < pageCount; ++i) {
-    if (m_cancelled.load()) {
-      fz_drop_document(ctx, doc);
-      fz_drop_context(ctx);
-      return;
-    }
-
-    fz_page *page = fz_load_page(ctx, doc, i);
-
-    fz_matrix ctm = fz_scale(150.0f / 72.0f, 150.0f / 72.0f);
-    fz_pixmap *pixmap = fz_new_pixmap_from_page_number(
-        ctx, doc, i, ctm, fz_device_rgb(ctx), false);
-
-    if (pixmap) {
-      int w = fz_pixmap_width(ctx, pixmap);
-      int h = fz_pixmap_height(ctx, pixmap);
-      int stride = fz_pixmap_stride(ctx, pixmap);
-      unsigned char *samples = fz_pixmap_samples(ctx, pixmap);
-
-      QImage img(samples, w, h, stride, QImage::Format_RGB888);
-      img = img.copy();
-
-      QString imgPath =
-          imgDir + "/" + baseName + "_page_" + QString::number(i + 1) + ".png";
-      img.save(imgPath, "PNG");
-      fz_drop_pixmap(ctx, pixmap);
-    }
-
-    fz_drop_page(ctx, page);
-
-    int filePct = (i + 1) * 100 / pageCount;
-    int overall =
-        (index * 100 / m_totalFiles) + (filePct * 100 / (m_totalFiles * 100));
-    emit progress(overall);
-  }
-
-  fz_drop_document(ctx, doc);
-  fz_drop_context(ctx);
-
-  SummaryRow row;
-  row.paperHash = paperHash;
-  row.title = baseName;
-  row.pagesNum = pageCount;
-  row.date = QDateTime::currentDateTime();
-
-  // Insert into SummaryModel on the main thread (it's a QObject living there)
-  QMetaObject::invokeMethod(
-      m_summaryModel,
-      [sm = m_summaryModel, r = std::move(row)]() { sm->insert(r); },
-      Qt::QueuedConnection);
-
-  ++m_completedFiles;
-  emit status("Done: " + baseName);
-  emit status2("Ingested " + QString::number(m_completedFiles) + "/" +
-               QString::number(m_totalFiles));
-}
-
-QString PdfWorker::computeFileHash(const QString &path) const {
-  QFile file(path);
-  if (!file.open(QIODevice::ReadOnly))
-    return {};
-  QCryptographicHash hash(QCryptographicHash::Md5);
-  while (!file.atEnd())
-    hash.addData(file.read(65536));
-  return hash.result().toHex();
-}
-
-QStringList PdfWorker::findPdfFiles(const QString &folder) const {
-  QStringList pdfs;
-  QDirIterator it(folder, {QStringLiteral("*.pdf"), QStringLiteral("*.PDF")},
-                  QDir::Files, QDirIterator::Subdirectories);
-  while (it.hasNext()) {
-    it.next();
-    pdfs << it.filePath();
-  }
-  return pdfs;
+    return extractedText;
 }

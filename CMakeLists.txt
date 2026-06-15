@@ -38,14 +38,14 @@ qt_add_qml_module(Paperize
         headers/summary.h
         headers/query.h
         headers/ingestionengine.h
-        headers/enginemanager.h
+        #headers/enginemanager.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
         src/summary.cpp
         src/query.cpp
         src/ingestionengine.cpp
-        src/enginemanager.cpp
+        #src/enginemanager.cpp
 )
 
 # Add resources separately
