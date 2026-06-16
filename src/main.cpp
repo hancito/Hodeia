@@ -1,6 +1,6 @@
 #include "headers/configmanager.h"
 #include "headers/database.h"
-#include "headers/ingestionengine.h"
+#include "headers/enginemanager.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -58,13 +58,14 @@ int main(int argc, char *argv[]) {
   DatabaseManager databaseManager(&configManager);
 
   // Create the PDF ingestion worker
-  PdfWorker pdfWorker;
+  EngineController engineController;
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
-  engine.rootContext()->setContextProperty("pdfWorker", &pdfWorker);
+  engine.rootContext()->setContextProperty("engineController",
+                                           &engineController);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

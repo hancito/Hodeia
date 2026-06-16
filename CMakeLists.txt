@@ -5,7 +5,7 @@ project(Paperize_CPP VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Pdf Sql)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 Pdf Sql)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -38,14 +38,14 @@ qt_add_qml_module(Paperize
         headers/summary.h
         headers/query.h
         headers/ingestionengine.h
-        #headers/enginemanager.h
+        headers/enginemanager.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
         src/summary.cpp
         src/query.cpp
         src/ingestionengine.cpp
-        #src/enginemanager.cpp
+        src/enginemanager.cpp
 )
 
 # Add resources separately
@@ -101,6 +101,7 @@ target_link_directories(Paperize PRIVATE
 )
 
 target_link_libraries(Paperize PRIVATE
+    Qt6::Concurrent
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf

@@ -13,6 +13,19 @@ Rectangle {
     opacity: 1
     signal openRagWindow
 
+    // React to engine finishing: re-enable buttons, hide progress
+    Connections {
+        target: engineController
+        function onIngestionFinished() {
+            ingestionProgress.visible = false;
+            ingestionProgress.value = 0;
+            statusLabel.visible = false;
+            massStatusLabel.visible = false;
+            addfilebtn.enabled = true;
+            addfolderbtn.enabled = true;
+        }
+    }
+
     // File dialog for selecting PDFs
     FileDialog {
         id: pdfFileDialog
@@ -25,8 +38,11 @@ Rectangle {
             massStatusLabel.visible = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
-            console.log(pdfWorker.getFileHash(selectedFile));
-            console.log(pdfWorker.extractText(selectedFile));
+            var imgPath = configManager.projectImgPath(configManager.lastProject);
+            var dbPath = configManager.projectDbPath(configManager.lastProject);
+            console.log("Img path:", imgPath);
+            console.log("DB path:", dbPath);
+            engineController.startEngine(selectedFiles, imgPath, dbPath);
         }
         onRejected: {
             console.log("Canceled");
@@ -38,10 +54,12 @@ Rectangle {
         id: pdfFolderDialog
         title: "Select a folder containing PDFs"
         onAccepted: {
-            console.log("Open a folder");
             ingestionProgress.visible = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
+            var imgPath = configManager.projectImgPath(configManager.lastProject);
+            var dbPath = configManager.projectDbPath(configManager.lastProject);
+            engineController.startEngine(engineController.findPdfFiles(selectedFolder), imgPath, dbPath);
         }
     }
 
