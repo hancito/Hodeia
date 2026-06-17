@@ -18,6 +18,7 @@ public slots:
 
 signals:
   void ingestionFinished();
+  void ingestionStarted(int fileNumber);
 
 private:
   void setupWorker();

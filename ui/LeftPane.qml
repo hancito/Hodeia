@@ -6,7 +6,7 @@ import QtQuick.Dialogs
 
 Rectangle {
     id: leftPane
-    property var activeTheme: ({})
+    property int elapsedTime: 0
     color: Colors.surface0
     border.width: 1
     radius: 5
@@ -17,12 +17,30 @@ Rectangle {
     Connections {
         target: engineController
         function onIngestionFinished() {
-            ingestionProgress.visible = false;
-            ingestionProgress.value = 0;
-            statusLabel.visible = false;
-            massStatusLabel.visible = false;
+            spinner.visible = false;
+            spinner.running = false;
+            executionTimer.stop();
+            statusLabel.text = "Ingestion finished in " + (leftPane.elapsedTime / 10) + " seconds!";
             addfilebtn.enabled = true;
             addfolderbtn.enabled = true;
+        }
+        function onIngestionStarted(fileNumber) {
+            leftPane.elapsedTime = 0;
+            executionTimer.running = true;
+            executionTimer.start();
+            statusLabel.visible = true;
+            statusLabel.text = "Processing " + fileNumber + " documents...";
+        }
+    }
+
+    Timer {
+        id: executionTimer
+        interval: 100 // Updates every 100 milliseconds (0.1 seconds)
+        running: false
+        repeat: true
+
+        onTriggered: {
+            leftPane.elapsedTime += 1;
         }
     }
 
@@ -33,9 +51,8 @@ Rectangle {
         nameFilters: ["PDF files (*.pdf)"]
         fileMode: FileDialog.OpenFiles
         onAccepted: {
-            ingestionProgress.visible = true;
-            statusLabel.visible = true;
-            massStatusLabel.visible = true;
+            spinner.visible = true;
+            spinner.running = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
@@ -54,7 +71,8 @@ Rectangle {
         id: pdfFolderDialog
         title: "Select a folder containing PDFs"
         onAccepted: {
-            ingestionProgress.visible = true;
+            spinner.visible = true;
+            spinner.running = true;
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
@@ -103,24 +121,22 @@ Rectangle {
         ColumnLayout {
             spacing: 10
             Layout.fillWidth: true
-            ProgressBar {
-                id: ingestionProgress
-                value: 0
+            BusyIndicator {
+                id: spinner
+                running: false
                 visible: false
-                Layout.fillWidth: true
-                Layout.minimumHeight: 10
+                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
             }
             Label {
                 id: statusLabel
-                text: "Status will be here"
-                visible: ingestionProgress.visible
-                elide: Text.ElideMiddle
+                visible: false
             }
-            Label {
-                id: massStatusLabel
-                text: "Mass status will be here"
-                visible: ingestionProgress.visible
-                wrapMode: Text.WordWrap
+            Text {
+                id: timerIndicator
+                font.family: Fonts.mono
+                visible: spinner.visible
+                text: "Elapsed Time: " + (leftPane.elapsedTime / 10).toFixed(1) + "s"
+                Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
             }
         }
 

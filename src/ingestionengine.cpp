@@ -20,11 +20,13 @@ void PdfWorker::stop() {
 
 void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                            const QString &dbPath) {
+  emit started(filePath.size());
   qInfo() << "[PdfWorker] processPDF started with" << filePath.size()
           << "files";
-  QStringList results = multiExtractText(filePath, imgPath, dbPath);
+  // QStringList results = multiExtractText(filePath, imgPath, dbPath);
+  QStringList results = parallelExtract(filePath, imgPath);
   qInfo() << "[PdfWorker] multiExtractText done, results size:"
-          << results.size();
+          << results.size() << results;
   emit finished();
   qInfo() << "[PdfWorker] finished signal emitted";
 }
@@ -55,6 +57,7 @@ QStringList PdfWorker::parallelHasher(const QList<QUrl> &fileList) const {
 QString PdfWorker::extractText(const QUrl &fileUrl,
                                const QString &imgPath) const {
   QString localPath = fileUrl.toLocalFile();
+
   if (localPath.isEmpty())
     return "Error: Invalid path.";
 
@@ -127,7 +130,8 @@ QString PdfWorker::extractText(const QUrl &fileUrl,
 
       // Define output file name prefixed with the PDF base name to avoid
       // collisions across files
-      QString baseName = QFileInfo(localPath).baseName();
+      // QString baseName = QFileInfo(localPath).baseName();
+      QString baseName = getFileHash(fileUrl);
       QString fileName =
           QString("%1_page_%2.png").arg(baseName).arg(i + 1, 3, 10, QChar('0'));
       QString fullOutputPath = QDir(imgPath).filePath(fileName);
@@ -185,4 +189,17 @@ QStringList PdfWorker::multiExtractText(const QList<QUrl> &filePaths,
     results << extractText(fileUrl, imgPath);
   }
   return results;
+}
+
+QStringList PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
+                                       const QString &imgPath) const {
+  // FIX 1: Use blockingMapped instead of blockingMap to return a new collection
+  QStringList textList =
+      QtConcurrent::blockingMapped(filePaths, [this, imgPath](const QUrl &url) {
+        // FIX 2: Added 'this' to the capture clause (since extractText is a
+        // member function) FIX 3: Added 'return' and the missing semicolon ';'
+        return this->extractText(url, imgPath);
+      });
+
+  return textList;
 }

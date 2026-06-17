@@ -18,6 +18,7 @@ public slots:
 
 signals:
   void finished();
+  void started(int fileNumber);
 
 private:
   QString extractText(const QUrl &filePath, const QString &imgPath) const;
@@ -26,4 +27,6 @@ private:
                                const QString &dbPath) const;
 
   QStringList parallelHasher(const QList<QUrl> &fileList) const;
+  QStringList parallelExtract(const QList<QUrl> &filePaths,
+                              const QString &imgPath) const;
 };
