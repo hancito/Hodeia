@@ -1,8 +1,9 @@
 #pragma once
+#include "headers/summary.h"
 #include <QList>
+#include <QMap>
 #include <QObject>
 #include <QString>
-#include <QStringList>
 #include <QUrl>
 
 class PdfWorker : public QObject {
@@ -21,12 +22,14 @@ signals:
   void started(int fileNumber);
 
 private:
-  QString extractText(const QUrl &filePath, const QString &imgPath) const;
-  QStringList multiExtractText(const QList<QUrl> &filePaths,
-                               const QString &imgPath,
-                               const QString &dbPath) const;
+  ExtractionResult extractText(const QUrl &filePath,
+                               const QString &imgPath) const;
 
-  QStringList parallelHasher(const QList<QUrl> &fileList) const;
-  QStringList parallelExtract(const QList<QUrl> &filePaths,
-                              const QString &imgPath) const;
+  QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList) const;
+  QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
+                                          const QString &imgPath) const;
+  void savePapers(const QList<SummaryRow> &rows, const QString &dbPath);
+  QStringList getAllPaperHashes(const QString &dbPath) const;
+  void filterExistingHashes(QMap<QString, QUrl> &hashesToProcess,
+                            const QString &dbPath) const;
 };

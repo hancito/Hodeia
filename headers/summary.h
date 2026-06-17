@@ -1,6 +1,7 @@
 #pragma once
 #include <QAbstractListModel>
 #include <QDateTime>
+#include <QString>
 #include <QVariant>
 
 struct SummaryRow {
@@ -13,10 +14,15 @@ struct SummaryRow {
   QString year;
   QString topics;
   QString model;
-  QString summaryText;
-  QString summaryLatex;
   QVariant summaryJson;
   QDateTime date;
+};
+
+struct ExtractionResult {
+  QString extractedText;
+  int pageCount = 0;
+  QString paperHash;
+  QString title;
 };
 
 class SummaryModel : public QAbstractListModel {
@@ -33,8 +39,6 @@ public:
     YearRole,
     TopicsRole,
     ModelRole,
-    SummaryTextRole,
-    SummaryLatexRole,
     SummaryJsonRole,
     DateRole,
     FormattedDateRole

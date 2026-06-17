@@ -35,10 +35,6 @@ QVariant SummaryModel::data(const QModelIndex &index, int role) const {
     return row.topics;
   case ModelRole:
     return row.model;
-  case SummaryTextRole:
-    return row.summaryText;
-  case SummaryLatexRole:
-    return row.summaryLatex;
   case SummaryJsonRole:
     return row.summaryJson;
   case DateRole:
@@ -60,8 +56,6 @@ QHash<int, QByteArray> SummaryModel::roleNames() const {
           {YearRole, "year"},
           {TopicsRole, "topics"},
           {ModelRole, "model"},
-          {SummaryTextRole, "summaryText"},
-          {SummaryLatexRole, "summaryLatex"},
           {SummaryJsonRole, "summaryJson"},
           {DateRole, "date"},
           {FormattedDateRole, "formattedDate"}};
@@ -81,7 +75,7 @@ void SummaryModel::loadAll() {
 
   QSqlQuery query(
       "SELECT id, paper_hash, title, authors, pages_num, journal, year, "
-      "topics, model, summary_text, summary_latex, summary_json, date FROM "
+      "topics, model, summary_json, date FROM "
       "Summaries ORDER BY id");
 
   while (query.next()) {
@@ -95,10 +89,8 @@ void SummaryModel::loadAll() {
     row.year = query.value(6).toString();
     row.topics = query.value(7).toString();
     row.model = query.value(8).toString();
-    row.summaryText = query.value(9).toString();
-    row.summaryLatex = query.value(10).toString();
-    row.summaryJson = query.value(11);
-    row.date = query.value(12).toDateTime();
+    row.summaryJson = query.value(9);
+    row.date = query.value(10).toDateTime();
     m_rows.append(row);
   }
 
@@ -118,9 +110,9 @@ void SummaryModel::insert(const SummaryRow &row) {
   query.prepare(
       "INSERT INTO Summaries "
       "(paper_hash, title, authors, pages_num, journal, year, topics, model, "
-      "summary_text, summary_latex, summary_json, date) "
+      "summary_json, date) "
       "VALUES (:hash, :title, :authors, :pages, :journal, :year, :topics, "
-      ":model, :text, :latex, :json, :date)");
+      ":model, :json, :date)");
   query.bindValue(":hash", newRow.paperHash);
   query.bindValue(":title", newRow.title);
   query.bindValue(":authors", newRow.authors);
@@ -129,8 +121,6 @@ void SummaryModel::insert(const SummaryRow &row) {
   query.bindValue(":year", newRow.year);
   query.bindValue(":topics", newRow.topics);
   query.bindValue(":model", newRow.model);
-  query.bindValue(":text", newRow.summaryText);
-  query.bindValue(":latex", newRow.summaryLatex);
   query.bindValue(":json", newRow.summaryJson);
   query.bindValue(":date", newRow.date);
 

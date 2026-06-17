@@ -55,8 +55,6 @@ void DatabaseManager::createTables() {
              "year TEXT, "
              "topics TEXT, "
              "model TEXT, "
-             "summary_text TEXT, "
-             "summary_latex TEXT, "
              "summary_json TEXT, "
              "date DATETIME)");
 
