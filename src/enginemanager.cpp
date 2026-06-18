@@ -60,10 +60,9 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
   });
 
   // Redirection des signaux du Worker vers l'extérieur (IHM / Application)
-  connect(m_worker, &PdfWorker::started, this, [this](int fileNumber) {
-    qInfo() << "[EngineController] ingestion started," << fileNumber
-            << " emitting to QML";
-    emit ingestionStarted(fileNumber);
+  connect(m_worker, &PdfWorker::status, this, [this](QString statusLog) {
+    qInfo() << "[EngineController] Notifying QML of new Status";
+    emit ingestionStarted(statusLog);
   });
   connect(m_worker, &PdfWorker::finished, this, [this]() {
     qInfo()

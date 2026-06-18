@@ -23,38 +23,62 @@ void PdfWorker::stop() {
 
 void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                            const QString &dbPath) {
-  emit started(filePath.size());
-  qInfo() << "[PdfWorker] processPDF started with" << filePath.size()
-          << "files";
 
-  QList<ExtractionResult> extractions = parallelExtract(filePath, imgPath);
-  QList<SummaryRow> rowsToSave;
+  QString message =
+      "Started with " + QString::number(filePath.size()) + " files";
+  emit status(message);
+  QMap<QString, QUrl> hashesToProcess = parallelHasher(filePath);
+  QList<QUrl> urlsToProcess = filterExistingHashes(hashesToProcess, dbPath);
+  message = "Skipped " +
+            QString::number(filePath.size() - urlsToProcess.size()) + " papers";
+  emit status(message);
 
-  for (const auto &extraction : extractions) {
-    if (extraction.extractedText.startsWith("Error:")) {
-      qCritical() << "[PdfWorker] Skipping file due to error:"
-                  << extraction.extractedText;
-      continue;
+  const int chunkSize = 50;
+  int savedCount = 0;
+  int errorCount = 0;
+  int total = urlsToProcess.size();
+
+  for (int i = 0; i < total; i += chunkSize) {
+    int end = qMin(i + chunkSize, total);
+    QList<QUrl> chunkUrls(urlsToProcess.mid(i, end - i));
+
+    message = QString("Extracting %1-%2/%3").arg(i + 1).arg(end).arg(total);
+    emit status(message);
+
+    QList<ExtractionResult> extractions = parallelExtract(chunkUrls, imgPath);
+
+    QList<SummaryRow> chunk;
+    for (const auto &extraction : extractions) {
+
+      if (extraction.title.isEmpty()) {
+        qCritical() << "[PdfWorker] Skipping file: empty extraction";
+        ++errorCount;
+        continue;
+      }
+
+      SummaryRow row;
+      row.paperHash = extraction.paperHash;
+      row.title = extraction.title;
+      row.pagesNum = extraction.pageCount;
+      row.date = QDateTime::currentDateTime();
+
+      chunk.append(row);
     }
 
-    SummaryRow row;
-    row.paperHash = extraction.paperHash;
-    row.title = extraction.title;
-    row.pagesNum = extraction.pageCount;
-    row.date = QDateTime::currentDateTime();
+    if (!chunk.isEmpty()) {
+      savePapers(chunk, dbPath);
+      savedCount += chunk.size();
+    }
 
-    // Store the extracted text in summaryJson so it is saved to the DB
-    QJsonObject json;
-    json["raw_text"] = extraction.extractedText;
-    row.summaryJson = QJsonDocument(json).toJson();
-
-    rowsToSave.append(row);
+    message =
+        QString("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
+    emit status(message);
   }
 
-  // Save everything in one batch transaction
-  if (!rowsToSave.isEmpty()) {
-    savePapers(rowsToSave, dbPath);
-  }
+  if (errorCount > 0)
+    qWarning() << "[PdfWorker] Total skipped due to errors:" << errorCount;
+  qInfo() << "[PdfWorker] Ingestion complete: saved" << savedCount
+          << "errors:" << errorCount;
 
   emit finished();
   qInfo() << "[PdfWorker] finished signal emitted";
@@ -66,7 +90,6 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
     return;
 
   // 1. Generate a strictly unique connection name for THIS specific run/thread
-  // execution
   static QAtomicInt counter = 0;
   QString connectionName =
       QString("worker_conn_%1_%2")
@@ -88,7 +111,6 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
       return;
     }
 
-    // Start transaction for bulk insertion speed and data atomicity
     if (!db.transaction()) {
       qCritical() << "[PdfWorker] Failed to start transaction:"
                   << db.lastError().text();
@@ -111,28 +133,24 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
       query.bindValue(":year", row.year);
       query.bindValue(":topics", row.topics);
       query.bindValue(":model", row.model);
-      query.bindValue(":json", row.summaryJson.toString());
+      query.bindValue(":json", row.summaryJson);
       query.bindValue(":date", row.date);
 
       if (!query.exec()) {
         qCritical() << "[PdfWorker] Error inserting paper" << row.title << ":"
                     << query.lastError().text();
-        db.rollback(); // Rollback entire batch if an insertion fails
+        db.rollback();
         return;
       }
     }
 
-    if (db.commit()) {
-      qInfo() << "[PdfWorker] Successfully batch saved" << rows.size()
-              << "papers.";
-    } else {
+    if (!db.commit()) {
       qCritical() << "[PdfWorker] Transaction commit failed:"
                   << db.lastError().text();
       db.rollback();
     }
     db.close();
   }
-  // Safely remove the unique connection from Qt's global storage
   QSqlDatabase::removeDatabase(connectionName);
 }
 
@@ -207,9 +225,10 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   QString localPath = fileUrl.toLocalFile();
 
   ExtractionResult result;
+  QString extractedText;
 
   if (localPath.isEmpty()) {
-    result.extractedText = "Error: Invalid path.";
+    result.title = "Error: Invalid path.";
     return result;
   }
 
@@ -219,7 +238,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   // 1. Create MuPDF context
   ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
   if (!ctx) {
-    result.extractedText = "Error: Cannot register MuPDF context.";
+    result.title = "Error: Cannot register MuPDF context.";
     return result;
   }
 
@@ -227,7 +246,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   fz_try(ctx) { fz_register_document_handlers(ctx); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
-    result.extractedText = "Error: Failed to register document handlers.";
+    result.title = "Error: Failed to register document handlers.";
     return result;
   }
 
@@ -235,7 +254,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   fz_try(ctx) { doc = fz_open_document(ctx, localPath.toUtf8().constData()); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
-    result.extractedText = "Error: Cannot open document " + localPath;
+    result.title = "Error: Cannot open document " + localPath;
     return result;
   }
 
@@ -247,7 +266,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   fz_catch(ctx) {
     fz_drop_document(ctx, doc);
     fz_drop_context(ctx);
-    result.extractedText = "Error: Cannot count pages.";
+    result.title = "Error: Cannot count pages.";
     return result;
   }
   result.pageCount = pageCount;
@@ -311,8 +330,8 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 
       // Append page content to our return variable
       const char *pageText = fz_string_from_buffer(ctx, buf);
-      result.extractedText.append(QString::fromUtf8(pageText));
-      result.extractedText.append("\n--- Page Break ---\n");
+      extractedText.append(QString::fromUtf8(pageText));
+      extractedText.append("\n--- Page Break ---\n");
 
       // Clean up buffers for this specific page loop
       fz_drop_buffer(ctx, buf);
@@ -347,17 +366,21 @@ PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
   return results;
 }
 
-void PdfWorker::filterExistingHashes(QMap<QString, QUrl> &hashesToProcess,
-                                     const QString &dbPath) const {
+QList<QUrl>
+PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
+                                const QString &dbPath) const {
   QStringList existingHashes = getAllPaperHashes(dbPath);
-  if (existingHashes.isEmpty()) {
-    return;
-  }
+  QList<QUrl> urlsToProcess;
 
-  for (const QString &hash : existingHashes) {
-    hashesToProcess.remove(hash);
+  for (auto it = hashesToProcess.constBegin(); it != hashesToProcess.constEnd();
+       ++it) {
+    if (!existingHashes.contains(it.key())) {
+      urlsToProcess.append(it.value());
+    }
   }
 
   qInfo() << "[PdfWorker] Filtered" << existingHashes.size()
-          << "existing hashes. Remaining to process:" << hashesToProcess.size();
+          << "existing hashes. Remaining to process:" << urlsToProcess.size();
+
+  return urlsToProcess;
 }

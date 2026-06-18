@@ -18,7 +18,7 @@ public slots:
 
 signals:
   void ingestionFinished();
-  void ingestionStarted(int fileNumber);
+  void ingestionStarted(QString statusLog);
 
 private:
   void setupWorker();

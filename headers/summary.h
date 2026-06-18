@@ -19,7 +19,6 @@ struct SummaryRow {
 };
 
 struct ExtractionResult {
-  QString extractedText;
   int pageCount = 0;
   QString paperHash;
   QString title;

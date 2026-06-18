@@ -12,6 +12,7 @@ Rectangle {
     radius: 5
     opacity: 1
     signal openRagWindow
+    property var statusBarLabel: null
 
     // React to engine finishing: re-enable buttons, hide progress
     Connections {
@@ -20,16 +21,19 @@ Rectangle {
             spinner.visible = false;
             spinner.running = false;
             executionTimer.stop();
-            statusLabel.text = "Ingestion finished in " + (leftPane.elapsedTime / 10) + " seconds!";
             addfilebtn.enabled = true;
             addfolderbtn.enabled = true;
+            if (leftPane.statusBarLabel) {
+                leftPane.statusBarLabel.text = "Ingestion finished in " + (leftPane.elapsedTime / 10) + " seconds!";
+            }
         }
-        function onIngestionStarted(fileNumber) {
+
+        function onIngestionStarted(statusLog) {
             leftPane.elapsedTime = 0;
             executionTimer.running = true;
             executionTimer.start();
             statusLabel.visible = true;
-            statusLabel.text = "Processing " + fileNumber + " documents...";
+            statusLabel.text = statusLog;
         }
     }
 
@@ -129,7 +133,12 @@ Rectangle {
             }
             Label {
                 id: statusLabel
-                visible: false
+                visible: spinner.visible
+            }
+            Label {
+                id: status2
+                visible: spinner.visible
+                text: "Ingesting..."
             }
             Text {
                 id: timerIndicator

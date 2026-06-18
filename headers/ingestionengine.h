@@ -19,7 +19,7 @@ public slots:
 
 signals:
   void finished();
-  void started(int fileNumber);
+  void status(QString statusLog);
 
 private:
   ExtractionResult extractText(const QUrl &filePath,
@@ -30,6 +30,6 @@ private:
                                           const QString &imgPath) const;
   void savePapers(const QList<SummaryRow> &rows, const QString &dbPath);
   QStringList getAllPaperHashes(const QString &dbPath) const;
-  void filterExistingHashes(QMap<QString, QUrl> &hashesToProcess,
-                            const QString &dbPath) const;
+  QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
+                                   const QString &dbPath) const;
 };

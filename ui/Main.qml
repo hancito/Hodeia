@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Effects
 
 ApplicationWindow {
     id: root
@@ -94,6 +95,17 @@ ApplicationWindow {
         color: Colors.base || Colors.background || "#1e1e1e"
     }
 
+    // 2. The effect that adds the shadow
+    MultiEffect {
+        source: leftPaneItem
+        anchors.fill: leftPaneItem
+        shadowEnabled: true
+        shadowColor: Colors.primary // Soft, transparent black
+        shadowBlur: 5.0          // How blurry/soft the shadow is
+        shadowHorizontalOffset: 0
+        shadowVerticalOffset: 12  // Pushes shadow down to simulate light from above
+    }
+
     GridLayout {
         anchors.fill: parent
         anchors.top: parent.top
@@ -120,6 +132,7 @@ ApplicationWindow {
                 id: leftPaneItem
                 SplitView.minimumWidth: 200
                 SplitView.maximumWidth: 400
+                statusBarLabel: footerLabel
                 onOpenRagWindow: {
                     // Check if the window instance already exists and is valid
                     if (root.secondaryWindow !== null) {
@@ -300,9 +313,9 @@ ApplicationWindow {
 
     // Status bar
     footer: ToolBar {
-        id: theFooter
         height: 30
         Label {
+            id: footerLabel
             anchors.fill: parent
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
