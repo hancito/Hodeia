@@ -5,16 +5,16 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
-static const QLatin1String ConnectionName("project_db");
-
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
-      m_queryModel(new QueryModel(this)) {
+      m_queryModel(new QueryModel(this)),
+      m_summaryProxyModel(new SummaryFilterProxyModel(this)) {
+  m_summaryProxyModel->setSourceModel(m_summaryModel);
   initDatabase();
 }
 
 DatabaseManager::~DatabaseManager() {
-  QSqlDatabase::removeDatabase(ConnectionName);
+  QSqlDatabase::removeDatabase(ProjectDbConnectionName);
 }
 
 bool DatabaseManager::initDatabase() {
@@ -26,7 +26,7 @@ bool DatabaseManager::initDatabase() {
   m_dbPath = m_config->projectDbPath(m_config->lastProject());
   qDebug() << "Loading project database:" << m_dbPath;
 
-  auto db = QSqlDatabase::addDatabase("QSQLITE", ConnectionName);
+  auto db = QSqlDatabase::addDatabase("QSQLITE", ProjectDbConnectionName);
   db.setDatabaseName(m_dbPath);
 
   if (!db.open()) {
@@ -43,7 +43,7 @@ bool DatabaseManager::initDatabase() {
 }
 
 void DatabaseManager::createTables() {
-  QSqlQuery query(QSqlDatabase::database(ConnectionName));
+  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
 
   query.exec("CREATE TABLE IF NOT EXISTS Summaries ("
              "id INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -71,7 +71,7 @@ void DatabaseManager::createTables() {
 }
 
 bool DatabaseManager::isOpen() const {
-  return QSqlDatabase::database(ConnectionName).isOpen();
+  return QSqlDatabase::database(ProjectDbConnectionName).isOpen();
 }
 
 QString DatabaseManager::databasePath() const { return m_dbPath; }
@@ -82,10 +82,10 @@ bool DatabaseManager::switchDatabase(const QString &dbPath) {
     return false;
   }
 
-  QSqlDatabase::database(ConnectionName).close();
-  QSqlDatabase::removeDatabase(ConnectionName);
+  QSqlDatabase::database(ProjectDbConnectionName).close();
+  QSqlDatabase::removeDatabase(ProjectDbConnectionName);
 
-  auto db = QSqlDatabase::addDatabase("QSQLITE", ConnectionName);
+  auto db = QSqlDatabase::addDatabase("QSQLITE", ProjectDbConnectionName);
   db.setDatabaseName(dbPath);
 
   if (!db.open()) {

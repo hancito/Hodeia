@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Controls.Basic as Basic
 
 Rectangle {
     id: rightPane
@@ -23,6 +24,7 @@ Rectangle {
             id: paperSearch
             Layout.fillWidth: true
             placeholderText: "Search paper"
+            onTextChanged: databaseManager.summaryProxyModel.filterText = text
         }
 
         RowLayout {
@@ -45,7 +47,10 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/refresh.svg"
-                onClicked: console.log("Refresh")
+                onClicked: {
+                    databaseManager.summaryModel.loadAll();
+                    console.log(databaseManager.summaryModel);
+                }
             }
 
             Button {
@@ -124,26 +129,109 @@ Rectangle {
             }
 
             ComboBox {
+                id: sortComboBox
                 model: ["Title", "Date", "Pages", "Model"]
                 Layout.fillWidth: true
+                onCurrentIndexChanged: {
+                    var roleMap = {
+                        0: 1,
+                        1: 2,
+                        2: 3,
+                        3: 4
+                    };
+                    databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 1;
+                }
             }
 
             CheckBox {
+                id: descendingCheckBox
                 text: "Descending"
+                onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
             }
         }
 
         // Paper List
-        ListView {
+        QtQuick.ListView {
             id: paperListView
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            // Add bounds behavior for responsiveness
             boundsBehavior: Flickable.DragAndOvershootBounds
-
-            // Ensure it takes remaining space
             Layout.minimumHeight: parent.height * 0.3
+
+            model: databaseManager.summaryProxyModel
+
+            delegate: Rectangle {
+                width: paperListView.width
+                height: 70
+                border.width: 1
+                border.color: Colors.surface1
+                radius: 4
+                color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
+
+                readonly property var rowItem: databaseManager.summaryProxyModel.get(index)
+
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 4
+
+                    Label {
+                        text: rowItem.title || ""
+                        Layout.fillWidth: true
+                        elide: Text.ElideMiddle
+                        font.bold: true
+                    }
+
+                    Label {
+                        text: rowItem.authors || ""
+                        Layout.fillWidth: true
+                        elide: Text.ElideMiddle
+                        opacity: 0.7
+                        font.pixelSize: 12
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        Label {
+                            text: rowItem.year || ""
+                            opacity: 0.5
+                            font.pixelSize: 11
+                        }
+
+                        Label {
+                            text: rowItem.journal || ""
+                            opacity: 0.5
+                            font.pixelSize: 11
+                            elide: Text.ElideMiddle
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                        }
+
+                        Label {
+                            text: rowItem.pagesNum ? rowItem.pagesNum + " p." : ""
+                            opacity: 0.5
+                            font.pixelSize: 11
+                        }
+
+                        Label {
+                            text: rowItem.formattedDate || ""
+                            opacity: 0.5
+                            font.pixelSize: 11
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 #include "headers/query.h"
+#include "headers/database.h"
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -55,7 +56,8 @@ void QueryModel::loadAll() {
   m_rows.clear();
 
   QSqlQuery query(
-      "SELECT id, query, response, date, model FROM Queries ORDER BY id");
+      "SELECT id, query, response, date, model FROM Queries ORDER BY id",
+      QSqlDatabase::database(ProjectDbConnectionName));
 
   while (query.next()) {
     QueryRow row;
@@ -75,7 +77,7 @@ void QueryModel::insert(const QueryRow &row) {
   m_rows.append(row);
   endInsertRows();
 
-  QSqlQuery q;
+  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
   q.prepare("INSERT INTO Queries (query, response, date, model) "
             "VALUES (:query, :response, :date, :model)");
   q.bindValue(":query", row.queryText);
@@ -97,7 +99,7 @@ void QueryModel::removeRow(int index) {
   m_rows.removeAt(index);
   endRemoveRows();
 
-  QSqlQuery q;
+  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
   q.prepare("DELETE FROM Queries WHERE id = :id");
   q.bindValue(":id", dbId);
   if (!q.exec()) {
@@ -110,7 +112,8 @@ void QueryModel::clear() {
   m_rows.clear();
   endResetModel();
 
-  QSqlQuery q("DELETE FROM Queries");
+  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
+  q.exec("DELETE FROM Queries");
   if (!q.exec()) {
     qDebug() << "Clear Queries failed:" << q.lastError().text();
   }

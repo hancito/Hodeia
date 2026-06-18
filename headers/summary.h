@@ -56,9 +56,8 @@ public:
   Q_INVOKABLE void clear();
 
   SummaryRow getRow(int index) const;
+  QString formatDate(const QDateTime &dt) const;
 
 private:
   QVector<SummaryRow> m_rows;
-
-  QString formatDate(const QDateTime &dt) const;
 };

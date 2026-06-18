@@ -30,8 +30,6 @@ Rectangle {
 
         function onIngestionStarted(statusLog) {
             leftPane.elapsedTime = 0;
-            executionTimer.running = true;
-            executionTimer.start();
             statusLabel.visible = true;
             statusLabel.text = statusLog;
         }
@@ -57,6 +55,8 @@ Rectangle {
         onAccepted: {
             spinner.visible = true;
             spinner.running = true;
+            executionTimer.running = true;
+            executionTimer.start();
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
@@ -77,6 +77,8 @@ Rectangle {
         onAccepted: {
             spinner.visible = true;
             spinner.running = true;
+            executionTimer.running = true;
+            executionTimer.start();
             addfilebtn.enabled = false;
             addfolderbtn.enabled = false;
             var imgPath = configManager.projectImgPath(configManager.lastProject);

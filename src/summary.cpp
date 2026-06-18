@@ -1,4 +1,5 @@
 #include "headers/summary.h"
+#include "headers/database.h"
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -55,7 +56,7 @@ QHash<int, QByteArray> SummaryModel::roleNames() const {
           {JournalRole, "journal"},
           {YearRole, "year"},
           {TopicsRole, "topics"},
-          {ModelRole, "model"},
+          {ModelRole, "llmModel"},
           {SummaryJsonRole, "summaryJson"},
           {DateRole, "date"},
           {FormattedDateRole, "formattedDate"}};
@@ -76,7 +77,8 @@ void SummaryModel::loadAll() {
   QSqlQuery query(
       "SELECT id, paper_hash, title, authors, pages_num, journal, year, "
       "topics, model, summary_json, date FROM "
-      "Summaries ORDER BY id");
+      "Summaries ORDER BY id",
+      QSqlDatabase::database(ProjectDbConnectionName));
 
   while (query.next()) {
     SummaryRow row;
@@ -106,7 +108,7 @@ void SummaryModel::insert(const SummaryRow &row) {
 
   endInsertRows();
 
-  QSqlQuery query;
+  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
   query.prepare(
       "INSERT INTO Summaries "
       "(paper_hash, title, authors, pages_num, journal, year, topics, model, "
@@ -138,7 +140,7 @@ void SummaryModel::removeRow(int index) {
   m_rows.removeAt(index);
   endRemoveRows();
 
-  QSqlQuery query;
+  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
   query.prepare("DELETE FROM Summaries WHERE id = :id");
   query.bindValue(":id", dbId);
   if (!query.exec()) {
@@ -151,7 +153,8 @@ void SummaryModel::clear() {
   m_rows.clear();
   endResetModel();
 
-  QSqlQuery query("DELETE FROM Summaries");
+  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
+  query.exec("DELETE FROM Summaries");
   if (!query.exec()) {
     qDebug() << "Clear Summaries failed:" << query.lastError().text();
   }
