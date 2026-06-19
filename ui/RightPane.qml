@@ -48,7 +48,6 @@ Rectangle {
                 icon.source: "qrc:/Resources/refresh.svg"
                 onClicked: {
                     databaseManager.summaryModel.loadAll();
-                    console.log(databaseManager.summaryModel);
                 }
             }
 
@@ -111,7 +110,7 @@ Rectangle {
             }
 
             Label {
-                text: "Paper Number:"
+                text: "Paper Number: " + databaseManager.summaryProxyModel.rowCount()
             }
 
             Item {
@@ -132,13 +131,17 @@ Rectangle {
                 model: ["Title", "Date", "Pages", "Model"]
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
+                    // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265
                     var roleMap = {
-                        0: 1,
-                        1: 2,
-                        2: 3,
-                        3: 4
+                        0: 259  // Title
+                        ,
+                        1: 267  // Date
+                        ,
+                        2: 261  // PagesNum
+                        ,
+                        3: 265   // LlmModel
                     };
-                    databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 1;
+                    databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 259;
                 }
             }
 
@@ -159,14 +162,17 @@ Rectangle {
             Layout.minimumHeight: parent.height * 0.3
 
             model: databaseManager.summaryProxyModel
+            spacing: 5
 
             delegate: Rectangle {
+                required property string title
+                required property string authors
                 width: paperListView.width
                 height: 70
                 border.width: 1
                 border.color: Colors.surface1
                 radius: 4
-                color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
+                color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
 
                 MouseArea {
                     id: mouseArea
@@ -178,54 +184,25 @@ Rectangle {
                     anchors.fill: parent
                     anchors.margins: 8
                     spacing: 4
-
-                    Label {
-                        text: model.title || ""
-                        Layout.fillWidth: true
-                        elide: Text.ElideMiddle
-                        font.bold: true
+                    RowLayout {
+                        CheckBox {
+                            icon.height: 12
+                            font.pixelSize: 10
+                        }
+                        Label {
+                            text: title || ""
+                            Layout.fillWidth: true
+                            elide: Text.ElideMiddle
+                            font.bold: true
+                        }
                     }
 
                     Label {
-                        text: model.authors || ""
+                        text: authors || ""
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         opacity: 0.7
                         font.pixelSize: 12
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        Label {
-                            text: model.year || ""
-                            opacity: 0.5
-                            font.pixelSize: 11
-                        }
-
-                        Label {
-                            text: model.journal || ""
-                            opacity: 0.5
-                            font.pixelSize: 11
-                            elide: Text.ElideMiddle
-                        }
-
-                        Item {
-                            Layout.fillWidth: true
-                        }
-
-                        Label {
-                            text: model.pagesNum ? model.pagesNum + " p." : ""
-                            opacity: 0.5
-                            font.pixelSize: 11
-                        }
-
-                        Label {
-                            text: model.formattedDate || ""
-                            opacity: 0.5
-                            font.pixelSize: 11
-                        }
                     }
                 }
             }

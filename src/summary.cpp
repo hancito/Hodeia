@@ -3,6 +3,7 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QVariantMap>
 
 SummaryModel::SummaryModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -15,8 +16,8 @@ int SummaryModel::rowCount(const QModelIndex &parent) const {
 QVariant SummaryModel::data(const QModelIndex &index, int role) const {
   if (!index.isValid() || index.row() < 0 || index.row() >= m_rows.size())
     return {};
-
   const auto &row = m_rows[index.row()];
+
   switch (role) {
   case IdRole:
     return row.id;
@@ -34,8 +35,8 @@ QVariant SummaryModel::data(const QModelIndex &index, int role) const {
     return row.year;
   case TopicsRole:
     return row.topics;
-  case ModelRole:
-    return row.model;
+  case LlmModelRole:
+    return row.llmodel;
   case SummaryJsonRole:
     return row.summaryJson;
   case DateRole:
@@ -48,18 +49,20 @@ QVariant SummaryModel::data(const QModelIndex &index, int role) const {
 }
 
 QHash<int, QByteArray> SummaryModel::roleNames() const {
-  return {{IdRole, "id"},
-          {PaperHashRole, "paperHash"},
-          {TitleRole, "title"},
-          {AuthorsRole, "authors"},
-          {PagesNumRole, "pagesNum"},
-          {JournalRole, "journal"},
-          {YearRole, "year"},
-          {TopicsRole, "topics"},
-          {ModelRole, "model"},
-          {SummaryJsonRole, "summaryJson"},
-          {DateRole, "date"},
-          {FormattedDateRole, "formattedDate"}};
+  QHash<int, QByteArray> roles;
+  roles[IdRole] = "id";
+  roles[PaperHashRole] = "paperHash";
+  roles[TitleRole] = "title";
+  roles[AuthorsRole] = "authors";
+  roles[PagesNumRole] = "pagesNum";
+  roles[JournalRole] = "journal";
+  roles[YearRole] = "year";
+  roles[TopicsRole] = "topics";
+  roles[LlmModelRole] = "llmodel";
+  roles[SummaryJsonRole] = "summaryJson";
+  roles[DateRole] = "date";
+  roles[FormattedDateRole] = "formattedDate";
+  return roles;
 }
 
 QString SummaryModel::formatDate(const QDateTime &dt) const {
@@ -76,7 +79,7 @@ void SummaryModel::loadAll() {
 
   QSqlQuery query(
       "SELECT id, paper_hash, title, authors, pages_num, journal, year, "
-      "topics, model, summary_json, date FROM "
+      "topics, llmodel, summary_json, date FROM "
       "Summaries ORDER BY id",
       QSqlDatabase::database(ProjectDbConnectionName));
 
@@ -90,7 +93,7 @@ void SummaryModel::loadAll() {
     row.journal = query.value(5).toString();
     row.year = query.value(6).toString();
     row.topics = query.value(7).toString();
-    row.model = query.value(8).toString();
+    row.llmodel = query.value(8).toString();
     row.summaryJson = query.value(9);
     row.date = query.value(10).toDateTime();
     m_rows.append(row);
@@ -111,10 +114,10 @@ void SummaryModel::insert(const SummaryRow &row) {
   QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
   query.prepare(
       "INSERT INTO Summaries "
-      "(paper_hash, title, authors, pages_num, journal, year, topics, model, "
+      "(paper_hash, title, authors, pages_num, journal, year, topics, llmodel, "
       "summary_json, date) "
       "VALUES (:hash, :title, :authors, :pages, :journal, :year, :topics, "
-      ":model, :json, :date)");
+      ":llmodel, :json, :date)");
   query.bindValue(":hash", newRow.paperHash);
   query.bindValue(":title", newRow.title);
   query.bindValue(":authors", newRow.authors);
@@ -122,7 +125,7 @@ void SummaryModel::insert(const SummaryRow &row) {
   query.bindValue(":journal", newRow.journal);
   query.bindValue(":year", newRow.year);
   query.bindValue(":topics", newRow.topics);
-  query.bindValue(":model", newRow.model);
+  query.bindValue(":llmodel", newRow.llmodel);
   query.bindValue(":json", newRow.summaryJson);
   query.bindValue(":date", newRow.date);
 

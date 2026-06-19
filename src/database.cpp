@@ -54,7 +54,7 @@ void DatabaseManager::createTables() {
              "journal TEXT, "
              "year TEXT, "
              "topics TEXT, "
-             "model TEXT, "
+             "llmodel TEXT, "
              "summary_json TEXT, "
              "date DATETIME)");
 
@@ -63,7 +63,7 @@ void DatabaseManager::createTables() {
              "query TEXT NOT NULL, "
              "response TEXT NOT NULL, "
              "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
-             "model TEXT NOT NULL)");
+             "llmodel TEXT NOT NULL)");
 
   if (query.lastError().isValid()) {
     qCritical() << "Create tables error:" << query.lastError().text();

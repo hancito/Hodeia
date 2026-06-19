@@ -1,10 +1,10 @@
 #pragma once
-#include "headers/summary.h"
-#include <QAbstractListModel>
+#include <QSortFilterProxyModel>
+
+class SummaryModel;
 
 class SummaryProxyModel : public QSortFilterProxyModel {
   Q_OBJECT
-
   Q_PROPERTY(QString filterText READ filterText WRITE setFilterText NOTIFY
                  filterTextChanged)
   Q_PROPERTY(
@@ -13,41 +13,33 @@ class SummaryProxyModel : public QSortFilterProxyModel {
                  NOTIFY sortDescendingChanged)
 
 public:
-  enum SortRoles { SortByTitle = 1, SortByDate, SortByPages, SortByModel };
-
   explicit SummaryProxyModel(QObject *parent = nullptr);
 
-  void setSourceModel(SummaryModel *source);
-
   QString filterText() const;
-  int sortRole() const;
-  bool isSortDescending() const;
-
   void setFilterText(const QString &text);
+
+  int sortRole() const;
   void setSortRole(int role);
+
+  bool isSortDescending() const;
   void setSortDescending(bool descending);
 
-  int rowCount(const QModelIndex &parent = {}) const override;
-  QVariant data(const QModelIndex &index,
-                int role = Qt::DisplayRole) const override;
   QHash<int, QByteArray> roleNames() const override;
 
-  Q_INVOKABLE QVariant get(int row) const;
-
 protected:
-  bool filterAcceptsRow(int sourceRow) const;
+  // Qt calls this to decide if a row should be visible
+  bool filterAcceptsRow(int source_row,
+                        const QModelIndex &source_parent) const override;
 
-private:
-  void refresh();
-
-  SummaryModel *m_source = nullptr;
-  QString m_filterText;
-  int m_sortRole = SortByTitle;
-  bool m_sortDescending = false;
-  QVector<int> m_filteredRows; // indices into source model
+  // Qt calls this to sort columns
+  bool lessThan(const QModelIndex &source_left,
+                const QModelIndex &source_right) const override;
 
 signals:
   void filterTextChanged();
   void sortRoleChanged();
   void sortDescendingChanged();
+
+private:
+  QString m_filterText;
 };

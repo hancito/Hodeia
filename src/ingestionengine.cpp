@@ -33,7 +33,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
             QString::number(filePath.size() - urlsToProcess.size()) + " papers";
   emit status(message);
 
-  const int chunkSize = 50;
+  const int chunkSize = 100;
   int savedCount = 0;
   int errorCount = 0;
   int total = urlsToProcess.size();
@@ -119,10 +119,10 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
 
     QSqlQuery query(db);
     query.prepare("INSERT INTO Summaries (paper_hash, title, authors, "
-                  "pages_num, journal, year, topics, model, "
+                  "pages_num, journal, year, topics, llmodel, "
                   "summary_json, date) "
                   "VALUES (:hash, :title, :authors, :pages, :journal, :year, "
-                  ":topics, :model, :json, :date)");
+                  ":topics, :llmodel, :json, :date)");
 
     for (const auto &row : rows) {
       query.bindValue(":hash", row.paperHash);
@@ -132,7 +132,7 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
       query.bindValue(":journal", row.journal);
       query.bindValue(":year", row.year);
       query.bindValue(":topics", row.topics);
-      query.bindValue(":model", row.model);
+      query.bindValue(":llmodel", row.llmodel);
       query.bindValue(":json", row.summaryJson);
       query.bindValue(":date", row.date);
 

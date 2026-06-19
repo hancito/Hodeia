@@ -13,7 +13,7 @@ struct SummaryRow {
   QString journal;
   QString year;
   QString topics;
-  QString model;
+  QString llmodel;
   QVariant summaryJson;
   QDateTime date;
 };
@@ -37,7 +37,7 @@ public:
     JournalRole,
     YearRole,
     TopicsRole,
-    ModelRole,
+    LlmModelRole,
     SummaryJsonRole,
     DateRole,
     FormattedDateRole

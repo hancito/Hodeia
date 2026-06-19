@@ -24,8 +24,8 @@ QVariant QueryModel::data(const QModelIndex &index, int role) const {
     return row.queryText;
   case ResponseRole:
     return row.response;
-  case ModelRole:
-    return row.model;
+  case LlmModelRole:
+    return row.llmodel;
   case DateRole:
     return row.date;
   case FormattedDateRole:
@@ -40,7 +40,7 @@ QHash<int, QByteArray> QueryModel::roleNames() const {
           {QueryTextRole, "queryText"},
           {ResponseRole, "response"},
           {DateRole, "date"},
-          {ModelRole, "model"},
+          {LlmModelRole, "model"},
           {FormattedDateRole, "formattedDate"}};
 }
 
@@ -56,7 +56,7 @@ void QueryModel::loadAll() {
   m_rows.clear();
 
   QSqlQuery query(
-      "SELECT id, query, response, date, model FROM Queries ORDER BY id",
+      "SELECT id, query, response, date, llmodel FROM Queries ORDER BY id",
       QSqlDatabase::database(ProjectDbConnectionName));
 
   while (query.next()) {
@@ -65,7 +65,7 @@ void QueryModel::loadAll() {
     row.queryText = query.value(1).toString();
     row.response = query.value(2).toString();
     row.date = query.value(3).toDateTime();
-    row.model = query.value(4).toString();
+    row.llmodel = query.value(4).toString();
     m_rows.append(row);
   }
 
@@ -78,12 +78,12 @@ void QueryModel::insert(const QueryRow &row) {
   endInsertRows();
 
   QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
-  q.prepare("INSERT INTO Queries (query, response, date, model) "
-            "VALUES (:query, :response, :date, :model)");
+  q.prepare("INSERT INTO Queries (query, response, date, llmodel) "
+            "VALUES (:query, :response, :date, :llmodel)");
   q.bindValue(":query", row.queryText);
   q.bindValue(":response", row.response);
   q.bindValue(":date", row.date);
-  q.bindValue(":model", row.model);
+  q.bindValue(":llmodel", row.llmodel);
 
   if (!q.exec()) {
     qDebug() << "Insert Query failed:" << q.lastError().text();

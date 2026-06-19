@@ -7,7 +7,7 @@ struct QueryRow {
   QString queryText;
   QString response;
   QDateTime date;
-  QString model;
+  QString llmodel;
 };
 
 class QueryModel : public QAbstractListModel {
@@ -19,7 +19,7 @@ public:
     QueryTextRole,
     ResponseRole,
     DateRole,
-    ModelRole,
+    LlmModelRole,
     FormattedDateRole
   };
 
