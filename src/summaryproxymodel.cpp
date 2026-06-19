@@ -1,10 +1,10 @@
-#include "headers/summaryfilterproxymodel.h"
+#include "headers/summaryproxymodel.h"
 #include <QSortFilterProxyModel>
 
-SummaryFilterProxyModel::SummaryFilterProxyModel(QObject *parent)
-    : QAbstractListModel(parent) {}
+SummaryProxyModel::SummaryProxyModel(QObject *parent)
+    : QSortFilterProxyModel(parent) {}
 
-void SummaryFilterProxyModel::setSourceModel(SummaryModel *source) {
+void SummaryProxyModel::setSourceModel(SummaryModel *source) {
   m_source = source;
   connect(source, &QAbstractListModel::modelReset, this,
           [this]() { refresh(); });
@@ -15,15 +15,13 @@ void SummaryFilterProxyModel::setSourceModel(SummaryModel *source) {
   refresh();
 }
 
-QString SummaryFilterProxyModel::filterText() const { return m_filterText; }
+QString SummaryProxyModel::filterText() const { return m_filterText; }
 
-int SummaryFilterProxyModel::sortRole() const { return m_sortRole; }
+int SummaryProxyModel::sortRole() const { return m_sortRole; }
 
-bool SummaryFilterProxyModel::isSortDescending() const {
-  return m_sortDescending;
-}
+bool SummaryProxyModel::isSortDescending() const { return m_sortDescending; }
 
-void SummaryFilterProxyModel::setFilterText(const QString &text) {
+void SummaryProxyModel::setFilterText(const QString &text) {
   if (m_filterText == text)
     return;
   m_filterText = text;
@@ -31,7 +29,7 @@ void SummaryFilterProxyModel::setFilterText(const QString &text) {
   emit filterTextChanged();
 }
 
-void SummaryFilterProxyModel::setSortRole(int role) {
+void SummaryProxyModel::setSortRole(int role) {
   if (m_sortRole == role)
     return;
   m_sortRole = role;
@@ -39,7 +37,7 @@ void SummaryFilterProxyModel::setSortRole(int role) {
   emit sortRoleChanged();
 }
 
-void SummaryFilterProxyModel::setSortDescending(bool descending) {
+void SummaryProxyModel::setSortDescending(bool descending) {
   if (m_sortDescending == descending)
     return;
   m_sortDescending = descending;
@@ -47,15 +45,14 @@ void SummaryFilterProxyModel::setSortDescending(bool descending) {
   emit sortDescendingChanged();
 }
 
-int SummaryFilterProxyModel::rowCount(const QModelIndex &parent) const {
+int SummaryProxyModel::rowCount(const QModelIndex &parent) const {
   if (parent.isValid())
     return 0;
-  qDebug() << "SummaryFilterProxyModel::rowCount()" << m_filteredRows.size();
+  qDebug() << "SummaryProxyModel::rowCount()" << m_filteredRows.size();
   return m_filteredRows.size();
 }
 
-QVariant SummaryFilterProxyModel::data(const QModelIndex &index,
-                                       int role) const {
+QVariant SummaryProxyModel::data(const QModelIndex &index, int role) const {
   if (!index.isValid() || index.row() < 0 ||
       index.row() >= m_filteredRows.size() || !m_source)
     return {};
@@ -64,13 +61,13 @@ QVariant SummaryFilterProxyModel::data(const QModelIndex &index,
   return m_source->data(m_source->index(sourceRow, 0), role);
 }
 
-QHash<int, QByteArray> SummaryFilterProxyModel::roleNames() const {
+QHash<int, QByteArray> SummaryProxyModel::roleNames() const {
   if (m_source)
     return m_source->roleNames();
   return QAbstractListModel::roleNames();
 }
 
-QVariant SummaryFilterProxyModel::get(int row) const {
+QVariant SummaryProxyModel::get(int row) const {
   if (!m_source || row < 0 || row >= m_filteredRows.size())
     return QVariant();
 
@@ -93,7 +90,7 @@ QVariant SummaryFilterProxyModel::get(int row) const {
   return map;
 }
 
-bool SummaryFilterProxyModel::filterAcceptsRow(int sourceRow) const {
+bool SummaryProxyModel::filterAcceptsRow(int sourceRow) const {
   if (!m_source || m_filterText.isEmpty())
     return true;
 
@@ -121,7 +118,7 @@ bool SummaryFilterProxyModel::filterAcceptsRow(int sourceRow) const {
   return combined.contains(m_filterText.toLower());
 }
 
-void SummaryFilterProxyModel::refresh() {
+void SummaryProxyModel::refresh() {
   if (!m_source)
     return;
 

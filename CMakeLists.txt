@@ -37,7 +37,7 @@ qt_add_qml_module(Paperize
         headers/database.h
         headers/summary.h
         headers/query.h
-        headers/summaryfilterproxymodel.h
+        headers/summaryproxymodel.h
         headers/ingestionengine.h
         headers/enginemanager.h
         src/thememanager.cpp
@@ -45,7 +45,7 @@ qt_add_qml_module(Paperize
         src/database.cpp
         src/summary.cpp
         src/query.cpp
-        src/summaryfilterproxymodel.cpp
+        src/summaryproxymodel.cpp
         src/ingestionengine.cpp
         src/enginemanager.cpp
 )

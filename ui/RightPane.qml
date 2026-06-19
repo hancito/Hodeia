@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import QtQuick.Controls.Basic as Basic
 
 Rectangle {
     id: rightPane
@@ -151,11 +150,11 @@ Rectangle {
         }
 
         // Paper List
-        QtQuick.ListView {
+        ListView {
             id: paperListView
             Layout.fillWidth: true
             Layout.fillHeight: true
-
+            clip: true
             boundsBehavior: Flickable.DragAndOvershootBounds
             Layout.minimumHeight: parent.height * 0.3
 
@@ -169,8 +168,6 @@ Rectangle {
                 radius: 4
                 color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
 
-                readonly property var rowItem: databaseManager.summaryProxyModel.get(index)
-
                 MouseArea {
                     id: mouseArea
                     anchors.fill: parent
@@ -183,14 +180,14 @@ Rectangle {
                     spacing: 4
 
                     Label {
-                        text: rowItem.title || ""
+                        text: model.title || ""
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         font.bold: true
                     }
 
                     Label {
-                        text: rowItem.authors || ""
+                        text: model.authors || ""
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         opacity: 0.7
@@ -202,13 +199,13 @@ Rectangle {
                         spacing: 10
 
                         Label {
-                            text: rowItem.year || ""
+                            text: model.year || ""
                             opacity: 0.5
                             font.pixelSize: 11
                         }
 
                         Label {
-                            text: rowItem.journal || ""
+                            text: model.journal || ""
                             opacity: 0.5
                             font.pixelSize: 11
                             elide: Text.ElideMiddle
@@ -219,13 +216,13 @@ Rectangle {
                         }
 
                         Label {
-                            text: rowItem.pagesNum ? rowItem.pagesNum + " p." : ""
+                            text: model.pagesNum ? model.pagesNum + " p." : ""
                             opacity: 0.5
                             font.pixelSize: 11
                         }
 
                         Label {
-                            text: rowItem.formattedDate || ""
+                            text: model.formattedDate || ""
                             opacity: 0.5
                             font.pixelSize: 11
                         }

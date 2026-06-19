@@ -2,7 +2,7 @@
 #include "headers/summary.h"
 #include <QAbstractListModel>
 
-class SummaryFilterProxyModel : public QAbstractListModel {
+class SummaryProxyModel : public QSortFilterProxyModel {
   Q_OBJECT
 
   Q_PROPERTY(QString filterText READ filterText WRITE setFilterText NOTIFY
@@ -15,7 +15,7 @@ class SummaryFilterProxyModel : public QAbstractListModel {
 public:
   enum SortRoles { SortByTitle = 1, SortByDate, SortByPages, SortByModel };
 
-  explicit SummaryFilterProxyModel(QObject *parent = nullptr);
+  explicit SummaryProxyModel(QObject *parent = nullptr);
 
   void setSourceModel(SummaryModel *source);
 

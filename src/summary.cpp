@@ -56,7 +56,7 @@ QHash<int, QByteArray> SummaryModel::roleNames() const {
           {JournalRole, "journal"},
           {YearRole, "year"},
           {TopicsRole, "topics"},
-          {ModelRole, "llmModel"},
+          {ModelRole, "model"},
           {SummaryJsonRole, "summaryJson"},
           {DateRole, "date"},
           {FormattedDateRole, "formattedDate"}};

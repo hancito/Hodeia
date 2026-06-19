@@ -8,7 +8,7 @@
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
       m_queryModel(new QueryModel(this)),
-      m_summaryProxyModel(new SummaryFilterProxyModel(this)) {
+      m_summaryProxyModel(new SummaryProxyModel(this)) {
   m_summaryProxyModel->setSourceModel(m_summaryModel);
   initDatabase();
 }
