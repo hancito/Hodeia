@@ -19,6 +19,7 @@ public slots:
 
 signals:
   void finished();
+  void started();
   void status(QString statusLog);
 
 private:

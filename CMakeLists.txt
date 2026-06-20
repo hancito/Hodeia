@@ -67,6 +67,8 @@ qt_add_resources(Paperize "resources" PREFIX "/" FILES
     Resources/save.svg
     Resources/share-square.svg
     Resources/trash-can.svg
+    Resources/circle-check.svg
+    Resources/circle-xmark.svg
 )
 
 # Copy themes folder to build directory

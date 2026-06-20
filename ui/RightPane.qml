@@ -6,10 +6,52 @@ import QtQuick.Layouts
 Rectangle {
     id: rightPane
     property var activeTheme: ({})
+    property int npapers: databaseManager.summaryModel.rowCount()
+    property list<string> selectedPapers: []
+
+    function addSelectedPaper(hash) {
+        if (!selectedPapers.includes(hash) && hash !== "") {
+            selectedPapers = selectedPapers.concat([hash]);
+        }
+    }
+
+    function removeSelectedPaper(hash) {
+        var result = [];
+        for (var i = 0; i < selectedPapers.length; i++) {
+            if (selectedPapers[i] !== hash) {
+                result.push(selectedPapers[i]);
+            }
+        }
+        selectedPapers = result;
+    }
+
+    function deleteSelected() {
+        if (selectedPapers.length === 0) {
+            console.log("No papers selected");
+            return;
+        }
+        console.log("Deleting", selectedPapers.length, "papers");
+        databaseManager.removeByHashes(selectedPapers);
+        var imgPath = configManager.projectImgPath(configManager.lastProject);
+        configManager.deleteImages(selectedPapers, imgPath);
+        selectedPapers = [];
+        databaseManager.summaryModel.loadAll();
+        numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+    }
+
     border.width: 1
     radius: 5
     color: Colors.surface0
     opacity: 1
+
+    Connections {
+        target: engineController
+
+        function onIngestionFinished() {
+            databaseManager.summaryModel.loadAll();
+            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -58,7 +100,7 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/list.svg"
-                onClicked: console.log("Generate Report")
+                onClicked: console.log("Generate Report from", rightPane.selectedPapers.length, "selected papers")
             }
 
             Button {
@@ -68,7 +110,7 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/trash-can.svg"
-                onClicked: console.log("Delete Paper")
+                onClicked: rightPane.deleteSelected()
             }
         }
 
@@ -103,14 +145,27 @@ Rectangle {
             Layout.fillWidth: true
 
             CheckBox {
+                id: selectAllCheckbox
                 text: "Select All"
+                checked: false
+                onCheckedChanged: {
+                    if (checked) {
+                        for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
+                            var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
+                            rightPane.addSelectedPaper(hash);
+                        }
+                    } else {
+                        rightPane.selectedPapers = [];
+                    }
+                }
             }
             Item {
                 Layout.fillWidth: true
             }
 
             Label {
-                text: "Paper Number: " + databaseManager.summaryProxyModel.rowCount()
+                id: numberPaper
+                text: "Paper Number: " + rightPane.npapers
             }
 
             Item {
@@ -167,9 +222,13 @@ Rectangle {
             delegate: Rectangle {
                 required property string title
                 required property string authors
+                required property int pagesNum
+                required property string llmodel
+                required property string formattedDate
+                required property string paperHash
                 width: paperListView.width
-                height: 70
-                border.width: 1
+                height: 120
+                border.width: 5
                 border.color: Colors.surface1
                 radius: 4
                 color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
@@ -183,11 +242,19 @@ Rectangle {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 8
-                    spacing: 4
+                    spacing: 1
                     RowLayout {
                         CheckBox {
-                            icon.height: 12
+                            checked: rightPane.selectedPapers.includes(paperHash)
+                            icon.height: 8
                             font.pixelSize: 10
+                            onCheckedChanged: {
+                                if (checked) {
+                                    rightPane.addSelectedPaper(paperHash);
+                                } else {
+                                    rightPane.removeSelectedPaper(paperHash);
+                                }
+                            }
                         }
                         Label {
                             text: title || ""
@@ -198,11 +265,57 @@ Rectangle {
                     }
 
                     Label {
-                        text: authors || ""
+                        text: authors || "Please summarise for authors name"
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         opacity: 0.7
-                        font.pixelSize: 12
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            font.pixelSize: 12
+                            text: pagesNum
+                            font.family: Fonts.mono
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        Label {
+                            text: formattedDate
+                            font.family: Fonts.mono
+                            font.pixelSize: 12
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        ToolButton {
+                            icon.source: llmodel ? "qrc:Resources/circle-check.svg" : "qrc:Resources/circle-xmark.svg"
+
+                            display: AbstractButton.IconOnly
+
+                            // Define the internal icon size
+                            icon.width: 20
+                            icon.height: 20
+                            icon.color: llmodel ? Colors.green : Colors.red
+
+                            // Define how much space the button takes in the Layout
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
+
+                            // Optional: Align it vertically to the center of the row
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+
+                        Label {
+                            text: "Le model ici"
+                            font.family: Fonts.mono
+                            font.pixelSize: 12
+                        }
                     }
                 }
             }

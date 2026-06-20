@@ -23,7 +23,7 @@ void PdfWorker::stop() {
 
 void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                            const QString &dbPath) {
-
+  emit started();
   QString message =
       "Started with " + QString::number(filePath.size()) + " files";
   emit status(message);

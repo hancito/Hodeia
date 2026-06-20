@@ -24,6 +24,8 @@ public:
   bool isSortDescending() const;
   void setSortDescending(bool descending);
 
+  Q_INVOKABLE QVariant get(int index, const QString &roleName) const;
+
   QHash<int, QByteArray> roleNames() const override;
 
 protected:

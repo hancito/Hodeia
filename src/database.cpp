@@ -106,3 +106,20 @@ void DatabaseManager::reloadModels() {
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
 }
+
+void DatabaseManager::removeByHashes(const QStringList &hashes) {
+  if (hashes.isEmpty())
+    return;
+
+  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
+  for (const QString &hash : hashes) {
+    query.prepare("DELETE FROM Summaries WHERE paper_hash = :hash");
+    query.bindValue(":hash", hash);
+    if (!query.exec()) {
+      qDebug() << "Delete by hash failed for" << hash << ":"
+               << query.lastError().text();
+    }
+  }
+  m_summaryModel->loadAll();
+  m_queryModel->loadAll();
+}

@@ -304,3 +304,27 @@ QString ConfigManager::projectImgPath(const QString &projectName) const {
 QString ConfigManager::projectPdfPath(const QString &projectName) const {
   return projectsRoot() + "/" + projectName + "/" + "PDF";
 }
+void ConfigManager::deleteImages(const QStringList &hashList,
+                                 const QString &imgPath) const {
+  QDir imgDir(imgPath);
+  if (!imgDir.exists()) {
+    qWarning() << "Image directory does not exist:" << imgPath;
+    return;
+  }
+
+  for (const QString &hash : hashList) {
+    // Match files like: 4ad90c343ca0d5a05e67f80da33a724b_page_001.png
+    imgDir.setNameFilters({hash + "_page_*.png"});
+    const QFileInfoList matchingFiles = imgDir.entryInfoList();
+    for (const QFileInfo &fileInfo : matchingFiles) {
+      if (QFile::remove(fileInfo.absoluteFilePath())) {
+        qDebug() << "Deleted image:" << fileInfo.absoluteFilePath();
+      } else {
+        qWarning() << "Failed to delete image:" << fileInfo.absoluteFilePath();
+      }
+    }
+    if (matchingFiles.isEmpty()) {
+      qDebug() << "No images found for hash:" << hash;
+    }
+  }
+}

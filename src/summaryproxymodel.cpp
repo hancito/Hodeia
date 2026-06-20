@@ -46,6 +46,22 @@ QHash<int, QByteArray> SummaryProxyModel::roleNames() const {
   return sourceModel()->roleNames();
 }
 
+QVariant SummaryProxyModel::get(int row, const QString &roleName) const {
+  QHash<int, QByteArray> roles = roleNames();
+  int roleInt = -1;
+  for (auto it = roles.begin(); it != roles.end(); ++it) {
+    if (it.value() == roleName.toUtf8()) {
+      roleInt = it.key();
+      break;
+    }
+  }
+  if (roleInt == -1)
+    return QVariant();
+
+  QModelIndex idx = QSortFilterProxyModel::index(row, 0, QModelIndex());
+  return data(idx, roleInt);
+}
+
 bool SummaryProxyModel::filterAcceptsRow(
     int source_row, const QModelIndex &source_parent) const {
   if (m_filterText.isEmpty())

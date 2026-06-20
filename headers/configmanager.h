@@ -52,6 +52,8 @@ public:
   Q_INVOKABLE QString projectDbPath(const QString &projectName) const;
   Q_INVOKABLE QString projectImgPath(const QString &projectName) const;
   Q_INVOKABLE QString projectPdfPath(const QString &projectName) const;
+  Q_INVOKABLE void deleteImages(const QStringList &hashList,
+                                const QString &imgPath) const;
 
   // File Operations
   Q_INVOKABLE void loadConfig();

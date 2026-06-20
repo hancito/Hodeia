@@ -28,6 +28,7 @@ public:
   Q_INVOKABLE QString databasePath() const;
   Q_INVOKABLE bool switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
+  Q_INVOKABLE void removeByHashes(const QStringList &hashes);
 
 private:
   bool initDatabase();

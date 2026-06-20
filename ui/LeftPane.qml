@@ -24,11 +24,16 @@ Rectangle {
             addfilebtn.enabled = true;
             addfolderbtn.enabled = true;
             if (leftPane.statusBarLabel) {
-                leftPane.statusBarLabel.text = "Ingestion finished in " + (leftPane.elapsedTime / 10) + " seconds!";
+                leftPane.statusBarLabel.text = statusLabel.text;
             }
+            statusLabel.visible = false;
         }
 
-        function onIngestionStarted(statusLog) {
+        function onIngestionStarted() {
+            leftPane.elapsedTime = 0;
+        }
+
+        function onIngestionStatus(statusLog) {
             leftPane.elapsedTime = 0;
             statusLabel.visible = true;
             statusLabel.text = statusLog;
@@ -61,8 +66,6 @@ Rectangle {
             addfolderbtn.enabled = false;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
             var dbPath = configManager.projectDbPath(configManager.lastProject);
-            console.log("Img path:", imgPath);
-            console.log("DB path:", dbPath);
             engineController.startEngine(selectedFiles, imgPath, dbPath);
         }
         onRejected: {
