@@ -9,6 +9,21 @@ set(CMAKE_JOB_POOL_LINK "link")
 
 find_package(Qt6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 Pdf)
 
+# Fetch llama.cpp for embeddings
+include(FetchContent)
+FetchContent_Declare(
+    llama
+    GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
+    GIT_TAG        b9747
+)
+set(LLAMA_BUILD_COMMON ON)
+set(LLAMA_BUILD_LIBRARY ON)
+set(LLAMA_BUILD_EXAMPLES OFF)
+set(LLAMA_BUILD_SERVER OFF)
+set(LLAMA_BUILD_TESTS OFF)
+set(GGML_CUDA ON)
+FetchContent_MakeAvailable(llama)
+
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(Paperize
@@ -102,6 +117,13 @@ add_custom_command(TARGET Paperize POST_BUILD
     $<TARGET_FILE_DIR:Paperize>/Fonts
 )
 
+# Copy embedding models to build directory
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/Models/Embedders
+    $<TARGET_FILE_DIR:Paperize>/Models/Embedders
+)
+
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
 # explicit, fixed bundle identifier manually though.
@@ -116,15 +138,12 @@ set_target_properties(Paperize PROPERTIES
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}/external/include
     ${CMAKE_SOURCE_DIR}/external/include/SqliteVec
-    ${CMAKE_SOURCE_DIR}/external/include/libembedding
-    ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0/include
     ${CMAKE_SOURCE_DIR}/src/thrdprty
     ${CMAKE_SOURCE_DIR}/src/thrdprty/cJSON
 )
 
 target_link_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}/external/lib
-    ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0/lib
 )
 
 target_link_libraries(Paperize PRIVATE
@@ -132,29 +151,11 @@ target_link_libraries(Paperize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf
-    onnxruntime
+    llama
     curl
     mupdf
     mupdf-third
     mupdf-threads
-)
-
-# Copy ONNX Runtime .so to build directory for runtime
-set(ONNXRUNTIME_ROOT ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0)
-add_custom_command(TARGET Paperize POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.1.27.0
-    $<TARGET_FILE_DIR:Paperize>/libonnxruntime.so.1.27.0
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_cuda.so
-    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_cuda.so
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_shared.so
-    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_shared.so
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_tensorrt.so
-    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_tensorrt.so
-    COMMENT "Copying ONNX Runtime shared libraries"
 )
 
 # Copy sqlite-vec extension to build directory

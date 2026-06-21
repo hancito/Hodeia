@@ -1,74 +1,96 @@
-#ifndef _Thread_local
-#define _Thread_local thread_local
-#endif
-#ifndef LIBEMBEDDING_NO_IMAGE
-#define LIBEMBEDDING_NO_IMAGE
-#endif
-#define LIBEMBEDDING_IMPLEMENTATION
-#include <libembedding/libembedding.h>
-
 #include "headers/sqlitevec.h"
+
+#include "llama.h"
+
+#include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <cstring>
+#include <QThread>
 
 namespace {
-constexpr const char *EmbedPrefix = "Represent this sentence for retrieval: ";
-}
+constexpr const char *PassagePrefix = "passage: ";
+constexpr const char *QueryPrefix = "query: ";
+constexpr int32_t MaxSeqLen = 512;
+constexpr int BatchSize = 64;
+constexpr const char *DefaultModel =
+    "Models/Embedders/multilingual-e5-small.gguf";
+} // namespace
 
 /* ── Constructor / Destructor ────────────────────────────────── */
 
 SqliteVecManager::SqliteVecManager(QObject *parent) : QObject(parent) {}
 
-SqliteVecManager::~SqliteVecManager() {
-  if (m_embeddingCtx) {
-    lembed_text_embedding_free(
-        static_cast<lembed_text_embedding_t *>(m_embeddingCtx));
-    m_embeddingCtx = nullptr;
-  }
-}
+SqliteVecManager::~SqliteVecManager() { shutdown(); }
 
 /* ── Initialization ──────────────────────────────────────────── */
 
-bool SqliteVecManager::initialize(const QString &cacheDir) {
+static QString resolveModelPath(const QString &modelPath) {
+  QString path = modelPath.isEmpty() ? DefaultModel : modelPath;
+
+  if (QFile::exists(path))
+    return path;
+
+  QString appDir = QCoreApplication::applicationDirPath();
+  QString candidate = appDir + "/" + path;
+  if (QFile::exists(candidate))
+    return candidate;
+
+  return path;
+}
+
+bool SqliteVecManager::initialize(const QString &modelPath) {
   if (m_ready)
     return true;
 
-  emit statusUpdated("Loading BGE Small EN v1.5 model...");
+  QString resolvedPath = resolveModelPath(modelPath);
 
-  lembed_text_options_t opts = lembed_text_options_default();
-  opts.model = LEMBED_TEXT_BGE_SMALL_EN_V15;
-  opts.provider = LEMBED_PROVIDER_CUDA;
-  opts.device_id = 0;
-  opts.max_length = 512;
-  opts.num_threads = 0; // auto
-  opts.show_download_progress = 0;
-
-  QByteArray cacheDirUtf8;
-  if (!cacheDir.isEmpty()) {
-    cacheDirUtf8 = cacheDir.toUtf8();
-    opts.cache_dir = cacheDirUtf8.constData();
-  }
-
-  lembed_text_embedding_t *ctx = nullptr;
-  lembed_status_t status = lembed_text_embedding_create(&opts, &ctx);
-
-  if (status != LEMBED_OK) {
-    qCritical() << "[SqliteVec] Failed to create embedding model:"
-                << lembed_status_message(status);
-    emit statusUpdated(QString("Embedding model failed: %1")
-                           .arg(lembed_status_message(status)));
+  if (!QFile::exists(resolvedPath)) {
+    qCritical() << "[SqliteVec] Model file not found:" << resolvedPath;
+    emit statusUpdated("Embedding model file not found: " + resolvedPath);
     return false;
   }
 
-  m_embeddingCtx = ctx;
-  m_dim = lembed_text_embedding_dim(ctx);
+  emit statusUpdated(QString("Loading embedding model: %1").arg(resolvedPath));
+
+  QByteArray pathUtf8 = resolvedPath.toUtf8();
+
+  llama_model_params mparams = llama_model_default_params();
+  mparams.vocab_only = false;
+
+  auto *model = llama_model_load_from_file(pathUtf8.constData(), mparams);
+  if (!model) {
+    qCritical() << "[SqliteVec] Failed to load model:" << resolvedPath;
+    emit statusUpdated(
+        QString("Failed to load embedding model: %1").arg(resolvedPath));
+    return false;
+  }
+
+  llama_context_params cparams = llama_context_default_params();
+  cparams.n_ctx = (uint32_t)MaxSeqLen;
+  cparams.n_batch = (uint32_t)MaxSeqLen;
+  cparams.embeddings = true;
+  cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+  cparams.n_threads = QThread::idealThreadCount();
+  cparams.n_threads_batch = QThread::idealThreadCount();
+
+  auto *ctx = llama_init_from_model(model, cparams);
+  if (!ctx) {
+    llama_model_free(model);
+    qCritical() << "[SqliteVec] Failed to create context";
+    emit statusUpdated("Failed to create llama context");
+    return false;
+  }
+
+  m_llamaModel = model;
+  m_llamaCtx = ctx;
+  m_dim = llama_model_n_embd(model);
   m_ready = true;
 
-  qInfo() << "[SqliteVec] Model loaded, dim=" << m_dim;
+  qInfo() << "[SqliteVec] E5 model loaded, dim=" << m_dim;
   emit statusUpdated(
-      QString("BGE Small EN v1.5 loaded (%1 dimensions)").arg(m_dim));
+      QString("E5 embedding model loaded (%1 dimensions)").arg(m_dim));
   return true;
 }
 
@@ -84,43 +106,79 @@ bool SqliteVecManager::createChunksTable(SqliteDb &db) {
 
 /* ── Embedding ───────────────────────────────────────────────── */
 
-QVector<float> SqliteVecManager::embed(const QStringList &texts) {
-  if (!m_ready || texts.isEmpty())
+QVector<float> SqliteVecManager::embed(const QStringList &texts,
+                                       EmbedMode mode) {
+  if (!m_ready || !m_llamaCtx || !m_llamaModel || texts.isEmpty())
     return {};
 
-  QStringList prefixedTexts;
-  prefixedTexts.reserve(texts.size());
-  for (const auto &t : texts) {
-    prefixedTexts.append(QString::fromUtf8(EmbedPrefix) + t);
+  auto *ctx = static_cast<struct llama_context *>(m_llamaCtx);
+  auto *model = static_cast<struct llama_model *>(m_llamaModel);
+  auto *vocab = llama_model_get_vocab(model);
+
+  const char *prefix = (mode == EmbedMode::Query) ? QueryPrefix : PassagePrefix;
+
+  QVector<float> results;
+  results.reserve((int)texts.size() * m_dim);
+
+  for (const auto &text : texts) {
+    QString prefixed = QString::fromUtf8(prefix) + text;
+    QByteArray utf8 = prefixed.toUtf8();
+
+    std::vector<llama_token> tokens(MaxSeqLen);
+    // First pass: discover how many tokens are needed.
+    // llama_tokenize returns -N when the output buffer is too small.
+    int32_t nTok = llama_tokenize(
+        vocab, utf8.constData(), (int32_t)utf8.size(), nullptr, 0,
+        /*add_special=*/false, /*parse_special=*/true);
+    if (nTok < 0)
+      nTok = -nTok; // flip to positive count
+    if (nTok <= 0) {
+      // Empty or whitespace-only text — embed as zero vector
+      results.resize(m_dim);
+      std::fill(results.begin(), results.end(), 0.0f);
+      continue;
+    }
+    // Truncate to context window
+    nTok = qMin(nTok, MaxSeqLen);
+    // Second pass: actually tokenize into the buffer
+    int32_t written = llama_tokenize(
+        vocab, utf8.constData(), (int32_t)utf8.size(), tokens.data(), nTok,
+        /*add_special=*/false, /*parse_special=*/true);
+    if (written < 0)
+      written = -written;
+    nTok = qMin(nTok, written);
+    if (nTok <= 0) {
+      qWarning() << "[SqliteVec] Tokenization produced 0 tokens for text len"
+                 << utf8.size();
+      results.resize(m_dim);
+      std::fill(results.begin(), results.end(), 0.0f);
+      continue;
+    }
+
+    llama_batch batch = llama_batch_get_one(tokens.data(), nTok);
+
+    // E5 is an encoder-only (BERT) model — use llama_encode, not llama_decode
+    if (llama_encode(ctx, batch) != 0) {
+      qWarning() << "[SqliteVec] llama_encode failed";
+      results.resize(m_dim);
+      std::fill(results.begin(), results.end(), 0.0f);
+      continue;
+    }
+    // NOTE: do NOT call llama_batch_free() — llama_batch_get_one uses stack
+    // memory
+
+    float *embd = llama_get_embeddings_seq(ctx, 0);
+    if (!embd) {
+      qWarning() << "[SqliteVec] No embeddings available for sequence";
+      results.resize(m_dim);
+      std::fill(results.begin(), results.end(), 0.0f);
+      continue;
+    }
+    for (int d = 0; d < m_dim; ++d)
+      results.append(embd[d]);
   }
 
-  QVector<const char *> cstrs;
-  cstrs.reserve(prefixedTexts.size());
-  QVector<QByteArray> utf8Bufs;
-  utf8Bufs.reserve(prefixedTexts.size());
-
-  for (const auto &t : prefixedTexts) {
-    QByteArray utf8 = t.toUtf8();
-    utf8Bufs.append(utf8);
-    cstrs.append(utf8Bufs.constLast().constData());
-  }
-
-  lembed_embeddings_t result;
-  lembed_status_t status = lembed_text_embedding_embed(
-      static_cast<lembed_text_embedding_t *>(m_embeddingCtx), cstrs.constData(),
-      (int)prefixedTexts.size(), 0, &result);
-
-  if (status != LEMBED_OK) {
-    qCritical() << "[SqliteVec] Embed failed:" << lembed_status_message(status);
-    return {};
-  }
-
-  QVector<float> embeddings(result.num_embeddings * result.dim);
-  std::memcpy(embeddings.data(), result.data,
-              (size_t)result.num_embeddings * result.dim * sizeof(float));
-  lembed_embeddings_free(&result);
-
-  return embeddings;
+  return results;
 }
 
 /* ── Chunk insertion ─────────────────────────────────────────── */
@@ -130,7 +188,6 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
   if (!m_ready || chunks.isEmpty())
     return 0;
 
-  int batchSize = 64;
   int totalInserted = 0;
 
   SqliteStatement stmt =
@@ -141,16 +198,15 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
     return -1;
   }
 
-  for (int start = 0; start < chunks.size(); start += batchSize) {
-    int end = qMin(start + batchSize, chunks.size());
+  for (int start = 0; start < chunks.size(); start += BatchSize) {
+    int end = qMin(start + BatchSize, chunks.size());
 
-    // Collect texts for this batch — embed all at once (GPU efficient)
     QStringList batchTexts;
     batchTexts.reserve(end - start);
     for (int j = start; j < end; ++j)
       batchTexts.append(chunks[j].text);
 
-    QVector<float> allEmbeddings = embed(batchTexts);
+    QVector<float> allEmbeddings = embed(batchTexts, EmbedMode::Passage);
     if (allEmbeddings.isEmpty()) {
       qWarning() << "[SqliteVec] Empty embeddings for batch starting at"
                  << start << ", skipping";
@@ -159,7 +215,6 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 
     emit embeddingProgress(end, chunks.size());
 
-    // Insert one-by-one so each metadata blob can be freed immediately
     for (int i = 0; i < end - start; ++i) {
       const TextChunk &c = chunks[start + i];
       const float *rowPtr = allEmbeddings.constData() + i * m_dim;
@@ -184,7 +239,6 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
       stmt.resetAndClearBindings();
       totalInserted++;
     }
-    // allEmbeddings destroyed here — memory freed before next batch
   }
 
   return totalInserted;
@@ -197,9 +251,7 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
   if (!m_ready)
     return {};
 
-  // Embed the query with the same prefix used for documents
-  QString queryText = QString::fromUtf8(EmbedPrefix) + query;
-  QVector<float> queryEmbedding = embed(QStringList{queryText});
+  QVector<float> queryEmbedding = embed(QStringList{query}, EmbedMode::Query);
   if (queryEmbedding.isEmpty())
     return {};
 
@@ -242,10 +294,13 @@ int SqliteVecManager::embeddingDim() const { return m_dim; }
 bool SqliteVecManager::isReady() const { return m_ready; }
 
 void SqliteVecManager::shutdown() {
-  if (m_embeddingCtx) {
-    lembed_text_embedding_free(
-        static_cast<lembed_text_embedding_t *>(m_embeddingCtx));
-    m_embeddingCtx = nullptr;
+  if (m_llamaCtx) {
+    llama_free(static_cast<struct llama_context *>(m_llamaCtx));
+    m_llamaCtx = nullptr;
+  }
+  if (m_llamaModel) {
+    llama_model_free(static_cast<struct llama_model *>(m_llamaModel));
+    m_llamaModel = nullptr;
   }
   m_ready = false;
   m_dim = 0;

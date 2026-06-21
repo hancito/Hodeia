@@ -17,18 +17,23 @@ class SqliteVecManager : public QObject {
   Q_OBJECT
 
 public:
+  enum class EmbedMode { Passage, Query };
+
   explicit SqliteVecManager(QObject *parent = nullptr);
   ~SqliteVecManager() override;
 
-  // Initialize the embedding model (calls libembedding to load Nomic Embed)
-  // Returns true on success. idempotent — safe to call multiple times.
-  bool initialize(const QString &cacheDir = QString());
+  // Initialize the embedding model via llama.cpp.
+  // modelPath points to a GGUF embedding model file.
+  // Empty string uses the default E5 model in Models/Embedders/.
+  bool initialize(const QString &modelPath = QString());
 
   // Create the vec0 virtual table "chunks" in the given database
   bool createChunksTable(SqliteDb &db);
 
-  // Embed a batch of text strings; returns flat float vectors (rows × dims)
-  QVector<float> embed(const QStringList &texts);
+  // Embed a batch of text strings; returns flat float vectors (rows × dims).
+  // Mode controls the E5 prefix ("passage: " vs "query: ").
+  QVector<float> embed(const QStringList &texts,
+                       EmbedMode mode = EmbedMode::Passage);
 
   // Insert chunks into the vec0 table. Returns count of inserted rows.
   int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks);
@@ -53,5 +58,7 @@ signals:
 private:
   bool m_ready = false;
   int m_dim = 0;
-  void *m_embeddingCtx = nullptr; // opaque lembed_text_embedding_t*
+  void *m_llamaCtx = nullptr;   // llama_context*
+  void *m_llamaModel = nullptr; // llama_model*
+  QString m_modelPath;
 };
