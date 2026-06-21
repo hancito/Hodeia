@@ -1,5 +1,7 @@
 #include "headers/sqlitedb.h"
+#include <QCoreApplication>
 #include <QDebug>
+#include <QLibraryInfo>
 extern "C" {
 #include <Sqlite3/sqlite3.h>
 }
@@ -171,7 +173,7 @@ bool SqliteDb::open(const QString &path) {
   if (rc != SQLITE_OK) {
     m_lastError = QString::fromUtf8(sqlite3_errmsg(m_db));
     qCritical() << "[SqliteDb] Failed to open:" << path << m_lastError;
-    sqlite3_close(m_db);
+    sqlite3_close_v2(m_db);
     m_db = nullptr;
     return false;
   }
@@ -179,12 +181,36 @@ bool SqliteDb::open(const QString &path) {
   // Enable WAL mode for better concurrent read/write
   sqlite3_exec(m_db, "PRAGMA journal_mode=WAL", nullptr, nullptr, nullptr);
 
+  // Enable loading of extensions
+  sqlite3_enable_load_extension(m_db, 1);
+
+  // Load sqlite-vec extension (vec0.so) from the application directory
+  QString vec0Path = QCoreApplication::applicationDirPath() + "/vec0.so";
+  char *load_err = nullptr;
+  rc = sqlite3_load_extension(m_db, vec0Path.toUtf8().constData(), nullptr,
+                              &load_err);
+  if (rc != SQLITE_OK) {
+    m_lastError = load_err ? QString::fromUtf8(load_err)
+                           : QString("sqlite3_load_extension failed");
+    qCritical() << "[SqliteDb] Failed to load vec0.so from" << vec0Path << ":"
+                << m_lastError;
+    if (load_err)
+      sqlite3_free(load_err);
+    close();
+    return false;
+  }
+  if (load_err)
+    sqlite3_free(load_err);
+
+  // Disable extension loading after init
+  sqlite3_enable_load_extension(m_db, 0);
+
   return true;
 }
 
 void SqliteDb::close() {
   if (m_db) {
-    sqlite3_close(m_db);
+    sqlite3_close_v2(m_db);
     m_db = nullptr;
   }
 }

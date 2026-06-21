@@ -1,5 +1,6 @@
 #include "headers/database.h"
 #include "headers/configmanager.h"
+#include "headers/sqlitevec.h"
 #include <QDir>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
@@ -29,6 +30,10 @@ bool DatabaseManager::initDatabase() {
   }
 
   createTables();
+
+  // Initialize embedding model (idempotent)
+  m_vecManager.initialize();
+
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
 
@@ -55,6 +60,9 @@ void DatabaseManager::createTables() {
             "response TEXT NOT NULL, "
             "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
             "llmodel TEXT NOT NULL)");
+
+  // Create vec0 virtual table for text chunks with embeddings
+  m_vecManager.createChunksTable(m_db);
 }
 
 bool DatabaseManager::isOpen() const { return m_db.isOpen(); }
@@ -100,6 +108,15 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
     }
     stmt.resetAndClearBindings();
   }
+
+  // Also remove associated vector chunks
+  // We need to parse the metadata JSON to match paper_hash; use a LIKE filter
+  for (const QString &hash : hashes) {
+    QString escapedHash = hash;
+    m_db.exec(QString("DELETE FROM chunks WHERE metadata_blob LIKE '%1%'")
+                  .arg(escapedHash));
+  }
+
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
 }

@@ -5,12 +5,22 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QRegularExpression>
 #include <QtConcurrent>
+
+namespace {
+constexpr int MaxChunkChars = 1500;
+constexpr int OverlapChars = 200;
+} // namespace
+
 extern "C" {
 #include <mupdf/fitz.h>
 }
 
-PdfWorker::PdfWorker(QObject *parent) : QObject(parent) {}
+PdfWorker::PdfWorker(QObject *parent) : QObject(parent) {
+  connect(&m_vecManager, &SqliteVecManager::embeddingProgress, this,
+          &PdfWorker::embeddingProgress);
+}
 
 PdfWorker::~PdfWorker() = default;
 
@@ -31,7 +41,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
             QString::number(filePath.size() - urlsToProcess.size()) + " papers";
   emit status(message);
 
-  const int chunkSize = 100;
+  const int chunkSize = 5;
   int savedCount = 0;
   int errorCount = 0;
   int total = urlsToProcess.size();
@@ -46,6 +56,8 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     QList<ExtractionResult> extractions = parallelExtract(chunkUrls, imgPath);
 
     QList<SummaryRow> chunk;
+    QList<TextChunk> allChunks;
+
     for (const auto &extraction : extractions) {
 
       if (extraction.title.isEmpty()) {
@@ -61,6 +73,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       row.date = QDateTime::currentDateTime();
 
       chunk.append(row);
+
+      // Chunks were already built during extraction
+      allChunks.append(extraction.chunks.begin(), extraction.chunks.end());
     }
 
     if (!chunk.isEmpty()) {
@@ -68,9 +83,36 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       savedCount += chunk.size();
     }
 
+    // Ingest vector chunks (embeddings + vec0 insert)
+    if (!allChunks.isEmpty()) {
+      QString statusMsg =
+          QString("Embedding %1 chunks...").arg(allChunks.size());
+      emit status(statusMsg);
+
+      if (!m_vecManager.isReady()) {
+        if (!m_vecManager.initialize()) {
+          qCritical() << "[PdfWorker] Failed to initialize embedding model";
+          emit status("Warning: embedding model failed to load, skipping "
+                      "vector storage");
+        }
+      }
+
+      if (m_vecManager.isReady()) {
+        ingestChunks(allChunks, dbPath);
+      }
+
+      allChunks.clear();
+      allChunks.squeeze();
+    }
+
     message =
         QString("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
     emit status(message);
+  }
+
+  // Release embedding model memory after all PDFs are processed
+  if (m_vecManager.isReady()) {
+    m_vecManager.shutdown();
   }
 
   if (errorCount > 0)
@@ -80,6 +122,44 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 
   emit finished();
   qInfo() << "[PdfWorker] finished signal emitted";
+}
+
+void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
+                             const QString &dbPath) {
+  if (chunks.isEmpty())
+    return;
+
+  SqliteDb db;
+  if (!db.open(dbPath)) {
+    qCritical() << "[PdfWorker] Failed to open database for chunk ingestion:"
+                << db.lastError();
+    return;
+  }
+
+  if (!db.transaction()) {
+    qCritical() << "[PdfWorker] Failed to start transaction for chunks:"
+                << db.lastError();
+    return;
+  }
+
+  int inserted = m_vecManager.insertChunks(db, chunks);
+
+  if (inserted < 0) {
+    // insertChunks returned a negative error code; roll back
+    if (!db.rollback()) {
+      qCritical() << "[PdfWorker] Chunk transaction rollback failed:"
+                  << db.lastError();
+    }
+    return;
+  }
+
+  if (!db.commit()) {
+    qCritical() << "[PdfWorker] Chunk transaction commit failed:"
+                << db.lastError();
+    db.rollback();
+  }
+
+  qInfo() << "[PdfWorker] Inserted" << inserted << "vector chunks";
 }
 
 void PdfWorker::savePapers(const QList<SummaryRow> &rows,
@@ -100,7 +180,8 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
   }
 
   SqliteStatement stmt =
-      db.prepare("INSERT INTO Summaries (paper_hash, title, authors, "
+      db.prepare("INSERT INTO Summaries (paper_hash, title, "
+                 "authors, "
                  "pages_num, journal, year, topics, llmodel, "
                  "summary_json, date) "
                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -137,7 +218,8 @@ QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
 
   SqliteDb db;
   if (!db.open(dbPath)) {
-    qCritical() << "[PdfWorker] Failed to open database for reading:"
+    qCritical() << "[PdfWorker] Failed to open "
+                   "database for reading:"
                 << db.lastError();
     return hashes;
   }
@@ -159,7 +241,8 @@ QString getFileHash(const QUrl &filePath) {
     return QString("Error: Could not open file.");
   }
 
-  // Calculate MD5 hash (you can change this to Sha256 if preferred)
+  // Calculate MD5 hash (you can change this to
+  // Sha256 if preferred)
   QCryptographicHash decrypter(QCryptographicHash::Md5);
   if (decrypter.addData(&file)) {
     return QString(decrypter.result().toHex());
@@ -188,7 +271,6 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   QString localPath = fileUrl.toLocalFile();
 
   ExtractionResult result;
-  QString extractedText;
 
   if (localPath.isEmpty()) {
     result.title = "Error: Invalid path.";
@@ -205,11 +287,13 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
     return result;
   }
 
-  // Register default document handlers (PDF, XPS, CBZ, etc.)
+  // Register default document handlers (PDF, XPS,
+  // CBZ, etc.)
   fz_try(ctx) { fz_register_document_handlers(ctx); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
-    result.title = "Error: Failed to register document handlers.";
+    result.title = "Error: Failed to register "
+                   "document handlers.";
     return result;
   }
 
@@ -249,10 +333,12 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       // Create a structure to hold extracted text
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
 
-      // Create a text-extracting device that feeds into our textPage structure
+      // Create a text-extracting device that feeds
+      // into our textPage structure
       dev = fz_new_stext_device(ctx, textPage, nullptr);
 
-      // Run the page through the device to extract text
+      // Run the page through the device to extract
+      // text
       fz_run_page(ctx, page, dev, fz_identity, nullptr);
 
       // Close the device immediately after use
@@ -260,17 +346,19 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       // Tax the image of the page
       pix = fz_new_pixmap_from_page_number(ctx, doc, i, ctm, fz_device_rgb(ctx),
                                            0);
-      // 5. Wrap MuPDF raw pixel data into a Qt QImage
-      // pix->samples contains raw RGB byte streams.
-      // pix->stride represents the total byte length of a single horizontal
-      // row.
+      // 5. Wrap MuPDF raw pixel data into a Qt
+      // QImage pix->samples contains raw RGB byte
+      // streams. pix->stride represents the total
+      // byte length of a single horizontal row.
       QImage img(pix->samples, pix->w, pix->h, pix->stride,
                  QImage::Format_RGB888);
-      img = img.copy(); // detach: MuPDF will drop pix below
+      img = img.copy(); // detach: MuPDF will drop
+                        // pix below
 
-      // Define output file name prefixed with the PDF base name to avoid
-      // collisions across files
-      // QString baseName = QFileInfo(localPath).baseName();
+      // Define output file name prefixed with the
+      // PDF base name to avoid collisions across
+      // files QString baseName =
+      // QFileInfo(localPath).baseName();
       QString hash = getFileHash(fileUrl);
       QString fileName =
           QString("%1_page_%2.png").arg(hash).arg(i + 1, 3, 10, QChar('0'));
@@ -283,25 +371,32 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
         qCritical() << "Failed to save image to:" << fullOutputPath;
       }
 
-      // Drop the pixmap allocation for this individual page loop
+      // Drop the pixmap allocation for this
+      // individual page loop
       fz_drop_pixmap(ctx, pix);
-      // Fetch the layout text from MuPDF as a string block
+      // Fetch the layout text from MuPDF as a string
+      // block
       fz_buffer *buf = fz_new_buffer(ctx, 256);
       fz_output *out = fz_new_output_with_buffer(ctx, buf);
       fz_print_stext_page_as_text(ctx, out, textPage);
       fz_close_output(ctx, out);
       fz_drop_output(ctx, out);
 
-      // Append page content to our return variable
+      // Extract page text as string
       const char *pageText = fz_string_from_buffer(ctx, buf);
-      extractedText.append(QString::fromUtf8(pageText));
-      extractedText.append("\n--- Page Break ---\n");
+      QString pageTextStr = QString::fromUtf8(pageText);
+
+      // Chunk directly and accumulate
+      QList<TextChunk> pageChunks =
+          chunkPageText(pageTextStr, result.paperHash, i);
+      result.chunks.append(pageChunks.begin(), pageChunks.end());
 
       // Clean up buffers for this specific page loop
       fz_drop_buffer(ctx, buf);
     }
     fz_always(ctx) {
-      // Clean up structures safely even if exceptions occurred
+      // Clean up structures safely even if
+      // exceptions occurred
       if (dev)
         fz_drop_device(ctx, dev);
       if (textPage)
@@ -328,6 +423,64 @@ PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
       });
 
   return results;
+}
+
+QList<TextChunk> PdfWorker::chunkPageText(const QString &pageText,
+                                          const QString &paperHash,
+                                          int pageNum) const {
+  QList<TextChunk> chunks;
+
+  // Split on sentence boundaries
+  QStringList sentences;
+  int lastEnd = 0;
+  QRegularExpression sentRe(R"((?<=[.!?])\s+)");
+  auto matchIter = sentRe.globalMatch(pageText);
+  while (matchIter.hasNext()) {
+    auto match = matchIter.next();
+    QString sentence = pageText.mid(lastEnd, match.capturedStart() - lastEnd +
+                                                 match.capturedLength());
+    if (!sentence.trimmed().isEmpty())
+      sentences.append(sentence.trimmed());
+    lastEnd = match.capturedEnd();
+  }
+  if (lastEnd < pageText.length()) {
+    QString remainder = pageText.mid(lastEnd).trimmed();
+    if (!remainder.isEmpty())
+      sentences.append(remainder);
+  }
+
+  // Accumulate sentences into chunks with overlap
+  QString currentChunk;
+  int chunkIdx = 0;
+
+  for (const auto &sent : sentences) {
+    QString candidate =
+        currentChunk.isEmpty() ? sent : currentChunk + " " + sent;
+    if (candidate.length() > MaxChunkChars && !currentChunk.isEmpty()) {
+      TextChunk tc;
+      tc.text = currentChunk.trimmed();
+      tc.paperHash = paperHash;
+      tc.page = pageNum;
+      tc.chunkIdx = chunkIdx++;
+      chunks.append(tc);
+
+      int overlapStart = qMax(0, currentChunk.length() - OverlapChars);
+      currentChunk = currentChunk.mid(overlapStart) + " " + sent;
+    } else {
+      currentChunk = candidate;
+    }
+  }
+
+  if (!currentChunk.trimmed().isEmpty()) {
+    TextChunk tc;
+    tc.text = currentChunk.trimmed();
+    tc.paperHash = paperHash;
+    tc.page = pageNum;
+    tc.chunkIdx = chunkIdx++;
+    chunks.append(tc);
+  }
+
+  return chunks;
 }
 
 QList<QUrl>

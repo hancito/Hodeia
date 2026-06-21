@@ -5,6 +5,13 @@
 #include <QString>
 #include <QVariant>
 
+struct TextChunk {
+  QString text;
+  QString paperHash;
+  int page = 0;
+  int chunkIdx = 0;
+};
+
 struct SummaryRow {
   int id = 0;
   QString paperHash;
@@ -23,6 +30,7 @@ struct ExtractionResult {
   int pageCount = 0;
   QString paperHash;
   QString title;
+  QList<TextChunk> chunks;
 };
 
 class SummaryModel : public QAbstractListModel {

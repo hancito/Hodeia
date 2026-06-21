@@ -1,6 +1,7 @@
 #pragma once
 #include "headers/query.h"
 #include "headers/sqlitedb.h"
+#include "headers/sqlitevec.h"
 #include "headers/summary.h"
 #include "headers/summaryproxymodel.h"
 #include <QObject>
@@ -23,6 +24,7 @@ public:
   QueryModel *queryModel() const { return m_queryModel; }
   SummaryProxyModel *summaryProxyModel() const { return m_summaryProxyModel; }
   SqliteDb &db() { return m_db; }
+  SqliteVecManager &vecManager() { return m_vecManager; }
 
   Q_INVOKABLE bool isOpen() const;
   Q_INVOKABLE QString databasePath() const;
@@ -40,4 +42,5 @@ private:
   SummaryModel *m_summaryModel = nullptr;
   QueryModel *m_queryModel = nullptr;
   SummaryProxyModel *m_summaryProxyModel = nullptr;
+  SqliteVecManager m_vecManager;
 };

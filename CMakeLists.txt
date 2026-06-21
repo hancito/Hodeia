@@ -15,8 +15,6 @@ qt_add_executable(Paperize
     src/main.cpp
 )
 
-set_source_files_properties(src/thrdprty/sqlite3.c PROPERTIES LANGUAGE C)
-
 set_source_files_properties(ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 set_source_files_properties(ui/Fonts.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -45,6 +43,7 @@ qt_add_qml_module(Paperize
         headers/ingestionengine.h
         headers/enginemanager.h
         headers/sqlitedb.h
+        headers/sqlitevec.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
@@ -54,7 +53,18 @@ qt_add_qml_module(Paperize
         src/ingestionengine.cpp
         src/enginemanager.cpp
         src/sqlitedb.cpp
-        src/thrdprty/sqlite3.c
+        src/sqlitevec.cpp
+)
+
+# Add sqlite3.c directly to the target (outside qt_add_qml_module)
+# to avoid C++ compiler flags being passed to the C compiler.
+set_source_files_properties(src/thrdprty/sqlite3.c PROPERTIES LANGUAGE C)
+set_source_files_properties(src/thrdprty/cJSON/cJSON.c PROPERTIES LANGUAGE C)
+set_source_files_properties(src/thrdprty/stb/stb_impl.c PROPERTIES LANGUAGE C)
+target_sources(Paperize PRIVATE
+    src/thrdprty/sqlite3.c
+    src/thrdprty/cJSON/cJSON.c
+    src/thrdprty/stb/stb_impl.c
 )
 
 # Add resources separately
@@ -105,10 +115,16 @@ set_target_properties(Paperize PROPERTIES
 
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}/external/include
+    ${CMAKE_SOURCE_DIR}/external/include/SqliteVec
+    ${CMAKE_SOURCE_DIR}/external/include/libembedding
+    ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0/include
+    ${CMAKE_SOURCE_DIR}/src/thrdprty
+    ${CMAKE_SOURCE_DIR}/src/thrdprty/cJSON
 )
 
 target_link_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}/external/lib
+    ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0/lib
 )
 
 target_link_libraries(Paperize PRIVATE
@@ -116,9 +132,37 @@ target_link_libraries(Paperize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf
+    onnxruntime
+    curl
     mupdf
     mupdf-third
     mupdf-threads
+)
+
+# Copy ONNX Runtime .so to build directory for runtime
+set(ONNXRUNTIME_ROOT ${CMAKE_SOURCE_DIR}/external/lib/onnxruntime-linux-x64-gpu_cuda13-1.27.0)
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.1.27.0
+    $<TARGET_FILE_DIR:Paperize>/libonnxruntime.so.1.27.0
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_cuda.so
+    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_cuda.so
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_shared.so
+    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_shared.so
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${ONNXRUNTIME_ROOT}/lib/libonnxruntime_providers_tensorrt.so
+    $<TARGET_FILE_DIR:Paperize>/libonnxruntime_providers_tensorrt.so
+    COMMENT "Copying ONNX Runtime shared libraries"
+)
+
+# Copy sqlite-vec extension to build directory
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/external/lib/sqlitevec/vec0.so
+    $<TARGET_FILE_DIR:Paperize>/vec0.so
+    COMMENT "Copying sqlite-vec extension"
 )
 
 install(TARGETS Paperize
