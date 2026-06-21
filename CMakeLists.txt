@@ -1,17 +1,21 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(Paperize_CPP VERSION 0.1 LANGUAGES CXX)
+project(Paperize_CPP VERSION 0.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_JOB_POOL_COMPILE "compile")
+set(CMAKE_JOB_POOL_LINK "link")
 
-find_package(Qt6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 Pdf Sql)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent Quick QuickControls2 Pdf)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(Paperize
     src/main.cpp
 )
+
+set_source_files_properties(src/thrdprty/sqlite3.c PROPERTIES LANGUAGE C)
 
 set_source_files_properties(ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
@@ -40,6 +44,7 @@ qt_add_qml_module(Paperize
         headers/summaryproxymodel.h
         headers/ingestionengine.h
         headers/enginemanager.h
+        headers/sqlitedb.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
@@ -48,6 +53,8 @@ qt_add_qml_module(Paperize
         src/summaryproxymodel.cpp
         src/ingestionengine.cpp
         src/enginemanager.cpp
+        src/sqlitedb.cpp
+        src/thrdprty/sqlite3.c
 )
 
 # Add resources separately
@@ -109,7 +116,6 @@ target_link_libraries(Paperize PRIVATE
     Qt6::Quick
     Qt6::QuickControls2
     Qt6::Pdf
-    Qt6::Sql
     mupdf
     mupdf-third
     mupdf-threads

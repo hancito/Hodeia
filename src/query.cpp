@@ -1,10 +1,8 @@
 #include "headers/query.h"
-#include "headers/database.h"
-#include <QSqlDatabase>
-#include <QSqlError>
-#include <QSqlQuery>
 
 QueryModel::QueryModel(QObject *parent) : QAbstractListModel(parent) {}
+
+void QueryModel::setDatabase(SqliteDb &db) { m_db = &db; }
 
 int QueryModel::rowCount(const QModelIndex &parent) const {
   if (parent.isValid())
@@ -52,20 +50,23 @@ QString QueryModel::formatDate(const QDateTime &dt) const {
 }
 
 void QueryModel::loadAll() {
+  if (!m_db)
+    return;
+
   beginResetModel();
   m_rows.clear();
 
-  QSqlQuery query(
-      "SELECT id, query, response, date, llmodel FROM Queries ORDER BY id",
-      QSqlDatabase::database(ProjectDbConnectionName));
+  SqliteStatement stmt =
+      m_db->prepare("SELECT id, query, response, date, llmodel FROM Queries "
+                    "ORDER BY id");
 
-  while (query.next()) {
+  while (stmt.step()) {
     QueryRow row;
-    row.id = query.value(0).toInt();
-    row.queryText = query.value(1).toString();
-    row.response = query.value(2).toString();
-    row.date = query.value(3).toDateTime();
-    row.llmodel = query.value(4).toString();
+    row.id = stmt.columnInt(0);
+    row.queryText = stmt.columnText(1);
+    row.response = stmt.columnText(2);
+    row.date = stmt.columnDateTime(3);
+    row.llmodel = stmt.columnText(4);
     m_rows.append(row);
   }
 
@@ -73,25 +74,28 @@ void QueryModel::loadAll() {
 }
 
 void QueryModel::insert(const QueryRow &row) {
+  if (!m_db)
+    return;
+
   beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
   m_rows.append(row);
   endInsertRows();
 
-  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
-  q.prepare("INSERT INTO Queries (query, response, date, llmodel) "
-            "VALUES (:query, :response, :date, :llmodel)");
-  q.bindValue(":query", row.queryText);
-  q.bindValue(":response", row.response);
-  q.bindValue(":date", row.date);
-  q.bindValue(":llmodel", row.llmodel);
+  SqliteStatement stmt =
+      m_db->prepare("INSERT INTO Queries (query, response, date, llmodel) "
+                    "VALUES (?, ?, ?, ?)");
+  stmt.bind(1, row.queryText);
+  stmt.bind(2, row.response);
+  stmt.bind(3, row.date);
+  stmt.bind(4, row.llmodel);
 
-  if (!q.exec()) {
-    qDebug() << "Insert Query failed:" << q.lastError().text();
+  if (!stmt.exec()) {
+    qDebug() << "Insert Query failed:" << stmt.errorMsg();
   }
 }
 
 void QueryModel::removeRow(int index) {
-  if (index < 0 || index >= m_rows.size())
+  if (!m_db || index < 0 || index >= m_rows.size())
     return;
 
   int dbId = m_rows[index].id;
@@ -99,24 +103,22 @@ void QueryModel::removeRow(int index) {
   m_rows.removeAt(index);
   endRemoveRows();
 
-  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
-  q.prepare("DELETE FROM Queries WHERE id = :id");
-  q.bindValue(":id", dbId);
-  if (!q.exec()) {
-    qDebug() << "Delete Query failed:" << q.lastError().text();
+  SqliteStatement stmt = m_db->prepare("DELETE FROM Queries WHERE id = ?");
+  stmt.bind(1, dbId);
+  if (!stmt.exec()) {
+    qDebug() << "Delete Query failed:" << stmt.errorMsg();
   }
 }
 
 void QueryModel::clear() {
+  if (!m_db)
+    return;
+
   beginResetModel();
   m_rows.clear();
   endResetModel();
 
-  QSqlQuery q(QSqlDatabase::database(ProjectDbConnectionName));
-  q.exec("DELETE FROM Queries");
-  if (!q.exec()) {
-    qDebug() << "Clear Queries failed:" << q.lastError().text();
-  }
+  m_db->exec("DELETE FROM Queries");
 }
 
 QueryRow QueryModel::getRow(int index) const {

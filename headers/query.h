@@ -1,4 +1,5 @@
 #pragma once
+#include "headers/sqlitedb.h"
 #include <QAbstractListModel>
 #include <QDateTime>
 
@@ -24,6 +25,7 @@ public:
   };
 
   explicit QueryModel(QObject *parent = nullptr);
+  void setDatabase(SqliteDb &db);
 
   int rowCount(const QModelIndex &parent = {}) const override;
   QVariant data(const QModelIndex &index,
@@ -38,6 +40,7 @@ public:
   QueryRow getRow(int index) const;
 
 private:
+  SqliteDb *m_db = nullptr;
   QVector<QueryRow> m_rows;
 
   QString formatDate(const QDateTime &dt) const;

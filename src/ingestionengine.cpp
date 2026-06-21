@@ -1,12 +1,10 @@
 #include "headers/ingestionengine.h"
+#include "headers/sqlitedb.h"
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
-#include <QSqlDatabase>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QtConcurrent>
 extern "C" {
 #include <mupdf/fitz.h>
@@ -89,99 +87,64 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
   if (rows.isEmpty())
     return;
 
-  // 1. Generate a strictly unique connection name for THIS specific run/thread
-  static QAtomicInt counter = 0;
-  QString connectionName =
-      QString("worker_conn_%1_%2")
-          .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()))
-          .arg(counter.fetchAndAddRelaxed(1));
-
-  {
-    QSqlDatabase db;
-    if (QSqlDatabase::contains(connectionName)) {
-      db = QSqlDatabase::database(connectionName);
-    } else {
-      db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-      db.setDatabaseName(dbPath);
-    }
-
-    if (!db.open()) {
-      qCritical() << "[PdfWorker] Failed to open database for saving in thread"
-                  << QThread::currentThreadId() << ":" << db.lastError().text();
-      return;
-    }
-
-    if (!db.transaction()) {
-      qCritical() << "[PdfWorker] Failed to start transaction:"
-                  << db.lastError().text();
-      return;
-    }
-
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO Summaries (paper_hash, title, authors, "
-                  "pages_num, journal, year, topics, llmodel, "
-                  "summary_json, date) "
-                  "VALUES (:hash, :title, :authors, :pages, :journal, :year, "
-                  ":topics, :llmodel, :json, :date)");
-
-    for (const auto &row : rows) {
-      query.bindValue(":hash", row.paperHash);
-      query.bindValue(":title", row.title);
-      query.bindValue(":authors", row.authors);
-      query.bindValue(":pages", row.pagesNum);
-      query.bindValue(":journal", row.journal);
-      query.bindValue(":year", row.year);
-      query.bindValue(":topics", row.topics);
-      query.bindValue(":llmodel", row.llmodel);
-      query.bindValue(":json", row.summaryJson);
-      query.bindValue(":date", row.date);
-
-      if (!query.exec()) {
-        qCritical() << "[PdfWorker] Error inserting paper" << row.title << ":"
-                    << query.lastError().text();
-        db.rollback();
-        return;
-      }
-    }
-
-    if (!db.commit()) {
-      qCritical() << "[PdfWorker] Transaction commit failed:"
-                  << db.lastError().text();
-      db.rollback();
-    }
-    db.close();
+  SqliteDb db;
+  if (!db.open(dbPath)) {
+    qCritical() << "[PdfWorker] Failed to open database for saving in thread"
+                << QThread::currentThreadId() << ":" << db.lastError();
+    return;
   }
-  QSqlDatabase::removeDatabase(connectionName);
+
+  if (!db.transaction()) {
+    qCritical() << "[PdfWorker] Failed to start transaction:" << db.lastError();
+    return;
+  }
+
+  SqliteStatement stmt =
+      db.prepare("INSERT INTO Summaries (paper_hash, title, authors, "
+                 "pages_num, journal, year, topics, llmodel, "
+                 "summary_json, date) "
+                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+  for (const auto &row : rows) {
+    stmt.bind(1, row.paperHash);
+    stmt.bind(2, row.title);
+    stmt.bind(3, row.authors);
+    stmt.bind(4, row.pagesNum);
+    stmt.bind(5, row.journal);
+    stmt.bind(6, row.year);
+    stmt.bind(7, row.topics);
+    stmt.bind(8, row.llmodel);
+    stmt.bind(9, row.summaryJson.toByteArray());
+    stmt.bind(10, row.date);
+
+    if (!stmt.exec()) {
+      qCritical() << "[PdfWorker] Error inserting paper" << row.title << ":"
+                  << stmt.errorMsg();
+      db.rollback();
+      return;
+    }
+    stmt.resetAndClearBindings();
+  }
+
+  if (!db.commit()) {
+    qCritical() << "[PdfWorker] Transaction commit failed:" << db.lastError();
+    db.rollback();
+  }
 }
 
 QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
   QStringList hashes;
-  QString connectionName = "reader_conn_" + QString::number(qHash(dbPath));
 
-  {
-    QSqlDatabase db;
-    if (QSqlDatabase::contains(connectionName)) {
-      db = QSqlDatabase::database(connectionName);
-    } else {
-      db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
-      db.setDatabaseName(dbPath);
-    }
+  SqliteDb db;
+  if (!db.open(dbPath)) {
+    qCritical() << "[PdfWorker] Failed to open database for reading:"
+                << db.lastError();
+    return hashes;
+  }
 
-    if (!db.open()) {
-      qCritical() << "[PdfWorker] Failed to open database for reading:"
-                  << db.lastError().text();
-      return hashes;
-    }
-
-    QSqlQuery query(db);
-    if (query.exec("SELECT paper_hash FROM Summaries")) {
-      while (query.next()) {
-        hashes << query.value(0).toString();
-      }
-    } else {
-      qCritical() << "[PdfWorker] Error fetching hashes:"
-                  << query.lastError().text();
-    }
+  SqliteStatement stmt = db.prepare("SELECT paper_hash FROM Summaries");
+  while (stmt.step()) {
+    hashes << stmt.columnText(0);
   }
   return hashes;
 }
@@ -327,6 +290,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       fz_output *out = fz_new_output_with_buffer(ctx, buf);
       fz_print_stext_page_as_text(ctx, out, textPage);
       fz_close_output(ctx, out);
+      fz_drop_output(ctx, out);
 
       // Append page content to our return variable
       const char *pageText = fz_string_from_buffer(ctx, buf);

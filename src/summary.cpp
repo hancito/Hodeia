@@ -1,11 +1,9 @@
 #include "headers/summary.h"
-#include "headers/database.h"
-#include <QSqlDatabase>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QVariantMap>
 
 SummaryModel::SummaryModel(QObject *parent) : QAbstractListModel(parent) {}
+
+void SummaryModel::setDatabase(SqliteDb &db) { m_db = &db; }
 
 int SummaryModel::rowCount(const QModelIndex &parent) const {
   if (parent.isValid())
@@ -67,35 +65,36 @@ QHash<int, QByteArray> SummaryModel::roleNames() const {
 
 QString SummaryModel::formatDate(const QDateTime &dt) const {
   if (dt.isValid()) {
-    // Convert to local time zone for display
     return dt.toLocalTime().toString("yyyy-MM-dd hh:mm:ss");
   }
   return {};
 }
 
 void SummaryModel::loadAll() {
+  if (!m_db)
+    return;
+
   beginResetModel();
   m_rows.clear();
 
-  QSqlQuery query(
-      "SELECT id, paper_hash, title, authors, pages_num, journal, year, "
-      "topics, llmodel, summary_json, date FROM "
-      "Summaries ORDER BY id",
-      QSqlDatabase::database(ProjectDbConnectionName));
+  SqliteStatement stmt = m_db->prepare(
+      "SELECT id, paper_hash, title, authors, pages_num, journal, "
+      "year, topics, llmodel, summary_json, date FROM Summaries "
+      "ORDER BY id");
 
-  while (query.next()) {
+  while (stmt.step()) {
     SummaryRow row;
-    row.id = query.value(0).toInt();
-    row.paperHash = query.value(1).toString();
-    row.title = query.value(2).toString();
-    row.authors = query.value(3).toString();
-    row.pagesNum = query.value(4).toInt();
-    row.journal = query.value(5).toString();
-    row.year = query.value(6).toString();
-    row.topics = query.value(7).toString();
-    row.llmodel = query.value(8).toString();
-    row.summaryJson = query.value(9);
-    row.date = query.value(10).toDateTime();
+    row.id = stmt.columnInt(0);
+    row.paperHash = stmt.columnText(1);
+    row.title = stmt.columnText(2);
+    row.authors = stmt.columnText(3);
+    row.pagesNum = stmt.columnInt(4);
+    row.journal = stmt.columnText(5);
+    row.year = stmt.columnText(6);
+    row.topics = stmt.columnText(7);
+    row.llmodel = stmt.columnText(8);
+    row.summaryJson = stmt.columnBlob(9);
+    row.date = stmt.columnDateTime(10);
     m_rows.append(row);
   }
 
@@ -103,39 +102,38 @@ void SummaryModel::loadAll() {
 }
 
 void SummaryModel::insert(const SummaryRow &row) {
-  beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
+  if (!m_db)
+    return;
 
+  beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
   SummaryRow newRow = row;
   m_rows.append(newRow);
-  int newId = m_rows.size() - 1;
-
   endInsertRows();
 
-  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
-  query.prepare(
-      "INSERT INTO Summaries "
-      "(paper_hash, title, authors, pages_num, journal, year, topics, llmodel, "
-      "summary_json, date) "
-      "VALUES (:hash, :title, :authors, :pages, :journal, :year, :topics, "
-      ":llmodel, :json, :date)");
-  query.bindValue(":hash", newRow.paperHash);
-  query.bindValue(":title", newRow.title);
-  query.bindValue(":authors", newRow.authors);
-  query.bindValue(":pages", newRow.pagesNum);
-  query.bindValue(":journal", newRow.journal);
-  query.bindValue(":year", newRow.year);
-  query.bindValue(":topics", newRow.topics);
-  query.bindValue(":llmodel", newRow.llmodel);
-  query.bindValue(":json", newRow.summaryJson);
-  query.bindValue(":date", newRow.date);
+  SqliteStatement stmt =
+      m_db->prepare("INSERT INTO Summaries "
+                    "(paper_hash, title, authors, pages_num, journal, year, "
+                    "topics, llmodel, summary_json, date) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-  if (!query.exec()) {
-    qDebug() << "Insert Summary failed:" << query.lastError().text();
+  stmt.bind(1, newRow.paperHash);
+  stmt.bind(2, newRow.title);
+  stmt.bind(3, newRow.authors);
+  stmt.bind(4, newRow.pagesNum);
+  stmt.bind(5, newRow.journal);
+  stmt.bind(6, newRow.year);
+  stmt.bind(7, newRow.topics);
+  stmt.bind(8, newRow.llmodel);
+  stmt.bind(9, newRow.summaryJson.toByteArray());
+  stmt.bind(10, newRow.date);
+
+  if (!stmt.exec()) {
+    qDebug() << "Insert Summary failed:" << stmt.errorMsg();
   }
 }
 
 void SummaryModel::removeRow(int index) {
-  if (index < 0 || index >= m_rows.size())
+  if (!m_db || index < 0 || index >= m_rows.size())
     return;
 
   int dbId = m_rows[index].id;
@@ -143,24 +141,22 @@ void SummaryModel::removeRow(int index) {
   m_rows.removeAt(index);
   endRemoveRows();
 
-  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
-  query.prepare("DELETE FROM Summaries WHERE id = :id");
-  query.bindValue(":id", dbId);
-  if (!query.exec()) {
-    qDebug() << "Delete Summary failed:" << query.lastError().text();
+  SqliteStatement stmt = m_db->prepare("DELETE FROM Summaries WHERE id = ?");
+  stmt.bind(1, dbId);
+  if (!stmt.exec()) {
+    qDebug() << "Delete Summary failed:" << stmt.errorMsg();
   }
 }
 
 void SummaryModel::clear() {
+  if (!m_db)
+    return;
+
   beginResetModel();
   m_rows.clear();
   endResetModel();
 
-  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
-  query.exec("DELETE FROM Summaries");
-  if (!query.exec()) {
-    qDebug() << "Clear Summaries failed:" << query.lastError().text();
-  }
+  m_db->exec("DELETE FROM Summaries");
 }
 
 SummaryRow SummaryModel::getRow(int index) const {

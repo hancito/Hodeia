@@ -1,21 +1,18 @@
 #include "headers/database.h"
 #include "headers/configmanager.h"
 #include <QDir>
-#include <QSqlDatabase>
-#include <QSqlError>
-#include <QSqlQuery>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
       m_queryModel(new QueryModel(this)),
       m_summaryProxyModel(new SummaryProxyModel(this)) {
   m_summaryProxyModel->setSourceModel(m_summaryModel);
+  m_summaryModel->setDatabase(m_db);
+  m_queryModel->setDatabase(m_db);
   initDatabase();
 }
 
-DatabaseManager::~DatabaseManager() {
-  QSqlDatabase::removeDatabase(ProjectDbConnectionName);
-}
+DatabaseManager::~DatabaseManager() = default;
 
 bool DatabaseManager::initDatabase() {
   if (!m_config || m_config->lastProject().isEmpty()) {
@@ -26,12 +23,8 @@ bool DatabaseManager::initDatabase() {
   m_dbPath = m_config->projectDbPath(m_config->lastProject());
   qDebug() << "Loading project database:" << m_dbPath;
 
-  auto db = QSqlDatabase::addDatabase("QSQLITE", ProjectDbConnectionName);
-  db.setDatabaseName(m_dbPath);
-
-  if (!db.open()) {
-    qCritical() << "Failed to open database:" << m_dbPath
-                << db.lastError().text();
+  if (!m_db.open(m_dbPath)) {
+    qCritical() << "Failed to open database:" << m_dbPath << m_db.lastError();
     return false;
   }
 
@@ -43,36 +36,28 @@ bool DatabaseManager::initDatabase() {
 }
 
 void DatabaseManager::createTables() {
-  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
+  m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "paper_hash TEXT NOT NULL, "
+            "title TEXT, "
+            "authors TEXT, "
+            "pages_num INTEGER NOT NULL, "
+            "journal TEXT, "
+            "year TEXT, "
+            "topics TEXT, "
+            "llmodel TEXT, "
+            "summary_json TEXT, "
+            "date DATETIME)");
 
-  query.exec("CREATE TABLE IF NOT EXISTS Summaries ("
-             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-             "paper_hash TEXT NOT NULL, "
-             "title TEXT, "
-             "authors TEXT, "
-             "pages_num INTEGER NOT NULL, "
-             "journal TEXT, "
-             "year TEXT, "
-             "topics TEXT, "
-             "llmodel TEXT, "
-             "summary_json TEXT, "
-             "date DATETIME)");
-
-  query.exec("CREATE TABLE IF NOT EXISTS Queries ("
-             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-             "query TEXT NOT NULL, "
-             "response TEXT NOT NULL, "
-             "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
-             "llmodel TEXT NOT NULL)");
-
-  if (query.lastError().isValid()) {
-    qCritical() << "Create tables error:" << query.lastError().text();
-  }
+  m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "query TEXT NOT NULL, "
+            "response TEXT NOT NULL, "
+            "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
+            "llmodel TEXT NOT NULL)");
 }
 
-bool DatabaseManager::isOpen() const {
-  return QSqlDatabase::database(ProjectDbConnectionName).isOpen();
-}
+bool DatabaseManager::isOpen() const { return m_db.isOpen(); }
 
 QString DatabaseManager::databasePath() const { return m_dbPath; }
 
@@ -82,15 +67,10 @@ bool DatabaseManager::switchDatabase(const QString &dbPath) {
     return false;
   }
 
-  QSqlDatabase::database(ProjectDbConnectionName).close();
-  QSqlDatabase::removeDatabase(ProjectDbConnectionName);
+  m_db.close();
 
-  auto db = QSqlDatabase::addDatabase("QSQLITE", ProjectDbConnectionName);
-  db.setDatabaseName(dbPath);
-
-  if (!db.open()) {
-    qCritical() << "Failed to open database:" << dbPath
-                << db.lastError().text();
+  if (!m_db.open(dbPath)) {
+    qCritical() << "Failed to open database:" << dbPath << m_db.lastError();
     return false;
   }
 
@@ -111,14 +91,14 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
   if (hashes.isEmpty())
     return;
 
-  QSqlQuery query(QSqlDatabase::database(ProjectDbConnectionName));
+  SqliteStatement stmt =
+      m_db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
   for (const QString &hash : hashes) {
-    query.prepare("DELETE FROM Summaries WHERE paper_hash = :hash");
-    query.bindValue(":hash", hash);
-    if (!query.exec()) {
-      qDebug() << "Delete by hash failed for" << hash << ":"
-               << query.lastError().text();
+    stmt.bind(1, hash);
+    if (!stmt.exec()) {
+      qDebug() << "Delete by hash failed for" << hash << ":" << stmt.errorMsg();
     }
+    stmt.resetAndClearBindings();
   }
   m_summaryModel->loadAll();
   m_queryModel->loadAll();

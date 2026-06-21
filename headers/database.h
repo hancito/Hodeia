@@ -1,10 +1,9 @@
 #pragma once
 #include "headers/query.h"
+#include "headers/sqlitedb.h"
 #include "headers/summary.h"
 #include "headers/summaryproxymodel.h"
 #include <QObject>
-
-inline static const QLatin1String ProjectDbConnectionName("project_db");
 
 class ConfigManager;
 
@@ -23,6 +22,7 @@ public:
   SummaryModel *summaryModel() const { return m_summaryModel; }
   QueryModel *queryModel() const { return m_queryModel; }
   SummaryProxyModel *summaryProxyModel() const { return m_summaryProxyModel; }
+  SqliteDb &db() { return m_db; }
 
   Q_INVOKABLE bool isOpen() const;
   Q_INVOKABLE QString databasePath() const;
@@ -35,6 +35,7 @@ private:
   void createTables();
 
   QString m_dbPath;
+  SqliteDb m_db;
   ConfigManager *m_config = nullptr;
   SummaryModel *m_summaryModel = nullptr;
   QueryModel *m_queryModel = nullptr;

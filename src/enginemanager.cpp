@@ -4,11 +4,7 @@
 
 EngineController::EngineController(QObject *parent) : QObject(parent) {}
 
-EngineController::~EngineController() {
-  // Sécurité : on s'assure que le thread est arrêté proprement avant de
-  // détruire le contrôleur
-  stopEngine();
-}
+EngineController::~EngineController() { stopEngine(); }
 
 QList<QUrl> EngineController::findPdfFiles(const QUrl &folderPath) const {
   QString localPath = folderPath.toLocalFile();
@@ -25,65 +21,57 @@ QList<QUrl> EngineController::findPdfFiles(const QUrl &folderPath) const {
 void EngineController::startEngine(const QList<QUrl> &pdfFiles,
                                    const QString &imgPath,
                                    const QString &dbPath) {
-  // On évite de lancer plusieurs threads en même temps
+  // Clean up any leftover objects from a previous run
   if (m_thread && m_thread->isRunning()) {
     return;
   }
+  if (m_worker) {
+    m_worker->deleteLater();
+    m_worker = nullptr;
+  }
+  if (m_thread) {
+    m_thread->deleteLater();
+    m_thread = nullptr;
+  }
 
-  // Sauvegarde des paramètres pour le lambda
+  // Save parameters
   m_pdfFiles = pdfFiles;
   m_dbPath = dbPath;
   m_imgPath = imgPath;
 
-  // 1. Instanciation (sans parent pour le worker, indispensable avant
-  // moveToThread)
   m_thread = new QThread();
   m_worker = new PdfWorker();
-
-  // 2. Déplacement du worker dans le nouveau thread
   m_worker->moveToThread(m_thread);
 
-  // Dclenche le travail ds le thread worker
+  // Trigger work
   connect(m_thread, &QThread::started, m_worker,
           [this]() { m_worker->processPDF(m_pdfFiles, m_imgPath, m_dbPath); });
 
-  // Nettoyage automatique de la mémoire en cascade
+  // When done: quit thread, then delete objects in the main thread's event loop
   connect(m_worker, &PdfWorker::finished, m_thread, &QThread::quit);
-  connect(m_worker, &PdfWorker::finished, m_worker, &QObject::deleteLater);
-  connect(m_thread, &QThread::finished, m_thread, &QObject::deleteLater);
-
-  // Reset des pointeurs une fois détruits pour éviter les pointeurs sauvages
-  // (Dangling Pointers)
-  connect(m_thread, &QThread::destroyed, this, [this]() {
-    m_thread = nullptr;
+  connect(m_thread, &QThread::finished, this, [this]() {
+    m_worker->deleteLater();
+    m_thread->deleteLater();
     m_worker = nullptr;
+    m_thread = nullptr;
   });
 
-  // Redirection des signaux du Worker vers l'extérieur (IHM / Application)
-  connect(m_worker, &PdfWorker::started, this, [this]() {
-    qInfo() << "[EngineController] Notifying QML of new Status";
-    emit ingestionStarted();
-  });
-  connect(m_worker, &PdfWorker::status, this, [this](QString statusLog) {
-    qInfo() << "[EngineController] Notifying QML of new Status";
-    emit ingestionStatus(statusLog);
-  });
-  connect(m_worker, &PdfWorker::finished, this, [this]() {
-    qInfo()
-        << "[EngineController] ingestion finished received, emitting to QML";
-    emit ingestionFinished();
-  });
+  // Forward signals to QML
+  connect(m_worker, &PdfWorker::started, this,
+          &EngineController::ingestionStarted);
+  connect(m_worker, &PdfWorker::status, this,
+          &EngineController::ingestionStatus);
+  connect(m_worker, &PdfWorker::finished, this,
+          &EngineController::ingestionFinished);
 
-  // 4. Lancement du thread
   qInfo() << "[EngineController] Starting worker thread";
   m_thread->start();
 }
 
 void EngineController::stopEngine() {
   if (m_worker && m_thread && m_thread->isRunning()) {
-    m_worker->stop(); // Demande gentiment au worker de s'arrêter
-    m_thread->quit(); // Demande à la boucle d'événements du thread de quitter
-    m_thread->wait(); // Bloque le thread principal jusqu'à l'arrêt complet du
-                      // background thread
+    m_worker->stop();
+    m_thread->quit();
+    m_thread->wait();
   }
 }
