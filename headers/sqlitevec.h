@@ -42,6 +42,11 @@ public:
   QList<ChunkSearchResult> search(SqliteDb &db, const QString &query,
                                   int k = 10);
 
+  // Retrieve all chunks belonging to a paper by its MD5 hash.
+  // Returns ChunkSearchResult items (distance is set to 0.0f).
+  QList<ChunkSearchResult> getChunksByHash(SqliteDb &db,
+                                           const QString &paperHash);
+
   // Get embedding dimensionality of the loaded model
   int embeddingDim() const;
 

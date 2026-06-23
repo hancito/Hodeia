@@ -11,6 +11,17 @@
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   loadConfig(); // Automatically load the file when instantiated
 
+  // If no backends were loaded, seed the default llama.cpp backend
+  if (m_backendList.isEmpty()) {
+    QVariantMap defaultBackend;
+    defaultBackend["name"] = QStringLiteral("llamacpp");
+    defaultBackend["url"] = QStringLiteral("");
+    defaultBackend["api_key"] = QStringLiteral("");
+    m_backendList.append(defaultBackend);
+    m_activeBackend = QStringLiteral("llamacpp");
+    saveConfig();
+  }
+
   // Create "Default" project if no projects exist yet
   QDir projRoot(projectsRoot());
   if (!projRoot.exists() ||
@@ -46,10 +57,13 @@ void ConfigManager::loadConfig() {
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
 
     // Load backend list from JSON array
+    // Expected format: [{"name":"..", "url":"..", "api_key":".."}, ...]
     QJsonArray backendArray = obj.value("backendList").toArray();
     m_backendList.clear();
     for (const auto &item : backendArray) {
-      m_backendList << item.toString();
+      if (item.isObject()) {
+        m_backendList.append(item.toObject().toVariantMap());
+      }
     }
   }
 }
@@ -66,10 +80,15 @@ void ConfigManager::saveConfig() {
   obj["contextWindow"] = static_cast<qint64>(m_contextWindow);
   obj["modelTemperature"] = m_modelTemperature;
 
-  // Save backend list as JSON array
+  // Save backend list as JSON array of objects
   QJsonArray backendArray;
-  for (const auto &backend : m_backendList) {
-    backendArray.append(backend);
+  for (const auto &entry : m_backendList) {
+    QJsonObject backendObj;
+    QVariantMap map = entry.toMap();
+    backendObj["name"] = map.value("name").toString();
+    backendObj["url"] = map.value("url").toString();
+    backendObj["api_key"] = map.value("api_key").toString();
+    backendArray.append(backendObj);
   }
   obj["backendList"] = backendArray;
 
@@ -118,11 +137,64 @@ void ConfigManager::setModelTemperature(double temperature) {
   }
 }
 
-void ConfigManager::setBackendList(const QStringList &backends) {
+void ConfigManager::setBackendList(const QVariantList &backends) {
   if (m_backendList != backends) {
     m_backendList = backends;
     emit backendListChanged();
     saveConfig();
+  }
+}
+
+QVariantMap ConfigManager::backendConfig(const QString &name) const {
+  for (const auto &entry : m_backendList) {
+    QVariantMap map = entry.toMap();
+    if (map.value("name").toString() == name) {
+      return map;
+    }
+  }
+  return QVariantMap();
+}
+
+QStringList ConfigManager::backendNames() const {
+  QStringList names;
+  for (const auto &entry : m_backendList) {
+    names << entry.toMap().value("name").toString();
+  }
+  return names;
+}
+
+void ConfigManager::setBackend(const QString &name, const QString &url,
+                               const QString &apiKey) {
+  // Update existing entry
+  for (int i = 0; i < m_backendList.size(); ++i) {
+    QVariantMap map = m_backendList[i].toMap();
+    if (map.value("name").toString() == name) {
+      map["url"] = url;
+      map["api_key"] = apiKey;
+      m_backendList[i] = map;
+      emit backendListChanged();
+      saveConfig();
+      return;
+    }
+  }
+  // Add new entry
+  QVariantMap newBackend;
+  newBackend["name"] = name;
+  newBackend["url"] = url;
+  newBackend["api_key"] = apiKey;
+  m_backendList.append(newBackend);
+  emit backendListChanged();
+  saveConfig();
+}
+
+void ConfigManager::removeBackend(const QString &name) {
+  for (int i = 0; i < m_backendList.size(); ++i) {
+    if (m_backendList[i].toMap().value("name").toString() == name) {
+      m_backendList.removeAt(i);
+      emit backendListChanged();
+      saveConfig();
+      return;
+    }
   }
 }
 

@@ -33,15 +33,9 @@ public:
   QHash<int, QByteArray> roleNames() const override;
 
   Q_INVOKABLE void loadAll();
-  Q_INVOKABLE void insert(const QueryRow &row);
-  Q_INVOKABLE void removeRow(int index);
-  Q_INVOKABLE void clear();
-
-  QueryRow getRow(int index) const;
 
 private:
   SqliteDb *m_db = nullptr;
   QVector<QueryRow> m_rows;
-
   QString formatDate(const QDateTime &dt) const;
 };

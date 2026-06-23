@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QThread>
+#include <algorithm>
 
 namespace {
 constexpr const char *PassagePrefix = "passage: ";
@@ -284,6 +285,53 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
     r.distance = distance;
     results.append(r);
   }
+
+  return results;
+}
+
+/* ── Get chunks by paper hash ─────────────────────────────────── */
+
+QList<ChunkSearchResult>
+SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
+  if (paperHash.isEmpty())
+    return {};
+
+  // The paper_hash lives inside the JSON metadata_blob.
+  // vec0 does not support indexed WHERE on text columns, so we
+  // scan with a LIKE filter and verify the key in C++ to avoid
+  // false positives from other JSON keys containing the same substring.
+  QString sql = "SELECT metadata_blob FROM chunks WHERE metadata_blob LIKE ?";
+
+  SqliteStatement stmt = db.prepare(sql);
+  if (!stmt.isValid())
+    return {};
+
+  stmt.bind(1, QString("\"paper_hash\":\"%1\"").arg(paperHash));
+
+  QList<ChunkSearchResult> results;
+  while (stmt.step()) {
+    QString metaStr = stmt.columnText(0);
+
+    QJsonObject meta = QJsonDocument::fromJson(metaStr.toUtf8()).object();
+    if (meta.value("paper_hash").toString() != paperHash)
+      continue; // guard against LIKE false positives
+
+    ChunkSearchResult r;
+    r.paperHash = meta.value("paper_hash").toString();
+    r.page = meta.value("page").toInt();
+    r.chunkIdx = meta.value("chunk_idx").toInt();
+    r.text = meta.value("text").toString();
+    r.distance = 0.0f;
+    results.append(r);
+  }
+
+  // Sort by page then chunk_idx for deterministic, readable order
+  std::sort(results.begin(), results.end(),
+            [](const ChunkSearchResult &a, const ChunkSearchResult &b) {
+              if (a.page != b.page)
+                return a.page < b.page;
+              return a.chunkIdx < b.chunkIdx;
+            });
 
   return results;
 }

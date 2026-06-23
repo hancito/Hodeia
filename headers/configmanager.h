@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <QVariantList>
 #include <qtmetamacros.h>
 
 class ConfigManager : public QObject {
@@ -18,7 +19,7 @@ class ConfigManager : public QObject {
                  setContextWindow NOTIFY contextWindowChanged)
   Q_PROPERTY(double modelTemperature READ modelTemperature WRITE
                  setModelTemperature NOTIFY modelTemperatureChanged)
-  Q_PROPERTY(QStringList backendList READ backendList WRITE setBackendList
+  Q_PROPERTY(QVariantList backendList READ backendList WRITE setBackendList
                  NOTIFY backendListChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
 
@@ -32,8 +33,14 @@ public:
   QString activeBackend() const { return m_activeBackend; }
   unsigned int contextWindow() const { return m_contextWindow; }
   float modelTemperature() const { return m_modelTemperature; }
-  QStringList backendList() const { return m_backendList; }
+  QVariantList backendList() const { return m_backendList; }
   QStringList projectList() const { return m_projectList; }
+
+  /// Look up a backend entry by name.  Returns an empty object if not found.
+  Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
+
+  /// Return the list of backend names (for UI dropdowns).
+  Q_INVOKABLE QStringList backendNames() const;
 
   // Setters (Will trigger auto-saving to disk)
   void setActiveThemeIndex(int index);
@@ -41,7 +48,17 @@ public:
   void setActiveBackend(const QString &backend);
   void setContextWindow(unsigned int window);
   void setModelTemperature(double temperature);
-  void setBackendList(const QStringList &backends);
+
+  /// Replace the entire backend list.
+  /// Each entry is a QVariantMap with keys: "name", "url", "api_key".
+  void setBackendList(const QVariantList &backends);
+
+  /// Add or update a single backend entry.
+  Q_INVOKABLE void setBackend(const QString &name, const QString &url,
+                              const QString &apiKey);
+
+  /// Remove a backend by name.
+  Q_INVOKABLE void removeBackend(const QString &name);
 
   // Project Operations
   Q_INVOKABLE bool createProject(const QString &projectName);
@@ -80,6 +97,8 @@ private:
   QString m_activeBackend = "";
   unsigned int m_contextWindow = 4000;
   double m_modelTemperature = 0.1;
-  QStringList m_backendList;
+
+  /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
+  QVariantList m_backendList;
   QStringList m_projectList;
 };

@@ -1,5 +1,4 @@
 #include "headers/summary.h"
-#include <QVariantMap>
 
 SummaryModel::SummaryModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -99,68 +98,4 @@ void SummaryModel::loadAll() {
   }
 
   endResetModel();
-}
-
-void SummaryModel::insert(const SummaryRow &row) {
-  if (!m_db)
-    return;
-
-  beginInsertRows(QModelIndex(), m_rows.size(), m_rows.size());
-  SummaryRow newRow = row;
-  m_rows.append(newRow);
-  endInsertRows();
-
-  SqliteStatement stmt =
-      m_db->prepare("INSERT INTO Summaries "
-                    "(paper_hash, title, authors, pages_num, journal, year, "
-                    "topics, llmodel, summary_json, date) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-  stmt.bind(1, newRow.paperHash);
-  stmt.bind(2, newRow.title);
-  stmt.bind(3, newRow.authors);
-  stmt.bind(4, newRow.pagesNum);
-  stmt.bind(5, newRow.journal);
-  stmt.bind(6, newRow.year);
-  stmt.bind(7, newRow.topics);
-  stmt.bind(8, newRow.llmodel);
-  stmt.bind(9, newRow.summaryJson.toByteArray());
-  stmt.bind(10, newRow.date);
-
-  if (!stmt.exec()) {
-    qDebug() << "Insert Summary failed:" << stmt.errorMsg();
-  }
-}
-
-void SummaryModel::removeRow(int index) {
-  if (!m_db || index < 0 || index >= m_rows.size())
-    return;
-
-  int dbId = m_rows[index].id;
-  beginRemoveRows(QModelIndex(), index, index);
-  m_rows.removeAt(index);
-  endRemoveRows();
-
-  SqliteStatement stmt = m_db->prepare("DELETE FROM Summaries WHERE id = ?");
-  stmt.bind(1, dbId);
-  if (!stmt.exec()) {
-    qDebug() << "Delete Summary failed:" << stmt.errorMsg();
-  }
-}
-
-void SummaryModel::clear() {
-  if (!m_db)
-    return;
-
-  beginResetModel();
-  m_rows.clear();
-  endResetModel();
-
-  m_db->exec("DELETE FROM Summaries");
-}
-
-SummaryRow SummaryModel::getRow(int index) const {
-  if (index < 0 || index >= m_rows.size())
-    return SummaryRow{};
-  return m_rows[index];
 }

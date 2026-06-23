@@ -70,9 +70,9 @@ ApplicationWindow {
         }
 
         // Show backend setup if no backends configured
-        if (configManager.backendList.length === 0) {
-            backendDialog.open();
-        }
+        //if (configManager.backendList.length === 0) {
+        //   backendDialog.open();
+        //}
     }
     menuBar: MyMenuBar {
         id: topNavigation
@@ -286,19 +286,6 @@ ApplicationWindow {
     // Backend setup modal
     BackendWindow {
         id: backendDialog
-        onAccepted: {
-            // Save backend configuration when user clicks Ok
-            if (backendComboBox.currentIndex >= 0) {
-                configManager.setActiveBackend(backendComboBox.currentText);
-            }
-            if (apiUrlValue.text) {
-                configManager.setLastProject(apiUrlValue.text);
-            }
-            if (apiKeyValue.text) {
-                configManager.setBackendList([apiKeyValue.text]);
-            }
-            configManager.saveConfig();
-        }
     }
 
     // Status bar

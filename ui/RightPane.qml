@@ -39,6 +39,18 @@ Rectangle {
         numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
     }
 
+    function summarizeSelected() {
+        if (selectedPapers.length === 0) {
+            console.log("No papers selected");
+            return;
+        }
+        console.log("Summarizing", selectedPapers.length, "papers");
+        databaseManager.removeByHashes(selectedPapers);
+
+        selectedPapers = [];
+        databaseManager.summaryModel.loadAll();
+    }
+
     border.width: 1
     radius: 5
     color: Colors.surface0
