@@ -69,6 +69,9 @@ ApplicationWindow {
             themeManager.setThemeIndex(configManager.activeThemeIndex);
         }
 
+        // Load models for the active backend (local or remote)
+        summarizer.loadActiveBackendModels();
+
         // Show backend setup if no backends configured
         //if (configManager.backendList.length === 0) {
         //   backendDialog.open();
@@ -286,6 +289,32 @@ ApplicationWindow {
     // Backend setup modal
     BackendWindow {
         id: backendDialog
+    }
+
+    // File dialog for selecting GGUF summarizer models
+    FileDialog {
+        id: localModelFileDialog
+        title: "Select GGUF Model File"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
+        onAccepted: {
+            configManager.addLocalSummarizer(selectedFile);
+        }
+    }
+
+    // Model copy progress in footer
+    Connections {
+        target: configManager
+        function onModelCopyProgress(percentage, fileName) {
+            footerLabel.text = "Copying model: " + fileName + " — " + percentage + "%";
+        }
+        function onModelCopyFinished(success, destPath, error) {
+            if (success) {
+                footerLabel.text = "Model copied: " + destPath;
+            } else {
+                footerLabel.text = "Copy failed: " + error;
+            }
+        }
     }
 
     // Status bar

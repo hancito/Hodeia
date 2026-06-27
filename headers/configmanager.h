@@ -5,6 +5,20 @@
 #include <QVariantList>
 #include <qtmetamacros.h>
 
+class QThread;
+
+/// Background worker for copying model files with progress reporting.
+class ModelCopyWorker : public QObject {
+  Q_OBJECT
+public:
+  explicit ModelCopyWorker(QObject *parent = nullptr);
+  Q_INVOKABLE void run(const QString &sourceUri, const QString &destDir);
+
+signals:
+  void progress(int percentage, const QString &fileName);
+  void finished(bool success, const QString &destPath, const QString &error);
+};
+
 class ConfigManager : public QObject {
   Q_OBJECT
 
@@ -21,6 +35,8 @@ class ConfigManager : public QObject {
                  setModelTemperature NOTIFY modelTemperatureChanged)
   Q_PROPERTY(QVariantList backendList READ backendList WRITE setBackendList
                  NOTIFY backendListChanged)
+  Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
+                 activeModelChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
 
 public:
@@ -34,6 +50,7 @@ public:
   unsigned int contextWindow() const { return m_contextWindow; }
   float modelTemperature() const { return m_modelTemperature; }
   QVariantList backendList() const { return m_backendList; }
+  QString activeModel() const { return m_activeModel; }
   QStringList projectList() const { return m_projectList; }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
@@ -45,7 +62,8 @@ public:
   // Setters (Will trigger auto-saving to disk)
   void setActiveThemeIndex(int index);
   void setLastProject(const QString &path);
-  void setActiveBackend(const QString &backend);
+  Q_INVOKABLE void setActiveBackend(const QString &backend);
+  Q_INVOKABLE void setActiveModel(const QString &model);
   void setContextWindow(unsigned int window);
   void setModelTemperature(double temperature);
 
@@ -72,6 +90,19 @@ public:
   Q_INVOKABLE void deleteImages(const QStringList &hashList,
                                 const QString &imgPath) const;
 
+  /// Path to the Models directory (contains Embedders/ and Summarizers/).
+  Q_INVOKABLE QString modelsPath() const;
+
+  /// Path to the Embedders subdirectory.
+  Q_INVOKABLE QString embeddersPath() const;
+
+  /// Path to the Summarizers subdirectory.
+  Q_INVOKABLE QString summarizersPath() const;
+
+  /// Copy a GGUF model file to the Summarizers folder in a background
+  /// thread.  Emits modelCopyProgress() and modelCopyFinished().
+  Q_INVOKABLE void addLocalSummarizer(const QString &sourcePath);
+
   // File Operations
   Q_INVOKABLE void loadConfig();
   Q_INVOKABLE void saveConfig();
@@ -83,22 +114,43 @@ signals:
   void activeThemeIndexChanged();
   void lastProjectChanged();
   void activeBackendChanged();
+  void activeModelChanged();
   void contextWindowChanged();
   void modelTemperatureChanged();
   void backendListChanged();
 
+  /// Progress for model file copy (0–100).
+  void modelCopyProgress(int percentage, const QString &fileName);
+
+  /// Model file copy finished.
+  /// @param success  true on success.
+  /// @param destPath destination path (empty on failure).
+  /// @param error    error description (empty on success).
+  void modelCopyFinished(bool success, const QString &destPath,
+                         const QString &error);
+
+  /// Emitted when a model file was successfully copied.
+  void modelCopied();
+
 private:
   void refreshProjectList();
+  void ensureModelsDirectory();
   QString getFilePath() const;
   QString projectsRoot() const;
+  QString modelsRoot() const;
 
   int m_activeThemeIndex = 0;
   QString m_lastProject = "";
   QString m_activeBackend = "";
+  QString m_activeModel = "";
   unsigned int m_contextWindow = 4000;
   double m_modelTemperature = 0.1;
 
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
   QVariantList m_backendList;
   QStringList m_projectList;
+
+  // Model copy worker
+  QThread *m_copyThread = nullptr;
+  ModelCopyWorker *m_copyWorker = nullptr;
 };

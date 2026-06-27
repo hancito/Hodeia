@@ -40,6 +40,23 @@ Rectangle {
         }
     }
 
+    // React to summarizer modelsChecked to populate the model combobox
+    Connections {
+        target: summarizer
+        function onModelsChecked(success, models, error) {
+            if (success && models.length > 0) {
+                modelComboBox.model = models;
+                // Sync: if activeModel is in the list, select it; else pick first
+                var idx = models.indexOf(configManager.activeModel);
+                if (idx < 0) {
+                    idx = 0;
+                    configManager.activeModel = models[0];
+                }
+                modelComboBox.currentIndex = idx;
+            }
+        }
+    }
+
     Timer {
         id: executionTimer
         interval: 100 // Updates every 100 milliseconds (0.1 seconds)
@@ -195,6 +212,11 @@ Rectangle {
             ComboBox {
                 id: modelComboBox
                 Layout.fillWidth: true
+                onCurrentTextChanged: {
+                    if (currentText !== "") {
+                        configManager.activeModel = currentText;
+                    }
+                }
             }
         }
         Item {

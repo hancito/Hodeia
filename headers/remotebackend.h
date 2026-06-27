@@ -6,12 +6,12 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 
-/// Remote OpenAI-compatible backend using QNetworkAccessManager.
+/// Remote backend using QNetworkAccessManager.
 ///
 /// Sends chat completion requests to a distant server
 /// (OpenAI, Ollama, LM Studio, etc.) via HTTP POST to /v1/chat/completions.
 /// Parses the JSON response and returns the assistant message content.
-class OpenAiServerBackend : public QObject {
+class RemoteBackend : public QObject {
   Q_OBJECT
 
   Q_PROPERTY(QString apiUrl READ apiUrl WRITE setApiUrl)
@@ -21,8 +21,8 @@ class OpenAiServerBackend : public QObject {
   Q_PROPERTY(int maxTokens READ maxTokens WRITE setMaxTokens)
 
 public:
-  explicit OpenAiServerBackend(QObject *parent = nullptr);
-  ~OpenAiServerBackend() override;
+  explicit RemoteBackend(QObject *parent = nullptr);
+  ~RemoteBackend() override;
 
   // Configuration
   QString apiUrl() const { return m_apiUrl; }
@@ -45,11 +45,16 @@ public:
 
   /// Generate a completion from system + user prompts.
   /// Asynchronous; result delivered via the finished() signal.
-  Q_INVOKABLE void generate(const QString &systemPrompt,
-                            const QString &userPrompt);
+  void generate(const QString &systemPrompt, const QString &userPrompt);
 
   /// Cancel an in-flight request.
-  Q_INVOKABLE void cancel();
+  void cancel();
+
+  /// Fetch the list of available models from the remote API.
+  /// Sends GET /v1/models using the given URL and key (does not modify
+  /// the persistent backend configuration). Emits modelsReady() with the
+  /// model IDs.
+  void fetchModels(const QString &apiUrl, const QString &apiKey);
 
 signals:
   /// Emitted when generation completes (success or failure).
@@ -57,10 +62,16 @@ signals:
   /// @param error Error description (empty on success).
   void finished(const QString &text, const QString &error);
 
+  /// Emitted after fetchModels() completes.
+  /// @param models List of model IDs (empty on error).
+  /// @param error  Error description (empty on success).
+  void modelsReady(const QStringList &models, const QString &error);
+
   void statusUpdated(const QString &msg);
 
 private:
   void handleReply(QNetworkReply *reply);
+  void handleModelsReply(QNetworkReply *reply);
 
   QNetworkAccessManager *m_manager = nullptr;
   QNetworkReply *m_currentReply = nullptr;

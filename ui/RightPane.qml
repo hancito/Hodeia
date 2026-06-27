@@ -5,7 +5,6 @@ import QtQuick.Layouts
 
 Rectangle {
     id: rightPane
-    property var activeTheme: ({})
     property int npapers: databaseManager.summaryModel.rowCount()
     property list<string> selectedPapers: []
 

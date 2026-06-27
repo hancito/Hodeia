@@ -6,21 +6,39 @@ import QtQuick.Layouts
 Dialog {
     id: backendWindow
     width: 520
-    height: 480
+    height: 600
     title: qsTr("Backend Management")
     anchors.centerIn: parent
     modal: true
     focus: true
     standardButtons: Dialog.Ok | Dialog.Cancel
-
     Component.onCompleted: {
         nameValue.text = "";
         urlValue.text = "";
         keyValue.text = "";
         editingIndex = -1;
+        connectionVerified = false;
+        modelCheckLabel.visible = false;
     }
 
     property int editingIndex: -1
+    property bool connectionVerified: false
+
+    // React to checkModels result
+    Connections {
+        target: summarizer
+        function onModelsChecked(success, models, error) {
+            if (success) {
+                modelCheckLabel.text = "Connected — " + models.length + " model(s) available";
+                modelCheckLabel.visible = true;
+                connectionVerified = true;
+            } else {
+                modelCheckLabel.text = "Connection failed: " + error;
+                modelCheckLabel.visible = true;
+                connectionVerified = false;
+            }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -36,11 +54,12 @@ Dialog {
                 id: backendListView
                 anchors.fill: parent
                 model: configManager.backendList
+                clip: true
 
                 delegate: RowLayout {
                     width: backendListView.width
-                    property int idx: index
-
+                    required property var modelData
+                    required property var index
                     Label {
                         text: modelData.name || ""
                         font.weight: Font.Bold
@@ -50,17 +69,19 @@ Dialog {
 
                     Button {
                         text: "Edit"
+                        visible: modelData.name !== "Llama.cpp"
                         onClicked: {
-                            editingIndex = idx;
+                            editingIndex = index;
                             nameValue.text = modelData.name || "";
                             urlValue.text = modelData.url || "";
                             keyValue.text = modelData.api_key || "";
+                            connectionVerified = false;
                         }
                     }
 
                     Button {
                         text: "Remove"
-                        enabled: modelData.name !== "llamacpp"
+                        visible: modelData.name !== "Llama.cpp"
                         onClicked: {
                             configManager.removeBackend(modelData.name);
                             editingIndex = -1;
@@ -119,14 +140,40 @@ Dialog {
                         id: keyValue
                         Layout.fillWidth: true
                         echoMode: TextField.Password
-                        placeholderText: "optional"
+                        placeholderText: "API Key (empty if not needed)"
                     }
+                }
+
+                Button {
+                    Layout.fillWidth: true
+                    text: qsTr("Check Connection")
+                    highlighted: false
+                    onClicked: {
+                        let n = nameValue.text.trim() || "Remote";
+                        let u = urlValue.text.trim();
+                        let k = keyValue.text.trim();
+                        if (u === "") {
+                            modelCheckLabel.text = "Please enter a URL";
+                            modelCheckLabel.visible = true;
+                            return;
+                        }
+                        summarizer.checkModels(n, u, k);
+                    }
+                }
+
+                Label {
+                    id: modelCheckLabel
+                    visible: false
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
                 }
 
                 Button {
                     Layout.fillWidth: true
                     text: editingIndex >= 0 ? qsTr("Save Changes") : qsTr("Add Backend")
                     highlighted: true
+                    visible: editingIndex >= 0 || connectionVerified
+                    enabled: connectionVerified
                     onClicked: {
                         let n = nameValue.text.trim();
                         if (n === "")
@@ -136,6 +183,7 @@ Dialog {
                         nameValue.clear();
                         urlValue.clear();
                         keyValue.clear();
+                        modelCheckLabel.visible = false;
                     }
                 }
             }

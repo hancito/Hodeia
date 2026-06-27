@@ -2,11 +2,14 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileDevice>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
+#include <QThread>
+#include <QUrl>
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   loadConfig(); // Automatically load the file when instantiated
@@ -14,11 +17,11 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   // If no backends were loaded, seed the default llama.cpp backend
   if (m_backendList.isEmpty()) {
     QVariantMap defaultBackend;
-    defaultBackend["name"] = QStringLiteral("llamacpp");
+    defaultBackend["name"] = QStringLiteral("Llama.cpp");
     defaultBackend["url"] = QStringLiteral("");
     defaultBackend["api_key"] = QStringLiteral("");
     m_backendList.append(defaultBackend);
-    m_activeBackend = QStringLiteral("llamacpp");
+    m_activeBackend = QStringLiteral("Llama.cpp");
     saveConfig();
   }
 
@@ -28,10 +31,33 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
       projRoot.entryList(QDir::Dirs | QDir::NoDotAndDotDot).isEmpty()) {
     createProject("Default");
   }
+  ensureModelsDirectory();
   refreshProjectList();
+
+  // Set up model copy worker thread
+  m_copyThread = new QThread(this);
+  m_copyWorker = new ModelCopyWorker();
+  m_copyWorker->moveToThread(m_copyThread);
+  QObject::connect(m_copyWorker, &ModelCopyWorker::progress, this,
+                   &ConfigManager::modelCopyProgress);
+  QObject::connect(
+      m_copyWorker, &ModelCopyWorker::finished, this,
+      [this](bool success, const QString &destPath, const QString &error) {
+        emit modelCopyFinished(success, destPath, error);
+        if (success) {
+          emit modelCopied();
+        }
+      });
+  m_copyThread->start();
 }
 
-ConfigManager::~ConfigManager() { saveConfig(); }
+ConfigManager::~ConfigManager() {
+  saveConfig();
+  if (m_copyThread) {
+    m_copyThread->quit();
+    m_copyThread->wait();
+  }
+}
 
 QString ConfigManager::getFilePath() const {
   // Finds location like: AppData/Roaming/Paperize/ or ~/.local/share/Paperize/
@@ -52,6 +78,7 @@ void ConfigManager::loadConfig() {
     m_activeThemeIndex = obj.value("activeThemeIndex").toInt(0);
     m_lastProject = obj.value("lastProject").toString("");
     m_activeBackend = obj.value("activeBackend").toString("");
+    m_activeModel = obj.value("activeModel").toString("");
     m_contextWindow =
         static_cast<unsigned int>(obj.value("contextWindow").toInt(4000));
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
@@ -77,6 +104,7 @@ void ConfigManager::saveConfig() {
   obj["activeThemeIndex"] = m_activeThemeIndex;
   obj["lastProject"] = m_lastProject;
   obj["activeBackend"] = m_activeBackend;
+  obj["activeModel"] = m_activeModel;
   obj["contextWindow"] = static_cast<qint64>(m_contextWindow);
   obj["modelTemperature"] = m_modelTemperature;
 
@@ -117,6 +145,14 @@ void ConfigManager::setActiveBackend(const QString &backend) {
   if (m_activeBackend != backend) {
     m_activeBackend = backend;
     emit activeBackendChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setActiveModel(const QString &model) {
+  if (m_activeModel != model) {
+    m_activeModel = model;
+    emit activeModelChanged();
     saveConfig();
   }
 }
@@ -351,6 +387,52 @@ bool ConfigManager::resetActiveProject() {
   return true;
 }
 
+void ConfigManager::ensureModelsDirectory() {
+  QDir modelsDir(modelsRoot());
+  if (!modelsDir.exists()) {
+    modelsDir.mkpath("Embedders");
+    modelsDir.mkpath("Summarizers");
+  }
+}
+
+QString ConfigManager::modelsRoot() const {
+  QString dirPath =
+      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  return dirPath + "/Models";
+}
+
+QString ConfigManager::modelsPath() const { return modelsRoot(); }
+
+QString ConfigManager::embeddersPath() const {
+  return modelsRoot() + "/Embedders";
+}
+
+QString ConfigManager::summarizersPath() const {
+  return modelsRoot() + "/Summarizers";
+}
+
+void ConfigManager::addLocalSummarizer(const QString &sourcePath) {
+  // Resolve file:// URI if needed
+  QString srcPath = sourcePath;
+  if (srcPath.startsWith("file://")) {
+    srcPath = QUrl(srcPath).toLocalFile();
+  }
+
+  QFile src(srcPath);
+  if (!src.exists()) {
+    qWarning() << "[ConfigManager] Source file does not exist:" << srcPath;
+    emit modelCopyFinished(false, QString(),
+                           "Source file does not exist: " + srcPath);
+    return;
+  }
+
+  QString destDir = summarizersPath();
+  QMetaObject::invokeMethod(
+      m_copyWorker,
+      [this, srcPath, destDir]() { m_copyWorker->run(srcPath, destDir); },
+      Qt::QueuedConnection);
+}
+
 void ConfigManager::refreshProjectList() {
   QDir projectsDir(projectsRoot());
   if (!projectsDir.exists()) {
@@ -376,6 +458,7 @@ QString ConfigManager::projectImgPath(const QString &projectName) const {
 QString ConfigManager::projectPdfPath(const QString &projectName) const {
   return projectsRoot() + "/" + projectName + "/" + "PDF";
 }
+
 void ConfigManager::deleteImages(const QStringList &hashList,
                                  const QString &imgPath) const {
   QDir imgDir(imgPath);
@@ -399,4 +482,78 @@ void ConfigManager::deleteImages(const QStringList &hashList,
       qDebug() << "No images found for hash:" << hash;
     }
   }
+}
+
+// ── ModelCopyWorker ──────────────────────────────────────────────────
+
+ModelCopyWorker::ModelCopyWorker(QObject *parent) : QObject(parent) {}
+
+void ModelCopyWorker::run(const QString &sourcePath, const QString &destDir) {
+  QString srcPath = sourcePath;
+  if (srcPath.startsWith("file://")) {
+    srcPath = QUrl(srcPath).toLocalFile();
+  }
+
+  QFile src(srcPath);
+  if (!src.exists()) {
+    emit finished(false, QString(), "Source file not found: " + srcPath);
+    return;
+  }
+
+  QString fileName = QFileInfo(src).fileName();
+  QString destPath = destDir + "/" + fileName;
+
+  QDir d;
+  d.mkpath(destDir);
+
+  // Remove existing destination if present
+  if (QFile::exists(destPath) && !QFile::remove(destPath)) {
+    emit finished(false, QString(), "Cannot remove existing file: " + destPath);
+    return;
+  }
+
+  if (!src.open(QIODevice::ReadOnly)) {
+    emit finished(false, QString(), "Cannot open source file: " + srcPath);
+    return;
+  }
+
+  qint64 total = src.size();
+  if (total <= 0) {
+    emit finished(false, QString(),
+                  "Cannot determine source file size: " + srcPath);
+    return;
+  }
+
+  QFile dest(destPath);
+  if (!dest.open(QIODevice::WriteOnly)) {
+    emit finished(false, QString(),
+                  "Cannot open destination for writing: " + destPath);
+    return;
+  }
+
+  const qint64 bufSize = 1024 * 1024; // 1 MiB chunks
+  char buf[bufSize];
+  qint64 copied = 0;
+
+  while (!src.atEnd()) {
+    qint64 bytesRead = src.read(buf, bufSize);
+    if (bytesRead <= 0)
+      break;
+    copied += dest.write(buf, bytesRead);
+    int pct = static_cast<int>(copied * 100 / total);
+    emit progress(pct, fileName);
+  }
+  dest.close();
+  src.close();
+
+  if (copied != total) {
+    QFile::remove(destPath);
+    emit finished(false, QString(),
+                  "Copy incomplete: " + QString::number(copied) + "/" +
+                      QString::number(total) + " bytes");
+    return;
+  }
+
+  emit progress(100, fileName);
+  emit finished(true, destPath, QString());
 }

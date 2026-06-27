@@ -1,6 +1,7 @@
 #include "headers/configmanager.h"
 #include "headers/database.h"
 #include "headers/enginemanager.h"
+#include "headers/summarizer.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -60,12 +61,16 @@ int main(int argc, char *argv[]) {
   // Create the PDF ingestion worker
   EngineController engineController;
 
+  // Create the Summarizer (orchestrates local/remote backends)
+  Summarizer summarizer(&configManager, &databaseManager);
+
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
   engine.rootContext()->setContextProperty("engineController",
                                            &engineController);
+  engine.rootContext()->setContextProperty("summarizer", &summarizer);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

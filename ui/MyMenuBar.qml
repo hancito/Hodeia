@@ -104,17 +104,22 @@ MenuBar {
                 text: "Add Backend..."
                 onTriggered: backendDialog.open()
             }
+            MenuItem {
+                text: "Add Local Summarizer..."
+                onTriggered: localModelFileDialog.open()
+            }
+            MenuSeparator {}
             Menu {
                 title: "Change Backend"
                 Repeater {
                     model: configManager.backendList
                     delegate: MenuItem {
                         required property var modelData
-                        text: modelData
+                        text: modelData.name
                         checkable: true
-                        checked: configManager.activeBackend === modelData
+                        checked: configManager.activeBackend === modelData.name
                         onTriggered: {
-                            configManager.setActiveBackend(modelData);
+                            configManager.setActiveBackend(modelData.name);
                         }
                     }
                 }

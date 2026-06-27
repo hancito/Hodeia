@@ -3,17 +3,17 @@
 #include <QObject>
 #include <QString>
 
-/// Llama.cpp backend — pure inference engine.
+/// Local backend — llama.cpp inference engine.
 ///
 /// Responsibilities: load a GGUF chat model, run generation,
 /// return raw text output.  Nothing else (no DB, no prompt building,
 /// no JSON parsing).  The Summarizer orchestrates everything above.
-class LlamaCppBackend : public QObject {
+class LocalBackend : public QObject {
   Q_OBJECT
 
 public:
-  explicit LlamaCppBackend(QObject *parent = nullptr);
-  ~LlamaCppBackend() override;
+  explicit LocalBackend(QObject *parent = nullptr);
+  ~LocalBackend() override;
 
   /// Load a GGUF model for chat completion.
   /// modelPath points to a GGUF file; empty string uses the default

@@ -1,4 +1,4 @@
-#include "headers/openaiserverbackend.h"
+#include "headers/remotebackend.h"
 #include "headers/configmanager.h"
 
 #include <QDebug>
@@ -11,34 +11,32 @@
 #include <QUrl>
 #include <QUrlQuery>
 
-OpenAiServerBackend::OpenAiServerBackend(QObject *parent) : QObject(parent) {
+RemoteBackend::RemoteBackend(QObject *parent) : QObject(parent) {
   m_manager = new QNetworkAccessManager(this);
 }
 
-OpenAiServerBackend::~OpenAiServerBackend() = default;
+RemoteBackend::~RemoteBackend() = default;
 
-void OpenAiServerBackend::setApiUrl(const QString &url) { m_apiUrl = url; }
+void RemoteBackend::setApiUrl(const QString &url) { m_apiUrl = url; }
 
-void OpenAiServerBackend::setApiKey(const QString &key) { m_apiKey = key; }
+void RemoteBackend::setApiKey(const QString &key) { m_apiKey = key; }
 
-void OpenAiServerBackend::setModelName(const QString &name) {
-  m_modelName = name;
-}
+void RemoteBackend::setModelName(const QString &name) { m_modelName = name; }
 
-void OpenAiServerBackend::setTemperature(float temp) { m_temperature = temp; }
+void RemoteBackend::setTemperature(float temp) { m_temperature = temp; }
 
-void OpenAiServerBackend::setMaxTokens(int tokens) { m_maxTokens = tokens; }
+void RemoteBackend::setMaxTokens(int tokens) { m_maxTokens = tokens; }
 
-void OpenAiServerBackend::applyConfig() {
+void RemoteBackend::applyConfig() {
   // Placeholder — the Summarizer passes config values directly.
 }
 
-bool OpenAiServerBackend::isReady() const {
+bool RemoteBackend::isReady() const {
   return !m_apiUrl.isEmpty() && !m_modelName.isEmpty();
 }
 
-void OpenAiServerBackend::generate(const QString &systemPrompt,
-                                   const QString &userPrompt) {
+void RemoteBackend::generate(const QString &systemPrompt,
+                             const QString &userPrompt) {
   if (!isReady()) {
     emit finished(QString(), "Backend not configured (URL or model missing)");
     return;
@@ -92,7 +90,7 @@ void OpenAiServerBackend::generate(const QString &systemPrompt,
                    });
 }
 
-void OpenAiServerBackend::cancel() {
+void RemoteBackend::cancel() {
   if (m_currentReply) {
     m_currentReply->abort();
     m_currentReply->deleteLater();
@@ -100,13 +98,39 @@ void OpenAiServerBackend::cancel() {
   }
 }
 
-void OpenAiServerBackend::handleReply(QNetworkReply *reply) {
+void RemoteBackend::fetchModels(const QString &apiUrl, const QString &apiKey) {
+  if (apiUrl.isEmpty()) {
+    emit modelsReady(QStringList(), "URL is empty");
+    return;
+  }
+
+  cancel();
+
+  QUrl baseUrl(apiUrl);
+  baseUrl.setPath(baseUrl.path() + "/models");
+
+  QNetworkRequest request(baseUrl);
+  if (!apiKey.isEmpty()) {
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+  }
+
+  emit statusUpdated(tr("Fetching model list from %1").arg(baseUrl.toString()));
+
+  m_currentReply = m_manager->get(request);
+  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
+                   [this, reply = m_currentReply]() {
+                     m_currentReply = nullptr;
+                     handleModelsReply(reply);
+                   });
+}
+
+void RemoteBackend::handleReply(QNetworkReply *reply) {
   if (!reply)
     return;
 
   if (reply->error() != QNetworkReply::NoError) {
     QString err = reply->errorString();
-    qDebug() << "[OpenAiServerBackend] Network error:" << err;
+    qDebug() << "[RemoteBackend] Network error:" << err;
     emit finished(QString(), err);
     reply->deleteLater();
     return;
@@ -119,7 +143,7 @@ void OpenAiServerBackend::handleReply(QNetworkReply *reply) {
   QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
   if (parseErr.error != QJsonParseError::NoError) {
     QString err = tr("JSON parse error: %1").arg(parseErr.errorString());
-    qDebug() << "[OpenAiServerBackend]" << err;
+    qDebug() << "[RemoteBackend]" << err;
     emit finished(QString(), err);
     return;
   }
@@ -143,4 +167,44 @@ void OpenAiServerBackend::handleReply(QNetworkReply *reply) {
 
   emit statusUpdated(tr("Response received (%1 chars)").arg(content.length()));
   emit finished(content, QString());
+}
+
+void RemoteBackend::handleModelsReply(QNetworkReply *reply) {
+  if (!reply)
+    return;
+
+  if (reply->error() != QNetworkReply::NoError) {
+    QString err = reply->errorString();
+    qDebug() << "[RemoteBackend] Network error during models fetch:" << err;
+    emit modelsReady(QStringList(), err);
+    reply->deleteLater();
+    return;
+  }
+
+  QByteArray data = reply->readAll();
+  reply->deleteLater();
+
+  QJsonParseError parseErr;
+  QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
+  if (parseErr.error != QJsonParseError::NoError) {
+    QString err = tr("JSON parse error: %1").arg(parseErr.errorString());
+    qDebug() << "[RemoteBackend]" << err;
+    emit modelsReady(QStringList(), err);
+    return;
+  }
+
+  QJsonObject root = doc.object();
+  QJsonArray dataArray = root.value("data").toArray();
+
+  QStringList models;
+  for (const auto &elem : dataArray) {
+    QJsonObject m = elem.toObject();
+    QString id = m.value("id").toString();
+    if (!id.isEmpty()) {
+      models.append(id);
+    }
+  }
+
+  emit statusUpdated(tr("Received %1 model(s) from server").arg(models.size()));
+  emit modelsReady(models, QString());
 }

@@ -42,8 +42,8 @@ qt_add_qml_module(Paperize
         headers/enginemanager.h
         headers/sqlitedb.h
         headers/sqlitevec.h
-        headers/llamacppbackend.h
-        headers/openaiserverbackend.h
+        headers/localbackend.h
+        headers/remotebackend.h
         headers/summarizer.h
         src/thememanager.cpp
         src/configmanager.cpp
@@ -55,8 +55,8 @@ qt_add_qml_module(Paperize
         src/enginemanager.cpp
         src/sqlitedb.cpp
         src/sqlitevec.cpp
-        src/llamacppbackend.cpp
-        src/openaiserverbackend.cpp
+        src/localbackend.cpp
+        src/remotebackend.cpp
         src/summarizer.cpp
 )
 

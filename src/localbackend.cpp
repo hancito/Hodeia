@@ -1,4 +1,4 @@
-#include "headers/llamacppbackend.h"
+#include "headers/localbackend.h"
 
 #include "llama.h"
 
@@ -11,23 +11,23 @@
 /// Static — llama_backend_init is called once on first construction.
 static bool s_llamaInitialized = false;
 
-LlamaCppBackend::LlamaCppBackend(QObject *parent) : QObject(parent) {
+LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
   if (!s_llamaInitialized) {
     llama_backend_init();
     s_llamaInitialized = true;
-    qDebug() << "[LlamaCppBackend] llama backend initialized"
+    qDebug() << "[LocalBackend] llama backend initialized"
              << llama_print_system_info();
   }
 }
 
-LlamaCppBackend::~LlamaCppBackend() { unloadModel(); }
+LocalBackend::~LocalBackend() { unloadModel(); }
 
-bool LlamaCppBackend::loadModel(const QString &modelPath) {
+bool LocalBackend::loadModel(const QString &modelPath) {
   unloadModel();
 
   QString path = resolveModelPath(modelPath);
   if (path.isEmpty() || !QFile::exists(path)) {
-    qCritical() << "[LlamaCppBackend] Model file not found:" << path;
+    qCritical() << "[LocalBackend] Model file not found:" << path;
     emit statusUpdated("Model file not found: " + path);
     return false;
   }
@@ -41,7 +41,7 @@ bool LlamaCppBackend::loadModel(const QString &modelPath) {
   m_llamaModel =
       llama_model_load_from_file(path.toUtf8().constData(), modelParams);
   if (!m_llamaModel) {
-    qCritical() << "[LlamaCppBackend] Failed to load model:" << path;
+    qCritical() << "[LocalBackend] Failed to load model:" << path;
     emit statusUpdated("Failed to load model");
     return false;
   }
@@ -56,7 +56,7 @@ bool LlamaCppBackend::loadModel(const QString &modelPath) {
 
   m_llamaCtx = llama_init_from_model(m_llamaModel, ctxParams);
   if (!m_llamaCtx) {
-    qCritical() << "[LlamaCppBackend] Failed to create context";
+    qCritical() << "[LocalBackend] Failed to create context";
     emit statusUpdated("Failed to create context");
     llama_model_free(m_llamaModel);
     m_llamaModel = nullptr;
@@ -67,14 +67,14 @@ bool LlamaCppBackend::loadModel(const QString &modelPath) {
   m_ready = true;
 
   uint32_t ctxSize = llama_n_ctx(m_llamaCtx);
-  qDebug() << "[LlamaCppBackend] Model loaded. ctx=" << ctxSize;
+  qDebug() << "[LocalBackend] Model loaded. ctx=" << ctxSize;
   emit statusUpdated("Model loaded: " + path);
   return true;
 }
 
-bool LlamaCppBackend::isReady() const { return m_ready; }
+bool LocalBackend::isReady() const { return m_ready; }
 
-void LlamaCppBackend::unloadModel() {
+void LocalBackend::unloadModel() {
   if (m_llamaCtx) {
     llama_free(m_llamaCtx);
     m_llamaCtx = nullptr;
@@ -87,10 +87,10 @@ void LlamaCppBackend::unloadModel() {
   m_modelPath.clear();
 }
 
-QString LlamaCppBackend::generate(const QString &systemPrompt,
-                                  const QString &userPrompt) {
+QString LocalBackend::generate(const QString &systemPrompt,
+                               const QString &userPrompt) {
   if (!m_ready) {
-    qWarning() << "[LlamaCppBackend] Model not loaded";
+    qWarning() << "[LocalBackend] Model not loaded";
     return QString();
   }
 
@@ -112,7 +112,7 @@ QString LlamaCppBackend::generate(const QString &systemPrompt,
   // Apply chat template
   const char *tmpl = llama_model_chat_template(m_llamaModel, nullptr);
   if (!tmpl) {
-    qWarning() << "[LlamaCppBackend] No chat template found in model";
+    qWarning() << "[LocalBackend] No chat template found in model";
     return QString();
   }
 
@@ -121,12 +121,12 @@ QString LlamaCppBackend::generate(const QString &systemPrompt,
       tmpl, chat, static_cast<size_t>(nMsg), true, promptBuf,
       static_cast<int32_t>(sizeof(promptBuf)));
   if (res < 0) {
-    qWarning() << "[LlamaCppBackend] Chat template failed";
+    qWarning() << "[LocalBackend] Chat template failed";
     return QString();
   }
 
   QString promptStr = QString::fromUtf8(promptBuf, res);
-  qDebug() << "[LlamaCppBackend] Prompt length:" << promptStr.length();
+  qDebug() << "[LocalBackend] Prompt length:" << promptStr.length();
 
   // Tokenize
   std::vector<llama_token> tokens;
@@ -177,7 +177,7 @@ QString LlamaCppBackend::generate(const QString &systemPrompt,
   }
 
   if (llama_decode(m_llamaCtx, batch) != 0) {
-    qWarning() << "[LlamaCppBackend] Prompt decode failed";
+    qWarning() << "[LocalBackend] Prompt decode failed";
     llama_sampler_free(smpl);
     llama_batch_free(batch);
     return QString();
@@ -212,7 +212,7 @@ QString LlamaCppBackend::generate(const QString &systemPrompt,
     single.logits[0] = 1;
 
     if (llama_decode(m_llamaCtx, single) != 0) {
-      qWarning() << "[LlamaCppBackend] Generation decode failed at step" << i;
+      qWarning() << "[LocalBackend] Generation decode failed at step" << i;
       llama_batch_free(single);
       break;
     }
@@ -233,14 +233,14 @@ QString LlamaCppBackend::generate(const QString &systemPrompt,
   llama_sampler_free(smpl);
   llama_batch_free(batch);
 
-  qDebug() << "[LlamaCppBackend] Generated" << generated.size() << "tokens"
+  qDebug() << "[LocalBackend] Generated" << generated.size() << "tokens"
            << (hitEos ? "(EOS)" : "(max_tokens)");
   emit statusUpdated(QString("Generated %1 tokens").arg(generated.size()));
 
   return result;
 }
 
-QString LlamaCppBackend::resolveModelPath(const QString &modelPath) const {
+QString LocalBackend::resolveModelPath(const QString &modelPath) const {
   if (modelPath.isEmpty()) {
     // Default: Models/Summarizers/default.gguf
     return QCoreApplication::applicationDirPath() +

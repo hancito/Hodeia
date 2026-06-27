@@ -5,8 +5,8 @@
 
 class ConfigManager;
 class DatabaseManager;
-class LlamaCppBackend;
-class OpenAiServerBackend;
+class LocalBackend;
+class RemoteBackend;
 class QThread;
 
 /// Paper-level summary produced by the LLM, mirrors the Python PaperSummary
@@ -50,6 +50,19 @@ public:
   /// Cancel an in-progress summarization batch.
   Q_INVOKABLE void cancel();
 
+  /// Check the remote backend connection and retrieve available models.
+  /// For remote backends: calls fetchModels(apiUrl, apiKey) on the remote
+  /// backend.  For local backends: scans the Summarizers folder for .gguf
+  /// files.  On success the backend is saved to ConfigManager (setBackend +
+  /// setActiveBackend).  On failure an error is reported.
+  /// Asynchronous: result reported via the modelsChecked signal.
+  Q_INVOKABLE void checkModels(const QString &name, const QString &apiUrl,
+                               const QString &apiKey);
+
+  /// Load available models for the currently active backend (local or remote).
+  /// Emits modelsChecked() with the list.
+  Q_INVOKABLE void loadActiveBackendModels();
+
   /// Get the system prompt template sent to the LLM.
   static const QString &systemPrompt();
 
@@ -64,6 +77,13 @@ signals:
 
   /// Entire batch completed.
   void allFinished(int successCount, int total);
+
+  /// Remote backend check result.
+  /// @param success  true if the API responded.
+  /// @param models   List of model IDs (empty on failure).
+  /// @param error    Error description (empty on success).
+  void modelsChecked(bool success, const QStringList &models,
+                     const QString &error);
 
 private:
   // ---- called from the worker thread ----
@@ -81,6 +101,10 @@ private:
   /// Convert PaperSummary to a JSON QByteArray.
   QByteArray summaryToJson(const PaperSummary &s) const;
 
+  /// Scan the Summarizers folder and return model names (without .gguf
+  /// extension).
+  QStringList listLocalModels() const;
+
   /// Upsert summary row into the Summaries table.
   bool upsertSummary(const QString &paperHash, const QByteArray &jsonBytes,
                      const QString &modelName);
@@ -88,8 +112,8 @@ private:
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
 
-  LlamaCppBackend *m_localBackend = nullptr;
-  OpenAiServerBackend *m_remoteBackend = nullptr;
+  LocalBackend *m_localBackend = nullptr;
+  RemoteBackend *m_remoteBackend = nullptr;
 
   // Worker thread
   QThread *m_workerThread = nullptr;
