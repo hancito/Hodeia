@@ -2,7 +2,8 @@
 #include <QDebug>
 #include <QDirIterator>
 
-EngineController::EngineController(QObject *parent) : QObject(parent) {}
+EngineController::EngineController(ConfigManager *config, QObject *parent)
+    : QObject(parent), m_config(config) {}
 
 EngineController::~EngineController() { stopEngine(); }
 
@@ -40,7 +41,7 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
   m_imgPath = imgPath;
 
   m_thread = new QThread();
-  m_worker = new PdfWorker();
+  m_worker = new PdfWorker(m_config);
   m_worker->moveToThread(m_thread);
 
   // Trigger work

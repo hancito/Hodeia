@@ -46,13 +46,16 @@ Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
   m_remoteBackend = new RemoteBackend();
   m_remoteBackend->moveToThread(m_workerThread);
 
-  // Auto-check the active backend when it changes (including at startup).
+  // Auto-check the active backend when it changes.
   QObject::connect(m_config, &ConfigManager::activeBackendChanged, this,
                    &Summarizer::loadActiveBackendModels);
 
   // Reload local model list after a model file is copied.
   QObject::connect(m_config, &ConfigManager::modelCopied, this,
                    &Summarizer::loadActiveBackendModels);
+
+  // Initial load for the currently active backend.
+  loadActiveBackendModels();
 
   m_workerThread->start();
 }
@@ -111,7 +114,11 @@ void Summarizer::checkModels(const QString &name, const QString &apiUrl,
                                    const QString &error) {
         if (error.isEmpty() && m_config) {
           m_config->setBackend(name, apiUrl, apiKey);
-          m_config->setActiveBackend(name);
+          // Only set active if it's different — avoids triggering
+          // activeBackendChanged and a re-entrant checkModels loop.
+          if (m_config->activeBackend() != name) {
+            m_config->setActiveBackend(name);
+          }
         }
         emit modelsChecked(error.isEmpty(), models, error);
       },

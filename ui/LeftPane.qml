@@ -14,6 +14,11 @@ Rectangle {
     signal openRagWindow
     property var statusBarLabel: null
 
+    // Load models for the active backend when this component is ready.
+    // The Summarizer emits modelsChecked in its constructor but QML may
+    // not be loaded yet, so we re-trigger from here.
+    Component.onCompleted: summarizer.loadActiveBackendModels()
+
     // React to engine finishing: re-enable buttons, hide progress
     Connections {
         target: engineController
@@ -44,15 +49,20 @@ Rectangle {
     Connections {
         target: summarizer
         function onModelsChecked(success, models, error) {
+            // Read activeModel BEFORE assigning the model to avoid the
+            // ComboBox resetting to index 0 and overwriting it via
+            // onCurrentTextChanged.
+            var savedModel = configManager.activeModel;
             if (success && models.length > 0) {
-                modelComboBox.model = models;
-                // Sync: if activeModel is in the list, select it; else pick first
-                var idx = models.indexOf(configManager.activeModel);
+                var idx = models.indexOf(savedModel);
                 if (idx < 0) {
                     idx = 0;
-                    configManager.activeModel = models[0];
+                    savedModel = models[0];
                 }
+                modelComboBox.model = models;
                 modelComboBox.currentIndex = idx;
+                // Restore after ComboBox has swallowed the reset
+                configManager.activeModel = savedModel;
             }
         }
     }

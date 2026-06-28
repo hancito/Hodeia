@@ -101,13 +101,6 @@ add_custom_command(TARGET Paperize POST_BUILD
     $<TARGET_FILE_DIR:Paperize>/Fonts
 )
 
-# Copy embedding models to build directory
-add_custom_command(TARGET Paperize POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_SOURCE_DIR}/Models/Embedders
-    $<TARGET_FILE_DIR:Paperize>/Models/Embedders
-)
-
 set_target_properties(Paperize PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}

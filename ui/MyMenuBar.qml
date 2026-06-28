@@ -104,10 +104,7 @@ MenuBar {
                 text: "Add Backend..."
                 onTriggered: backendDialog.open()
             }
-            MenuItem {
-                text: "Add Local Summarizer..."
-                onTriggered: localModelFileDialog.open()
-            }
+
             MenuSeparator {}
             Menu {
                 title: "Change Backend"
@@ -124,6 +121,10 @@ MenuBar {
                     }
                 }
             }
+        }
+        MenuItem {
+            text: "Add Local Model"
+            onTriggered: localModelFileDialog.open()
         }
     }
 }

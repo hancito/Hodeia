@@ -10,7 +10,7 @@
 class PdfWorker : public QObject {
   Q_OBJECT
 public:
-  explicit PdfWorker(QObject *parent = nullptr);
+  explicit PdfWorker(ConfigManager *config, QObject *parent = nullptr);
   ~PdfWorker();
 
 public slots:
@@ -41,4 +41,5 @@ private:
 
   mutable SqliteVecManager m_vecManager;
   bool m_stopFlag = false;
+  ConfigManager *m_config = nullptr;
 };

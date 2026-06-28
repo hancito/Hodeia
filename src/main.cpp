@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
   DatabaseManager databaseManager(&configManager);
 
   // Create the PDF ingestion worker
-  EngineController engineController;
+  EngineController engineController(&configManager);
 
   // Create the Summarizer (orchestrates local/remote backends)
   Summarizer summarizer(&configManager, &databaseManager);

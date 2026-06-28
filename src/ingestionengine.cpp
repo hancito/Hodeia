@@ -17,7 +17,8 @@ extern "C" {
 #include <mupdf/fitz.h>
 }
 
-PdfWorker::PdfWorker(QObject *parent) : QObject(parent) {
+PdfWorker::PdfWorker(ConfigManager *config, QObject *parent)
+    : QObject(parent), m_vecManager(config), m_config(config) {
   connect(&m_vecManager, &SqliteVecManager::embeddingProgress, this,
           &PdfWorker::embeddingProgress);
 }

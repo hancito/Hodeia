@@ -1,4 +1,5 @@
 #include "headers/sqlitevec.h"
+#include "headers/configmanager.h"
 
 #include "llama.h"
 
@@ -15,20 +16,26 @@ constexpr const char *PassagePrefix = "passage: ";
 constexpr const char *QueryPrefix = "query: ";
 constexpr int32_t MaxSeqLen = 512;
 constexpr int BatchSize = 64;
-constexpr const char *DefaultModel =
-    "Models/Embedders/multilingual-e5-small.gguf";
 } // namespace
 
 /* ── Constructor / Destructor ────────────────────────────────── */
 
-SqliteVecManager::SqliteVecManager(QObject *parent) : QObject(parent) {}
+SqliteVecManager::SqliteVecManager(ConfigManager *config, QObject *parent)
+    : QObject(parent), m_config(config) {}
 
 SqliteVecManager::~SqliteVecManager() { shutdown(); }
 
 /* ── Initialization ──────────────────────────────────────────── */
 
-static QString resolveModelPath(const QString &modelPath) {
-  QString path = modelPath.isEmpty() ? DefaultModel : modelPath;
+static QString resolveModelPath(ConfigManager *config,
+                                const QString &modelPath) {
+  QString path = modelPath;
+  if (path.isEmpty() && config) {
+    path = config->embeddersPath() + "/multilingual-e5-small.gguf";
+  }
+
+  if (path.isEmpty())
+    return QString();
 
   if (QFile::exists(path))
     return path;
@@ -45,7 +52,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   if (m_ready)
     return true;
 
-  QString resolvedPath = resolveModelPath(modelPath);
+  QString resolvedPath = resolveModelPath(m_config, modelPath);
 
   if (!QFile::exists(resolvedPath)) {
     qCritical() << "[SqliteVec] Model file not found:" << resolvedPath;

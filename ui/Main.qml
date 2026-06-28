@@ -69,9 +69,6 @@ ApplicationWindow {
             themeManager.setThemeIndex(configManager.activeThemeIndex);
         }
 
-        // Load models for the active backend (local or remote)
-        summarizer.loadActiveBackendModels();
-
         // Show backend setup if no backends configured
         //if (configManager.backendList.length === 0) {
         //   backendDialog.open();

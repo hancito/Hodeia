@@ -13,13 +13,15 @@ struct ChunkSearchResult {
   float distance;
 };
 
+class ConfigManager;
+
 class SqliteVecManager : public QObject {
   Q_OBJECT
 
 public:
   enum class EmbedMode { Passage, Query };
 
-  explicit SqliteVecManager(QObject *parent = nullptr);
+  explicit SqliteVecManager(ConfigManager *config, QObject *parent = nullptr);
   ~SqliteVecManager() override;
 
   // Initialize the embedding model via llama.cpp.
@@ -66,4 +68,5 @@ private:
   void *m_llamaCtx = nullptr;   // llama_context*
   void *m_llamaModel = nullptr; // llama_model*
   QString m_modelPath;
+  ConfigManager *m_config = nullptr;
 };

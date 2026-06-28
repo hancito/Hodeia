@@ -4,10 +4,12 @@
 #include <QThread>
 #include <QUrl>
 
+class ConfigManager;
+
 class EngineController : public QObject {
   Q_OBJECT
 public:
-  explicit EngineController(QObject *parent = nullptr);
+  explicit EngineController(ConfigManager *config, QObject *parent = nullptr);
   ~EngineController() override;
 
 public slots:
@@ -30,4 +32,5 @@ private:
   QList<QUrl> m_pdfFiles;
   QString m_dbPath;
   QString m_imgPath;
+  ConfigManager *m_config = nullptr;
 };
