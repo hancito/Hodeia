@@ -15,9 +15,7 @@ Rectangle {
     property var statusBarLabel: null
 
     // Load models for the active backend when this component is ready.
-    // The Summarizer emits modelsChecked in its constructor but QML may
-    // not be loaded yet, so we re-trigger from here.
-    Component.onCompleted: summarizer.loadActiveBackendModels()
+    Component.onCompleted: modelHelper.loadActiveBackendModels()
 
     // React to engine finishing: re-enable buttons, hide progress
     Connections {
@@ -45,9 +43,9 @@ Rectangle {
         }
     }
 
-    // React to summarizer modelsChecked to populate the model combobox
+    // React to modelHelper modelsChecked to populate the model combobox
     Connections {
-        target: summarizer
+        target: modelHelper
         function onModelsChecked(success, models, error) {
             // Read activeModel BEFORE assigning the model to avoid the
             // ComboBox resetting to index 0 and overwriting it via

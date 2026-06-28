@@ -1,7 +1,8 @@
 #include "headers/configmanager.h"
 #include "headers/database.h"
 #include "headers/enginemanager.h"
-#include "headers/summarizer.h"
+#include "headers/helpers.h"
+// #include "headers/summarythreadmanager.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -62,7 +63,10 @@ int main(int argc, char *argv[]) {
   EngineController engineController(&configManager);
 
   // Create the Summarizer (orchestrates local/remote backends)
-  Summarizer summarizer(&configManager, &databaseManager);
+  // SummaryController SummaryController(&configManager, &databaseManager);
+
+  // Create the ModelHelper (manages model discovery for QML)
+  ModelHelper modelHelper(&configManager);
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
@@ -70,7 +74,9 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
   engine.rootContext()->setContextProperty("engineController",
                                            &engineController);
-  engine.rootContext()->setContextProperty("summarizer", &summarizer);
+  // engine.rootContext()->setContextProperty("summaryController",
+  // &summaryController);
+  engine.rootContext()->setContextProperty("modelHelper", &modelHelper);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

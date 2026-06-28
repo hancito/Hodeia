@@ -24,9 +24,9 @@ Dialog {
     property int editingIndex: -1
     property bool connectionVerified: false
 
-    // React to checkModels result
+    // React to checkRemoteModels result
     Connections {
-        target: summarizer
+        target: modelHelper
         function onModelsChecked(success, models, error) {
             if (success) {
                 modelCheckLabel.text = "Connected — " + models.length + " model(s) available";
@@ -157,7 +157,7 @@ Dialog {
                             modelCheckLabel.visible = true;
                             return;
                         }
-                        summarizer.checkModels(n, u, k);
+                        modelHelper.checkRemoteModels(n, u, k);
                     }
                 }
 

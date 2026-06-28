@@ -44,8 +44,9 @@ qt_add_qml_module(Paperize
         headers/sqlitevec.h
         headers/localbackend.h
         headers/remotebackend.h
-        headers/summarizer.h
-        headers/batchworker.h
+        # headers/summarizer.h
+        # headers/summarythreadmanager.h
+        headers/helpers.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
@@ -58,8 +59,9 @@ qt_add_qml_module(Paperize
         src/sqlitevec.cpp
         src/localbackend.cpp
         src/remotebackend.cpp
-        src/summarizer.cpp
-        src/batchworker.cpp
+        # src/summarizer.cpp
+        # src/summarythreadmanager.cpp
+        src/helpers.cpp
 )
 
 # Add sqlite3.c directly to the target (outside qt_add_qml_module)
