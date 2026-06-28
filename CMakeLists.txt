@@ -45,6 +45,7 @@ qt_add_qml_module(Paperize
         headers/localbackend.h
         headers/remotebackend.h
         headers/summarizer.h
+        headers/batchworker.h
         src/thememanager.cpp
         src/configmanager.cpp
         src/database.cpp
@@ -58,6 +59,7 @@ qt_add_qml_module(Paperize
         src/localbackend.cpp
         src/remotebackend.cpp
         src/summarizer.cpp
+        src/batchworker.cpp
 )
 
 # Add sqlite3.c directly to the target (outside qt_add_qml_module)
@@ -85,6 +87,11 @@ qt_add_resources(Paperize "resources" PREFIX "/" FILES
     Resources/trash-can.svg
     Resources/circle-check.svg
     Resources/circle-xmark.svg
+    Resources/arrow-circle-left.svg
+    Resources/arrow-circle-right.svg
+    Resources/magnifying-glass-plus.svg
+    Resources/magnifying-glass-minus.svg
+    Resources/arrow-rotate-back.svg
 )
 
 # Copy themes folder to build directory

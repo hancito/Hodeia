@@ -1,4 +1,5 @@
 #include "headers/summarizer.h"
+#include "headers/batchworker.h"
 #include "headers/configmanager.h"
 #include "headers/database.h"
 #include "headers/localbackend.h"
@@ -7,6 +8,8 @@
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -35,9 +38,11 @@ Return only valid JSON.)";
 const QString &Summarizer::systemPrompt() { return s_systemPrompt; }
 
 // ── Construction / destruction ───────────────────────────────────────
+
 Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
                        QObject *parent)
     : QObject(parent), m_config(config), m_database(database) {
+  m_worker = new BatchWorker(database, this);
   m_workerThread = new QThread(this);
 
   m_localBackend = new LocalBackend();
@@ -61,24 +66,67 @@ Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
 }
 
 Summarizer::~Summarizer() {
-  cancel();
-  m_workerThread->quit();
-  m_workerThread->wait();
+  if (m_workerThread->isRunning()) {
+    m_workerThread->quit();
+    m_workerThread->wait();
+  }
 }
 
 // ── Public API ───────────────────────────────────────────────────────
+
 void Summarizer::summarizePapers(const QStringList &hashes) {
-  if (m_isBusy)
+  if (m_isBusy || !m_config || hashes.isEmpty()) {
+    if (hashes.isEmpty())
+      qDebug() << "[Summarizer] summarizePapers — no hashes";
+    if (m_isBusy)
+      qDebug() << "[Summarizer] summarizePapers — already busy";
     return;
-  m_hashes = hashes;
-  m_cancelled = false;
+  }
+
+  // Capture backend configuration from the main thread.
+  QString backendName = m_config->activeBackend();
+  QVariantMap backendCfg = m_config->backendConfig(backendName);
+  QString backendUrl = backendCfg.value("url").toString();
+  QString backendKey = backendCfg.value("api_key").toString();
+  QString modelPath = m_config->activeModel();
+
+  // For local backend, resolve to full path now (from main thread).
+  if (backendName == "Llama.cpp" && !modelPath.isEmpty()) {
+    QString ggufPath = m_config->summarizersPath() + "/" + modelPath;
+    if (QFile::exists(ggufPath)) {
+      modelPath = ggufPath;
+    }
+  }
+
+  qDebug() << "[Summarizer] summarizePapers — papers:" << hashes.size()
+           << "backend:" << backendName << "model:" << modelPath;
+
   m_isBusy = true;
   emit busyChanged();
 
-  QMetaObject::invokeMethod(this, "runBatch", Qt::QueuedConnection);
+  for (const QString &hash : hashes) {
+    emit progressUpdated(hash, "Retrieving context...");
+    QString context = m_worker->retrieveContext(hash);
+    if (context.isEmpty()) {
+      emit paperFinished(hash, false, "No context found");
+      continue;
+    }
+
+    emit paperFinished(hash, true,
+                       "Context retrieved (" +
+                           QString::number(context.length()) + " chars)");
+  }
+
+  m_isBusy = false;
+  emit busyChanged();
+  emit allFinished(hashes.size(), hashes.size());
 }
 
-void Summarizer::cancel() { m_cancelled = true; }
+void Summarizer::cancel() {
+  // TODO: forward cancel to the current BatchWorker
+}
+
+// ── Model discovery ──────────────────────────────────────────────────
 
 void Summarizer::loadActiveBackendModels() {
   if (!m_config)
@@ -107,7 +155,6 @@ void Summarizer::checkModels(const QString &name, const QString &apiUrl,
   }
 
   // One-shot connection: when the backend finishes, save or report error.
-  // The connection is automatically deleted after the first emission.
   QObject::connect(
       m_remoteBackend, &RemoteBackend::modelsReady, this,
       [this, name, apiUrl, apiKey](const QStringList &models,
@@ -133,131 +180,7 @@ void Summarizer::checkModels(const QString &name, const QString &apiUrl,
       Qt::QueuedConnection);
 }
 
-// ── Worker-thread batch runner ───────────────────────────────────────
-void Summarizer::runBatch() {
-  int success = 0;
-  int total = m_hashes.size();
-
-  for (const QString &hash : m_hashes) {
-    if (m_cancelled) {
-      emit paperFinished(hash, false, "Cancelled");
-      continue;
-    }
-
-    emit progressUpdated(hash, "Retrieving context...");
-    QString context = retrieveContext(hash);
-    if (context.isEmpty()) {
-      emit paperFinished(hash, false, "No context found");
-      continue;
-    }
-
-    emit progressUpdated(hash, "Building prompt...");
-    QString userPrompt = buildUserPrompt(context);
-
-    emit progressUpdated(hash, "Generating summary...");
-
-    // TODO: select backend (local vs remote) based on config
-    QString rawOutput = m_localBackend->generate(s_systemPrompt, userPrompt);
-
-    if (rawOutput.isEmpty()) {
-      emit paperFinished(hash, false, "LLM generation failed");
-      continue;
-    }
-
-    PaperSummary summary = parseSummary(rawOutput);
-    QByteArray jsonBytes = summaryToJson(summary);
-    bool ok = upsertSummary(hash, jsonBytes, "llamacpp");
-
-    if (ok) {
-      success++;
-      emit paperFinished(hash, true, "Summary saved");
-    } else {
-      emit paperFinished(hash, false, "Failed to save summary to DB");
-    }
-  }
-
-  m_isBusy = false;
-  emit busyChanged();
-  emit allFinished(success, total);
-}
-
-// ── Context retrieval ────────────────────────────────────────────────
-QString Summarizer::retrieveContext(const QString &paperHash) const {
-  // TODO: query chunks table ordered by page number, concatenate text
-  QString text;
-  Q_UNUSED(paperHash)
-  Q_UNUSED(text)
-  return text;
-}
-
-QString Summarizer::buildUserPrompt(const QString &textContext) const {
-  return textContext.left(8000); // truncate to fit context window
-}
-
-// ── Parsing ──────────────────────────────────────────────────────────
-PaperSummary Summarizer::parseSummary(const QString &rawOutput) const {
-  PaperSummary s;
-
-  QJsonDocument doc = QJsonDocument::fromJson(rawOutput.toUtf8());
-  if (!doc.isObject())
-    return s;
-
-  QJsonObject obj = doc.object();
-  s.title = obj.value("title").toString();
-  s.journal = obj.value("journal").toString();
-  s.year = obj.value("year").toInt();
-  s.researchObjective = obj.value("researchObjective").toString();
-  s.methodology = obj.value("methodology").toString();
-  s.coreFindingsAndSignificance =
-      obj.value("coreFindingsAndSignificance").toString();
-  s.criticalLimitations = obj.value("criticalLimitations").toString();
-  s.citableSummary = obj.value("citableSummary").toString();
-
-  QJsonArray authorsArr = obj.value("authors").toArray();
-  for (const auto &a : authorsArr)
-    s.authors << a.toString();
-
-  QJsonArray topicsArr = obj.value("topics").toArray();
-  for (const auto &t : topicsArr)
-    s.topics << t.toString();
-
-  return s;
-}
-
-QByteArray Summarizer::summaryToJson(const PaperSummary &s) const {
-  QJsonObject obj;
-  obj["title"] = s.title;
-  obj["journal"] = s.journal;
-  obj["year"] = s.year;
-  obj["researchObjective"] = s.researchObjective;
-  obj["methodology"] = s.methodology;
-  obj["coreFindingsAndSignificance"] = s.coreFindingsAndSignificance;
-  obj["criticalLimitations"] = s.criticalLimitations;
-  obj["citableSummary"] = s.citableSummary;
-
-  QJsonArray authorsArr;
-  for (const auto &a : s.authors)
-    authorsArr.append(a);
-  obj["authors"] = authorsArr;
-
-  QJsonArray topicsArr;
-  for (const auto &t : s.topics)
-    topicsArr.append(t);
-  obj["topics"] = topicsArr;
-
-  return QJsonDocument(obj).toJson(QJsonDocument::Compact);
-}
-
-// ── Database ─────────────────────────────────────────────────────────
-bool Summarizer::upsertSummary(const QString &paperHash,
-                               const QByteArray &jsonBytes,
-                               const QString &modelName) {
-  // TODO: execute UPSERT on Summaries table via m_database
-  Q_UNUSED(paperHash)
-  Q_UNUSED(jsonBytes)
-  Q_UNUSED(modelName)
-  return false;
-}
+// ── Model discovery ──────────────────────────────────────────────────
 
 QStringList Summarizer::listLocalModels() const {
   QString summarizersDir = m_config ? m_config->summarizersPath() : QString();

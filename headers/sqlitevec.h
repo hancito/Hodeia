@@ -11,6 +11,8 @@ struct ChunkSearchResult {
   int chunkIdx;
   QString text;
   float distance;
+  QString citation;
+  QString cleanTitle;
 };
 
 class ConfigManager;

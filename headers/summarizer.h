@@ -5,6 +5,7 @@
 
 class ConfigManager;
 class DatabaseManager;
+class BatchWorker;
 class LocalBackend;
 class RemoteBackend;
 class QThread;
@@ -86,40 +87,19 @@ signals:
                      const QString &error);
 
 private:
-  // ---- called from the worker thread ----
-  void runBatch();
-
-  /// Retrieve concatenated text context for a paper from chunks table.
-  QString retrieveContext(const QString &paperHash) const;
-
-  /// Build the user prompt from reconstructed text.
-  QString buildUserPrompt(const QString &textContext) const;
-
-  /// Parse raw LLM output into a structured PaperSummary.
-  PaperSummary parseSummary(const QString &rawOutput) const;
-
-  /// Convert PaperSummary to a JSON QByteArray.
-  QByteArray summaryToJson(const PaperSummary &s) const;
-
   /// Scan the Summarizers folder and return model names (without .gguf
   /// extension).
   QStringList listLocalModels() const;
 
-  /// Upsert summary row into the Summaries table.
-  bool upsertSummary(const QString &paperHash, const QByteArray &jsonBytes,
-                     const QString &modelName);
-
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
+  BatchWorker *m_worker = nullptr;
 
   LocalBackend *m_localBackend = nullptr;
   RemoteBackend *m_remoteBackend = nullptr;
 
-  // Worker thread
+  // Worker thread for model fetching
   QThread *m_workerThread = nullptr;
 
-  // Batch state (set from main thread, consumed in worker)
-  QStringList m_hashes;
   bool m_isBusy = false;
-  bool m_cancelled = false;
 };

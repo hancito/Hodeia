@@ -153,11 +153,13 @@ ApplicationWindow {
             CentralPane {
                 id: centralPaneItem
                 SplitView.minimumWidth: 1000
+                activePaperHash: rightPaneItem.activePaperHash
             }
 
             RightPane {
                 id: rightPaneItem
                 SplitView.minimumWidth: 600
+                statusBarLabel: footerLabel
             }
         }
     }

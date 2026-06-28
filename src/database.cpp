@@ -110,11 +110,15 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
   }
 
   // Also remove associated vector chunks
-  // We need to parse the metadata JSON to match paper_hash; use a LIKE filter
+  SqliteStatement chunkStmt =
+      m_db.prepare("DELETE FROM chunks WHERE paper_hash = ?");
   for (const QString &hash : hashes) {
-    QString escapedHash = hash;
-    m_db.exec(QString("DELETE FROM chunks WHERE metadata_blob LIKE '%1%'")
-                  .arg(escapedHash));
+    chunkStmt.bind(1, hash);
+    if (!chunkStmt.exec()) {
+      qDebug() << "Delete chunks by hash failed for" << hash << ":"
+               << chunkStmt.errorMsg();
+    }
+    chunkStmt.resetAndClearBindings();
   }
 
   m_summaryModel->loadAll();

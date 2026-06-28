@@ -7,6 +7,8 @@ Rectangle {
     id: rightPane
     property int npapers: databaseManager.summaryModel.rowCount()
     property list<string> selectedPapers: []
+    property string activePaperHash: ""
+    property var statusBarLabel: null
 
     function addSelectedPaper(hash) {
         if (!selectedPapers.includes(hash) && hash !== "") {
@@ -38,18 +40,6 @@ Rectangle {
         numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
     }
 
-    function summarizeSelected() {
-        if (selectedPapers.length === 0) {
-            console.log("No papers selected");
-            return;
-        }
-        console.log("Summarizing", selectedPapers.length, "papers");
-        databaseManager.removeByHashes(selectedPapers);
-
-        selectedPapers = [];
-        databaseManager.summaryModel.loadAll();
-    }
-
     border.width: 1
     radius: 5
     color: Colors.surface0
@@ -57,10 +47,25 @@ Rectangle {
 
     Connections {
         target: engineController
-
         function onIngestionFinished() {
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+        }
+    }
+
+    // Summarizer feedback
+    Connections {
+        target: summarizer
+        function onPaperFinished(hash, success, message) {
+            if (rightPane.statusBarLabel)
+                rightPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
+        }
+        function onAllFinished(successCount, total) {
+            databaseManager.summaryModel.loadAll();
+            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+            if (rightPane.statusBarLabel)
+                rightPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
+            summarizeProgress.visible = false;
         }
     }
 
@@ -89,7 +94,15 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
-                onClicked: console.log("Summarize")
+                onClicked: {
+                    if (rightPane.selectedPapers.length === 0) {
+                        console.log("No papers selected");
+                        return;
+                    }
+                    summarizeProgress.visible = true;
+                    summarizer.summarizePapers(rightPane.selectedPapers);
+                    rightPane.selectedPapers = [];
+                }
             }
 
             Button {
@@ -239,8 +252,8 @@ Rectangle {
                 required property string paperHash
                 width: paperListView.width
                 height: 120
-                border.width: 5
-                border.color: Colors.surface1
+                border.width: rightPane.activePaperHash === paperHash ? 4 : 5
+                border.color: rightPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
                 radius: 4
                 color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
 
@@ -248,6 +261,7 @@ Rectangle {
                     id: mouseArea
                     anchors.fill: parent
                     hoverEnabled: true
+                    onClicked: rightPane.activePaperHash = paperHash
                 }
 
                 ColumnLayout {

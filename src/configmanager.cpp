@@ -484,6 +484,30 @@ void ConfigManager::deleteImages(const QStringList &hashList,
   }
 }
 
+QStringList ConfigManager::getImagesForHash(const QString &paperHash,
+                                            const QString &imgPath) const {
+  QStringList result;
+
+  QDir imgDir(imgPath);
+  if (!imgDir.exists()) {
+    qWarning() << "Image directory does not exist:" << imgPath;
+    return result;
+  }
+
+  // Match files like: 4ad90c343ca0d5a05e67f80da33a724b_page_001.png
+  imgDir.setNameFilters({paperHash + "_page_*.png"});
+  const QFileInfoList matchingFiles = imgDir.entryInfoList();
+
+  for (const QFileInfo &fileInfo : matchingFiles) {
+    result.append(fileInfo.absoluteFilePath());
+  }
+
+  // Sort by file name so page order is preserved
+  result.sort();
+
+  return result;
+}
+
 // ── ModelCopyWorker ──────────────────────────────────────────────────
 
 ModelCopyWorker::ModelCopyWorker(QObject *parent) : QObject(parent) {}

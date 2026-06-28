@@ -6,8 +6,6 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QThread>
 #include <algorithm>
 
@@ -105,10 +103,16 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 /* ── vec0 table creation ─────────────────────────────────────── */
 
 bool SqliteVecManager::createChunksTable(SqliteDb &db) {
+  int dim = m_dim > 0 ? m_dim : 384;
   QString sql = QString("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
                         "embedding float[%1], "
-                        "metadata_blob text)")
-                    .arg(m_dim > 0 ? m_dim : 384);
+                        "paper_hash text, "
+                        "page integer, "
+                        "chunk_idx integer, "
+                        "chunk_text text, "
+                        "citation text, "
+                        "clean_title text)")
+                    .arg(dim);
   return db.exec(sql);
 }
 
@@ -198,9 +202,10 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 
   int totalInserted = 0;
 
-  SqliteStatement stmt =
-      db.prepare("INSERT INTO chunks (embedding, metadata_blob) "
-                 "VALUES (vec_f32(?), ?)");
+  SqliteStatement stmt = db.prepare(
+      "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, chunk_text, "
+      "citation, clean_title) "
+      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?)");
   if (!stmt.isValid()) {
     qCritical() << "[SqliteVec] Prepare failed:" << stmt.errorMsg();
     return -1;
@@ -229,16 +234,13 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
       QByteArray blob(reinterpret_cast<const char *>(rowPtr),
                       m_dim * sizeof(float));
 
-      QJsonObject meta;
-      meta["paper_hash"] = c.paperHash;
-      meta["page"] = c.page;
-      meta["chunk_idx"] = c.chunkIdx;
-      meta["text"] = c.text;
-
-      QByteArray metaJson = QJsonDocument(meta).toJson(QJsonDocument::Compact);
-
       stmt.bind(1, blob);
-      stmt.bind(2, QString::fromUtf8(metaJson));
+      stmt.bind(2, c.paperHash);
+      stmt.bind(3, c.page);
+      stmt.bind(4, c.chunkIdx);
+      stmt.bind(5, c.text);
+      stmt.bind(6, QString()); // citation (empty for now)
+      stmt.bind(7, QString()); // clean_title (empty for now)
 
       if (!stmt.exec()) {
         qCritical() << "[SqliteVec] Insert failed:" << stmt.errorMsg();
@@ -267,10 +269,12 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
       reinterpret_cast<const char *>(queryEmbedding.constData()),
       m_dim * sizeof(float));
 
-  QString sql = QString("SELECT metadata_blob, distance "
-                        "FROM chunks WHERE embedding MATCH vec_f32(?) "
-                        "ORDER BY distance LIMIT %1")
-                    .arg(k);
+  QString sql =
+      QString("SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
+              "clean_title, distance "
+              "FROM chunks WHERE embedding MATCH vec_f32(?) "
+              "LIMIT %1")
+          .arg(k);
 
   SqliteStatement stmt = db.prepare(sql);
   if (!stmt.isValid())
@@ -280,16 +284,14 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
 
   QList<ChunkSearchResult> results;
   while (stmt.step()) {
-    QString metaStr = stmt.columnText(0);
-    float distance = stmt.columnDouble(1);
-
-    QJsonObject meta = QJsonDocument::fromJson(metaStr.toUtf8()).object();
     ChunkSearchResult r;
-    r.paperHash = meta.value("paper_hash").toString();
-    r.page = meta.value("page").toInt();
-    r.chunkIdx = meta.value("chunk_idx").toInt();
-    r.text = meta.value("text").toString();
-    r.distance = distance;
+    r.paperHash = stmt.columnText(0);
+    r.page = stmt.columnInt(1);
+    r.chunkIdx = stmt.columnInt(2);
+    r.text = stmt.columnText(3);
+    r.citation = stmt.columnText(4);
+    r.cleanTitle = stmt.columnText(5);
+    r.distance = stmt.columnDouble(6);
     results.append(r);
   }
 
@@ -303,42 +305,28 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
   if (paperHash.isEmpty())
     return {};
 
-  // The paper_hash lives inside the JSON metadata_blob.
-  // vec0 does not support indexed WHERE on text columns, so we
-  // scan with a LIKE filter and verify the key in C++ to avoid
-  // false positives from other JSON keys containing the same substring.
-  QString sql = "SELECT metadata_blob FROM chunks WHERE metadata_blob LIKE ?";
+  QString sql = "SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
+                "clean_title FROM chunks WHERE paper_hash = ? "
+                "ORDER BY page, chunk_idx";
 
   SqliteStatement stmt = db.prepare(sql);
   if (!stmt.isValid())
     return {};
 
-  stmt.bind(1, QString("\"paper_hash\":\"%1\"").arg(paperHash));
+  stmt.bind(1, paperHash);
 
   QList<ChunkSearchResult> results;
   while (stmt.step()) {
-    QString metaStr = stmt.columnText(0);
-
-    QJsonObject meta = QJsonDocument::fromJson(metaStr.toUtf8()).object();
-    if (meta.value("paper_hash").toString() != paperHash)
-      continue; // guard against LIKE false positives
-
     ChunkSearchResult r;
-    r.paperHash = meta.value("paper_hash").toString();
-    r.page = meta.value("page").toInt();
-    r.chunkIdx = meta.value("chunk_idx").toInt();
-    r.text = meta.value("text").toString();
+    r.paperHash = stmt.columnText(0);
+    r.page = stmt.columnInt(1);
+    r.chunkIdx = stmt.columnInt(2);
+    r.text = stmt.columnText(3);
+    r.citation = stmt.columnText(4);
+    r.cleanTitle = stmt.columnText(5);
     r.distance = 0.0f;
     results.append(r);
   }
-
-  // Sort by page then chunk_idx for deterministic, readable order
-  std::sort(results.begin(), results.end(),
-            [](const ChunkSearchResult &a, const ChunkSearchResult &b) {
-              if (a.page != b.page)
-                return a.page < b.page;
-              return a.chunkIdx < b.chunkIdx;
-            });
 
   return results;
 }
