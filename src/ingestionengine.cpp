@@ -1,5 +1,6 @@
 #include "headers/ingestionengine.h"
 #include "headers/sqlitedb.h"
+#include "headers/sqlitevec.h"
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QFile>
@@ -17,10 +18,13 @@ extern "C" {
 #include <mupdf/fitz.h>
 }
 
-PdfWorker::PdfWorker(ConfigManager *config, QObject *parent)
-    : QObject(parent), m_vecManager(config), m_config(config) {
-  connect(&m_vecManager, &SqliteVecManager::embeddingProgress, this,
-          &PdfWorker::embeddingProgress);
+PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
+                     QObject *parent)
+    : QObject(parent), m_vecManager(vecManager), m_config(config) {
+  if (m_vecManager) {
+    connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
+            &PdfWorker::embeddingProgress);
+  }
 }
 
 PdfWorker::~PdfWorker() = default;
@@ -90,16 +94,11 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
           QString("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
 
-      if (!m_vecManager.isReady()) {
-        if (!m_vecManager.initialize()) {
-          qCritical() << "[PdfWorker] Failed to initialize embedding model";
-          emit status("Warning: embedding model failed to load, skipping "
-                      "vector storage");
-        }
-      }
-
-      if (m_vecManager.isReady()) {
+      if (m_vecManager && m_vecManager->isReady()) {
         ingestChunks(allChunks, dbPath);
+      } else {
+        emit status("Warning: embedding model not loaded, skipping vector "
+                    "storage");
       }
 
       allChunks.clear();
@@ -109,11 +108,6 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     message =
         QString("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
     emit status(message);
-  }
-
-  // Release embedding model memory after all PDFs are processed
-  if (m_vecManager.isReady()) {
-    m_vecManager.shutdown();
   }
 
   if (errorCount > 0)
@@ -143,7 +137,7 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     return;
   }
 
-  int inserted = m_vecManager.insertChunks(db, chunks);
+  int inserted = m_vecManager->insertChunks(db, chunks);
 
   if (inserted < 0) {
     // insertChunks returned a negative error code; roll back

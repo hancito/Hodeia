@@ -1,9 +1,12 @@
 #include "headers/enginemanager.h"
+#include "headers/ingestionengine.h"
 #include <QDebug>
 #include <QDirIterator>
 
-EngineController::EngineController(ConfigManager *config, QObject *parent)
-    : QObject(parent), m_config(config) {}
+EngineController::EngineController(ConfigManager *config,
+                                   SqliteVecManager *vecManager,
+                                   QObject *parent)
+    : QObject(parent), m_config(config), m_vecManager(vecManager) {}
 
 EngineController::~EngineController() { stopEngine(); }
 
@@ -41,7 +44,7 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
   m_imgPath = imgPath;
 
   m_thread = new QThread();
-  m_worker = new PdfWorker(m_config);
+  m_worker = new PdfWorker(m_config, m_vecManager);
   m_worker->moveToThread(m_thread);
 
   // Trigger work

@@ -92,8 +92,6 @@ public:
 
   /// Return the list of absolute PNG paths for a given paper hash,
   /// sorted by page number (e.g. hash_page_001.png, hash_page_002.png …).
-  Q_INVOKABLE QStringList getImagesForHash(const QString &paperHash,
-                                           const QString &imgPath) const;
 
   /// Path to the Models directory (contains Embedders/ and Summarizers/).
   Q_INVOKABLE QString modelsPath() const;

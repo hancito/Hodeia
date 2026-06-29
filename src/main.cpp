@@ -2,7 +2,7 @@
 #include "headers/database.h"
 #include "headers/enginemanager.h"
 #include "headers/helpers.h"
-// #include "headers/summarythreadmanager.h"
+#include "headers/summarythreadmanager.h"
 #include "headers/thememanager.h"
 #include <QDir>
 #include <QFontDatabase>
@@ -60,10 +60,10 @@ int main(int argc, char *argv[]) {
   DatabaseManager databaseManager(&configManager);
 
   // Create the PDF ingestion worker
-  EngineController engineController(&configManager);
+  EngineController engineController(&configManager, &databaseManager.vecManager());
 
   // Create the Summarizer (orchestrates local/remote backends)
-  // SummaryController SummaryController(&configManager, &databaseManager);
+  SummaryController summaryController(&configManager, &databaseManager);
 
   // Create the ModelHelper (manages model discovery for QML)
   ModelHelper modelHelper(&configManager);
@@ -74,8 +74,8 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
   engine.rootContext()->setContextProperty("engineController",
                                            &engineController);
-  // engine.rootContext()->setContextProperty("summaryController",
-  // &summaryController);
+  engine.rootContext()->setContextProperty("summaryController",
+                                           &summaryController);
   engine.rootContext()->setContextProperty("modelHelper", &modelHelper);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

@@ -28,6 +28,13 @@ ModelHelper::ModelHelper(ConfigManager *config, QObject *parent)
   m_workerThread->start();
 }
 
+ModelHelper::~ModelHelper() {
+  if (m_workerThread && m_workerThread->isRunning()) {
+    m_workerThread->quit();
+    m_workerThread->wait(3000);
+  }
+}
+
 QStringList ModelHelper::listLocalModels() {
   if (!m_config)
     return QStringList();
@@ -37,15 +44,24 @@ QStringList ModelHelper::listLocalModels() {
   if (!dir.exists())
     return QStringList();
 
-  QStringList filters;
-  filters << "*.gguf";
-  dir.setNameFilters(filters);
-  dir.setFilter(QDir::Files | QDir::NoSymLinks);
-
+  // Each model lives in its own subfolder (e.g. Summarizers/<model>/).
+  // Scan subfolders and return the main .gguf path inside each.
+  QStringList allDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
   QStringList models;
-  for (const QString &file : dir.entryList(filters)) {
-    models.append(file);
+
+  for (const QString &subdir : allDirs) {
+    QDir subDir(summarizersDir + "/" + subdir);
+    QStringList ggufFiles =
+        subDir.entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
+    // Pick the first non-mmproj .gguf as the main model.
+    for (const QString &f : ggufFiles) {
+      if (!f.contains("mmproj", Qt::CaseInsensitive)) {
+        models.append(subdir + "/" + f);
+        break;
+      }
+    }
   }
+
   return models;
 }
 

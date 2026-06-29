@@ -426,10 +426,16 @@ void ConfigManager::addLocalSummarizer(const QString &sourcePath) {
     return;
   }
 
-  QString destDir = summarizersPath();
+  // Create a subfolder named after the model (without extension).
+  QString modelName = QFileInfo(srcPath).completeBaseName();
+  QString modelFolder = summarizersPath() + "/" + modelName;
+  QDir().mkpath(modelFolder);
+
   QMetaObject::invokeMethod(
       m_copyWorker,
-      [this, srcPath, destDir]() { m_copyWorker->run(srcPath, destDir); },
+      [this, srcPath, modelFolder]() {
+        m_copyWorker->run(srcPath, modelFolder);
+      },
       Qt::QueuedConnection);
 }
 
@@ -482,30 +488,6 @@ void ConfigManager::deleteImages(const QStringList &hashList,
       qDebug() << "No images found for hash:" << hash;
     }
   }
-}
-
-QStringList ConfigManager::getImagesForHash(const QString &paperHash,
-                                            const QString &imgPath) const {
-  QStringList result;
-
-  QDir imgDir(imgPath);
-  if (!imgDir.exists()) {
-    qWarning() << "Image directory does not exist:" << imgPath;
-    return result;
-  }
-
-  // Match files like: 4ad90c343ca0d5a05e67f80da33a724b_page_001.png
-  imgDir.setNameFilters({paperHash + "_page_*.png"});
-  const QFileInfoList matchingFiles = imgDir.entryInfoList();
-
-  for (const QFileInfo &fileInfo : matchingFiles) {
-    result.append(fileInfo.absoluteFilePath());
-  }
-
-  // Sort by file name so page order is preserved
-  result.sort();
-
-  return result;
 }
 
 // ── ModelCopyWorker ──────────────────────────────────────────────────

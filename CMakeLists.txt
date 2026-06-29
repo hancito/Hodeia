@@ -42,10 +42,10 @@ qt_add_qml_module(Paperize
         headers/enginemanager.h
         headers/sqlitedb.h
         headers/sqlitevec.h
-        headers/localbackend.h
+        headers/llama_chat_backend.h
         headers/remotebackend.h
-        # headers/summarizer.h
-        # headers/summarythreadmanager.h
+        headers/summarizer.h
+        headers/summarythreadmanager.h
         headers/helpers.h
         src/thememanager.cpp
         src/configmanager.cpp
@@ -57,10 +57,10 @@ qt_add_qml_module(Paperize
         src/enginemanager.cpp
         src/sqlitedb.cpp
         src/sqlitevec.cpp
-        src/localbackend.cpp
+        src/llama_chat_backend.cpp
         src/remotebackend.cpp
-        # src/summarizer.cpp
-        # src/summarythreadmanager.cpp
+        src/summarizer.cpp
+        src/summarythreadmanager.cpp
         src/helpers.cpp
 )
 
@@ -162,9 +162,13 @@ elseif(LLAMA_VARIANT STREQUAL "vulkan")
     list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-vulkan.so.0.15.2")
 endif()
 
+# Include libmtmd in the shared library set
+list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libmtmd.so.0.0.0")
+
 # Link against the real libllama (fully versioned) — SONAME carries the .so.0 name
 target_link_libraries(Paperize PRIVATE
     ${LLAMA_DIR}/libllama.so.0.0.0
+    ${LLAMA_DIR}/libmtmd.so.0.0.0
 )
 target_link_directories(Paperize PRIVATE ${LLAMA_DIR})
 
@@ -248,6 +252,10 @@ add_custom_command(TARGET Paperize POST_BUILD
         libggml-cpu.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         libggml-cpu.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        libmtmd.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libmtmd.so.0
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        libmtmd.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libmtmd.so
     COMMENT "Creating llama.cpp .so symlinks"
 )
 
@@ -277,6 +285,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     "DIR=\"$1\"\n"
     "for f in \"$DIR\"/libllama.so.0.0.0 \"$DIR\"/libggml.so.0.15.2"
     " \"$DIR\"/libggml-base.so.0.15.2 \"$DIR\"/libggml-cpu.so.0.15.2"
+    " \"$DIR\"/libmtmd.so.0.0.0"
 )
 if(LLAMA_VARIANT STREQUAL "cuda")
     file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"

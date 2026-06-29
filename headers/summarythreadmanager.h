@@ -9,21 +9,24 @@ class SummaryController : public QObject {
   Q_OBJECT
 
 public:
-  explicit SummaryController(QObject *parent = nullptr);
+  explicit SummaryController(ConfigManager *config, DatabaseManager *database,
+                             QObject *parent = nullptr);
   ~SummaryController() override;
 
 public slots:
-  void startSummarize();
+  void startSummarize(const QStringList &hashes);
   void stopSummarize();
 
 signals:
   void summaryStarted();
   void summaryFinished();
+  void paperFinished(const QString &hash, bool success, const QString &message);
+  void allFinished(int successCount, int total);
 
 private:
   QThread *m_thread = nullptr;
   Summarizer *m_worker = nullptr;
-  QString m_dbPath;
-  QString m_imgPath;
+  QStringList m_hashes;
+  DatabaseManager *m_database = nullptr;
   ConfigManager *m_config = nullptr;
 };

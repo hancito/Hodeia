@@ -2,10 +2,13 @@
 
 #include <QObject>
 #include <QStringList>
+#include <vector>
+
+#include "headers/llama_chat_backend.h"
 
 class ConfigManager;
 class DatabaseManager;
-class LocalBackend;
+class RemoteBackend;
 class QThread;
 
 /// Paper-level summary produced by the LLM, mirrors the Python PaperSummary
@@ -27,11 +30,6 @@ struct PaperSummary {
 ///
 /// The heavy lifting (chunk retrieval, LLM calls, DB writes) runs in a
 /// dedicated worker thread so the main thread stays responsive.
-///
-/// Model discovery has been moved to ModelHelper (helpers.h).
-///
-/// Usage from QML:
-///   summarizer.summarizePapers(["hash1", "hash2"])
 class Summarizer : public QObject {
   Q_OBJECT
 
@@ -41,24 +39,25 @@ public:
   ~Summarizer() override;
 
 public slots:
-  void summarizePapers(const QStringList &hashes);
+  void summarizePapers(const QStringList &hashes, ConfigManager *config);
   void stop();
 
 signals:
-  void finished();
+  void paperFinished(const QString &hash, bool success, const QString &message);
+  void allFinished(int successCount, int total);
   void started();
 
 private:
   QString retrieveContext(const QString &paperHash) const;
+  std::vector<PageImage> retrieveVisualContext(const QString &paperHash) const;
+  PromptPayload buildPrompt(const QString &paperHash) const;
   /// Get the system prompt template sent to the LLM.
   static const QString &systemPrompt();
+  /// Get the user prompt prefix (e.g. "Summarize this paper:").
+  static const QString &userPrompt();
 
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
-  LocalBackend *m_localBackend = nullptr;
-
-  // Worker thread for backend inference
-  QThread *m_workerThread = nullptr;
-
-  bool m_isBusy = false;
+  LlamaChatBackend *m_chatBackend = nullptr;
+  RemoteBackend *m_remoteBackend = nullptr;
 };

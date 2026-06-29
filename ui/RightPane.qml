@@ -55,7 +55,7 @@ Rectangle {
 
     // Summarizer feedback
     Connections {
-        target: summarizer
+        target: summaryController
         function onPaperFinished(hash, success, message) {
             if (rightPane.statusBarLabel)
                 rightPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
@@ -100,7 +100,7 @@ Rectangle {
                         return;
                     }
                     summarizeProgress.visible = true;
-                    summarizer.summarizePapers(rightPane.selectedPapers);
+                    summaryController.startSummarize(rightPane.selectedPapers);
                     rightPane.selectedPapers = [];
                 }
             }

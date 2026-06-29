@@ -10,7 +10,8 @@
 class PdfWorker : public QObject {
   Q_OBJECT
 public:
-  explicit PdfWorker(ConfigManager *config, QObject *parent = nullptr);
+  explicit PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
+                     QObject *parent = nullptr);
   ~PdfWorker();
 
 public slots:
@@ -39,7 +40,7 @@ private:
   QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
                                    const QString &dbPath) const;
 
-  mutable SqliteVecManager m_vecManager;
+  SqliteVecManager *m_vecManager = nullptr;
   bool m_stopFlag = false;
   ConfigManager *m_config = nullptr;
 };

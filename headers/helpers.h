@@ -15,6 +15,7 @@ class ModelHelper : public QObject {
 
 public:
   explicit ModelHelper(ConfigManager *config, QObject *parent = nullptr);
+  ~ModelHelper() override;
 
 public slots:
   /// List .gguf model files in the local Summarizers directory.

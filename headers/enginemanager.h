@@ -5,11 +5,13 @@
 #include <QUrl>
 
 class ConfigManager;
+class SqliteVecManager;
 
 class EngineController : public QObject {
   Q_OBJECT
 public:
-  explicit EngineController(ConfigManager *config, QObject *parent = nullptr);
+  explicit EngineController(ConfigManager *config, SqliteVecManager *vecManager,
+                            QObject *parent = nullptr);
   ~EngineController() override;
 
 public slots:
@@ -33,4 +35,5 @@ private:
   QString m_dbPath;
   QString m_imgPath;
   ConfigManager *m_config = nullptr;
+  SqliteVecManager *m_vecManager = nullptr;
 };
