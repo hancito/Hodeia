@@ -5,22 +5,20 @@
 #include "headers/remotebackend.h"
 #include "headers/sqlitevec.h"
 
-#include <QByteArray>
-#include <QCoreApplication>
+#include <QBuffer>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QMetaObject>
-#include <QThread>
-#include <QVariantMap>
 #include <QVector>
 
-// ── System prompt ────────────────────────────────────────────────────
+/* ── Prompts ───────────────────────────────────────────────────── */
+
 static const QString s_systemPrompt = []() {
   return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper yo will:
   1. Read the provided text context
@@ -49,7 +47,7 @@ static const QString s_userPrompt = []() {
 const QString &Summarizer::systemPrompt() { return s_systemPrompt; }
 const QString &Summarizer::userPrompt() { return s_userPrompt; }
 
-// ── Construction / destruction ───────────────────────────────────────
+/* ── Construction / destruction ─────────────────────────────────── */
 
 Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
                        QObject *parent)
@@ -58,157 +56,193 @@ Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
   m_remoteBackend = new RemoteBackend(this);
 }
 
-Summarizer::~Summarizer() {}
+Summarizer::~Summarizer() = default;
 
-// ── Public API ───────────────────────────────────────────────────────
+/* ── Public API ─────────────────────────────────────────────────── */
+
+struct BackendInfo {
+  bool isLocal;
+  QString modelName;
+  QString modelPath;
+  QVariantMap config;
+};
 
 void Summarizer::summarizePapers(const QStringList &hashes,
                                  ConfigManager *config) {
   emit started();
-  if (hashes.isEmpty()) {
-    qDebug() << "[Summarizer] summarizePapers — no hashes";
+  if (hashes.isEmpty())
     return;
-  }
-
-  QElapsedTimer totalTimer;
-  totalTimer.start();
 
   qDebug() << "[Summarizer] Starting summarization for" << hashes.size()
            << "paper(s)";
 
-  // Resolve the active backend from the passed ConfigManager.
-  QString backendName = config->activeBackend();
-  QString activeModel = config->activeModel();
-  QVariantMap backendCfg = config->backendConfig(backendName);
-  QString backendUrl = backendCfg.value("url").toString();
+  QElapsedTimer totalTimer;
+  totalTimer.start();
 
-  qDebug() << "[Summarizer] Backend:" << backendName
-           << "| Model:" << activeModel;
+  BackendInfo backend = resolveBackend(config);
+  qDebug() << "[Summarizer] Backend:" << (backend.isLocal ? "local" : "remote")
+           << "| Model:" << backend.modelName;
 
-  bool wasEmbeddingReady = false;
-  bool isLocalBackend = (backendName == "Llama.cpp");
-
-  // Free GPU memory by unloading the embedding model before loading the
-  // (much larger) chat model.
-  if (isLocalBackend && m_database) {
-    SqliteVecManager &vecMgr = m_database->vecManager();
-    if (vecMgr.isReady()) {
-      wasEmbeddingReady = true;
-      vecMgr.shutdown();
-      qDebug() << "[Summarizer] Embedding model unloaded to free GPU memory";
-    }
-  }
+  bool wasEmbeddingReady = prepareGpu(backend.isLocal);
 
   int successCount = 0;
-
   for (int i = 0; i < hashes.size(); ++i) {
     const QString &hash = hashes[i];
     qDebug() << "[Summarizer] Processing paper" << i + 1 << "/" << hashes.size()
              << "—" << hash;
+
     PromptPayload payload = buildPrompt(hash);
     qDebug() << "[Summarizer] Prompt built — text context:"
              << payload.textContext.length()
              << "chars, visuals:" << payload.visualContext.size();
 
     QString result;
-    QString error;
+    if (backend.isLocal)
+      result = summarizeLocal(payload, backend, config);
+    else
+      result = summarizeRemote(payload, backend, config);
 
-    if (isLocalBackend) {
-      // ── Local backend ──
-      QString modelPath = activeModel;
-      if (!modelPath.isEmpty()) {
-        QString ggufPath = config->summarizersPath() + "/" + modelPath;
-        if (QFile::exists(ggufPath)) {
-          modelPath = ggufPath;
-        }
-      }
-      qDebug() << "[Summarizer] Loading local model:" << modelPath;
-      QElapsedTimer loadTimer;
-      loadTimer.start();
-      if (!m_chatBackend->loadModel(modelPath)) {
-        error = "Failed to load local model";
-        emit paperFinished(hash, false, error);
-        continue;
-      }
-      qDebug() << "[Summarizer] Model loaded in" << loadTimer.elapsed() << "ms";
-
-      QElapsedTimer genTimer;
-      genTimer.start();
-      result = m_chatBackend->summarize(payload);
-      qDebug() << "[Summarizer] Generation completed in" << genTimer.elapsed()
-               << "ms"
-               << "(" << result.length() << "chars)";
-    } else {
-      // ── Remote backend ──
-      QString apiUrl = backendCfg.value("url").toString();
-      QString apiKey = backendCfg.value("api_key").toString();
-      m_remoteBackend->setApiUrl(apiUrl);
-      m_remoteBackend->setApiKey(apiKey);
-      m_remoteBackend->setModelName(activeModel);
-
-      qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
-               << "| Model:" << activeModel;
-
-      QElapsedTimer genTimer;
-      genTimer.start();
-
-      // Synchronous wait for the async remote call.
-      QEventLoop loop;
-      QObject::connect(
-          m_remoteBackend, &RemoteBackend::finished, this,
-          [&result, &error, &loop](const QString &text, const QString &err) {
-            result = text;
-            error = err;
-            loop.quit();
-          },
-          Qt::SingleShotConnection);
-
-      m_remoteBackend->generate(payload.systemPrompt,
-                                payload.userMessage + "\n\n" +
-                                    payload.textContext,
-                                payload.visualContext);
-      loop.exec();
-
-      qDebug() << "[Summarizer] Remote generation completed in"
-               << genTimer.elapsed() << "ms"
-               << "(" << result.length() << "chars)" << result;
-    }
-
-    if (error.isEmpty() && !result.isEmpty()) {
-      successCount++;
-      emit paperFinished(hash, true,
-                         "Summary generated (" +
-                             QString::number(result.length()) + " chars)");
-      qDebug() << "[Summarizer] ✓ Paper" << hash << "summarized successfully"
-               << "(" << result.length() << "chars)";
-    } else {
-      QString msg = error.isEmpty() ? "Empty response" : error;
+    if (result.isEmpty()) {
+      QString msg = "Empty response";
       emit paperFinished(hash, false, msg);
       qDebug() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
+    } else {
+      PaperSummary summary = SummaryHelpers::parseSummaryJson(result);
+      saveSummary(hash, summary, result, backend.modelName);
+
+      successCount++;
+      emit paperFinished(hash, true,
+                         "Summary generated and saved (" +
+                             QString::number(result.length()) + " chars)");
+      qDebug() << "[Summarizer] ✓ Paper" << hash << "summarized and saved"
+               << "(" << result.length() << "chars)";
     }
   }
 
   emit allFinished(successCount, hashes.size());
-
   qDebug() << "[Summarizer] All done —" << successCount << "/" << hashes.size()
            << "succeeded in" << totalTimer.elapsed() << "ms";
 
-  // Restore the embedding model after summarization is complete.
+  cleanupGpu(backend.isLocal, wasEmbeddingReady);
+}
+
+/* ── Backend resolution ─────────────────────────────────────────── */
+
+Summarizer::BackendInfo Summarizer::resolveBackend(ConfigManager *config) {
+  BackendInfo info;
+  info.isLocal = (config->activeBackend() == "Llama.cpp");
+  info.modelName = config->activeModel();
+  info.config = config->backendConfig(config->activeBackend());
+
+  if (info.isLocal) {
+    info.modelPath = info.modelName;
+    QString ggufPath = config->summarizersPath() + "/" + info.modelName;
+    if (QFile::exists(ggufPath))
+      info.modelPath = ggufPath;
+  }
+  return info;
+}
+
+/* ── GPU preparation ────────────────────────────────────────────── */
+
+bool Summarizer::prepareGpu(bool isLocal) {
+  if (!isLocal || !m_database)
+    return false;
+
+  SqliteVecManager &vecMgr = m_database->vecManager();
+  if (vecMgr.isReady()) {
+    vecMgr.shutdown();
+    qDebug() << "[Summarizer] Embedding model unloaded to free GPU memory";
+    return true;
+  }
+  return false;
+}
+
+void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
   if (wasEmbeddingReady && m_database) {
     qDebug() << "[Summarizer] Reloading embedding model...";
-    QElapsedTimer embedTimer;
-    embedTimer.start();
+    QElapsedTimer t;
+    t.start();
     m_database->vecManager().initialize();
-    qDebug() << "[Summarizer] Embedding model reloaded in"
-             << embedTimer.elapsed() << "ms";
+    qDebug() << "[Summarizer] Embedding model reloaded in" << t.elapsed()
+             << "ms";
   }
-
-  // Unload the chat model to free GPU memory for future use.
-  if (isLocalBackend) {
+  if (isLocal) {
     m_chatBackend->unloadModel();
     qDebug() << "[Summarizer] Chat model unloaded";
   }
 }
+
+/* ── Local summarization ────────────────────────────────────────── */
+
+QString Summarizer::summarizeLocal(const PromptPayload &payload,
+                                   const BackendInfo &backend,
+                                   ConfigManager *config) {
+  qDebug() << "[Summarizer] Loading local model:" << backend.modelPath;
+  QElapsedTimer loadTimer;
+  loadTimer.start();
+
+  if (!m_chatBackend->loadModel(backend.modelPath)) {
+    return QString();
+  }
+  qDebug() << "[Summarizer] Model loaded in" << loadTimer.elapsed() << "ms";
+
+  QElapsedTimer genTimer;
+  genTimer.start();
+  QString result = m_chatBackend->summarize(payload);
+  qDebug() << "[Summarizer] Generation completed in" << genTimer.elapsed()
+           << "ms"
+           << "(" << result.length() << "chars)";
+  return result;
+}
+
+/* ── Remote summarization ───────────────────────────────────────── */
+
+QString Summarizer::summarizeRemote(const PromptPayload &payload,
+                                    const BackendInfo &backend,
+                                    ConfigManager *config) {
+  Q_UNUSED(config);
+
+  QString apiUrl = backend.config.value("url").toString();
+  QString apiKey = backend.config.value("api_key").toString();
+
+  m_remoteBackend->setApiUrl(apiUrl);
+  m_remoteBackend->setApiKey(apiKey);
+  m_remoteBackend->setModelName(backend.modelName);
+
+  qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
+           << "| Model:" << backend.modelName;
+
+  QElapsedTimer genTimer;
+  genTimer.start();
+
+  // Synchronous wait for the async remote call.
+  QString result, error;
+  QEventLoop loop;
+  QObject::connect(
+      m_remoteBackend, &RemoteBackend::finished, this,
+      [&result, &error, &loop](const QString &text, const QString &err) {
+        result = text;
+        error = err;
+        loop.quit();
+      },
+      Qt::SingleShotConnection);
+
+  m_remoteBackend->generate(payload.systemPrompt,
+                            payload.userMessage + "\n\n" + payload.textContext,
+                            payload.visualContext);
+  loop.exec();
+
+  qDebug() << "[Summarizer] Remote generation completed in"
+           << genTimer.elapsed() << "ms"
+           << "(" << result.length() << "chars)";
+
+  if (!error.isEmpty())
+    return QString();
+  return result;
+}
+
+/* ── Prompt building ────────────────────────────────────────────── */
 
 QString Summarizer::retrieveContext(const QString &paperHash) const {
   if (!m_database || !m_database->isOpen()) {
@@ -216,19 +250,16 @@ QString Summarizer::retrieveContext(const QString &paperHash) const {
     return QString();
   }
 
-  auto &db = m_database->db();
-  auto &vecMgr = m_database->vecManager();
-
-  QList<ChunkSearchResult> chunks = vecMgr.getChunksByHash(db, paperHash);
+  QList<ChunkSearchResult> chunks =
+      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
   if (chunks.isEmpty()) {
     qDebug() << "[Summarizer] no chunks for hash:" << paperHash;
     return QString();
   }
 
   QString context;
-  for (const auto &c : chunks) {
+  for (const auto &c : chunks)
     context += QString("Page %1: %2\n\n").arg(c.page).arg(c.text);
-  }
 
   qDebug() << "[Summarizer] retrieved" << chunks.size()
            << "chunks, length:" << context.length() << "for hash:" << paperHash;
@@ -239,27 +270,15 @@ std::vector<PageImage>
 Summarizer::retrieveVisualContext(const QString &paperHash) const {
   std::vector<PageImage> result;
 
-  if (!m_config) {
-    qWarning() << "[Summarizer] no ConfigManager";
-    return result;
-  }
-
   QString imgPath = m_config->projectImgPath(m_config->lastProject());
   QDir imgDir(imgPath);
-  if (!imgDir.exists()) {
-    qWarning() << "[Summarizer] Image directory does not exist:" << imgPath;
+  if (!imgDir.exists())
     return result;
-  }
 
-  // Match files like: 4ad90c343ca0d5a05e67f80da33a724b_page_001.png
   imgDir.setNameFilters({paperHash + "_page_*.png"});
-  const QFileInfoList matchingFiles = imgDir.entryInfoList();
-
-  // Sort by file name so page order is preserved
   QStringList paths;
-  for (const QFileInfo &fileInfo : matchingFiles) {
-    paths.append(fileInfo.absoluteFilePath());
-  }
+  for (const QFileInfo &fi : imgDir.entryInfoList())
+    paths.append(fi.absoluteFilePath());
   paths.sort();
 
   for (const QString &path : paths) {
@@ -269,10 +288,9 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
       continue;
     }
     QImage rgb = img.convertToFormat(QImage::Format_RGB888);
-    PageImage pi;
-    pi.width = rgb.width();
-    pi.height = rgb.height();
-    pi.data.assign(rgb.bits(), rgb.bits() + rgb.sizeInBytes());
+    PageImage pi{rgb.width(),
+                 rgb.height(),
+                 {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
     result.push_back(std::move(pi));
   }
 
@@ -283,15 +301,65 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
 
 PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   PromptPayload payload;
-
   payload.systemPrompt = s_systemPrompt;
   payload.userMessage = s_userPrompt;
   payload.textContext = retrieveContext(paperHash);
   payload.visualContext = retrieveVisualContext(paperHash);
-
   return payload;
 }
 
 void Summarizer::stop() {
   // TODO: forward cancel to the current inference pipeline
+}
+
+/* ── Database persistence ───────────────────────────────────────── */
+
+void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
+                             const QString &rawJson, const QString &modelName) {
+  if (!m_database || !m_database->isOpen()) {
+    qWarning() << "[Summarizer] Database not open — cannot save summary";
+    return;
+  }
+
+  auto &db = m_database->db();
+
+  SqliteStatement stmt =
+      db.prepare("INSERT INTO Summaries "
+                 "(paper_hash, title, authors, pages_num, journal, year, "
+                 "topics, llmodel, summary_json, date) "
+                 "VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, datetime('now')) "
+                 "ON CONFLICT(paper_hash) DO UPDATE SET "
+                 "title = excluded.title, "
+                 "authors = excluded.authors, "
+                 "journal = excluded.journal, "
+                 "year = excluded.year, "
+                 "topics = excluded.topics, "
+                 "llmodel = excluded.llmodel, "
+                 "summary_json = excluded.summary_json, "
+                 "date = excluded.date");
+  if (!stmt.isValid()) {
+    qCritical() << "[Summarizer] Failed to prepare summary upsert";
+    return;
+  }
+
+  stmt.bind(1, hash);
+  stmt.bind(2, summary.title);
+  stmt.bind(3, summary.authors.join("; "));
+  stmt.bind(4, summary.journal);
+  stmt.bind(5, QString::number(summary.year));
+  stmt.bind(6, summary.topics.join(", "));
+  stmt.bind(7, modelName);
+  stmt.bind(8, rawJson.toUtf8());
+
+  if (!stmt.exec()) {
+    qCritical() << "[Summarizer] Failed to save summary for" << hash << ":"
+                << stmt.errorMsg();
+    return;
+  }
+
+  if (m_database->summaryModel())
+    m_database->summaryModel()->loadAll();
+
+  qDebug() << "[Summarizer] Saved summary for" << hash
+           << "— title:" << summary.title;
 }

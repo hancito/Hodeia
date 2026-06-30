@@ -8,6 +8,31 @@ class ConfigManager;
 class QNetworkAccessManager;
 class QNetworkReply;
 
+/// Paper-level summary produced by the LLM.
+struct PaperSummary {
+  QString title;
+  QStringList authors;
+  QString journal;
+  int year = 0;
+  QStringList topics;
+  QString researchObjective;
+  QString methodology;
+  QString coreFindingsAndSignificance;
+  QString criticalLimitations;
+  QString citableSummary;
+};
+
+namespace SummaryHelpers {
+/// Parse LLM JSON response into a PaperSummary struct.
+PaperSummary parseSummaryJson(const QString &json);
+
+/// Convert a PaperSummary to a readable Markdown string.
+QString toMarkdown(const PaperSummary &summary);
+
+/// Convert a PaperSummary to a LaTeX snippet.
+QString toLatex(const PaperSummary &summary);
+} // namespace SummaryHelpers
+
 /// Singleton-like helper that manages model discovery for both local
 /// (Llama.cpp .gguf) and remote (OpenAI-compatible API) backends.
 /// Exposed to QML as "modelHelper".
@@ -19,6 +44,12 @@ public:
   ~ModelHelper() override;
 
 public slots:
+  /// Convert a JSON summary string to Markdown.
+  Q_INVOKABLE QString summaryToMarkdown(const QString &json) const;
+
+  /// Convert a JSON summary string to LaTeX.
+  Q_INVOKABLE QString summaryToLatex(const QString &json) const;
+
   /// List .gguf model files in the local Summarizers directory.
   QStringList listLocalModels();
 

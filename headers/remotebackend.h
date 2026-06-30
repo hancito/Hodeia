@@ -9,12 +9,10 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 class QNetworkRequest;
+class QUrl;
 
-/// Remote backend using QNetworkAccessManager.
-///
-/// Sends chat completion requests to a distant server
-/// (OpenAI, Ollama, LM Studio, etc.) via HTTP POST to /v1/chat/completions.
-/// Parses the JSON response and returns the assistant message content.
+/// Sends chat-completion requests to an OpenAI-compatible endpoint
+/// (Ollama, LM Studio, etc.) via HTTP POST to /v1/chat/completions.
 class RemoteBackend : public QObject {
   Q_OBJECT
 
@@ -35,25 +33,19 @@ public:
   float temperature() const { return m_temperature; }
   int maxTokens() const { return m_maxTokens; }
 
-  void setApiUrl(const QString &url);
-  void setApiKey(const QString &key);
-  void setModelName(const QString &name);
-  void setTemperature(float temp);
-  void setMaxTokens(int tokens);
+  void setApiUrl(const QString &url) { m_apiUrl = url; }
+  void setApiKey(const QString &key) { m_apiKey = key; }
+  void setModelName(const QString &name) { m_modelName = name; }
+  void setTemperature(float temp) { m_temperature = temp; }
+  void setMaxTokens(int tokens) { m_maxTokens = tokens; }
 
-  /// Apply settings from ConfigManager (convenience wrapper).
-  void applyConfig();
+  /// Whether the backend has a valid URL and model name.
+  bool isReady() const { return !m_apiUrl.isEmpty() && !m_modelName.isEmpty(); }
 
-  /// Whether the backend has a valid configuration.
-  bool isReady() const;
-
-  /// Generate a completion from system + user prompts.
-  /// Asynchronous; result delivered via the finished() signal.
+  /// Generate a completion (text-only).
   void generate(const QString &systemPrompt, const QString &userPrompt);
 
-  /// Generate a completion with system + user prompts and page images.
-  /// Images are encoded as PNG base64 and sent using the OpenAI vision
-  /// content array format. Asynchronous; result via finished().
+  /// Generate a completion with page images (vision).
   void generate(const QString &systemPrompt, const QString &userPrompt,
                 const std::vector<PageImage> &images);
 
@@ -61,26 +53,32 @@ public:
   void cancel();
 
 signals:
-  /// Emitted when generation completes (success or failure).
-  /// @param text  Assistant message content (empty on error).
-  /// @param error Error description (empty on success).
   void finished(const QString &text, const QString &error);
-
   void statusUpdated(const QString &msg);
 
 private:
   QUrl buildCompletionUrl() const;
   QNetworkRequest buildRequest(const QUrl &url) const;
   void sendRequest(QNetworkRequest request, const QByteArray &payload);
+
   QJsonObject buildBody(const QJsonArray &messages) const;
+  QJsonObject ollamaOptions() const;
+  bool isOllamaLocal() const;
+
+  QJsonObject systemMessage(const QString &prompt) const;
+  QJsonObject textUserMessage(const QString &prompt) const;
+  QJsonObject visionUserMessage(const QString &prompt,
+                                const std::vector<PageImage> &images) const;
+  QJsonObject imageToPart(const PageImage &img) const;
+
   void handleReply(QNetworkReply *reply);
 
   QNetworkAccessManager *m_manager = nullptr;
   QNetworkReply *m_currentReply = nullptr;
 
-  QString m_apiUrl; // e.g. "http://localhost:11434/v1"
+  QString m_apiUrl;
   QString m_apiKey;
   QString m_modelName;
   float m_temperature = 0.1f;
-  int m_maxTokens = 4096;
+  int m_maxTokens = 8192;
 };

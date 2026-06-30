@@ -43,7 +43,7 @@ bool DatabaseManager::initDatabase() {
 void DatabaseManager::createTables() {
   m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "paper_hash TEXT NOT NULL, "
+            "paper_hash TEXT NOT NULL UNIQUE, "
             "title TEXT, "
             "authors TEXT, "
             "pages_num INTEGER NOT NULL, "

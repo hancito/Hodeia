@@ -1,35 +1,18 @@
 #pragma once
 
+#include <QDateTime>
 #include <QObject>
 #include <QStringList>
 #include <vector>
 
+#include "headers/helpers.h"
 #include "headers/llama_chat_backend.h"
 
 class ConfigManager;
 class DatabaseManager;
 class RemoteBackend;
-class QThread;
 
-/// Paper-level summary produced by the LLM, mirrors the Python PaperSummary
-/// schema.
-struct PaperSummary {
-  QString title;
-  QStringList authors;
-  QString journal;
-  int year = 0;
-  QStringList topics;
-  QString researchObjective;
-  QString methodology;
-  QString coreFindingsAndSignificance;
-  QString criticalLimitations;
-  QString citableSummary;
-};
-
-/// Central orchestrator for paper summarization.
-///
-/// The heavy lifting (chunk retrieval, LLM calls, DB writes) runs in a
-/// dedicated worker thread so the main thread stays responsive.
+/// Orchestrator for paper summarization.
 class Summarizer : public QObject {
   Q_OBJECT
 
@@ -48,12 +31,36 @@ signals:
   void started();
 
 private:
+  /* backend resolution */
+  struct BackendInfo {
+    bool isLocal;
+    QString modelName;
+    QString modelPath;
+    QVariantMap config;
+  };
+
+  BackendInfo resolveBackend(ConfigManager *config);
+
+  /* GPU lifecycle */
+  bool prepareGpu(bool isLocal);
+  void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
+
+  /* inference */
+  QString summarizeLocal(const PromptPayload &payload,
+                         const BackendInfo &backend, ConfigManager *config);
+  QString summarizeRemote(const PromptPayload &payload,
+                          const BackendInfo &backend, ConfigManager *config);
+
+  /* prompt building */
+  PromptPayload buildPrompt(const QString &paperHash) const;
   QString retrieveContext(const QString &paperHash) const;
   std::vector<PageImage> retrieveVisualContext(const QString &paperHash) const;
-  PromptPayload buildPrompt(const QString &paperHash) const;
-  /// Get the system prompt template sent to the LLM.
+
+  /* result handling */
+  void saveSummary(const QString &hash, const PaperSummary &summary,
+                   const QString &rawJson, const QString &modelName);
+
   static const QString &systemPrompt();
-  /// Get the user prompt prefix (e.g. "Summarize this paper:").
   static const QString &userPrompt();
 
   ConfigManager *m_config = nullptr;

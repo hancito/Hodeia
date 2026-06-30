@@ -1,5 +1,4 @@
 #include "headers/remotebackend.h"
-#include "headers/configmanager.h"
 
 #include <QBuffer>
 #include <QDebug>
@@ -11,13 +10,11 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSslError>
-#include <QUrl>
-#include <QUrlQuery>
 
 RemoteBackend::RemoteBackend(QObject *parent) : QObject(parent) {
   m_manager = new QNetworkAccessManager(this);
   connect(m_manager, &QNetworkAccessManager::sslErrors, this,
-          [this](QNetworkReply *rep, const QList<QSslError> &errors) {
+          [this](QNetworkReply *, const QList<QSslError> &errors) {
             QString details;
             for (const auto &e : errors)
               details += e.errorString() + " ";
@@ -28,31 +25,28 @@ RemoteBackend::RemoteBackend(QObject *parent) : QObject(parent) {
 
 RemoteBackend::~RemoteBackend() = default;
 
-void RemoteBackend::setApiUrl(const QString &url) { m_apiUrl = url; }
+/* ── Detection helpers ──────────────────────────────────────────── */
 
-void RemoteBackend::setApiKey(const QString &key) { m_apiKey = key; }
-
-void RemoteBackend::setModelName(const QString &name) { m_modelName = name; }
-
-void RemoteBackend::setTemperature(float temp) { m_temperature = temp; }
-
-void RemoteBackend::setMaxTokens(int tokens) { m_maxTokens = tokens; }
-
-void RemoteBackend::applyConfig() {
-  // Placeholder — the Summarizer passes config values directly.
+bool RemoteBackend::isOllamaLocal() const {
+  return m_apiUrl.contains("localhost:11434");
 }
 
-bool RemoteBackend::isReady() const {
-  return !m_apiUrl.isEmpty() && !m_modelName.isEmpty();
+QJsonObject RemoteBackend::ollamaOptions() const {
+  QJsonObject options;
+  options["num_ctx"] = 256000;
+  options["num_predict"] = m_maxTokens;
+  QJsonObject thinking;
+  thinking["enabled"] = false;
+  options["thinking"] = thinking;
+  return options;
 }
 
-// ── Private helpers ────────────────────────────────────────────────
+/* ── URL / request builders ─────────────────────────────────────── */
 
 QUrl RemoteBackend::buildCompletionUrl() const {
   QUrl url(m_apiUrl);
-  if (url.path().endsWith("/v1")) {
+  if (url.path().endsWith("/v1"))
     url.setPath(url.path().chopped(3));
-  }
   url.setPath(url.path() + "/v1/chat/completions");
   return url;
 }
@@ -60,9 +54,8 @@ QUrl RemoteBackend::buildCompletionUrl() const {
 QNetworkRequest RemoteBackend::buildRequest(const QUrl &url) const {
   QNetworkRequest request(url);
   request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-  if (!m_apiKey.isEmpty()) {
+  if (!m_apiKey.isEmpty())
     request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
-  }
   return request;
 }
 
@@ -78,16 +71,83 @@ void RemoteBackend::sendRequest(QNetworkRequest request,
                    });
 }
 
+/* ── Message builders ───────────────────────────────────────────── */
+
+QJsonObject RemoteBackend::systemMessage(const QString &prompt) const {
+  QJsonObject msg;
+  msg["role"] = "system";
+  msg["content"] = prompt;
+  return msg;
+}
+
+QJsonObject RemoteBackend::textUserMessage(const QString &prompt) const {
+  QJsonObject msg;
+  msg["role"] = "user";
+  msg["content"] = prompt;
+  return msg;
+}
+
+QJsonObject
+RemoteBackend::visionUserMessage(const QString &prompt,
+                                 const std::vector<PageImage> &images) const {
+  QJsonArray contentParts;
+
+  QJsonObject textPart;
+  textPart["type"] = "text";
+  textPart["text"] = prompt;
+  contentParts.append(textPart);
+
+  for (const auto &img : images)
+    contentParts.append(imageToPart(img));
+
+  QJsonObject msg;
+  msg["role"] = "user";
+  msg["content"] = contentParts;
+  return msg;
+}
+
+QJsonObject RemoteBackend::imageToPart(const PageImage &img) const {
+  QImage image(img.data.data(), img.width, img.height, QImage::Format_RGB888);
+  image = image.copy();
+
+  QByteArray pngData;
+  QBuffer buffer(&pngData);
+  buffer.open(QIODevice::WriteOnly);
+  image.save(&buffer, "PNG");
+  buffer.close();
+
+  QJsonObject part;
+  part["type"] = "image_url";
+  QJsonObject imgUrl;
+  imgUrl["url"] = QString("data:image/png;base64,") +
+                  QString::fromLatin1(pngData.toBase64());
+  part["image_url"] = imgUrl;
+
+  return part;
+}
+
+/* ── Request body ───────────────────────────────────────────────── */
+
 QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
   QJsonObject body;
   body["model"] = m_modelName;
   body["messages"] = messages;
   body["temperature"] = m_temperature;
   body["max_tokens"] = m_maxTokens;
+  body["stream"] = false;
+
+  QJsonObject responseFormat;
+  responseFormat["type"] = "json_object";
+  body["response_format"] = responseFormat;
+
+  if (isOllamaLocal()) {
+    body["options"] = ollamaOptions();
+  }
+
   return body;
 }
 
-// ── Public API ─────────────────────────────────────────────────────
+/* ── Public generate overloads ──────────────────────────────────── */
 
 void RemoteBackend::generate(const QString &systemPrompt,
                              const QString &userPrompt) {
@@ -97,24 +157,14 @@ void RemoteBackend::generate(const QString &systemPrompt,
   }
   cancel();
 
-  // Build messages array (text-only)
   QJsonArray messages;
-  if (!systemPrompt.isEmpty()) {
-    QJsonObject sysMsg;
-    sysMsg["role"] = "system";
-    sysMsg["content"] = systemPrompt;
-    messages.append(sysMsg);
-  }
-  QJsonObject userMsg;
-  userMsg["role"] = "user";
-  userMsg["content"] = userPrompt;
-  messages.append(userMsg);
+  if (!systemPrompt.isEmpty())
+    messages.append(systemMessage(systemPrompt));
+  messages.append(textUserMessage(userPrompt));
 
-  QUrl url = buildCompletionUrl();
-  QNetworkRequest request = buildRequest(url);
-  QByteArray payload =
-      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact);
-  sendRequest(request, payload);
+  sendRequest(
+      buildRequest(buildCompletionUrl()),
+      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
 }
 
 void RemoteBackend::generate(const QString &systemPrompt,
@@ -126,55 +176,17 @@ void RemoteBackend::generate(const QString &systemPrompt,
   }
   cancel();
 
-  // Build messages array with vision format
-  QJsonArray messages;
-  if (!systemPrompt.isEmpty()) {
-    QJsonObject sysMsg;
-    sysMsg["role"] = "system";
-    sysMsg["content"] = systemPrompt;
-    messages.append(sysMsg);
-  }
-
-  // User message: content as array [text, image_url, image_url, ...]
-  QJsonArray contentParts;
-  QJsonObject textPart;
-  textPart["type"] = "text";
-  textPart["text"] = userPrompt;
-  contentParts.append(textPart);
-
-  for (size_t i = 0; i < images.size(); ++i) {
-    QImage img(images[i].data.data(), images[i].width, images[i].height,
-               QImage::Format_RGB888);
-    img = img.copy(); // QImage does not copy on construction from external ptr
-
-    QByteArray pngData;
-    QBuffer buffer(&pngData);
-    buffer.open(QIODevice::WriteOnly);
-    img.save(&buffer, "PNG");
-    buffer.close();
-
-    QJsonObject imgUrlPart;
-    imgUrlPart["type"] = "image_url";
-    QJsonObject imgUrl;
-    imgUrl["url"] = QString("data:image/png;base64,") +
-                    QString::fromLatin1(pngData.toBase64());
-    imgUrlPart["image_url"] = imgUrl;
-    contentParts.append(imgUrlPart);
-  }
-
-  QJsonObject userMsg;
-  userMsg["role"] = "user";
-  userMsg["content"] = contentParts;
-  messages.append(userMsg);
-
   qDebug() << "[RemoteBackend] Sending request with" << images.size()
            << "image(s)";
 
-  QUrl url = buildCompletionUrl();
-  QNetworkRequest request = buildRequest(url);
-  QByteArray payload =
-      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact);
-  sendRequest(request, payload);
+  QJsonArray messages;
+  if (!systemPrompt.isEmpty())
+    messages.append(systemMessage(systemPrompt));
+  messages.append(visionUserMessage(userPrompt, images));
+
+  sendRequest(
+      buildRequest(buildCompletionUrl()),
+      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
 }
 
 void RemoteBackend::cancel() {
@@ -185,10 +197,13 @@ void RemoteBackend::cancel() {
   }
 }
 
+/* ── Response handling ──────────────────────────────────────────── */
+
 void RemoteBackend::handleReply(QNetworkReply *reply) {
   if (!reply)
     return;
 
+  // Network-level errors
   if (reply->error() != QNetworkReply::NoError) {
     QString err = reply->errorString();
     qDebug() << "[RemoteBackend] Network error:" << err;
@@ -200,6 +215,7 @@ void RemoteBackend::handleReply(QNetworkReply *reply) {
   QByteArray data = reply->readAll();
   reply->deleteLater();
 
+  // JSON parse
   QJsonParseError parseErr;
   QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
   if (parseErr.error != QJsonParseError::NoError) {
@@ -209,19 +225,29 @@ void RemoteBackend::handleReply(QNetworkReply *reply) {
     return;
   }
 
-  // Extract choices[0].message.content
-  QJsonObject root = doc.object();
-  QJsonArray choices = root.value("choices").toArray();
+  // Extract assistant content
+  QJsonArray choices = doc.object().value("choices").toArray();
   if (choices.isEmpty()) {
+    qDebug() << "[RemoteBackend] No choices in response";
     emit finished(QString(), "Empty response from server");
     return;
   }
 
-  QJsonObject firstChoice = choices.at(0).toObject();
-  QJsonObject message = firstChoice.value("message").toObject();
+  QJsonObject message = choices.first().toObject().value("message").toObject();
   QString content = message.value("content").toString();
 
+  // Fallback: reasoning models put output in "reasoning"
   if (content.isEmpty()) {
+    content = message.value("reasoning").toString();
+    if (!content.isEmpty())
+      qDebug() << "[RemoteBackend] Used reasoning field as fallback"
+               << content.size() << "chars";
+  }
+
+  if (content.isEmpty()) {
+    auto firstChoice = choices.first().toObject();
+    qDebug() << "[RemoteBackend] Empty content — finish_reason:"
+             << firstChoice.value("finish_reason");
     emit finished(QString(), "Empty content in response");
     return;
   }

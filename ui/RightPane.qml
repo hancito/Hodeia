@@ -337,7 +337,7 @@ Rectangle {
                         }
 
                         Label {
-                            text: "Le model ici"
+                            text: llmodel
                             font.family: Fonts.mono
                             font.pixelSize: 12
                         }

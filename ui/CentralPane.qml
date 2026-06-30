@@ -13,6 +13,18 @@ Rectangle {
     border.width: 1
     radius: 5
 
+    // Resolve the raw JSON summary for the active paper
+    readonly property string activeSummaryJson: {
+        if (activePaperHash === "")
+            return "";
+        for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
+            var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
+            if (hash === activePaperHash)
+                return databaseManager.summaryProxyModel.get(i, "summaryJson");
+        }
+        return "";
+    }
+
     // Reset page spinner and zoom when the active paper changes
     Connections {
         target: centralPane
@@ -152,9 +164,8 @@ Rectangle {
                             readOnly: true
                             textFormat: TextEdit.MarkdownText
                             wrapMode: TextEdit.WordWrap
-                            font.family: Fonts.display
 
-                            text: "# TextArea Markdown\n\n" + "1. This is a scrollable area.\n" + "2. You can select this text.\n" + "3. **Bold** and *italics* work perfectly"
+                            text: modelHelper.summaryToMarkdown(centralPane.activeSummaryJson)
                         }
                     }
 
@@ -201,7 +212,9 @@ Rectangle {
                             id: latexEditor
                             readOnly: true
                             wrapMode: TextEdit.WordWrap
-                            placeholderText: "Latex will be here"
+                            font.family: Fonts.mono
+                            placeholderText: "Select a paper to see its LaTeX summary"
+                            text: modelHelper.summaryToLatex(centralPane.activeSummaryJson)
                         }
                     }
 
