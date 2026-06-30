@@ -8,6 +8,7 @@
 
 class QNetworkAccessManager;
 class QNetworkReply;
+class QNetworkRequest;
 
 /// Remote backend using QNetworkAccessManager.
 ///
@@ -59,28 +60,20 @@ public:
   /// Cancel an in-flight request.
   void cancel();
 
-  /// Fetch the list of available models from the remote API.
-  /// Sends GET /v1/models using the given URL and key (does not modify
-  /// the persistent backend configuration). Emits modelsReady() with the
-  /// model IDs.
-  void fetchModels(const QString &apiUrl, const QString &apiKey);
-
 signals:
   /// Emitted when generation completes (success or failure).
   /// @param text  Assistant message content (empty on error).
   /// @param error Error description (empty on success).
   void finished(const QString &text, const QString &error);
 
-  /// Emitted after fetchModels() completes.
-  /// @param models List of model IDs (empty on error).
-  /// @param error  Error description (empty on success).
-  void modelsReady(const QStringList &models, const QString &error);
-
   void statusUpdated(const QString &msg);
 
 private:
+  QUrl buildCompletionUrl() const;
+  QNetworkRequest buildRequest(const QUrl &url) const;
+  void sendRequest(QNetworkRequest request, const QByteArray &payload);
+  QJsonObject buildBody(const QJsonArray &messages) const;
   void handleReply(QNetworkReply *reply);
-  void handleModelsReply(QNetworkReply *reply);
 
   QNetworkAccessManager *m_manager = nullptr;
   QNetworkReply *m_currentReply = nullptr;

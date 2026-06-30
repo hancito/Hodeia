@@ -4,12 +4,26 @@
 #include "headers/helpers.h"
 #include "headers/summarythreadmanager.h"
 #include "headers/thememanager.h"
+#include "llama.h"
+
 #include <QDir>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+
+/// Install a global llama.cpp log callback early (before any model loads)
+/// so that embedding model init and chat backend share the same filter.
+static void initLlamaLogging() {
+  llama_log_set(
+      [](enum ggml_log_level level, const char *text, void *) {
+        if (level >= GGML_LOG_LEVEL_ERROR) {
+          fprintf(stderr, "llama.cpp: %s", text);
+        }
+      },
+      nullptr);
+}
 
 // Register the custom Fonts
 static void registerApplicationFonts(const QString &fontsDir) {
@@ -45,6 +59,9 @@ int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
   app.setWindowIcon(QIcon(":/Resources/paperize.png"));
 
+  // Suppress llama.cpp verbosity (must run before any model is loaded)
+  initLlamaLogging();
+
   // Register custom fonts
   registerApplicationFonts(app.applicationDirPath() + "/Fonts");
 
@@ -60,7 +77,8 @@ int main(int argc, char *argv[]) {
   DatabaseManager databaseManager(&configManager);
 
   // Create the PDF ingestion worker
-  EngineController engineController(&configManager, &databaseManager.vecManager());
+  EngineController engineController(&configManager,
+                                    &databaseManager.vecManager());
 
   // Create the Summarizer (orchestrates local/remote backends)
   SummaryController summaryController(&configManager, &databaseManager);

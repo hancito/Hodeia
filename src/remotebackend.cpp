@@ -46,23 +46,58 @@ bool RemoteBackend::isReady() const {
   return !m_apiUrl.isEmpty() && !m_modelName.isEmpty();
 }
 
+// ── Private helpers ────────────────────────────────────────────────
+
+QUrl RemoteBackend::buildCompletionUrl() const {
+  QUrl url(m_apiUrl);
+  if (url.path().endsWith("/v1")) {
+    url.setPath(url.path().chopped(3));
+  }
+  url.setPath(url.path() + "/v1/chat/completions");
+  return url;
+}
+
+QNetworkRequest RemoteBackend::buildRequest(const QUrl &url) const {
+  QNetworkRequest request(url);
+  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+  if (!m_apiKey.isEmpty()) {
+    request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
+  }
+  return request;
+}
+
+void RemoteBackend::sendRequest(QNetworkRequest request,
+                                const QByteArray &payload) {
+  emit statusUpdated(tr("Sending request to %1").arg(request.url().toString()));
+
+  m_currentReply = m_manager->post(request, payload);
+  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
+                   [this, reply = m_currentReply]() {
+                     m_currentReply = nullptr;
+                     handleReply(reply);
+                   });
+}
+
+QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
+  QJsonObject body;
+  body["model"] = m_modelName;
+  body["messages"] = messages;
+  body["temperature"] = m_temperature;
+  body["max_tokens"] = m_maxTokens;
+  return body;
+}
+
+// ── Public API ─────────────────────────────────────────────────────
+
 void RemoteBackend::generate(const QString &systemPrompt,
                              const QString &userPrompt) {
   if (!isReady()) {
     emit finished(QString(), "Backend not configured (URL or model missing)");
     return;
   }
-
   cancel();
 
-  QUrl baseUrl(m_apiUrl);
-  // Strip trailing /v1 so we can append cleanly
-  if (baseUrl.path().endsWith("/v1")) {
-    baseUrl.setPath(baseUrl.path().chopped(3));
-  }
-  baseUrl.setPath(baseUrl.path() + "/v1/chat/completions");
-
-  // Build messages array
+  // Build messages array (text-only)
   QJsonArray messages;
   if (!systemPrompt.isEmpty()) {
     QJsonObject sysMsg;
@@ -75,30 +110,11 @@ void RemoteBackend::generate(const QString &systemPrompt,
   userMsg["content"] = userPrompt;
   messages.append(userMsg);
 
-  // Build request body
-  QJsonObject body;
-  body["model"] = m_modelName;
-  body["messages"] = messages;
-  body["temperature"] = m_temperature;
-  body["max_tokens"] = m_maxTokens;
-
-  QByteArray payload = QJsonDocument(body).toJson(QJsonDocument::Compact);
-
-  // Build HTTP request
-  QNetworkRequest request(baseUrl);
-  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-  if (!m_apiKey.isEmpty()) {
-    request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
-  }
-
-  emit statusUpdated(tr("Sending request to %1").arg(baseUrl.toString()));
-
-  m_currentReply = m_manager->post(request, payload);
-  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
-                   [this, reply = m_currentReply]() {
-                     m_currentReply = nullptr;
-                     handleReply(reply);
-                   });
+  QUrl url = buildCompletionUrl();
+  QNetworkRequest request = buildRequest(url);
+  QByteArray payload =
+      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact);
+  sendRequest(request, payload);
 }
 
 void RemoteBackend::generate(const QString &systemPrompt,
@@ -108,14 +124,7 @@ void RemoteBackend::generate(const QString &systemPrompt,
     emit finished(QString(), "Backend not configured (URL or model missing)");
     return;
   }
-
   cancel();
-
-  QUrl baseUrl(m_apiUrl);
-  if (baseUrl.path().endsWith("/v1")) {
-    baseUrl.setPath(baseUrl.path().chopped(3));
-  }
-  baseUrl.setPath(baseUrl.path() + "/v1/chat/completions");
 
   // Build messages array with vision format
   QJsonArray messages;
@@ -158,32 +167,14 @@ void RemoteBackend::generate(const QString &systemPrompt,
   userMsg["content"] = contentParts;
   messages.append(userMsg);
 
-  // Build request body
-  QJsonObject body;
-  body["model"] = m_modelName;
-  body["messages"] = messages;
-  body["temperature"] = m_temperature;
-  body["max_tokens"] = m_maxTokens;
-
-  QByteArray payload = QJsonDocument(body).toJson(QJsonDocument::Compact);
-
   qDebug() << "[RemoteBackend] Sending request with" << images.size()
-           << "image(s), payload size:" << payload.size() << "bytes";
+           << "image(s)";
 
-  QNetworkRequest request(baseUrl);
-  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-  if (!m_apiKey.isEmpty()) {
-    request.setRawHeader("Authorization", ("Bearer " + m_apiKey).toUtf8());
-  }
-
-  emit statusUpdated(tr("Sending request to %1").arg(baseUrl.toString()));
-
-  m_currentReply = m_manager->post(request, payload);
-  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
-                   [this, reply = m_currentReply]() {
-                     m_currentReply = nullptr;
-                     handleReply(reply);
-                   });
+  QUrl url = buildCompletionUrl();
+  QNetworkRequest request = buildRequest(url);
+  QByteArray payload =
+      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact);
+  sendRequest(request, payload);
 }
 
 void RemoteBackend::cancel() {
@@ -192,32 +183,6 @@ void RemoteBackend::cancel() {
     m_currentReply->deleteLater();
     m_currentReply = nullptr;
   }
-}
-
-void RemoteBackend::fetchModels(const QString &apiUrl, const QString &apiKey) {
-  if (apiUrl.isEmpty()) {
-    emit modelsReady(QStringList(), "URL is empty");
-    return;
-  }
-
-  cancel();
-
-  QUrl baseUrl(apiUrl);
-  baseUrl.setPath(baseUrl.path() + "/models");
-
-  QNetworkRequest request(baseUrl);
-  if (!apiKey.isEmpty()) {
-    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
-  }
-
-  emit statusUpdated(tr("Fetching model list from %1").arg(baseUrl.toString()));
-
-  m_currentReply = m_manager->get(request);
-  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
-                   [this, reply = m_currentReply]() {
-                     m_currentReply = nullptr;
-                     handleModelsReply(reply);
-                   });
 }
 
 void RemoteBackend::handleReply(QNetworkReply *reply) {
@@ -263,44 +228,4 @@ void RemoteBackend::handleReply(QNetworkReply *reply) {
 
   emit statusUpdated(tr("Response received (%1 chars)").arg(content.length()));
   emit finished(content, QString());
-}
-
-void RemoteBackend::handleModelsReply(QNetworkReply *reply) {
-  if (!reply)
-    return;
-
-  if (reply->error() != QNetworkReply::NoError) {
-    QString err = reply->errorString();
-    qDebug() << "[RemoteBackend] Network error during models fetch:" << err;
-    emit modelsReady(QStringList(), err);
-    reply->deleteLater();
-    return;
-  }
-
-  QByteArray data = reply->readAll();
-  reply->deleteLater();
-
-  QJsonParseError parseErr;
-  QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
-  if (parseErr.error != QJsonParseError::NoError) {
-    QString err = tr("JSON parse error: %1").arg(parseErr.errorString());
-    qDebug() << "[RemoteBackend]" << err;
-    emit modelsReady(QStringList(), err);
-    return;
-  }
-
-  QJsonObject root = doc.object();
-  QJsonArray dataArray = root.value("data").toArray();
-
-  QStringList models;
-  for (const auto &elem : dataArray) {
-    QJsonObject m = elem.toObject();
-    QString id = m.value("id").toString();
-    if (!id.isEmpty()) {
-      models.append(id);
-    }
-  }
-
-  emit statusUpdated(tr("Received %1 model(s) from server").arg(models.size()));
-  emit modelsReady(models, QString());
 }

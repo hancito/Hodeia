@@ -5,7 +5,8 @@
 #include <QStringList>
 
 class ConfigManager;
-class RemoteBackend;
+class QNetworkAccessManager;
+class QNetworkReply;
 
 /// Singleton-like helper that manages model discovery for both local
 /// (Llama.cpp .gguf) and remote (OpenAI-compatible API) backends.
@@ -44,7 +45,10 @@ signals:
                      const QString &error);
 
 private:
-  RemoteBackend *m_remoteBackend = nullptr;
+  void fetchRemoteModels(const QString &apiUrl, const QString &apiKey);
+  void handleModelsReply(QNetworkReply *reply);
+
   ConfigManager *m_config = nullptr;
-  QThread *m_workerThread = nullptr;
+  QNetworkAccessManager *m_networkManager = nullptr;
+  QNetworkReply *m_currentReply = nullptr;
 };

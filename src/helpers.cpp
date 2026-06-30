@@ -1,18 +1,19 @@
 #include "headers/helpers.h"
 #include "headers/configmanager.h"
-#include "headers/remotebackend.h"
 
 #include <QDir>
 #include <QFile>
-#include <QMetaObject>
-#include <QThread>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrl>
 
 ModelHelper::ModelHelper(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config) {
-  m_workerThread = new QThread(this);
-
-  m_remoteBackend = new RemoteBackend();
-  m_remoteBackend->moveToThread(m_workerThread);
+  m_networkManager = new QNetworkAccessManager(this);
 
   // Auto-reload when the active backend changes.
   QObject::connect(m_config, &ConfigManager::activeBackendChanged, this,
@@ -24,16 +25,9 @@ ModelHelper::ModelHelper(ConfigManager *config, QObject *parent)
 
   // Initial load for the currently active backend.
   loadActiveBackendModels();
-
-  m_workerThread->start();
 }
 
-ModelHelper::~ModelHelper() {
-  if (m_workerThread && m_workerThread->isRunning()) {
-    m_workerThread->quit();
-    m_workerThread->wait(3000);
-  }
-}
+ModelHelper::~ModelHelper() = default;
 
 QStringList ModelHelper::listLocalModels() {
   if (!m_config)
@@ -88,17 +82,17 @@ QStringList ModelHelper::getImagesForHash(const QString &paperHash,
 
 void ModelHelper::checkRemoteModels(const QString &name, const QString &apiUrl,
                                     const QString &apiKey) {
-  if (!m_remoteBackend || apiUrl.isEmpty()) {
+  if (apiUrl.isEmpty()) {
     emit modelsChecked(false, QStringList(), "Invalid parameters");
     return;
   }
 
-  // One-shot connection: when the backend finishes, save or report error.
+  // One-shot connection: when the fetch completes, save or report error.
   QObject::connect(
-      m_remoteBackend, &RemoteBackend::modelsReady, this,
-      [this, name, apiUrl, apiKey](const QStringList &models,
-                                   const QString &error) {
-        if (error.isEmpty() && m_config) {
+      this, &ModelHelper::modelsChecked, this,
+      [this, name, apiUrl, apiKey](bool success, const QStringList & /*models*/,
+                                   const QString & /*error*/) {
+        if (success && m_config) {
           m_config->setBackend(name, apiUrl, apiKey);
           // Only set active if it's different — avoids triggering
           // activeBackendChanged and a re-entrant check loop.
@@ -106,17 +100,80 @@ void ModelHelper::checkRemoteModels(const QString &name, const QString &apiUrl,
             m_config->setActiveBackend(name);
           }
         }
-        emit modelsChecked(error.isEmpty(), models, error);
       },
       Qt::SingleShotConnection);
 
-  // Trigger fetchModels in the worker thread.
-  QMetaObject::invokeMethod(
-      m_remoteBackend,
-      [this, apiUrl, apiKey]() {
-        m_remoteBackend->fetchModels(apiUrl, apiKey);
-      },
-      Qt::QueuedConnection);
+  fetchRemoteModels(apiUrl, apiKey);
+}
+
+void ModelHelper::fetchRemoteModels(const QString &apiUrl,
+                                    const QString &apiKey) {
+  if (apiUrl.isEmpty()) {
+    emit modelsChecked(false, QStringList(), "URL is empty");
+    return;
+  }
+
+  // Cancel any in-flight request (reply will be cleaned up by its parent,
+  // QNetworkAccessManager — we just null our watch pointer).
+  if (m_currentReply) {
+    m_currentReply->abort();
+    m_currentReply = nullptr;
+  }
+
+  QUrl baseUrl(apiUrl);
+  baseUrl.setPath(baseUrl.path() + "/models");
+
+  QNetworkRequest request(baseUrl);
+  if (!apiKey.isEmpty()) {
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+  }
+
+  m_currentReply = m_networkManager->get(request);
+  QObject::connect(m_currentReply, &QNetworkReply::finished, this,
+                   [this, reply = m_currentReply]() {
+                     if (m_currentReply == reply)
+                       m_currentReply = nullptr;
+                     handleModelsReply(reply);
+                   });
+}
+
+void ModelHelper::handleModelsReply(QNetworkReply *reply) {
+  if (!reply)
+    return;
+
+  if (reply->error() != QNetworkReply::NoError) {
+    QString err = reply->errorString();
+    qDebug() << "[ModelHelper] Network error during models fetch:" << err;
+    emit modelsChecked(false, QStringList(), err);
+    return;
+  }
+
+  QByteArray data = reply->readAll();
+
+  QJsonParseError parseErr;
+  QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
+  if (parseErr.error != QJsonParseError::NoError) {
+    QString err = QString("JSON parse error: %1").arg(parseErr.errorString());
+    qDebug() << "[ModelHelper]" << err;
+    emit modelsChecked(false, QStringList(), err);
+    return;
+  }
+
+  QJsonObject root = doc.object();
+  QJsonArray dataArray = root.value("data").toArray();
+
+  QStringList models;
+  for (const auto &elem : dataArray) {
+    QJsonObject m = elem.toObject();
+    QString id = m.value("id").toString();
+    if (!id.isEmpty()) {
+      models.append(id);
+    }
+  }
+
+  qDebug() << "[ModelHelper] Received" << models.size()
+           << "model(s) from server";
+  emit modelsChecked(true, models, QString());
 }
 
 void ModelHelper::loadActiveBackendModels() {

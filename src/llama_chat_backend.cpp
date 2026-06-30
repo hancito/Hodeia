@@ -21,22 +21,6 @@ static bool s_llamaInitialized = false;
 
 LlamaChatBackend::LlamaChatBackend(QObject *parent) : QObject(parent) {
   if (!s_llamaInitialized) {
-    // Suppress llama.cpp / mtmd log spam — only show warnings+.
-    llama_log_set(
-        [](enum ggml_log_level level, const char *text, void *) {
-          if (level >= GGML_LOG_LEVEL_WARN) {
-            fprintf(stderr, "llama.cpp: %s", text);
-          }
-        },
-        nullptr);
-    mtmd_helper_log_set(
-        [](enum ggml_log_level level, const char *text, void *) {
-          if (level >= GGML_LOG_LEVEL_WARN) {
-            fprintf(stderr, "mtmd: %s", text);
-          }
-        },
-        nullptr);
-
     llama_backend_init();
     s_llamaInitialized = true;
     qDebug() << "[LlamaChatBackend] llama backend initialized"
@@ -460,56 +444,10 @@ LlamaChatBackend::runInference(const QString &formattedText,
 
     qDebug() << "[LlamaChatBackend] All chunks decoded, n_past=" << nPast;
 
-    // ── Generation loop (same as text-only path) ──
-    auto *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(smpl, llama_sampler_init_top_k(TopK));
-    llama_sampler_chain_add(smpl, llama_sampler_init_top_p(TopP, 1));
-    if (Temperature > 0.0f) {
-      llama_sampler_chain_add(smpl, llama_sampler_init_temp(Temperature));
-    } else {
-      llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
-    }
-    llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
-
-    std::vector<llama_token> generated;
-    generated.reserve(MaxGenTokens);
-    bool hitEos = false;
-
-    for (int i = 0; i < MaxGenTokens; i++) {
-      llama_token nextTok = llama_sampler_sample(smpl, m_llamaCtx, -1);
-      generated.push_back(nextTok);
-
-      if (llama_vocab_is_eog(vocab, nextTok) || i == MaxGenTokens - 1) {
-        hitEos = true;
-        break;
-      }
-
-      llama_batch single = llama_batch_get_one(&nextTok, 1);
-      if (llama_decode(m_llamaCtx, single) != 0) {
-        qWarning() << "[LlamaChatBackend] Generation decode failed at step"
-                   << i;
-        llama_batch_free(single);
-        break;
-      }
-      llama_batch_free(single);
-    }
-
-    // Detokenize
-    QString result;
-    for (llama_token t : generated) {
-      std::array<char, 32> buf;
-      int len = llama_token_to_piece(vocab, t, buf.data(),
-                                     static_cast<int32_t>(buf.size()), 0, true);
-      if (len > 0) {
-        result.append(QString::fromUtf8(buf.data(), len));
-      }
-    }
-
+    // ── Generation loop (shared) ──
+    auto *smpl = createSampler();
+    QString result = generateTokens(smpl);
     llama_sampler_free(smpl);
-
-    qDebug() << "[LlamaChatBackend] Generated" << generated.size() << "tokens"
-             << (hitEos ? "(EOS)" : "(max_tokens)");
-    emit statusUpdated(QString("Generated %1 tokens").arg(generated.size()));
     return result;
   }
 
@@ -532,15 +470,7 @@ LlamaChatBackend::runInference(const QString &formattedText,
     tokens.resize(maxPromptToks);
   }
 
-  auto *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-  llama_sampler_chain_add(smpl, llama_sampler_init_top_k(TopK));
-  llama_sampler_chain_add(smpl, llama_sampler_init_top_p(TopP, 1));
-  if (Temperature > 0.0f) {
-    llama_sampler_chain_add(smpl, llama_sampler_init_temp(Temperature));
-  } else {
-    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
-  }
-  llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
+  auto *smpl = createSampler();
 
   llama_memory_clear(llama_get_memory(m_llamaCtx), true);
 
@@ -553,6 +483,31 @@ LlamaChatBackend::runInference(const QString &formattedText,
     llama_batch_free(batch);
     return QString();
   }
+
+  QString result = generateTokens(smpl);
+  llama_sampler_free(smpl);
+  llama_batch_free(batch);
+
+  return result;
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────
+
+struct llama_sampler *LlamaChatBackend::createSampler() const {
+  auto *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+  llama_sampler_chain_add(smpl, llama_sampler_init_top_k(TopK));
+  llama_sampler_chain_add(smpl, llama_sampler_init_top_p(TopP, 1));
+  if (Temperature > 0.0f) {
+    llama_sampler_chain_add(smpl, llama_sampler_init_temp(Temperature));
+  } else {
+    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+  }
+  llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
+  return smpl;
+}
+
+QString LlamaChatBackend::generateTokens(struct llama_sampler *smpl) {
+  const auto *vocab = llama_model_get_vocab(m_llamaModel);
 
   std::vector<llama_token> generated;
   generated.reserve(MaxGenTokens);
@@ -585,9 +540,6 @@ LlamaChatBackend::runInference(const QString &formattedText,
       result.append(QString::fromUtf8(buf.data(), len));
     }
   }
-
-  llama_sampler_free(smpl);
-  llama_batch_free(batch);
 
   qDebug() << "[LlamaChatBackend] Generated" << generated.size() << "tokens"
            << (hitEos ? "(EOS)" : "(max_tokens)");

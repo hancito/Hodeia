@@ -49,6 +49,8 @@ private:
   QString buildFormattedPrompt(const PromptPayload &payload, int32_t maxChars);
   QString runInference(const QString &formattedText,
                        const std::vector<PageImage> &pageImages);
+  struct llama_sampler *createSampler() const;
+  QString generateTokens(struct llama_sampler *smpl);
 
   struct llama_context *m_llamaCtx = nullptr;
   struct llama_model *m_llamaModel = nullptr;
