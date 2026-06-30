@@ -143,34 +143,49 @@ find_library(HOST_CUBLAS  cublas  PATHS /opt/cuda/lib64 /usr/local/cuda/lib64 NO
 find_library(HOST_VULKAN  vulkan  PATHS /usr/lib /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
 
 if(HOST_CUDART AND HOST_CUBLAS AND EXISTS "${LLAMA_BASE}/cuda")
-    set(LLAMA_VARIANT cuda)
+  set(LLAMA_VARIANT cuda)
 elseif(HOST_VULKAN AND EXISTS "${LLAMA_BASE}/vulkan")
-    set(LLAMA_VARIANT vulkan)
+  set(LLAMA_VARIANT vulkan)
 else()
-    set(LLAMA_VARIANT cpu)
+  set(LLAMA_VARIANT cpu)
 endif()
 message(STATUS "llama.cpp variant: ${LLAMA_VARIANT}")
 
 set(LLAMA_DIR "${LLAMA_BASE}/${LLAMA_VARIANT}")
 
+# GGml shared library version (keep in sync with external/lib/llamacpp/<variant>/)
+set(GGML_SO_VER 0.15.3)
+
 # Only real (non-symlink) .so files — the linker follows SONAME from these
 file(GLOB LLAMA_REAL_SO "${LLAMA_DIR}/lib*.so.*.*")
 # Also grab any backend-specific real .so with the right version pattern
 if(LLAMA_VARIANT STREQUAL "cuda")
-    list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-cuda.so.0.15.2")
+  list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-cuda.so.${GGML_SO_VER}")
 elseif(LLAMA_VARIANT STREQUAL "vulkan")
-    list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-vulkan.so.0.15.2")
+  list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-vulkan.so.${GGML_SO_VER}")
 endif()
 
 # Include libmtmd in the shared library set
 list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libmtmd.so.0.0.0")
 
-# Link against the real libllama (fully versioned) — SONAME carries the .so.0 name
-target_link_libraries(Paperize PRIVATE
+# Link all llama.cpp / ggml shared libraries explicitly so the linker can
+# resolve transitive undefined symbols (linking a .so by absolute path does
+# NOT pull in its NEEDED dependencies for symbol resolution).
+# Order matters: dependents first, providers last.
+set(LLAMA_GGML_LIBS
     ${LLAMA_DIR}/libllama.so.0.0.0
     ${LLAMA_DIR}/libmtmd.so.0.0.0
+    ${LLAMA_DIR}/libggml.so.${GGML_SO_VER}
+    ${LLAMA_DIR}/libggml-base.so.${GGML_SO_VER}
+    ${LLAMA_DIR}/libggml-cpu.so.${GGML_SO_VER}
 )
-target_link_directories(Paperize PRIVATE ${LLAMA_DIR})
+if(LLAMA_VARIANT STREQUAL "cuda")
+  list(APPEND LLAMA_GGML_LIBS "${LLAMA_DIR}/libggml-cuda.so.${GGML_SO_VER}")
+elseif(LLAMA_VARIANT STREQUAL "vulkan")
+  list(APPEND LLAMA_GGML_LIBS "${LLAMA_DIR}/libggml-vulkan.so.${GGML_SO_VER}")
+endif()
+
+target_link_libraries(Paperize PRIVATE ${LLAMA_GGML_LIBS})
 
 # ── Link libraries (order: Qt, MuPDF, llama above) ─────────────────
 target_link_libraries(Paperize PRIVATE
@@ -193,28 +208,28 @@ target_link_libraries(Paperize PRIVATE
 # OpenMP — required by ggml-cpu backend (all variants)
 find_package(OpenMP QUIET)
 if(OpenMP_CXX_FOUND)
-    message(STATUS "OpenMP found")
-    target_link_libraries(Paperize PRIVATE OpenMP::OpenMP_C)
+  message(STATUS "OpenMP found")
+  target_link_libraries(Paperize PRIVATE OpenMP::OpenMP_C)
 endif()
 
 # CUDA syslibs — required at runtime by the CUDA variant
 if(LLAMA_VARIANT STREQUAL "cuda")
-    find_library(CUDA_LIB  cuda      PATHS /usr/lib/x86_64-linux-gnu /usr/lib NO_DEFAULT_PATH)
-    find_library(NCCL_LIB  nccl      PATHS /usr/lib/x86_64-linux-gnu /usr/lib /opt/cuda/lib64 NO_DEFAULT_PATH)
-    if(CUDA_LIB)
-        target_link_libraries(Paperize PRIVATE ${CUDA_LIB})
-    endif()
-    if(NCCL_LIB)
-        target_link_libraries(Paperize PRIVATE ${NCCL_LIB})
-    endif()
+  find_library(CUDA_LIB  cuda      PATHS /usr/lib/x86_64-linux-gnu /usr/lib NO_DEFAULT_PATH)
+  find_library(NCCL_LIB  nccl      PATHS /usr/lib/x86_64-linux-gnu /usr/lib /opt/cuda/lib64 NO_DEFAULT_PATH)
+  if(CUDA_LIB)
+    target_link_libraries(Paperize PRIVATE ${CUDA_LIB})
+  endif()
+  if(NCCL_LIB)
+    target_link_libraries(Paperize PRIVATE ${NCCL_LIB})
+  endif()
 endif()
 
 # Vulkan syslib — required at runtime by the Vulkan variant
 if(LLAMA_VARIANT STREQUAL "vulkan")
-    if(HOST_VULKAN)
-        message(STATUS "Vulkan found — linking ${HOST_VULKAN}")
-        target_link_libraries(Paperize PRIVATE ${HOST_VULKAN})
-    endif()
+  if(HOST_VULKAN)
+    message(STATUS "Vulkan found — linking ${HOST_VULKAN}")
+    target_link_libraries(Paperize PRIVATE ${HOST_VULKAN})
+  endif()
 endif()
 
 # Copy sqlite-vec extension to build directory
@@ -241,17 +256,17 @@ add_custom_command(TARGET Paperize POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         libllama.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libllama.so
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml.so.0
+        libggml.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml.so
+        libggml.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml.so
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml-base.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-base.so.0
+        libggml-base.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-base.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml-base.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-base.so
+        libggml-base.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-base.so
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml-cpu.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so.0
+        libggml-cpu.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
-        libggml-cpu.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so
+        libggml-cpu.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cpu.so
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         libmtmd.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libmtmd.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
@@ -261,19 +276,19 @@ add_custom_command(TARGET Paperize POST_BUILD
 
 # Backend-specific symlinks
 if(LLAMA_VARIANT STREQUAL "cuda")
-    add_custom_command(TARGET Paperize POST_BUILD
+  add_custom_command(TARGET Paperize POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-            libggml-cuda.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so.0
+            libggml-cuda.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so.0
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-            libggml-cuda.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so
+            libggml-cuda.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so
         COMMENT "Creating libggml-cuda symlinks"
     )
 elseif(LLAMA_VARIANT STREQUAL "vulkan")
-    add_custom_command(TARGET Paperize POST_BUILD
+  add_custom_command(TARGET Paperize POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-            libggml-vulkan.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-vulkan.so.0
+            libggml-vulkan.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-vulkan.so.0
         COMMAND ${CMAKE_COMMAND} -E create_symlink
-            libggml-vulkan.so.0.15.2 $<TARGET_FILE_DIR:Paperize>/libggml-vulkan.so
+            libggml-vulkan.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-vulkan.so
         COMMENT "Creating libggml-vulkan symlinks"
     )
 endif()
@@ -283,16 +298,16 @@ endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     "#!/bin/bash\n"
     "DIR=\"$1\"\n"
-    "for f in \"$DIR\"/libllama.so.0.0.0 \"$DIR\"/libggml.so.0.15.2"
-    " \"$DIR\"/libggml-base.so.0.15.2 \"$DIR\"/libggml-cpu.so.0.15.2"
+    "for f in \"$DIR\"/libllama.so.0.0.0 \"$DIR\"/libggml.so.${GGML_SO_VER}"
+    " \"$DIR\"/libggml-base.so.${GGML_SO_VER} \"$DIR\"/libggml-cpu.so.${GGML_SO_VER}"
     " \"$DIR\"/libmtmd.so.0.0.0"
 )
 if(LLAMA_VARIANT STREQUAL "cuda")
-    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
-        " \"$DIR\"/libggml-cuda.so.0.15.2")
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
+        " \"$DIR\"/libggml-cuda.so.${GGML_SO_VER}")
 elseif(LLAMA_VARIANT STREQUAL "vulkan")
-    file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
-        " \"$DIR\"/libggml-vulkan.so.0.15.2")
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
+        " \"$DIR\"/libggml-vulkan.so.${GGML_SO_VER}")
 endif()
 file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     "\n  do patchelf --set-rpath '\$ORIGIN' \"$f\"; done\n")

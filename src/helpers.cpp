@@ -65,6 +65,27 @@ QStringList ModelHelper::listLocalModels() {
   return models;
 }
 
+QStringList ModelHelper::getImagesForHash(const QString &paperHash,
+                                          const QString &imgPath) const {
+  QDir imgDir(imgPath);
+  if (!imgDir.exists()) {
+    qWarning() << "Image directory does not exist:" << imgPath;
+    return QStringList();
+  }
+
+  imgDir.setNameFilters({paperHash + "_page_*.png"});
+  const QFileInfoList matchingFiles = imgDir.entryInfoList();
+
+  QStringList paths;
+  paths.reserve(matchingFiles.size());
+  for (const QFileInfo &fi : matchingFiles) {
+    paths.append(fi.absoluteFilePath());
+  }
+  paths.sort();
+
+  return paths;
+}
+
 void ModelHelper::checkRemoteModels(const QString &name, const QString &apiUrl,
                                     const QString &apiKey) {
   if (!m_remoteBackend || apiUrl.isEmpty()) {

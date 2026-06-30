@@ -163,12 +163,15 @@ void Summarizer::summarizePapers(const QStringList &hashes,
           },
           Qt::SingleShotConnection);
 
-      m_remoteBackend->generate(payload.systemPrompt, payload.userMessage);
+      m_remoteBackend->generate(payload.systemPrompt,
+                                payload.userMessage + "\n\n" +
+                                    payload.textContext,
+                                payload.visualContext);
       loop.exec();
 
       qDebug() << "[Summarizer] Remote generation completed in"
                << genTimer.elapsed() << "ms"
-               << "(" << result.length() << "chars)";
+               << "(" << result.length() << "chars)" << result;
     }
 
     if (error.isEmpty() && !result.isEmpty()) {

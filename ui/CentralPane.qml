@@ -27,7 +27,7 @@ Rectangle {
         if (activePaperHash === "")
             return [];
         let imgPath = configManager.projectImgPath(configManager.lastProject);
-        return configManager.getImagesForHash(activePaperHash, imgPath);
+        return modelHelper.getImagesForHash(activePaperHash, imgPath);
     }
 
     ColumnLayout {

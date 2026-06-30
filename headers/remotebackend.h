@@ -2,6 +2,9 @@
 
 #include <QObject>
 #include <QString>
+#include <vector>
+
+#include "headers/llama_chat_backend.h"
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -46,6 +49,12 @@ public:
   /// Generate a completion from system + user prompts.
   /// Asynchronous; result delivered via the finished() signal.
   void generate(const QString &systemPrompt, const QString &userPrompt);
+
+  /// Generate a completion with system + user prompts and page images.
+  /// Images are encoded as PNG base64 and sent using the OpenAI vision
+  /// content array format. Asynchronous; result via finished().
+  void generate(const QString &systemPrompt, const QString &userPrompt,
+                const std::vector<PageImage> &images);
 
   /// Cancel an in-flight request.
   void cancel();
