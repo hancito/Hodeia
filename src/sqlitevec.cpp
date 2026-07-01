@@ -122,7 +122,12 @@ bool SqliteVecManager::createChunksTable(SqliteDb &db) {
 
 QVector<float> SqliteVecManager::embed(const QStringList &texts,
                                        EmbedMode mode) {
-  if (!m_ready || !m_llamaCtx || !m_llamaModel || texts.isEmpty())
+  if (texts.isEmpty())
+    return {};
+  // Lazy load the embedding model on first use.
+  if (!m_ready && !initialize())
+    return {};
+  if (!m_ready || !m_llamaCtx || !m_llamaModel)
     return {};
 
   auto *ctx = static_cast<struct llama_context *>(m_llamaCtx);
@@ -205,7 +210,12 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
 
 int SqliteVecManager::insertChunks(SqliteDb &db,
                                    const QList<TextChunk> &chunks) {
-  if (!m_ready || chunks.isEmpty())
+  if (chunks.isEmpty())
+    return 0;
+  // Lazy load on first use.
+  if (!m_ready && !initialize())
+    return 0;
+  if (!m_ready)
     return 0;
 
   int totalInserted = 0;
@@ -266,6 +276,9 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 
 QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
                                                   const QString &query, int k) {
+  // Lazy load on first use.
+  if (!m_ready && !initialize())
+    return {};
   if (!m_ready)
     return {};
 

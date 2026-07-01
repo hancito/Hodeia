@@ -31,8 +31,8 @@ bool DatabaseManager::initDatabase() {
 
   createTables();
 
-  // Initialize embedding model (idempotent)
-  m_vecManager.initialize();
+  // Embedding model is loaded lazily on first use (see SqliteVecManager).
+  m_vecManager.createChunksTable(m_db);
 
   m_summaryModel->loadAll();
   m_queryModel->loadAll();

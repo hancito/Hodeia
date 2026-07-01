@@ -89,9 +89,9 @@ void EngineController::stopEngine() {
 }
 
 void EngineController::releaseAndReloadModel() {
-  // Force the embedding model off the GPU/CPU arena to release memory
-  // that would otherwise stay allocated for the lifetime of the process.
+  // Unload the embedding model to free its arena (RAM + VRAM) that would
+  // otherwise stay allocated for the lifetime of the process.
+  // The model will be reloaded lazily on the next embed/search/insert call.
   m_vecManager->shutdown();
-  m_vecManager->initialize();
   emit ingestionFinished();
 }
