@@ -75,7 +75,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       row.paperHash = extraction.paperHash;
       row.title = extraction.title;
       row.pagesNum = extraction.pageCount;
-      row.date = QDateTime::currentDateTime();
+      row.date = QDateTime::currentDateTimeUtc();
 
       chunk.append(row);
 

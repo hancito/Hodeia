@@ -9,6 +9,10 @@ Rectangle {
     property list<string> selectedPapers: []
     property string activePaperHash: ""
     property var statusBarLabel: null
+    property int paperProgress: 0
+    property int totalPapers: 0
+    property int elapsedTime: 0
+    property bool summarizing: false
 
     function addSelectedPaper(hash) {
         if (!selectedPapers.includes(hash) && hash !== "") {
@@ -57,15 +61,20 @@ Rectangle {
     Connections {
         target: summaryController
         function onPaperFinished(hash, success, message) {
+            rightPane.paperProgress += 1;
             if (rightPane.statusBarLabel)
                 rightPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
         }
         function onAllFinished(successCount, total) {
+            summarizeTimer.stop();
+            rightPane.summarizing = false;
+            rightPane.totalPapers = 0;
+            rightPane.paperProgress = 0;
+            rightPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
             if (rightPane.statusBarLabel)
                 rightPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
-            summarizeProgress.visible = false;
         }
     }
 
@@ -99,7 +108,11 @@ Rectangle {
                         console.log("No papers selected");
                         return;
                     }
-                    summarizeProgress.visible = true;
+                    rightPane.totalPapers = rightPane.selectedPapers.length;
+                    rightPane.paperProgress = 0;
+                    rightPane.elapsedTime = 0;
+                    rightPane.summarizing = true;
+                    summarizeTimer.start();
                     summaryController.startSummarize(rightPane.selectedPapers);
                     rightPane.selectedPapers = [];
                 }
@@ -142,24 +155,34 @@ Rectangle {
         ColumnLayout {
             spacing: 5
             Layout.fillWidth: true
+            visible: rightPane.summarizing
 
             ProgressBar {
                 id: summarizeProgress
-                value: 24
+                from: 0
+                to: 100
+                value: rightPane.totalPapers > 0 ? (rightPane.paperProgress / rightPane.totalPapers) * 100 : 0
                 Layout.fillWidth: true
-                visible: false
             }
 
             Label {
-                text: "Summarize"
+                text: "Summarizing " + rightPane.paperProgress + "/" + rightPane.totalPapers + " papers"
                 Layout.fillWidth: true
-                visible: summarizeProgress.visible
             }
 
             Label {
-                text: "Elapsed Time"
+                text: "Elapsed Time: " + (rightPane.elapsedTime / 10).toFixed(1) + "s"
                 Layout.fillWidth: true
-                visible: summarizeProgress.visible
+            }
+        }
+
+        Timer {
+            id: summarizeTimer
+            interval: 100
+            running: false
+            repeat: true
+            onTriggered: {
+                rightPane.elapsedTime += 1;
             }
         }
 

@@ -36,7 +36,7 @@ static const QString s_systemPrompt = []() {
   "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
   "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
-  "references": ["A list of the references cited by the paper"]
+  "references": ["A list of the fully detailed paper cited by the paper in the references or bibliography section"]
 }
 Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
 }();
@@ -328,7 +328,7 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
       db.prepare("INSERT INTO Summaries "
                  "(paper_hash, title, authors, pages_num, journal, year, "
                  "topics, llmodel, summary_json, date) "
-                 "VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, datetime('now')) "
+                 "VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?) "
                  "ON CONFLICT(paper_hash) DO UPDATE SET "
                  "title = excluded.title, "
                  "authors = excluded.authors, "
@@ -351,6 +351,7 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
   stmt.bind(6, summary.topics.join(", "));
   stmt.bind(7, modelName);
   stmt.bind(8, rawJson.toUtf8());
+  stmt.bind(9, QDateTime::currentDateTimeUtc());
 
   if (!stmt.exec()) {
     qCritical() << "[Summarizer] Failed to save summary for" << hash << ":"
