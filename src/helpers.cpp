@@ -31,9 +31,15 @@ PaperSummary parseSummaryJson(const QString &json) {
   summary.year = obj.value("year").toInt();
   summary.researchObjective = obj.value("researchObjective").toString();
   summary.methodology = obj.value("methodology").toString();
-  summary.coreFindingsAndSignificance =
-      obj.value("coreFindingsAndSignificance").toString();
-  summary.criticalLimitations = obj.value("criticalLimitations").toString();
+
+  for (const auto &f : obj.value("coreFindingsAndSignificance").toArray())
+    summary.coreFindingsAndSignificance.append(f.toString());
+  for (const auto &l : obj.value("criticalLimitations").toArray())
+    summary.criticalLimitations.append(l.toString());
+
+  for (const auto &l : obj.value("references").toArray())
+    summary.references.append(l.toString());
+
   summary.citableSummary = obj.value("citableSummary").toString();
 
   for (const auto &a : obj.value("authors").toArray())
@@ -50,54 +56,50 @@ PaperSummary parseSummaryJson(const QString &json) {
 
 namespace SummaryHelpers {
 
-// Split a field that may be a bulleted list or a plain paragraph into lines.
-static QStringList splitLines(const QString &text) {
-  QStringList lines;
-  for (const QString &line : text.split('\n', Qt::SkipEmptyParts)) {
-    QString trimmed = line.trimmed();
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* "))
-      trimmed = trimmed.mid(2);
-    else if (trimmed.startsWith("• ") || trimmed.startsWith("– "))
-      trimmed = trimmed.mid(2);
-    if (!trimmed.isEmpty())
-      lines.append(trimmed);
-  }
-  return lines;
-}
-
 QString toMarkdown(const PaperSummary &summary) {
   QString authors = summary.authors.join(", ");
   QString title = summary.title;
   if (!title.isEmpty())
     title[0] = title[0].toUpper();
 
-  QStringList findings = splitLines(summary.coreFindingsAndSignificance);
-  QStringList limitations = splitLines(summary.criticalLimitations);
+  QString findingsMd = summary.coreFindingsAndSignificance.join("\n- ");
+  QString limitationsMd = summary.criticalLimitations.join("\n- ");
 
-  QString findingsMd = findings.join("\n- ");
-  QString limitationsMd = limitations.join("\n- ");
+  QStringList parts;
+  parts.append(QString("## %1, (%2): %3")
+                   .arg(authors, QString::number(summary.year), title));
+  parts.append(QString());
+  parts.append(QString("### %1").arg(summary.journal));
+  parts.append(QString());
+  parts.append("## Research objective");
+  parts.append(summary.researchObjective);
+  parts.append(QString());
+  parts.append("## Methodology");
+  parts.append(summary.methodology);
+  parts.append(QString());
+  parts.append("## Core findings and significance");
+  parts.append(QString("- %1").arg(findingsMd));
+  parts.append(QString());
+  parts.append("## Critical Limitations");
+  parts.append(QString("- %1").arg(limitationsMd));
+  parts.append(QString());
+  parts.append("## Citable summary");
+  parts.append(summary.citableSummary);
 
-  return QString("## %1, (%2): %3\n"
-                 "\n"
-                 "### %4\n"
-                 "\n"
-                 "## Research objective\n"
-                 "%5\n"
-                 "\n"
-                 "## Methodology\n"
-                 "%6\n"
-                 "\n"
-                 "## Core findings and significance\n"
-                 "- %7\n"
-                 "\n"
-                 "## Critical Limitations\n"
-                 "- %8\n"
-                 "\n"
-                 "## Citable summary\n"
-                 "%9")
-      .arg(authors, QString::number(summary.year), title, summary.journal,
-           summary.researchObjective, summary.methodology, findingsMd,
-           limitationsMd, summary.citableSummary);
+  return parts.join("\n");
+}
+
+QString toRef(const PaperSummary &summary) {
+
+  QString refMd = summary.references.join("\n- ");
+
+  QStringList parts;
+
+  parts.append("## References");
+  parts.append(QString("- %1").arg(refMd));
+  parts.append(QString());
+
+  return parts.join("\n");
 }
 
 QString toLatex(const PaperSummary &summary) {
@@ -106,37 +108,35 @@ QString toLatex(const PaperSummary &summary) {
   if (!title.isEmpty())
     title[0] = title[0].toUpper();
 
-  QStringList findings = splitLines(summary.coreFindingsAndSignificance);
-  QStringList limitations = splitLines(summary.criticalLimitations);
-
   QString findingsItems;
-  for (const QString &f : findings)
+  for (const QString &f : summary.coreFindingsAndSignificance)
     findingsItems += QString("\n    \\item %1").arg(f);
 
   QString limitationsItems;
-  for (const QString &l : limitations)
+  for (const QString &l : summary.criticalLimitations)
     limitationsItems += QString("\n    \\item %1").arg(l);
 
-  return QString(R"(\section{%1, (%2): %3}
-\subsection{Research objective}
-%4
+  QStringList parts;
+  parts.append(QString("\\section{%1, (%2): %3}")
+                   .arg(authors, QString::number(summary.year), title));
+  parts.append("\\subsection{Research objective}");
+  parts.append(summary.researchObjective);
+  parts.append(QString());
+  parts.append("\\subsection{Methodology}");
+  parts.append(summary.methodology);
+  parts.append(QString());
+  parts.append("\\subsection{Core findings and significance}");
+  parts.append(QString("\\begin{itemize}%1").arg(findingsItems));
+  parts.append("\\end{itemize}");
+  parts.append(QString());
+  parts.append("\\subsection{Critical Limitations}");
+  parts.append(QString("\\begin{itemize}%1").arg(limitationsItems));
+  parts.append("\\end{itemize}");
+  parts.append(QString());
+  parts.append("\\subsection{Citable summary}");
+  parts.append(summary.citableSummary);
 
-\subsection{Methodology}
-%5
-
-\subsection{Core findings and significance}
-\begin{itemize}%6
-\end{itemize}
-
-\subsection{Critical Limitations}
-\begin{itemize}%7
-\end{itemize}
-
-\subsection{Citable summary}
-%8)")
-      .arg(authors, QString::number(summary.year), title,
-           summary.researchObjective, summary.methodology, findingsItems,
-           limitationsItems, summary.citableSummary);
+  return parts.join("\n");
 }
 
 } // namespace SummaryHelpers
@@ -163,6 +163,10 @@ ModelHelper::~ModelHelper() = default;
 
 QString ModelHelper::summaryToMarkdown(const QString &json) const {
   return SummaryHelpers::toMarkdown(SummaryHelpers::parseSummaryJson(json));
+}
+
+QString ModelHelper::summaryToRef(const QString &json) const {
+  return SummaryHelpers::toRef(SummaryHelpers::parseSummaryJson(json));
 }
 
 QString ModelHelper::summaryToLatex(const QString &json) const {

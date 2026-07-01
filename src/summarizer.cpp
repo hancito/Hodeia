@@ -24,6 +24,7 @@ static const QString s_systemPrompt = []() {
   1. Read the provided text context
   2. Look at the provided images of the document to gather broader context and verify data/tables.
   3. And respond with high details following this structured schema in english and don't put icons:
+  4. Use mathematical description when pertinent
 {
   "title": "The full title of the paper",
   "authors": [A list of author names],
@@ -32,10 +33,10 @@ static const QString s_systemPrompt = []() {
   "topics": [A list the 5 most relevant topics or keywords from the paper.],
   "researchObjective": "Identify the primary question or hypothesis in 1 sentence",
   "methodology": "Describe the study design, sample size, and key variables. Use a paragraph",
-  "coreFindingsAndSignificance": "Highlight the most statistically or theoretically significant results. Use a bulleted list",
-  "criticalLimitations": "Identify a list of internal or external validity threats mentioned or observed.",
+  "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
+  "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
-  "references": "A list of the references cited by the paper"
+  "references": ["A list of the references cited by the paper"]
 }
 Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
 }();

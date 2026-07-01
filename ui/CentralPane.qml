@@ -60,13 +60,16 @@ Rectangle {
                 text: qsTr("Latex")
             }
             TabButton {
+                text: qsTr("References")
+            }
+            TabButton {
                 text: qsTr("PDF")
             }
         }
 
         // Page navigation row (visible only on PDF tab)
         RowLayout {
-            visible: tabBar.currentIndex === 2
+            visible: tabBar.currentIndex === 3
             Layout.fillWidth: true
             spacing: 8
             opacity: centralPane.pageImages.length > 0 ? 1 : 0
@@ -163,9 +166,9 @@ Rectangle {
                             id: textEditor
                             readOnly: true
                             textFormat: TextEdit.MarkdownText
+                            font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-
-                            text: modelHelper.summaryToMarkdown(centralPane.activeSummaryJson)
+                            text: modelHelper.summaryToMarkdown(centralPane.activeSummaryJson) || "Please make a summary of this paper"
                         }
                     }
 
@@ -183,7 +186,7 @@ Rectangle {
                             icon.width: 24
                             icon.height: 24
                             icon.source: "qrc:/Resources/save.svg"
-                            onClicked: console.log("Save Text")
+                            onClicked: console.log(centralPane.activeSummaryJson)
                         }
 
                         Button {
@@ -245,7 +248,29 @@ Rectangle {
                     }
                 }
             }
-
+            Item {
+                id: refTab
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.rightMargin: 5
+                    anchors.leftMargin: 5
+                    spacing: 10
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                        TextArea {
+                            id: refEditor
+                            readOnly: true
+                            textFormat: TextEdit.MarkdownText
+                            font.pointSize: 12
+                            wrapMode: TextEdit.WordWrap
+                            placeholderText: "Select a paper to see its LaTeX summary"
+                            text: modelHelper.summaryToRef(centralPane.activeSummaryJson)
+                        }
+                    }
+                }
+            }
             // ── PDF tab ─────────────────────────────────────
             Item {
                 id: pdfTab
@@ -275,20 +300,6 @@ Rectangle {
                                 "file://" + centralPane.pageImages[Math.max(pageSpinner.value - 1, 0)];
                             else
                                 "";
-                        }
-                    }
-
-                    // Mouse wheel zoom (Ctrl + wheel); pass-through for normal scroll
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.NoButton
-                        propagateComposedEvents: true
-                        onWheel: wheel => {
-                            if (wheel.modifiers & Qt.ControlModifier) {
-                                wheel.accepted = true;
-                                let delta = wheel.angleDelta.y > 0 ? 0.15 : -0.15;
-                                pdfTab.pdfZoomLevel = Math.min(5, Math.max(0.25, pdfTab.pdfZoomLevel + delta));
-                            }
                         }
                     }
                 }

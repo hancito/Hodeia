@@ -17,8 +17,9 @@ struct PaperSummary {
   QStringList topics;
   QString researchObjective;
   QString methodology;
-  QString coreFindingsAndSignificance;
-  QString criticalLimitations;
+  QStringList coreFindingsAndSignificance;
+  QStringList criticalLimitations;
+  QStringList references;
   QString citableSummary;
 };
 
@@ -46,7 +47,8 @@ public:
 public slots:
   /// Convert a JSON summary string to Markdown.
   Q_INVOKABLE QString summaryToMarkdown(const QString &json) const;
-
+  /// Convert a JSON summary string to Markdown.
+  Q_INVOKABLE QString summaryToRef(const QString &json) const;
   /// Convert a JSON summary string to LaTeX.
   Q_INVOKABLE QString summaryToLatex(const QString &json) const;
 
