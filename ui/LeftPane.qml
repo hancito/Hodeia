@@ -34,11 +34,10 @@ Rectangle {
 
         function onIngestionStarted() {
             leftPane.elapsedTime = 0;
+            statusLabel.visible = true;
         }
 
         function onIngestionStatus(statusLog) {
-            leftPane.elapsedTime = 0;
-            statusLabel.visible = true;
             statusLabel.text = statusLog;
         }
     }
@@ -174,7 +173,20 @@ Rectangle {
                 id: timerIndicator
                 font.family: Fonts.mono
                 visible: spinner.visible
-                text: "Elapsed Time: " + (leftPane.elapsedTime / 10).toFixed(1) + "s"
+                text: {
+                    var totalSec = Math.floor(leftPane.elapsedTime / 10);
+                    if (totalSec >= 3600) {
+                        var h = Math.floor(totalSec / 3600);
+                        var m = Math.floor((totalSec % 3600) / 60);
+                        return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
+                    } else if (totalSec >= 60) {
+                        var m = Math.floor(totalSec / 60);
+                        var s = totalSec % 60;
+                        return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
+                    } else {
+                        return "Elapsed Time: " + totalSec + "s";
+                    }
+                }
                 Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
             }
         }

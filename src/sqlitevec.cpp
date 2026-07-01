@@ -76,6 +76,8 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   llama_context_params cparams = llama_context_default_params();
   cparams.n_ctx = (uint32_t)MaxSeqLen;
   cparams.n_batch = (uint32_t)MaxSeqLen;
+  cparams.n_ubatch = (uint32_t)MaxSeqLen;
+  cparams.n_seq_max = 1; // we embed one passage at a time
   cparams.embeddings = true;
   cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
   cparams.n_threads = QThread::idealThreadCount();
@@ -188,6 +190,12 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     }
     for (int d = 0; d < m_dim; ++d)
       results.append(embd[d]);
+
+    // Free the memory/KV cache slot — encoder models accumulate slots on
+    // each llama_encode call and leak VRAM if never cleared.
+    auto mem = llama_get_memory(ctx);
+    if (mem)
+      llama_memory_clear(mem, true);
   }
 
   return results;

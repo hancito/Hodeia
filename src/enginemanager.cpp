@@ -25,7 +25,7 @@ QList<QUrl> EngineController::findPdfFiles(const QUrl &folderPath) const {
 void EngineController::startEngine(const QList<QUrl> &pdfFiles,
                                    const QString &imgPath,
                                    const QString &dbPath) {
-  // Clean up any leftover objects from a previous run
+  // Tear down any leftover thread from a previous run.
   if (m_thread && m_thread->isRunning()) {
     return;
   }
@@ -47,29 +47,37 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
   m_worker = new PdfWorker(m_config, m_vecManager);
   m_worker->moveToThread(m_thread);
 
-  // Trigger work
-  connect(m_thread, &QThread::started, m_worker,
-          [this]() { m_worker->processPDF(m_pdfFiles, m_imgPath, m_dbPath); });
+  // Capture raw pointers by value so the lambda cleans up the correct
+  // objects even if m_thread / m_worker have been replaced by a newer run.
+  QThread *thisThread = m_thread;
+  PdfWorker *thisWorker = m_worker;
 
-  // When done: quit thread, then delete objects in the main thread's event loop
-  connect(m_worker, &PdfWorker::finished, m_thread, &QThread::quit);
-  connect(m_thread, &QThread::finished, this, [this]() {
-    m_worker->deleteLater();
-    m_thread->deleteLater();
-    m_worker = nullptr;
-    m_thread = nullptr;
+  // Trigger work
+  connect(thisThread, &QThread::started, thisWorker, [thisWorker, this]() {
+    thisWorker->processPDF(m_pdfFiles, m_imgPath, m_dbPath);
   });
 
-  // Forward signals to QML
-  connect(m_worker, &PdfWorker::started, this,
+  // When done: quit thread, then delete objects in the main thread's event loop
+  connect(thisWorker, &PdfWorker::finished, thisThread, &QThread::quit);
+  connect(thisThread, &QThread::finished, this, [thisThread, thisWorker]() {
+    thisWorker->deleteLater();
+    thisThread->deleteLater();
+  });
+
+  // Forward signals to QML (auto-disconnected when worker is deleted)
+  connect(thisWorker, &PdfWorker::started, this,
           &EngineController::ingestionStarted);
-  connect(m_worker, &PdfWorker::status, this,
+  connect(thisWorker, &PdfWorker::status, this,
           &EngineController::ingestionStatus);
-  connect(m_worker, &PdfWorker::finished, this,
-          &EngineController::ingestionFinished);
+
+  // After ingestion: unload the embedding model to free its arena,
+  // then reload it.  This runs on the main thread after the worker
+  // has finished and been deleted.
+  connect(thisWorker, &PdfWorker::finished, this,
+          &EngineController::releaseAndReloadModel, Qt::QueuedConnection);
 
   qInfo() << "[EngineController] Starting worker thread";
-  m_thread->start();
+  thisThread->start();
 }
 
 void EngineController::stopEngine() {
@@ -78,4 +86,12 @@ void EngineController::stopEngine() {
     m_thread->quit();
     m_thread->wait();
   }
+}
+
+void EngineController::releaseAndReloadModel() {
+  // Force the embedding model off the GPU/CPU arena to release memory
+  // that would otherwise stay allocated for the lifetime of the process.
+  m_vecManager->shutdown();
+  m_vecManager->initialize();
+  emit ingestionFinished();
 }

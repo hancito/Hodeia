@@ -69,6 +69,5 @@ private:
   int m_dim = 0;
   void *m_llamaCtx = nullptr;   // llama_context*
   void *m_llamaModel = nullptr; // llama_model*
-  QString m_modelPath;
   ConfigManager *m_config = nullptr;
 };

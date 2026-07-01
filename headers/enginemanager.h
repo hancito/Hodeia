@@ -26,8 +26,7 @@ signals:
   void ingestionStatus(QString statusLog);
 
 private:
-  void setupWorker();
-  void stopThread();
+  void releaseAndReloadModel();
 
   QThread *m_thread = nullptr;
   PdfWorker *m_worker = nullptr;

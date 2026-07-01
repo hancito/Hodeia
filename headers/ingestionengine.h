@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <atomic>
 
 class PdfWorker : public QObject {
   Q_OBJECT
@@ -26,10 +27,13 @@ signals:
   void embeddingProgress(int current, int total);
 
 private:
-  ExtractionResult extractText(const QUrl &filePath,
+  ExtractionResult extractText(const QUrl &fileUrl,
                                const QString &imgPath) const;
-  QList<TextChunk> chunkPageText(const QString &pageText,
-                                 const QString &paperHash, int pageNum) const;
+  QString cleanPdfText(const QString &raw) const;
+  QList<TextChunk> chunkDocumentText(const QString &fullText,
+                                     const QVector<quint16> &pageMap,
+                                     const QString &paperHash) const;
+  QString computeFileHash(const QUrl &fileUrl) const;
 
   QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList) const;
   QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
@@ -40,7 +44,11 @@ private:
   QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
                                    const QString &dbPath) const;
 
+  // Chunking parameters
+  int m_maxChunkChars = 1500;
+  int m_overlapChars = 200;
+
   SqliteVecManager *m_vecManager = nullptr;
-  bool m_stopFlag = false;
+  std::atomic<bool> m_stopFlag{false};
   ConfigManager *m_config = nullptr;
 };
