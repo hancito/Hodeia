@@ -54,15 +54,12 @@ static void detectCpu(int &threads, int &cores, QString &model) {
     QString content = cpuinfo.readAll();
 
     auto extractField = [&](const QString &key) -> QString {
-      QString lineStart = key + ":";
-      int pos = content.indexOf(lineStart);
-      if (pos != -1) {
-        int end = content.indexOf('\n', pos);
-        if (end == -1)
-          end = content.size();
-        return content
-            .mid(pos + lineStart.length(), end - pos - lineStart.length())
-            .trimmed();
+      for (const auto &line : content.split('\n', Qt::SkipEmptyParts)) {
+        // /proc/cpuinfo uses "key\t: value" — split on ':' to be robust
+        QString beforeColon = line.section(':', 0, 0).trimmed();
+        if (beforeColon == key) {
+          return line.section(':', 1).trimmed();
+        }
       }
       return QString();
     };
@@ -174,6 +171,19 @@ static QList<GpuInfo> detectGpus() {
   QList<GpuInfo> gpus;
 
 #ifdef Q_OS_LINUX
+  // Check system-wide Vulkan availability first
+  bool systemHasVulkan = false;
+  {
+    QProcess vkTest;
+    vkTest.setProgram("vulkaninfo");
+    vkTest.setArguments({"--summary"});
+    vkTest.start();
+    if (vkTest.waitForFinished(5000)) {
+      QString out = QString::fromUtf8(vkTest.readAllStandardOutput()).trimmed();
+      systemHasVulkan = (vkTest.exitCode() == 0 && !out.isEmpty());
+    }
+  }
+
   // Strategy 1: nvidia-smi (most reliable for NVIDIA VRAM)
   QString nvidiaOut =
       runCommand("nvidia-smi", {"--query-gpu=name,memory.total",
@@ -194,22 +204,31 @@ static QList<GpuInfo> detectGpus() {
               1024.0);
         }
         gpu.vendor = "nvidia";
+        gpu.has_cuda = true;
+        gpu.has_vulkan = systemHasVulkan;
         gpus.append(gpu);
       }
     }
   }
 
-  // Strategy 2: /sys/class/drm for AMD / Intel
-  if (gpus.isEmpty()) {
+  // Strategy 2: /sys/class/drm for AMD / Intel (non-NVIDIA)
+  {
     QDir drm("/sys/class/drm");
     if (drm.exists()) {
+      QSet<QString> seenDevices;
       for (const auto &entry :
            drm.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        if (!entry.startsWith("card"))
+        if (!entry.startsWith("card") || entry.mid(4).isEmpty() ||
+            !entry.mid(4, 1).at(0).isDigit())
           continue;
         QString devicePath = drm.absolutePath() + "/" + entry + "/device";
         QString vendorId = readSysfs(devicePath + "/vendor");
         QString deviceId = readSysfs(devicePath + "/device");
+
+        QString pciKey = vendorId + ":" + deviceId;
+        if (seenDevices.contains(pciKey))
+          continue;
+        seenDevices.insert(pciKey);
 
         QString vendor;
         if (vendorId.contains("0x10de")) {
@@ -222,10 +241,22 @@ static QList<GpuInfo> detectGpus() {
           vendor = "unknown";
         }
 
+        // Skip if already reported by nvidia-smi
+        bool alreadyReported = false;
+        for (const auto &existing : gpus) {
+          if (existing.vendor == vendor) {
+            alreadyReported = true;
+            break;
+          }
+        }
+        if (alreadyReported)
+          continue;
+
         GpuInfo gpu;
         gpu.name = vendor.toUpper() + " GPU (" + deviceId + ")";
         gpu.vram_bytes = 0;
         gpu.vendor = vendor;
+        gpu.has_vulkan = systemHasVulkan;
         gpus.append(gpu);
       }
     }
@@ -237,7 +268,8 @@ static QList<GpuInfo> detectGpus() {
     QString spOut = runCommand("system_profiler", {"SPDisplaysDataType"});
     GpuInfo gpu;
     gpu.vendor = "apple";
-    gpu.vram_bytes = detectRamBytes(); // shared unified memory
+    gpu.vram_bytes = detectRamBytes();
+    gpu.has_metal = true;
     if (!spOut.isEmpty()) {
       for (const auto &line : spOut.split('\n')) {
         if (line.contains("Chipset Model:") || line.contains("GPU Name:")) {
@@ -266,14 +298,16 @@ static QList<GpuInfo> detectGpus() {
         gpu.name = line.left(comma);
         gpu.vram_bytes = line.mid(comma + 1).trimmed().toLongLong();
         QString nl = gpu.name.toLower();
-        if (nl.contains("nvidia"))
+        if (nl.contains("nvidia")) {
           gpu.vendor = "nvidia";
-        else if (nl.contains("amd") || nl.contains("radeon"))
+          gpu.has_cuda = true;
+        } else if (nl.contains("amd") || nl.contains("radeon")) {
           gpu.vendor = "amd";
-        else if (nl.contains("intel"))
+        } else if (nl.contains("intel")) {
           gpu.vendor = "intel";
-        else
+        } else {
           gpu.vendor = "unknown";
+        }
         gpus.append(gpu);
       }
     }
@@ -304,6 +338,104 @@ static bool detectNpu() {
   return false;
 }
 
+// ── NUMA ────────────────────────────────────────────────────────────
+
+static QList<NumaNodeInfo> detectNuma() {
+  QList<NumaNodeInfo> nodes;
+
+#ifdef Q_OS_LINUX
+  QDir nodeDir("/sys/devices/system/node");
+  if (!nodeDir.exists())
+    return nodes; // no NUMA exposed by kernel
+
+  for (const auto &entry :
+       nodeDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+    if (!entry.startsWith("node"))
+      continue;
+
+    int nodeId = entry.mid(4).toInt();
+    QString nodePath = nodeDir.absolutePath() + "/" + entry;
+
+    NumaNodeInfo node;
+    node.node_id = nodeId;
+
+    // cpulist
+    QString cpulist = readSysfs(nodePath + "/cpulist");
+    if (!cpulist.isEmpty()) {
+      // e.g. "0-15,32-47" or "0"
+      for (const auto &range : cpulist.split(',')) {
+        if (range.contains('-')) {
+          QStringList bounds = range.split('-');
+          int start = bounds[0].toInt();
+          int end = bounds[1].toInt();
+          for (int c = start; c <= end; ++c)
+            node.cpus.append(c);
+        } else {
+          node.cpus.append(range.toInt());
+        }
+      }
+    }
+
+    // memory (in kB)
+    QString memStr = readSysfs(nodePath + "/meminfo");
+    for (const auto &line : memStr.split('\n', Qt::SkipEmptyParts)) {
+      if (line.startsWith("NodeMemTotal:")) {
+        QString value = line.section(':', 1, 1).trimmed();
+        bool ok = false;
+        double kb = value.section(' ', 0, 0).toDouble(&ok);
+        if (ok)
+          node.memory_bytes = static_cast<qint64>(kb * 1024.0);
+        break;
+      }
+    }
+
+    nodes.append(node);
+  }
+
+#elif defined(Q_OS_MAC)
+  // macOS treats all memory as unified — single NUMA node
+  NumaNodeInfo node;
+  node.node_id = 0;
+  int nc = static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
+  for (int c = 0; c < nc; ++c)
+    node.cpus.append(c);
+  node.memory_bytes = detectRamBytes();
+  nodes.append(node);
+
+#elif defined(Q_OS_WIN)
+  // Windows: query via PowerShell / WMI
+  QString psOut = runCommand("powershell.exe",
+                             {"-NoProfile", "-Command",
+                              "Get-CimInstance Win32_NUMANode | "
+                              "ForEach-Object { '{0},{1},{2}' -f "
+                              "$_.NodeNumber,$_.Memory,$_.ProcessorMask }"});
+  if (!psOut.isEmpty()) {
+    for (const auto &line : psOut.split('\n', Qt::SkipEmptyParts)) {
+      QStringList parts = line.split(',');
+      if (parts.size() >= 3) {
+        NumaNodeInfo node;
+        node.node_id = parts[0].toInt();
+        node.memory_bytes = parts[1].toLongLong() * 1024; // WMI returns kB
+
+        // ProcessorMask is a bitmask (decimal string)
+        QString maskStr = parts[2].trimmed();
+        quint64 mask = maskStr.toULongLong();
+        int bit = 0;
+        while (mask > 0) {
+          if (mask & 1)
+            node.cpus.append(bit);
+          mask >>= 1;
+          ++bit;
+        }
+        nodes.append(node);
+      }
+    }
+  }
+#endif
+
+  return nodes;
+}
+
 // ── Public entry point ──────────────────────────────────────────────
 
 HardwareInfo detectHardware() {
@@ -312,6 +444,7 @@ HardwareInfo detectHardware() {
   info.total_ram_bytes = detectRamBytes();
   info.gpus = detectGpus();
   info.has_npu = detectNpu();
+  info.numa_nodes = detectNuma();
   info.detection_time = QDateTime::currentDateTime().toString(Qt::ISODate);
   return info;
 }

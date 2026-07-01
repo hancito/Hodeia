@@ -69,7 +69,7 @@ QString toMarkdown(const PaperSummary &summary) {
   parts.append(QString("## %1, (%2): %3")
                    .arg(authors, QString::number(summary.year), title));
   parts.append(QString());
-  parts.append(QString("### %1").arg(summary.journal));
+  parts.append(QString("### Journal:  %1").arg(summary.journal));
   parts.append(QString());
   parts.append("## Research objective");
   parts.append(summary.researchObjective);

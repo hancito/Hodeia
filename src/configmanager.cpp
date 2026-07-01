@@ -526,9 +526,26 @@ void ConfigManager::detectAndSaveHardware() {
         gpuObj["name"] = m["name"].toString();
         gpuObj["vram_bytes"] = m["vram_bytes"].toDouble();
         gpuObj["vendor"] = m["vendor"].toString();
+        gpuObj["has_vulkan"] = m["has_vulkan"].toBool();
+        gpuObj["has_metal"] = m["has_metal"].toBool();
+        gpuObj["has_cuda"] = m["has_cuda"].toBool();
         arr.append(gpuObj);
       }
       obj["gpus"] = arr;
+    } else if (it.key() == "numa_nodes") {
+      QJsonArray arr;
+      for (const auto &nodeVar : it.value().toList()) {
+        QJsonObject nodeObj;
+        QVariantMap m = nodeVar.toMap();
+        nodeObj["node_id"] = m["node_id"].toInt();
+        nodeObj["memory_bytes"] = m["memory_bytes"].toDouble();
+        QJsonArray cpuArr;
+        for (const auto &cpu : m["cpus"].toList())
+          cpuArr.append(cpu.toInt());
+        nodeObj["cpus"] = cpuArr;
+        arr.append(nodeObj);
+      }
+      obj["numa_nodes"] = arr;
     } else {
       obj[it.key()] = QJsonValue::fromVariant(it.value());
     }
@@ -553,10 +570,27 @@ ConfigManager::hardwareToVariantMap(const HardwareInfo &info) const {
     g["name"] = gpu.name;
     g["vram_bytes"] = static_cast<double>(gpu.vram_bytes);
     g["vendor"] = gpu.vendor;
+    g["has_vulkan"] = gpu.has_vulkan;
+    g["has_metal"] = gpu.has_metal;
+    g["has_cuda"] = gpu.has_cuda;
     gpuList.append(g);
   }
   v["gpus"] = gpuList;
   v["has_npu"] = info.has_npu;
+
+  QVariantList numaList;
+  for (const auto &node : info.numa_nodes) {
+    QVariantMap n;
+    n["node_id"] = node.node_id;
+    n["memory_bytes"] = static_cast<double>(node.memory_bytes);
+    QVariantList cpuList;
+    for (int c : node.cpus)
+      cpuList.append(c);
+    n["cpus"] = cpuList;
+    numaList.append(n);
+  }
+  v["numa_nodes"] = numaList;
+
   v["detection_time"] = info.detection_time;
   return v;
 }
@@ -575,7 +609,19 @@ HardwareInfo ConfigManager::hardwareFromVariantMap(const QVariantMap &v) const {
     gpu.name = g["name"].toString();
     gpu.vram_bytes = static_cast<qint64>(g["vram_bytes"].toDouble());
     gpu.vendor = g["vendor"].toString();
+    gpu.has_vulkan = g["has_vulkan"].toBool();
+    gpu.has_metal = g["has_metal"].toBool();
+    gpu.has_cuda = g["has_cuda"].toBool();
     info.gpus.append(gpu);
+  }
+  for (const auto &entry : v["numa_nodes"].toList()) {
+    QVariantMap n = entry.toMap();
+    NumaNodeInfo node;
+    node.node_id = n["node_id"].toInt();
+    node.memory_bytes = static_cast<qint64>(n["memory_bytes"].toDouble());
+    for (const auto &cpu : n["cpus"].toList())
+      node.cpus.append(cpu.toInt());
+    info.numa_nodes.append(node);
   }
   return info;
 }

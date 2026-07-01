@@ -168,7 +168,7 @@ Rectangle {
                             textFormat: TextEdit.MarkdownText
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-                            text: modelHelper.summaryToMarkdown(centralPane.activeSummaryJson) || "Please make a summary of this paper"
+                            text: centralPane.activeSummaryJson ? modelHelper.summaryToMarkdown(centralPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
 
@@ -217,7 +217,7 @@ Rectangle {
                             wrapMode: TextEdit.WordWrap
                             font.family: Fonts.mono
                             placeholderText: "Select a paper to see its LaTeX summary"
-                            text: modelHelper.summaryToLatex(centralPane.activeSummaryJson)
+                            text: centralPane.activeSummaryJson ? modelHelper.summaryToLatex(centralPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
 
@@ -266,7 +266,7 @@ Rectangle {
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
                             placeholderText: "Select a paper to see its LaTeX summary"
-                            text: modelHelper.summaryToRef(centralPane.activeSummaryJson)
+                            text: centralPane.activeSummaryJson ? modelHelper.summaryToRef(centralPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
                 }
