@@ -1,5 +1,6 @@
 #include "headers/configmanager.h"
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileDevice>
@@ -12,6 +13,20 @@
 #include <QUrl>
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
+  // Probe hardware only when hardware.json does not yet exist.
+  // On subsequent launches the cached file is loaded directly.
+  if (!QFile::exists(hardwareJsonPath())) {
+    detectAndSaveHardware();
+  } else {
+    QFile hwFile(hardwareJsonPath());
+    if (hwFile.open(QIODevice::ReadOnly)) {
+      QJsonDocument doc = QJsonDocument::fromJson(hwFile.readAll());
+      if (doc.isObject()) {
+        m_hardwareInfo = hardwareFromVariantMap(doc.object().toVariantMap());
+      }
+    }
+  }
+
   loadConfig(); // Automatically load the file when instantiated
 
   // If no backends were loaded, seed the default llama.cpp backend
@@ -488,6 +503,92 @@ void ConfigManager::deleteImages(const QStringList &hashList,
       qDebug() << "No images found for hash:" << hash;
     }
   }
+}
+
+// ── Hardware detection ──────────────────────────────────────────────
+
+void ConfigManager::detectAndSaveHardware() {
+  m_hardwareInfo = detectHardware();
+
+  QFile file(hardwareJsonPath());
+  if (!file.open(QIODevice::WriteOnly)) {
+    qWarning() << "[ConfigManager] Could not write" << hardwareJsonPath();
+    return;
+  }
+  QVariantMap v = hardwareToVariantMap(m_hardwareInfo);
+  QJsonObject obj;
+  for (auto it = v.constBegin(); it != v.constEnd(); ++it) {
+    if (it.key() == "gpus") {
+      QJsonArray arr;
+      for (const auto &gpuVar : it.value().toList()) {
+        QJsonObject gpuObj;
+        QVariantMap m = gpuVar.toMap();
+        gpuObj["name"] = m["name"].toString();
+        gpuObj["vram_bytes"] = m["vram_bytes"].toDouble();
+        gpuObj["vendor"] = m["vendor"].toString();
+        arr.append(gpuObj);
+      }
+      obj["gpus"] = arr;
+    } else {
+      obj[it.key()] = QJsonValue::fromVariant(it.value());
+    }
+  }
+  QJsonDocument doc(obj);
+  file.write(doc.toJson());
+  emit hardwareInfoChanged();
+  qDebug() << "[ConfigManager] Hardware detected and saved to"
+           << hardwareJsonPath();
+}
+
+QVariantMap
+ConfigManager::hardwareToVariantMap(const HardwareInfo &info) const {
+  QVariantMap v;
+  v["cpu_threads"] = info.cpu_threads;
+  v["cpu_cores"] = info.cpu_cores;
+  v["cpu_model"] = info.cpu_model;
+  v["total_ram_bytes"] = static_cast<double>(info.total_ram_bytes);
+  QVariantList gpuList;
+  for (const auto &gpu : info.gpus) {
+    QVariantMap g;
+    g["name"] = gpu.name;
+    g["vram_bytes"] = static_cast<double>(gpu.vram_bytes);
+    g["vendor"] = gpu.vendor;
+    gpuList.append(g);
+  }
+  v["gpus"] = gpuList;
+  v["has_npu"] = info.has_npu;
+  v["detection_time"] = info.detection_time;
+  return v;
+}
+
+HardwareInfo ConfigManager::hardwareFromVariantMap(const QVariantMap &v) const {
+  HardwareInfo info;
+  info.cpu_threads = v["cpu_threads"].toInt();
+  info.cpu_cores = v["cpu_cores"].toInt();
+  info.cpu_model = v["cpu_model"].toString();
+  info.total_ram_bytes = static_cast<qint64>(v["total_ram_bytes"].toDouble());
+  info.has_npu = v["has_npu"].toBool();
+  info.detection_time = v["detection_time"].toString();
+  for (const auto &entry : v["gpus"].toList()) {
+    QVariantMap g = entry.toMap();
+    GpuInfo gpu;
+    gpu.name = g["name"].toString();
+    gpu.vram_bytes = static_cast<qint64>(g["vram_bytes"].toDouble());
+    gpu.vendor = g["vendor"].toString();
+    info.gpus.append(gpu);
+  }
+  return info;
+}
+
+QVariantMap ConfigManager::hardwareInfo() const {
+  return hardwareToVariantMap(m_hardwareInfo);
+}
+
+QString ConfigManager::hardwareJsonPath() const {
+  QString dirPath =
+      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  QDir().mkpath(dirPath);
+  return dirPath + "/hardware.json";
 }
 
 // ── ModelCopyWorker ──────────────────────────────────────────────────

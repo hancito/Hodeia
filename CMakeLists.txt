@@ -34,6 +34,7 @@ qt_add_qml_module(Paperize
     SOURCES
         headers/thememanager.h
         headers/configmanager.h
+        headers/hardwaredetector.h
         headers/database.h
         headers/summary.h
         headers/query.h
@@ -49,6 +50,7 @@ qt_add_qml_module(Paperize
         headers/helpers.h
         src/thememanager.cpp
         src/configmanager.cpp
+        src/hardwaredetector.cpp
         src/database.cpp
         src/summary.cpp
         src/query.cpp

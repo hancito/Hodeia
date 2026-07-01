@@ -3,7 +3,10 @@
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 #include <qtmetamacros.h>
+
+#include "headers/hardwaredetector.h"
 
 class QThread;
 
@@ -38,6 +41,8 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
                  activeModelChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
+  Q_PROPERTY(
+      QVariantMap hardwareInfo READ hardwareInfo NOTIFY hardwareInfoChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -52,6 +57,9 @@ public:
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
   QStringList projectList() const { return m_projectList; }
+
+  /// Return the hardware info as a QVariantMap (QML-friendly).
+  QVariantMap hardwareInfo() const;
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -135,10 +143,16 @@ signals:
   /// Emitted when a model file was successfully copied.
   void modelCopied();
 
+  void hardwareInfoChanged();
+
 private:
   void refreshProjectList();
   void ensureModelsDirectory();
+  void detectAndSaveHardware();
+  QVariantMap hardwareToVariantMap(const HardwareInfo &info) const;
+  HardwareInfo hardwareFromVariantMap(const QVariantMap &v) const;
   QString getFilePath() const;
+  QString hardwareJsonPath() const;
   QString projectsRoot() const;
   QString modelsRoot() const;
 
@@ -152,6 +166,8 @@ private:
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
   QVariantList m_backendList;
   QStringList m_projectList;
+
+  HardwareInfo m_hardwareInfo;
 
   // Model copy worker
   QThread *m_copyThread = nullptr;
