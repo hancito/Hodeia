@@ -8,20 +8,6 @@
 
 #include "headers/hardwaredetector.h"
 
-class QThread;
-
-/// Background worker for copying model files with progress reporting.
-class ModelCopyWorker : public QObject {
-  Q_OBJECT
-public:
-  explicit ModelCopyWorker(QObject *parent = nullptr);
-  Q_INVOKABLE void run(const QString &sourceUri, const QString &destDir);
-
-signals:
-  void progress(int percentage, const QString &fileName);
-  void finished(bool success, const QString &destPath, const QString &error);
-};
-
 class ConfigManager : public QObject {
   Q_OBJECT
 
@@ -110,10 +96,6 @@ public:
   /// Path to the Summarizers subdirectory.
   Q_INVOKABLE QString summarizersPath() const;
 
-  /// Copy a GGUF model file to the Summarizers folder in a background
-  /// thread.  Emits modelCopyProgress() and modelCopyFinished().
-  Q_INVOKABLE void addLocalSummarizer(const QString &sourcePath);
-
   // File Operations
   Q_INVOKABLE void loadConfig();
   Q_INVOKABLE void saveConfig();
@@ -131,12 +113,10 @@ signals:
   void backendListChanged();
 
   /// Progress for model file copy (0–100).
+  /// Emitted by ModelHelper but forwarded here for QML convenience.
   void modelCopyProgress(int percentage, const QString &fileName);
 
-  /// Model file copy finished.
-  /// @param success  true on success.
-  /// @param destPath destination path (empty on failure).
-  /// @param error    error description (empty on success).
+  /// Model file copy finished (emitted by ModelHelper, forwarded here).
   void modelCopyFinished(bool success, const QString &destPath,
                          const QString &error);
 
@@ -168,8 +148,4 @@ private:
   QStringList m_projectList;
 
   HardwareInfo m_hardwareInfo;
-
-  // Model copy worker
-  QThread *m_copyThread = nullptr;
-  ModelCopyWorker *m_copyWorker = nullptr;
 };

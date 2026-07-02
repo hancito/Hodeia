@@ -9,7 +9,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
-#include <QThread>
 #include <QUrl>
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
@@ -48,31 +47,9 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   }
   ensureModelsDirectory();
   refreshProjectList();
-
-  // Set up model copy worker thread
-  m_copyThread = new QThread(this);
-  m_copyWorker = new ModelCopyWorker();
-  m_copyWorker->moveToThread(m_copyThread);
-  QObject::connect(m_copyWorker, &ModelCopyWorker::progress, this,
-                   &ConfigManager::modelCopyProgress);
-  QObject::connect(
-      m_copyWorker, &ModelCopyWorker::finished, this,
-      [this](bool success, const QString &destPath, const QString &error) {
-        emit modelCopyFinished(success, destPath, error);
-        if (success) {
-          emit modelCopied();
-        }
-      });
-  m_copyThread->start();
 }
 
-ConfigManager::~ConfigManager() {
-  saveConfig();
-  if (m_copyThread) {
-    m_copyThread->quit();
-    m_copyThread->wait();
-  }
-}
+ConfigManager::~ConfigManager() { saveConfig(); }
 
 QString ConfigManager::getFilePath() const {
   // Finds location like: AppData/Roaming/Paperize/ or ~/.local/share/Paperize/
@@ -426,34 +403,6 @@ QString ConfigManager::summarizersPath() const {
   return modelsRoot() + "/Summarizers";
 }
 
-void ConfigManager::addLocalSummarizer(const QString &sourcePath) {
-  // Resolve file:// URI if needed
-  QString srcPath = sourcePath;
-  if (srcPath.startsWith("file://")) {
-    srcPath = QUrl(srcPath).toLocalFile();
-  }
-
-  QFile src(srcPath);
-  if (!src.exists()) {
-    qWarning() << "[ConfigManager] Source file does not exist:" << srcPath;
-    emit modelCopyFinished(false, QString(),
-                           "Source file does not exist: " + srcPath);
-    return;
-  }
-
-  // Create a subfolder named after the model (without extension).
-  QString modelName = QFileInfo(srcPath).completeBaseName();
-  QString modelFolder = summarizersPath() + "/" + modelName;
-  QDir().mkpath(modelFolder);
-
-  QMetaObject::invokeMethod(
-      m_copyWorker,
-      [this, srcPath, modelFolder]() {
-        m_copyWorker->run(srcPath, modelFolder);
-      },
-      Qt::QueuedConnection);
-}
-
 void ConfigManager::refreshProjectList() {
   QDir projectsDir(projectsRoot());
   if (!projectsDir.exists()) {
@@ -635,78 +584,4 @@ QString ConfigManager::hardwareJsonPath() const {
       QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
   QDir().mkpath(dirPath);
   return dirPath + "/hardware.json";
-}
-
-// ── ModelCopyWorker ──────────────────────────────────────────────────
-
-ModelCopyWorker::ModelCopyWorker(QObject *parent) : QObject(parent) {}
-
-void ModelCopyWorker::run(const QString &sourcePath, const QString &destDir) {
-  QString srcPath = sourcePath;
-  if (srcPath.startsWith("file://")) {
-    srcPath = QUrl(srcPath).toLocalFile();
-  }
-
-  QFile src(srcPath);
-  if (!src.exists()) {
-    emit finished(false, QString(), "Source file not found: " + srcPath);
-    return;
-  }
-
-  QString fileName = QFileInfo(src).fileName();
-  QString destPath = destDir + "/" + fileName;
-
-  QDir d;
-  d.mkpath(destDir);
-
-  // Remove existing destination if present
-  if (QFile::exists(destPath) && !QFile::remove(destPath)) {
-    emit finished(false, QString(), "Cannot remove existing file: " + destPath);
-    return;
-  }
-
-  if (!src.open(QIODevice::ReadOnly)) {
-    emit finished(false, QString(), "Cannot open source file: " + srcPath);
-    return;
-  }
-
-  qint64 total = src.size();
-  if (total <= 0) {
-    emit finished(false, QString(),
-                  "Cannot determine source file size: " + srcPath);
-    return;
-  }
-
-  QFile dest(destPath);
-  if (!dest.open(QIODevice::WriteOnly)) {
-    emit finished(false, QString(),
-                  "Cannot open destination for writing: " + destPath);
-    return;
-  }
-
-  const qint64 bufSize = 1024 * 1024; // 1 MiB chunks
-  char buf[bufSize];
-  qint64 copied = 0;
-
-  while (!src.atEnd()) {
-    qint64 bytesRead = src.read(buf, bufSize);
-    if (bytesRead <= 0)
-      break;
-    copied += dest.write(buf, bytesRead);
-    int pct = static_cast<int>(copied * 100 / total);
-    emit progress(pct, fileName);
-  }
-  dest.close();
-  src.close();
-
-  if (copied != total) {
-    QFile::remove(destPath);
-    emit finished(false, QString(),
-                  "Copy incomplete: " + QString::number(copied) + "/" +
-                      QString::number(total) + " bytes");
-    return;
-  }
-
-  emit progress(100, fileName);
-  emit finished(true, destPath, QString());
 }

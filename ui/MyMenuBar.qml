@@ -11,6 +11,7 @@ MenuBar {
     signal requestSwitchProject(string projectName)
     signal requestDeleteProject
     signal requestCleanProject
+    signal requestDeleteModels
     Menu {
         title: "File"
         MenuItem {
@@ -125,7 +126,43 @@ MenuBar {
         }
         MenuItem {
             text: "Add Local Model"
-            onTriggered: localModelFileDialog.open()
+            onTriggered: localModelDialog.open()
+        }
+        Menu {
+            id: deleteModelMenu
+            title: "Delete Model..."
+            visible: mainWin !== null
+            Repeater {
+                model: modelHelper.localModelList
+                delegate: Item {
+                    required property var modelData
+                    width: deleteModelMenu.width
+                    height: 32
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        CheckBox {
+                            checked: mainWin.selectedModels.includes(modelData)
+                            onClicked: {
+                                if (mainWin.selectedModels.includes(modelData)) {
+                                    mainWin.selectedModels = mainWin.selectedModels.filter(p => p !== modelData);
+                                } else {
+                                    mainWin.selectedModels = mainWin.selectedModels.concat([modelData]);
+                                }
+                            }
+                        }
+                        Label {
+                            text: modelData
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+            MenuItem {
+                text: "Delete Selected"
+                enabled: mainWin.selectedModels.length > 0
+                onTriggered: menuBar.requestDeleteModels()
+            }
         }
     }
 }

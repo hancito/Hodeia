@@ -15,6 +15,7 @@ ApplicationWindow {
     property var secondaryWindow: null
     property var windowComponent: null
     property var selectedProjects: []
+    property var selectedModels: []
 
     readonly property var activeTheme: themeManager.activeTheme || {}
     readonly property var activeProject: configManager.lastProject || {}
@@ -87,6 +88,7 @@ ApplicationWindow {
         }
         onRequestDeleteProject: deleteConfirmDialog.open()
         onRequestCleanProject: cleanProjectDialog.open()
+        onRequestDeleteModels: deleteModelDialog.open()
     }
 
     // Apply theme to the entire window content
@@ -285,19 +287,136 @@ ApplicationWindow {
         }
     }
 
+    // Delete model confirmation dialog
+    Dialog {
+        id: deleteModelDialog
+        anchors.centerIn: parent
+        modal: true
+        title: "Delete Models"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        ColumnLayout {
+            spacing: 5
+            Label {
+                text: "Delete the selected model(s)? This cannot be undone."
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: root.selectedModels
+                delegate: Label {
+                    required property var modelData
+                    text: "  • " + modelData
+                    font.weight: Font.Bold
+                }
+            }
+        }
+        onAccepted: {
+            modelHelper.deleteLocalModels(root.selectedModels);
+            root.selectedModels = [];
+        }
+        onRejected: {
+            root.selectedModels = [];
+        }
+    }
+
     // Backend setup modal
     BackendWindow {
         id: backendDialog
     }
 
-    // File dialog for selecting GGUF summarizer models
+    // Dialog for adding a local GGUF model (+ optional mmproj)
+    Dialog {
+        id: localModelDialog
+        anchors.centerIn: parent
+        modal: true
+        title: "Add Local Model"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        width: 520
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+
+            // ── Model GGUF ──
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Label {
+                    text: "Model:"
+                    Layout.minimumWidth: 60
+                }
+                TextField {
+                    id: modelPathField
+                    Layout.fillWidth: true
+                    placeholderText: "Select a .gguf model file..."
+                    readOnly: true
+                }
+                Button {
+                    text: "Browse..."
+                    onClicked: localModelFileDlg.open()
+                }
+            }
+
+            // ── MMProj GGUF (optional) ──
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+                Label {
+                    text: "MMProj:"
+                    Layout.minimumWidth: 60
+                }
+                TextField {
+                    id: mmprojPathField
+                    Layout.fillWidth: true
+                    placeholderText: "Optional — select a .gguf mmproj file..."
+                    readOnly: true
+                }
+                Button {
+                    text: "Browse..."
+                    onClicked: localMmprojFileDlg.open()
+                }
+            }
+
+            Label {
+                text: "The mmproj file is optional. Leave empty to skip."
+                font.italic: true
+                opacity: 0.6
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+        onAccepted: {
+            let modelPath = modelPathField.text.trim();
+            let mmprojPath = mmprojPathField.text.trim();
+            if (modelPath === "") {
+                return;
+            }
+            modelHelper.addLocalSummarizerWithMmproj(modelPath, mmprojPath);
+        }
+        onClosed: {
+            modelPathField.clear();
+            mmprojPathField.clear();
+        }
+    }
+
+    // Backing file dialog — model GGUF
     FileDialog {
-        id: localModelFileDialog
+        id: localModelFileDlg
         title: "Select GGUF Model File"
         fileMode: FileDialog.OpenFile
         nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
         onAccepted: {
-            configManager.addLocalSummarizer(selectedFile);
+            modelPathField.text = selectedFile.toString().replace("file://", "");
+        }
+    }
+
+    // Backing file dialog — mmproj GGUF
+    FileDialog {
+        id: localMmprojFileDlg
+        title: "Select MMProj GGUF File"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
+        onAccepted: {
+            mmprojPathField.text = selectedFile.toString().replace("file://", "");
         }
     }
 
