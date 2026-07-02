@@ -35,6 +35,7 @@ MenuBar {
         Menu {
             id: deleteProjectMenu
             title: "Delete Project..."
+            visible: mainWin !== null
             Repeater {
                 model: configManager.projectList
                 delegate: Item {

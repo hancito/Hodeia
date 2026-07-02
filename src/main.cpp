@@ -12,6 +12,7 @@
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickStyle>
 
 /// Install a global llama.cpp log callback early (before any model loads)
 /// so that embedding model init and chat backend share the same filter.
@@ -58,6 +59,10 @@ static void registerApplicationFonts(const QString &fontsDir) {
 int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
   app.setWindowIcon(QIcon(":/Resources/paperize.png"));
+
+  // Force Fusion style to avoid platform-dependent styles (e.g. Breeze on KDE)
+  // that conflict with our manual palette theming.
+  QQuickStyle::setStyle("Fusion");
 
   // Suppress llama.cpp verbosity (must run before any model is loaded)
   initLlamaLogging();

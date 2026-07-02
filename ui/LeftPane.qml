@@ -1,8 +1,8 @@
 pragma ComponentBehavior: Bound
+import QtQuick.Dialogs
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 Rectangle {
     id: leftPane
