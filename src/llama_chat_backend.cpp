@@ -10,25 +10,28 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QImage>
 #include <QThread>
 #include <array>
-#include <cstring>
 #include <vector>
 
-/// Static — llama_backend_init is called once on first construction.
+/// Static — llama_backend init/once.
 static bool s_llamaInitialized = false;
 
 LlamaChatBackend::LlamaChatBackend(QObject *parent) : QObject(parent) {
   if (!s_llamaInitialized) {
+    ggml_backend_load_all();
     llama_backend_init();
     s_llamaInitialized = true;
-    qDebug() << "[LlamaChatBackend] llama backend initialized"
-             << llama_print_system_info();
   }
 }
 
-LlamaChatBackend::~LlamaChatBackend() { unloadModel(); }
+LlamaChatBackend::~LlamaChatBackend() {
+  unloadModel();
+  if (s_llamaInitialized) {
+    llama_backend_free();
+    s_llamaInitialized = false;
+  }
+}
 
 // ── Model / mmproj loading ─────────────────────────────────────────
 
@@ -44,45 +47,32 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
 
   emit statusUpdated("Loading model: " + path);
 
+  // ── Load model ──
   llama_model_params modelParams = llama_model_default_params();
   modelParams.n_gpu_layers = 99;
-  modelParams.progress_callback = nullptr;
 
   m_llamaModel =
       llama_model_load_from_file(path.toUtf8().constData(), modelParams);
   if (!m_llamaModel) {
-    qCritical() << "[LlamaChatBackend] Failed to load model on GPU. "
-                << "Retrying on CPU...";
-    emit statusUpdated("GPU load failed — retrying on CPU");
-
-    modelParams.n_gpu_layers = 0;
-    m_llamaModel =
-        llama_model_load_from_file(path.toUtf8().constData(), modelParams);
-    if (!m_llamaModel) {
-      qCritical() << "[LlamaChatBackend] Failed to load model on CPU too:"
-                  << path;
-      emit statusUpdated("Failed to load model");
-      return false;
-    }
-    qDebug() << "[LlamaChatBackend] Model loaded on CPU (no GPU offload)";
+    qCritical() << "[LlamaChatBackend] Failed to load model:" << path;
+    emit statusUpdated("Failed to load model");
+    return false;
   }
 
   bool useGpu = (modelParams.n_gpu_layers > 0);
+  qDebug() << "[LlamaChatBackend] GPU layers:" << modelParams.n_gpu_layers;
 
+  // ── Create context ──
   llama_context_params ctxParams = llama_context_default_params();
   ctxParams.n_ctx = MaxPromptTokens + MaxGenTokens;
-  ctxParams.n_batch = MaxPromptTokens;
-  ctxParams.n_ubatch = MaxPromptTokens;
+  ctxParams.n_batch = MaxPromptTokens + MaxGenTokens;
+  ctxParams.n_ubatch = 2048;
   ctxParams.n_threads = QThread::idealThreadCount();
-  ctxParams.n_threads_batch = -1;
-  if (useGpu) {
-    ctxParams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
-  }
+  ctxParams.n_threads_batch = QThread::idealThreadCount();
 
   m_llamaCtx = llama_init_from_model(m_llamaModel, ctxParams);
   if (!m_llamaCtx) {
     qCritical() << "[LlamaChatBackend] Failed to create context";
-    emit statusUpdated("Failed to create context");
     llama_model_free(m_llamaModel);
     m_llamaModel = nullptr;
     return false;
@@ -90,27 +80,21 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
 
   m_modelPath = path;
 
-  // ── Try to load mmproj for multimodal support ──
+  // ── Load mmproj (multimodal projector) ──
   m_mmprojPath = resolveMmprojPath(path);
   if (!m_mmprojPath.isEmpty()) {
     emit statusUpdated("Loading multimodal projector: " + m_mmprojPath);
 
-    auto mparams = mtmd_context_params_default();
-    mparams.use_gpu = useGpu;
-    mparams.n_threads = QThread::idealThreadCount();
-    if (useGpu) {
-      mparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
-    }
-    mparams.warmup = false;
+    auto mtmdParams = mtmd_context_params_default();
+    mtmdParams.use_gpu = useGpu;
+    mtmdParams.n_threads = QThread::idealThreadCount();
+    mtmdParams.warmup = false;
 
     m_mtmdCtx = mtmd_init_from_file(m_mmprojPath.toUtf8().constData(),
-                                    m_llamaModel, mparams);
+                                    m_llamaModel, mtmdParams);
     if (m_mtmdCtx) {
       m_hasVision = mtmd_support_vision(m_mtmdCtx);
       qDebug() << "[LlamaChatBackend] Vision support:" << m_hasVision;
-      if (m_hasVision) {
-        emit statusUpdated("Multimodal projector loaded (vision)");
-      }
     } else {
       qWarning() << "[LlamaChatBackend] Failed to load mmproj:" << m_mmprojPath;
     }
@@ -153,19 +137,17 @@ QString LlamaChatBackend::summarize(const PromptPayload &payload) {
     return QString();
   }
 
-  // Build the formatted prompt text, clamped to context size.
-  // Reserve ~3 chars/tokens; leave room for system prompt + generation.
   int32_t ctxSize = llama_n_ctx(m_llamaCtx);
   int32_t maxPromptToks = std::max(1, ctxSize - MaxGenTokens);
   int maxChars = maxPromptToks * 3;
 
-  QString promptText =
-      buildFormattedPrompt(payload, m_hasVision ? maxChars : maxChars);
+  QString promptText = buildFormattedPrompt(payload, maxChars);
 
-  return runInference(promptText, payload.visualContext);
+  if (m_hasVision && m_mtmdCtx && !payload.visualContext.empty()) {
+    return runMultimodalInference(promptText, payload.visualContext);
+  }
+  return runTextInference(promptText);
 }
-
-// ── Text-only generate (public API, used by callers without images) ─
 
 QString LlamaChatBackend::generate(const QString &systemPrompt,
                                    const QString &userPrompt) {
@@ -176,54 +158,41 @@ QString LlamaChatBackend::generate(const QString &systemPrompt,
   return summarize(p);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────
+// ── Text-only inference ────────────────────────────────────────────
 
-QString LlamaChatBackend::resolveModelPath(const QString &modelPath) const {
-  if (modelPath.isEmpty()) {
-    return QCoreApplication::applicationDirPath() +
-           "/Models/Summarizers/default.gguf";
-  }
-  if (QFile::exists(modelPath))
-    return modelPath;
-  QString appPath = QCoreApplication::applicationDirPath() + "/" + modelPath;
-  if (QFile::exists(appPath))
-    return appPath;
-  return modelPath;
-}
-
-QString LlamaChatBackend::resolveMmprojPath(const QString &modelPath) const {
-  // Strategy: look for <model>-mmproj.gguf next to the model.
-  QString dir = QFileInfo(modelPath).absoluteDir().absolutePath();
-  QString stem = QFileInfo(modelPath).completeBaseName();
-
-  QStringList candidates;
-  candidates << dir + "/" + stem + "-mmproj.gguf"
-             << dir + "/" + stem + ".mmproj.gguf" << dir + "/mmproj.gguf";
-
-  // Also check the Models/Mmproj directory.
-  QString appDir = QCoreApplication::applicationDirPath();
-  candidates << appDir + "/Models/Mmproj/" + stem + "-mmproj.gguf"
-             << appDir + "/Models/Mmproj/mmproj.gguf";
-
-  for (const QString &c : candidates) {
-    if (QFile::exists(c)) {
-      qDebug() << "[LlamaChatBackend] Found mmproj:" << c;
-      return c;
-    }
-  }
-
-  qDebug() << "[LlamaChatBackend] No mmproj found for model:" << modelPath;
+QString LlamaChatBackend::runTextInference(const QString &formattedText) {
+  qWarning() << "[LlamaChatBackend] Text-only inference not yet implemented";
   return QString();
 }
 
+// ── Multimodal inference (TODO) ────────────────────────────────────
+
+QString
+LlamaChatBackend::runMultimodalInference(const QString &formattedText,
+                                         const std::vector<PageImage> &images) {
+  Q_UNUSED(formattedText);
+  Q_UNUSED(images);
+  qWarning() << "[LlamaChatBackend] Multimodal inference not yet implemented";
+  return QString();
+}
+
+// ── Prompt building ────────────────────────────────────────────────
+
 QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
                                                int32_t maxChars) {
-  // Build the user message.  If vision is enabled, insert one media marker
-  // per image so mtmd_tokenize can replace them.
-  const char *marker =
-      mtmd_get_marker(m_mtmdCtx) ? mtmd_get_marker(m_mtmdCtx) : "<__media__>";
+  const char *rawMarker =
+      m_mtmdCtx != nullptr ? mtmd_get_marker(m_mtmdCtx) : nullptr;
+  const char *marker = rawMarker ? rawMarker : "<__media__>";
 
-  QString userPrompt = payload.userMessage + "\n\n";
+  QString userPrompt;
+  if (!payload.visualContext.empty()) {
+    userPrompt += "## VISUAL CONTEXT\n";
+    for (size_t i = 0; i < payload.visualContext.size(); ++i) {
+      userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
+    }
+    userPrompt += "\n";
+  }
+  userPrompt += payload.userMessage + "\n\n";
   userPrompt += "## TEXT CONTEXT\n\n";
 
   QString ctx = payload.textContext;
@@ -232,23 +201,18 @@ QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
   }
   userPrompt += ctx;
 
-  // Append media markers for images (mtmd will replace them with image
-  // tokens during tokenization).
-  if (!payload.visualContext.empty()) {
-    userPrompt += "\n\n## VISUAL CONTEXT\n";
-    for (size_t i = 0; i < payload.visualContext.size(); ++i) {
-      userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
-    }
-  }
+  return applyChatTemplate(payload.systemPrompt, userPrompt);
+}
 
-  // Apply chat template (system + user).
+QString LlamaChatBackend::applyChatTemplate(const QString &systemPrompt,
+                                            const QString &userMessage) {
   struct llama_chat_message chat[2];
   int nMsg = 0;
 
-  QByteArray sysBytes = payload.systemPrompt.toUtf8();
-  QByteArray userBytes = userPrompt.toUtf8();
+  QByteArray sysBytes = systemPrompt.toUtf8();
+  QByteArray userBytes = userMessage.toUtf8();
 
-  if (!payload.systemPrompt.isEmpty()) {
+  if (!systemPrompt.isEmpty()) {
     chat[nMsg].role = "system";
     chat[nMsg].content = sysBytes.constData();
     nMsg++;
@@ -257,7 +221,6 @@ QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
   chat[nMsg].content = userBytes.constData();
   nMsg++;
 
-  // Try built-in template first, then known fallbacks.
   const char *tmpl = llama_model_chat_template(m_llamaModel, nullptr);
   const char *tmplCandidates[] = {tmpl, "chatml", "gemma", nullptr};
 
@@ -278,7 +241,6 @@ QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
       break;
     if (res == -1 && t < 2)
       continue;
-    // Buffer too small — resize and retry.
     promptBuf.resize(static_cast<size_t>(-res));
     res = llama_chat_apply_template(
         tmplCandidates[t], chat, static_cast<size_t>(nMsg), true,
@@ -296,254 +258,46 @@ QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
   return QString::fromUtf8(promptBuf.data(), res);
 }
 
-// ── Core inference loop ────────────────────────────────────────────
+// ── Path resolution ────────────────────────────────────────────────
 
-QString
-LlamaChatBackend::runInference(const QString &formattedText,
-                               const std::vector<PageImage> &pageImages) {
-  if (!m_ready)
-    return QString();
-
-  const auto *vocab = llama_model_get_vocab(m_llamaModel);
-  int32_t ctxSize = llama_n_ctx(m_llamaCtx);
-  int32_t maxPromptToks = std::max(1, ctxSize - MaxGenTokens);
-
-  // ── Multimodal path ──
-  if (m_hasVision && m_mtmdCtx && !pageImages.empty()) {
-    qDebug() << "[LlamaChatBackend] Multimodal inference with"
-             << pageImages.size() << "image(s)";
-
-    // Build mtmd bitmaps directly from raw RGB pixels (no encoding overhead).
-    std::vector<mtmd_bitmap *> bitmaps;
-    bitmaps.reserve(pageImages.size());
-
-    for (size_t i = 0; i < pageImages.size(); ++i) {
-      const auto &pi = pageImages[i];
-      mtmd_bitmap *bm = mtmd_bitmap_init(pi.width, pi.height, pi.data.data());
-      if (bm) {
-        bitmaps.push_back(bm);
-      } else {
-        qWarning() << "[LlamaChatBackend] Failed to create bitmap" << i;
-      }
-    }
-
-    // Tokenize prompt + images.
-    mtmd_input_text text;
-    QByteArray fmtBytes = formattedText.toUtf8();
-    text.text = fmtBytes.constData();
-    text.add_special = true;
-    text.parse_special = true;
-
-    auto chunks = mtmd::input_chunks(mtmd_input_chunks_init());
-    // Build const pointer array for mtmd_tokenize.
-    std::vector<const mtmd_bitmap *> constBitmaps;
-    constBitmaps.reserve(bitmaps.size());
-    for (auto *bm : bitmaps)
-      constBitmaps.push_back(bm);
-
-    int32_t tokRes = mtmd_tokenize(m_mtmdCtx, chunks.ptr.get(), &text,
-                                   constBitmaps.data(), constBitmaps.size());
-    if (tokRes != 0) {
-      qWarning() << "[LlamaChatBackend] mtmd_tokenize failed:" << tokRes;
-      for (auto bm : bitmaps)
-        mtmd_bitmap_free(bm);
-      return QString();
-    }
-
-    // Free bitmaps (no longer needed after tokenize).
-    for (auto bm : bitmaps)
-      mtmd_bitmap_free(bm);
-
-    // Decode each chunk (text via llama_decode, image via mtmd_encode).
-    llama_pos nPast = 0;
-    size_t nChunks = chunks.size();
-
-    // Batch encode all media chunks first.
-    auto mbatch = mtmd::batch_ptr(mtmd_batch_init(m_mtmdCtx));
-
-    for (size_t i = 0; i < nChunks; i++) {
-      const mtmd_input_chunk *chunk = chunks[i];
-      if (mtmd_input_chunk_get_type(chunk) == MTMD_INPUT_CHUNK_TYPE_IMAGE) {
-        mtmd_batch_add_chunk(mbatch.get(), chunk);
-      }
-    }
-
-    // Actually encode the batched media chunks.
-    // (We do a simple single-chunk encode loop since batch add may reject
-    //  incompatible chunks).
-    // Fallback: encode each image chunk individually.
-    for (size_t i = 0; i < nChunks; i++) {
-      const mtmd_input_chunk *chunk = chunks[i];
-      auto ctype = mtmd_input_chunk_get_type(chunk);
-
-      if (ctype == MTMD_INPUT_CHUNK_TYPE_TEXT) {
-        // Text chunk — decode directly.
-        const llama_token *tokens = nullptr;
-        size_t nTokens = 0;
-        tokens = mtmd_input_chunk_get_tokens_text(chunk, &nTokens);
-
-        // Copy to mutable buffer (llama_batch_get_one needs non-const).
-        std::vector<llama_token> mutableTokens(tokens, tokens + nTokens);
-        llama_batch batch = llama_batch_get_one(mutableTokens.data(),
-                                                static_cast<int>(nTokens));
-        for (int32_t j = 0; j < batch.n_tokens; j++) {
-          batch.pos[j] = nPast;
-        }
-        batch.logits[batch.n_tokens - 1] = (i == nChunks - 1) ? 1 : 0;
-
-        if (llama_decode(m_llamaCtx, batch) != 0) {
-          qWarning() << "[LlamaChatBackend] Text chunk decode failed at" << i;
-          llama_batch_free(batch);
-          return QString();
-        }
-        nPast += static_cast<llama_pos>(nTokens);
-        llama_batch_free(batch);
-
-      } else {
-        // Image chunk — encode + decode embeddings.
-        if (mtmd_encode_chunk(m_mtmdCtx, chunk) != 0) {
-          qWarning() << "[LlamaChatBackend] Image encode failed at" << i;
-          return QString();
-        }
-
-        const auto *imageTokens = mtmd_input_chunk_get_tokens_image(chunk);
-        size_t nImgToks = mtmd_image_tokens_get_n_tokens(imageTokens);
-
-        float *embdPtr = mtmd_get_output_embd(m_mtmdCtx);
-        int32_t nEmbd = llama_model_n_embd_inp(m_llamaModel);
-
-        // batch.embd points to a contiguous buffer of n_tokens * n_embd floats.
-        // Copy the image embeddings into it.
-        llama_batch batch =
-            llama_batch_init(static_cast<uint32_t>(nImgToks), 0, 1);
-        batch.n_tokens = static_cast<int32_t>(nImgToks);
-
-        // Copy embedding data: each token gets nEmbd floats.
-        if (batch.embd) {
-          std::memcpy(batch.embd, embdPtr, nImgToks * nEmbd * sizeof(float));
-        }
-
-        for (size_t j = 0; j < nImgToks; j++) {
-          batch.token[j] = 0;
-          batch.pos[j] = nPast + static_cast<llama_pos>(j);
-          batch.seq_id[j][0] = 0;
-          batch.n_seq_id[j] = 1;
-          batch.logits[j] = 0;
-        }
-        batch.logits[batch.n_tokens - 1] = (i == nChunks - 1) ? 1 : 0;
-
-        if (llama_decode(m_llamaCtx, batch) != 0) {
-          qWarning() << "[LlamaChatBackend] Image chunk decode failed at" << i;
-          llama_batch_free(batch);
-          return QString();
-        }
-        nPast += static_cast<llama_pos>(nImgToks);
-        llama_batch_free(batch);
-      }
-    }
-
-    qDebug() << "[LlamaChatBackend] All chunks decoded, n_past=" << nPast;
-
-    // ── Generation loop (shared) ──
-    auto *smpl = createSampler();
-    QString result = generateTokens(smpl);
-    llama_sampler_free(smpl);
-    return result;
+QString LlamaChatBackend::resolveModelPath(const QString &modelPath) const {
+  if (modelPath.isEmpty()) {
+    return QCoreApplication::applicationDirPath() +
+           "/Models/Summarizers/default.gguf";
   }
-
-  // ── Text-only path ──
-  QByteArray promptBytes = formattedText.toUtf8();
-  int nTok = llama_tokenize(vocab, promptBytes.constData(), promptBytes.size(),
-                            nullptr, 0, true, true);
-  if (nTok < 0)
-    nTok = -nTok;
-
-  std::vector<llama_token> tokens(nTok);
-  nTok = llama_tokenize(vocab, promptBytes.constData(), promptBytes.size(),
-                        tokens.data(), static_cast<int>(tokens.size()), true,
-                        true);
-  tokens.resize(nTok);
-
-  if (static_cast<int>(tokens.size()) > maxPromptToks) {
-    qWarning() << "[LlamaChatBackend] Truncating prompt from" << tokens.size()
-               << "to" << maxPromptToks << "tokens";
-    tokens.resize(maxPromptToks);
-  }
-
-  auto *smpl = createSampler();
-
-  llama_memory_clear(llama_get_memory(m_llamaCtx), true);
-
-  llama_batch batch =
-      llama_batch_get_one(tokens.data(), static_cast<int>(tokens.size()));
-
-  if (llama_decode(m_llamaCtx, batch) != 0) {
-    qWarning() << "[LlamaChatBackend] Prompt decode failed";
-    llama_sampler_free(smpl);
-    llama_batch_free(batch);
-    return QString();
-  }
-
-  QString result = generateTokens(smpl);
-  llama_sampler_free(smpl);
-  llama_batch_free(batch);
-
-  return result;
+  if (QFile::exists(modelPath))
+    return modelPath;
+  QString appPath = QCoreApplication::applicationDirPath() + "/" + modelPath;
+  if (QFile::exists(appPath))
+    return appPath;
+  return modelPath;
 }
 
-// ── Shared helpers ─────────────────────────────────────────────────
+QString LlamaChatBackend::resolveMmprojPath(const QString &modelPath) const {
+  QString dir = QFileInfo(modelPath).absoluteDir().absolutePath();
+  QString stem = QFileInfo(modelPath).completeBaseName();
 
-struct llama_sampler *LlamaChatBackend::createSampler() const {
-  auto *smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
-  llama_sampler_chain_add(smpl, llama_sampler_init_top_k(TopK));
-  llama_sampler_chain_add(smpl, llama_sampler_init_top_p(TopP, 1));
-  if (Temperature > 0.0f) {
-    llama_sampler_chain_add(smpl, llama_sampler_init_temp(Temperature));
-  } else {
-    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
-  }
-  llama_sampler_chain_add(smpl, llama_sampler_init_dist(1234));
-  return smpl;
-}
+  QStringList candidates;
 
-QString LlamaChatBackend::generateTokens(struct llama_sampler *smpl) {
-  const auto *vocab = llama_model_get_vocab(m_llamaModel);
-
-  std::vector<llama_token> generated;
-  generated.reserve(MaxGenTokens);
-  bool hitEos = false;
-
-  for (int i = 0; i < MaxGenTokens; i++) {
-    llama_token nextTok = llama_sampler_sample(smpl, m_llamaCtx, -1);
-    generated.push_back(nextTok);
-
-    if (llama_vocab_is_eog(vocab, nextTok) || i == MaxGenTokens - 1) {
-      hitEos = true;
-      break;
-    }
-
-    llama_batch single = llama_batch_get_one(&nextTok, 1);
-    if (llama_decode(m_llamaCtx, single) != 0) {
-      qWarning() << "[LlamaChatBackend] Generation decode failed at step" << i;
-      llama_batch_free(single);
-      break;
-    }
-    llama_batch_free(single);
-  }
-
-  QString result;
-  for (llama_token t : generated) {
-    std::array<char, 32> buf;
-    int len = llama_token_to_piece(vocab, t, buf.data(),
-                                   static_cast<int32_t>(buf.size()), 0, true);
-    if (len > 0) {
-      result.append(QString::fromUtf8(buf.data(), len));
+  QDir modelDir(dir);
+  modelDir.setFilter(QDir::Files | QDir::NoDotAndDotDot);
+  for (const QFileInfo &fi : modelDir.entryInfoList()) {
+    if (fi.fileName().contains("mmproj", Qt::CaseInsensitive)) {
+      candidates << fi.absoluteFilePath();
     }
   }
 
-  qDebug() << "[LlamaChatBackend] Generated" << generated.size() << "tokens"
-           << (hitEos ? "(EOS)" : "(max_tokens)");
-  emit statusUpdated(QString("Generated %1 tokens").arg(generated.size()));
+  QString appDir = QCoreApplication::applicationDirPath();
+  candidates << appDir + "/Models/Mmproj/" + stem + "-mmproj.gguf"
+             << appDir + "/Models/Mmproj/mmproj.gguf";
 
-  return result;
+  for (const QString &c : candidates) {
+    if (QFile::exists(c)) {
+      qDebug() << "[LlamaChatBackend] Found mmproj:" << c;
+      return c;
+    }
+  }
+
+  qDebug() << "[LlamaChatBackend] No mmproj found for model:" << modelPath;
+  return QString();
 }

@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
+#include <vector>
 
 /// One page image as raw RGB pixels (no base64).
 struct PageImage {
@@ -34,23 +35,23 @@ public:
   void unloadModel();
   QString modelPath() const { return m_modelPath; }
 
-  /// Run summarization with a rich payload (text + images).
   QString summarize(const PromptPayload &payload);
-
-  /// Run raw chat completion from system + user prompts.
   QString generate(const QString &systemPrompt, const QString &userPrompt);
 
 signals:
   void statusUpdated(const QString &msg);
 
 private:
+  QString runMultimodalInference(const QString &formattedText,
+                                 const std::vector<PageImage> &images);
+  QString runTextInference(const QString &formattedText);
+
+  QString buildFormattedPrompt(const PromptPayload &payload, int32_t maxChars);
+  QString applyChatTemplate(const QString &systemPrompt,
+                            const QString &userMessage);
+
   QString resolveModelPath(const QString &modelPath) const;
   QString resolveMmprojPath(const QString &modelPath) const;
-  QString buildFormattedPrompt(const PromptPayload &payload, int32_t maxChars);
-  QString runInference(const QString &formattedText,
-                       const std::vector<PageImage> &pageImages);
-  struct llama_sampler *createSampler() const;
-  QString generateTokens(struct llama_sampler *smpl);
 
   struct llama_context *m_llamaCtx = nullptr;
   struct llama_model *m_llamaModel = nullptr;
@@ -58,7 +59,6 @@ private:
   QString m_modelPath;
   QString m_mmprojPath;
 
-  // Multimodal (mtmd) state
   struct mtmd_context *m_mtmdCtx = nullptr;
   bool m_hasVision = false;
 
