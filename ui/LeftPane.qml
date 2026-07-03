@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
+import QtQuick.Controls.Basic
 import QtQuick.Dialogs
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {

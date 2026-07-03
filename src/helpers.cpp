@@ -21,10 +21,46 @@
 
 namespace SummaryHelpers {
 
-PaperSummary parseSummaryJson(const QString &json) {
+PaperSummary parseSummaryJson(const QString &raw) {
   PaperSummary summary;
+
+  QString text = raw;
+
+  // 1. Strip markdown code fences FIRST ( ```json ... ```  or  ``` ... ``` )
+  {
+    int firstFence = text.indexOf("```");
+    if (firstFence >= 0) {
+      text = text.mid(firstFence + 3);
+      // Skip the language tag line (e.g. "json\n")
+      int nl = text.indexOf('\n');
+      if (nl >= 0 && nl < 10) {
+        text = text.mid(nl + 1);
+      }
+      // Remove the closing fence and anything after
+      int lastFence = text.lastIndexOf("```");
+      if (lastFence > 0) {
+        text = text.mid(0, lastFence);
+      }
+    }
+  }
+
+  // 2. Strip reasoning/thinking prefix — jump straight to the first '{'
+  {
+    int bracePos = text.indexOf('{');
+    if (bracePos > 0) {
+      text = text.mid(bracePos);
+    }
+    // Also ensure the closing '}' is the last meaningful char
+    int endBrace = text.lastIndexOf('}');
+    if (endBrace > 0) {
+      text = text.mid(0, endBrace + 1);
+    }
+  }
+
+  text = text.trimmed();
+
   QJsonParseError err;
-  QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8(), &err);
+  QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8(), &err);
   if (err.error != QJsonParseError::NoError) {
     qWarning() << "[SummaryHelpers] JSON parse error:" << err.errorString();
     return summary;

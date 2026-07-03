@@ -1,7 +1,8 @@
 #include "headers/llama_chat_backend.h"
 
+#include "headers/llama_inference_engine.h"
+
 #include "llama.h"
-#include "mtmd-helper.h"
 #include "mtmd.h"
 
 #include <QByteArray>
@@ -161,19 +162,57 @@ QString LlamaChatBackend::generate(const QString &systemPrompt,
 // ── Text-only inference ────────────────────────────────────────────
 
 QString LlamaChatBackend::runTextInference(const QString &formattedText) {
-  qWarning() << "[LlamaChatBackend] Text-only inference not yet implemented";
-  return QString();
+  InferenceParams params;
+  params.max_tokens = MaxGenTokens;
+  params.temperature = Temperature;
+  params.top_k = TopK;
+  params.top_p = TopP;
+
+  LlamaInferenceEngine engine(m_llamaCtx, m_llamaModel, params);
+  QString result = engine.inferText(formattedText);
+
+  if (result.isEmpty()) {
+    qWarning() << "[LlamaChatBackend] Text inference returned empty output";
+  }
+  return result;
 }
 
-// ── Multimodal inference (TODO) ────────────────────────────────────
+// ── Multimodal inference ──────────────────────────────────────────
 
 QString
 LlamaChatBackend::runMultimodalInference(const QString &formattedText,
                                          const std::vector<PageImage> &images) {
-  Q_UNUSED(formattedText);
-  Q_UNUSED(images);
-  qWarning() << "[LlamaChatBackend] Multimodal inference not yet implemented";
-  return QString();
+  if (!m_mtmdCtx || !m_hasVision) {
+    qWarning() << "[LlamaChatBackend] Multimodal inference requested but "
+                  "vision not available";
+    return QString();
+  }
+
+  // PageImage and RawImage share the same layout (width, height, data).
+  // The engine handles mtmd_bitmap creation internally.
+  std::vector<RawImage> rawImages;
+  rawImages.reserve(images.size());
+  for (const auto &img : images) {
+    rawImages.push_back({img.width, img.height, img.data});
+  }
+
+  qDebug() << "[LlamaChatBackend] Multimodal inference with" << rawImages.size()
+           << "images";
+
+  InferenceParams params;
+  params.max_tokens = MaxGenTokens;
+  params.temperature = Temperature;
+  params.top_k = TopK;
+  params.top_p = TopP;
+
+  LlamaInferenceEngine engine(m_llamaCtx, m_llamaModel, params);
+  QString result = engine.inferMultimodal(formattedText, rawImages, m_mtmdCtx);
+
+  if (result.isEmpty()) {
+    qWarning()
+        << "[LlamaChatBackend] Multimodal inference returned empty output";
+  }
+  return result;
 }
 
 // ── Prompt building ────────────────────────────────────────────────

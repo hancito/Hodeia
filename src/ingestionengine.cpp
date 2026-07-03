@@ -195,7 +195,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
           QString("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
 
-      if (m_vecManager && m_vecManager->isReady()) {
+      if (m_vecManager) {
+        // insertChunks() has its own lazy-load guard — it will call
+        // initialize() if m_ready is false.
         ingestChunks(allChunks, dbPath);
       } else {
         emit status("Warning: embedding model not loaded, skipping vector "

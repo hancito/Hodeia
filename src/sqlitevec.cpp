@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QMutex>
 #include <QThread>
 #include <algorithm>
 
@@ -59,6 +60,18 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   }
 
   emit statusUpdated(QString("Loading embedding model: %1").arg(resolvedPath));
+
+  // Init llama backends on this thread if not already done.
+  static QMutex initMutex;
+  {
+    QMutexLocker lock(&initMutex);
+    static bool s_initialized = false;
+    if (!s_initialized) {
+      ggml_backend_load_all();
+      llama_backend_init();
+      s_initialized = true;
+    }
+  }
 
   QByteArray pathUtf8 = resolvedPath.toUtf8();
 
@@ -214,9 +227,9 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
     return 0;
   // Lazy load on first use.
   if (!m_ready && !initialize())
-    return 0;
+    return -1;
   if (!m_ready)
-    return 0;
+    return -1;
 
   int totalInserted = 0;
 
