@@ -2,7 +2,6 @@
 
 #include <QObject>
 #include <QString>
-#include <QStringList>
 #include <vector>
 
 // The MOC scanner needs to know what llama_token is before it parses
@@ -16,15 +15,11 @@ typedef int32_t llama_token;
 struct llama_context;
 struct llama_model;
 struct mtmd_context;
-
-/// Raw RGB image — no dependency on any external library.
-struct RawImage {
-  int width;
-  int height;
-  std::vector<unsigned char> data; ///< RGB888, width*height*3 bytes
-};
+struct PageImage;
 
 /// Sampling parameters for the inference engine.
+/// These map directly to the sampler chain stages: penalties → temp →
+/// top_k → top_p → min_p → greedy/dist selector.
 struct InferenceParams {
   int32_t max_tokens = 4096;
   float temperature = 0.1f;
@@ -34,8 +29,8 @@ struct InferenceParams {
   float penalty_repeat = 1.1f;
   int32_t penalty_last_n = 64;
   uint32_t seed = 0;
-  int32_t n_threads = 0; // 0 = idealThreadCount()
-  QString stop_sequence; // optional early-stop string
+  int32_t n_threads = 0; ///< 0 = idealThreadCount()
+  QString stop_sequence; ///< optional early-stop string
 };
 
 /// C++ wrapper around llama.cpp / mtmd that handles tokenization →
@@ -46,6 +41,12 @@ struct InferenceParams {
 /// are managed by the caller (LlamaChatBackend).  Callers pass a
 /// fully initialised context; the engine uses it for one inference
 /// pass (prompt + generation) and returns.
+///
+/// Key design: the prompt decoding and token generation are split into
+/// two phases.  inferText()/inferMultimodal() fill the KV cache with the
+/// prompt, then the shared generate() loop samples tokens one at a time.
+/// This separation lets both text-only and multimodal paths reuse the
+/// same generation logic.
 ///
 /// All llama.h / mtmd.h details are hidden inside this class; callers
 /// never touch those headers directly.
@@ -67,7 +68,7 @@ public:
   /// injected.  `images` are raw RGB pixel buffers.  `mctx` is the
   /// mtmd multimodal context (loaded alongside the mmproj).
   QString inferMultimodal(const QString &prompt,
-                          const std::vector<RawImage> &images,
+                          const std::vector<PageImage> &images,
                           struct mtmd_context *mctx);
 
 signals:
@@ -94,6 +95,7 @@ private:
   struct llama_model *m_model = nullptr;
   const struct llama_vocab *m_vocab = nullptr;
   struct llama_sampler *m_chain = nullptr;
+  int32_t m_n_batch = 0; ///< max tokens per llama_decode() call
   InferenceParams m_params;
-  mutable std::vector<char> m_pieceBuf;
+  mutable std::vector<char> m_pieceBuf; ///< reusable detokenization buffer
 };

@@ -1,4 +1,5 @@
 #include "headers/llama_inference_engine.h"
+#include "headers/llama_chat_backend.h"
 
 #include "llama.h"
 #include "mtmd-helper.h"
@@ -7,27 +8,36 @@
 #include <QDebug>
 #include <QThread>
 #include <algorithm>
-#include <cstring>
-#include <string>
 #include <vector>
 
-using namespace std::chrono_literals;
-
+/// Construct the engine and build the sampler chain.
+/// The engine captures raw pointers to the context/model (owned by the
+/// backend) and initialises a sampler chain from the inference params.
 LlamaInferenceEngine::LlamaInferenceEngine(struct llama_context *ctx,
                                            struct llama_model *model,
                                            const InferenceParams &params,
                                            QObject *parent)
     : QObject(parent), m_ctx(ctx), m_model(model),
-      m_vocab(llama_model_get_vocab(model)), m_params(params) {
+      m_vocab(llama_model_get_vocab(model)), m_n_batch(llama_n_batch(ctx)),
+      m_params(params) {
   if (m_params.n_threads == 0) {
     m_params.n_threads = QThread::idealThreadCount();
   }
-  m_pieceBuf.resize(32);
+  m_pieceBuf.resize(32); // pre-allocate detokenization buffer
   buildSampler();
 }
 
 // ── Sampler chain construction ────────────────────────────────────
 
+/// Build a pipeline of samplers that transform raw logits into a token
+/// selection.  The chain runs in this order:
+///
+///   penalties → temp → top_k → top_p → min_p → greedy/dist
+///
+/// Each stage modifies the logit distribution before passing it to the
+/// next.  The final stage (greedy or dist) picks the actual token.
+/// This pipeline approach lets us combine multiple sampling strategies
+/// without any single one dominating.
 void LlamaInferenceEngine::buildSampler() {
   auto chainParams = llama_sampler_chain_default_params();
   m_chain = llama_sampler_chain_init(chainParams);
@@ -79,6 +89,13 @@ LlamaInferenceEngine::~LlamaInferenceEngine() { freeSampler(); }
 
 // ── Text-only inference ───────────────────────────────────────────
 
+/// Tokenize the prompt, decode it into the KV cache (in n_batch-sized
+/// chunks), then hand off to the shared generate() loop.
+///
+/// The prompt is split into batches because llama_decode has an internal
+/// buffer whose size scales with n_batch.  If the prompt exceeds n_batch
+/// tokens, we process it in chunks to avoid allocating excessively large
+/// temporary buffers.
 QString LlamaInferenceEngine::inferText(const QString &prompt) {
   QByteArray data = prompt.toUtf8();
   const char *text = data.constData();
@@ -98,27 +115,37 @@ QString LlamaInferenceEngine::inferText(const QString &prompt) {
 
   qDebug() << "[LlamaInferenceEngine] Prompt tokens:" << nTokens;
 
-  // Decode the prompt in one batch
-  llama_batch batch = llama_batch_init(nTokens, 0, 1);
-  batch.n_tokens = nTokens;
+  // Decode the prompt in chunks that fit within n_batch.
+  // Each chunk advances the position counter so the KV cache keeps track
+  // of absolute positions (required for RoPE embeddings).
+  // We only request logits at the very last token of the final chunk —
+  // all intermediate positions are just being cached, not sampled.
+  for (int32_t i = 0; i < nTokens; i += m_n_batch) {
+    int32_t nCurr = std::min(m_n_batch, nTokens - i);
+    bool lastChunk = (i + nCurr >= nTokens);
 
-  for (int32_t i = 0; i < nTokens; ++i) {
-    batch.token[i] = tokens[i];
-    batch.pos[i] = i;
-    batch.seq_id[i][0] = 0;
-    batch.n_seq_id[i] = 1;
-    batch.logits[i] = false; // we only need logits for the last position
-  }
-  // We need logits at the last position to start sampling
-  batch.logits[nTokens - 1] = true;
+    llama_batch batch = llama_batch_init(nCurr, 0, 1);
+    batch.n_tokens = nCurr;
 
-  int32_t res = llama_decode(m_ctx, batch);
-  llama_batch_free(batch);
+    for (int32_t j = 0; j < nCurr; ++j) {
+      batch.token[j] = tokens[i + j];
+      batch.pos[j] = i + j;
+      batch.seq_id[j][0] = 0;
+      batch.n_seq_id[j] = 1;
+      batch.logits[j] = false;
+    }
+    // Need logits at the last position of the final chunk.
+    if (lastChunk)
+      batch.logits[nCurr - 1] = true;
 
-  if (res != 0) {
-    qCritical() << "[LlamaInferenceEngine] Prompt decode failed with error:"
-                << res;
-    return QString();
+    int32_t res = llama_decode(m_ctx, batch);
+    llama_batch_free(batch);
+
+    if (res != 0) {
+      qCritical() << "[LlamaInferenceEngine] Prompt decode failed at offset"
+                  << i << "with error:" << res;
+      return QString();
+    }
   }
 
   return generate();
@@ -126,9 +153,19 @@ QString LlamaInferenceEngine::inferText(const QString &prompt) {
 
 // ── Multimodal inference ──────────────────────────────────────────
 
+/// Tokenize the prompt + images together using mtmd, which produces
+/// interleaved text and image chunks.  Each image is encoded through the
+/// vision encoder (Siglip) and its embeddings are decoded at the position
+/// of the media marker in the prompt.
+///
+/// The key difference from text-only inference:
+///   - mtmd_tokenize replaces media markers with image token slots
+///   - mtmd_helper_eval_chunks handles the mixed text/image decode loop
+///     (text → normal decode, images → vision encode + embedding decode)
+///   - M-RoPE positions are tracked by mtmd_helper_eval_chunks
 QString
 LlamaInferenceEngine::inferMultimodal(const QString &prompt,
-                                      const std::vector<RawImage> &images,
+                                      const std::vector<PageImage> &images,
                                       struct mtmd_context *mctx) {
 
   if (!mctx || !mtmd_support_vision(mctx)) {
@@ -137,7 +174,7 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
     return QString();
   }
 
-  // Convert RawImage → mtmd_bitmap internally
+  // Convert PageImage → mtmd_bitmap (wraps the raw pixel buffer, no copy).
   std::vector<const mtmd_bitmap *> bitmaps;
   bitmaps.reserve(images.size());
 
@@ -215,6 +252,14 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
 
 // ── Shared generation loop ────────────────────────────────────────
 
+/// Autoregressive token generation.  The prompt has already been decoded
+/// into the KV cache; we sample tokens one at a time until EOS, a stop
+/// sequence, or the token budget is exhausted.
+///
+/// Position tracking: instead of passing n_past explicitly, we query the
+/// KV cache for the highest occupied position via llama_memory_seq_pos_max.
+/// This works uniformly for both text-only and multimodal paths because
+/// mtmd_helper_eval_chunks already wrote its position into the cache.
 QString LlamaInferenceEngine::generate() {
   QString output;
 
@@ -224,8 +269,10 @@ QString LlamaInferenceEngine::generate() {
   const auto eotToken = llama_vocab_eot(m_vocab);
 
   // Query the KV cache to find where the prompt left off.
-  // This works for both text-only (pos_max == n_prompt_tokens-1)
-  // and multimodal (pos_max == n_past from mtmd_helper_eval_chunks).
+  // We use seq_pos_max on sequence 0 (the only sequence we use) to get
+  // the last position written.  Adding 1 gives us the next free slot.
+  // This is more robust than tracking nPast manually because it works
+  // correctly even when the prompt path changes (text vs multimodal).
   llama_pos nPast = 0;
   {
     auto mem = llama_get_memory(m_ctx);
@@ -238,10 +285,12 @@ QString LlamaInferenceEngine::generate() {
   int32_t tokenCount = 0;
 
   for (int32_t i = 0; i < m_params.max_tokens; ++i) {
-    // Sample next token from logits at the last position
+    // Sample next token from logits at the last position (-1 = last).
+    // The sampler chain applies all configured transformations (temp,
+    // top-k, top-p, etc.) before picking the token.
     llama_token tokenId = llama_sampler_sample(m_chain, m_ctx, -1);
 
-    // Accept into sampler state (penalties, grammar, etc.)
+    // Accept into sampler state so penalty trackers know what was emitted.
     llama_sampler_accept(m_chain, tokenId);
 
     // Check for EOS / EOT
@@ -298,6 +347,10 @@ bool LlamaInferenceEngine::shouldStop(const QString &output) const {
   return output.endsWith(m_params.stop_sequence);
 }
 
+/// Convert a single token id back to its UTF-8 string representation.
+/// Uses a reusable buffer (m_pieceBuf) to avoid per-token allocations.
+/// The lstrip_space flag strips the leading-space prefix that BPE tokenizers
+/// add to continuation tokens — this keeps output readable.
 QString LlamaInferenceEngine::tokenToPiece(llama_token tok) const {
   m_pieceBuf.resize(32);
   int32_t n = llama_token_to_piece(m_vocab, tok, m_pieceBuf.data(),

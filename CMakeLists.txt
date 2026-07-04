@@ -132,7 +132,7 @@ set(SQLITEVEC_LIB ${EXTERNAL}/lib/sqlitevec)
 
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}            # for headers/*.h
-    ${LLAMA_INC}                   # for #include "llama.h"
+    ${LLAMA_INC}                   # for #include "llama.h", "common/*.h", "nlohmann/json.hpp"
     ${EXTERNAL}/include            # for #include <Sqlite3/sqlite3.h>, <mupdf/fitz.h>
     ${SQLITEVEC_INC}               # for #include "sqlitevec.h"
     ${CMAKE_SOURCE_DIR}/src/thrdprty
@@ -177,6 +177,7 @@ list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libmtmd.so.0.0.0")
 # NOT pull in its NEEDED dependencies for symbol resolution).
 # Order matters: dependents first, providers last.
 set(LLAMA_GGML_LIBS
+    ${LLAMA_DIR}/libllama-common.so.0.0.0
     ${LLAMA_DIR}/libllama.so.0.0.0
     ${LLAMA_DIR}/libmtmd.so.0.0.0
     ${LLAMA_DIR}/libggml.so.${GGML_SO_VER}
@@ -275,6 +276,10 @@ add_custom_command(TARGET Paperize POST_BUILD
         libmtmd.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libmtmd.so.0
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         libmtmd.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libmtmd.so
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        libllama-common.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libllama-common.so.0
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        libllama-common.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libllama-common.so
     COMMENT "Creating llama.cpp .so symlinks"
 )
 
@@ -304,7 +309,7 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     "DIR=\"$1\"\n"
     "for f in \"$DIR\"/libllama.so.0.0.0 \"$DIR\"/libggml.so.${GGML_SO_VER}"
     " \"$DIR\"/libggml-base.so.${GGML_SO_VER} \"$DIR\"/libggml-cpu.so.${GGML_SO_VER}"
-    " \"$DIR\"/libmtmd.so.0.0.0"
+    " \"$DIR\"/libmtmd.so.0.0.0 \"$DIR\"/libllama-common.so.0.0.0"
 )
 if(LLAMA_VARIANT STREQUAL "cuda")
   file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"

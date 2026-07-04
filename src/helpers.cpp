@@ -59,10 +59,33 @@ PaperSummary parseSummaryJson(const QString &raw) {
 
   text = text.trimmed();
 
+  // Quick sanity before parsing.
+  if (!text.startsWith("{") && !text.startsWith("```")) {
+    int bracePos = text.indexOf('{');
+    if (bracePos < 0) {
+      qWarning() << "[SummaryHelpers] No JSON object found in output (length:"
+                 << raw.length() << ")";
+      qWarning() << "[SummaryHelpers] start:" << raw;
+      return summary;
+    }
+    // If the JSON starts very late, the response was likely truncated.
+    if (bracePos > raw.length() * 0.5) {
+      qWarning() << "[SummaryHelpers] JSON brace at position" << bracePos
+                 << "of" << raw.length() << "— response likely truncated";
+    }
+  }
+
   QJsonParseError err;
   QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8(), &err);
   if (err.error != QJsonParseError::NoError) {
     qWarning() << "[SummaryHelpers] JSON parse error:" << err.errorString();
+    qWarning() << "[SummaryHelpers] offset:" << err.offset << "| context:"
+               << text.mid(qMax(0, err.offset - 30), 60).replace('\n', " ");
+    qWarning() << "[SummaryHelpers] raw length:" << raw.length()
+               << "| cleaned length:" << text.length();
+    if (text.length() < 200) {
+      qWarning() << "[SummaryHelpers] full cleaned text:" << text;
+    }
     return summary;
   }
   QJsonObject obj = doc.object();
