@@ -97,6 +97,9 @@ LlamaInferenceEngine::~LlamaInferenceEngine() { freeSampler(); }
 /// tokens, we process it in chunks to avoid allocating excessively large
 /// temporary buffers.
 QString LlamaInferenceEngine::inferText(const QString &prompt) {
+  // Clear stale KV cache from any previous inference on this context.
+  clearKvCache();
+
   QByteArray data = prompt.toUtf8();
   const char *text = data.constData();
   int32_t textLen = static_cast<int32_t>(data.size());
@@ -167,6 +170,9 @@ QString
 LlamaInferenceEngine::inferMultimodal(const QString &prompt,
                                       const std::vector<PageImage> &images,
                                       struct mtmd_context *mctx) {
+
+  // Clear stale KV cache from any previous inference on this context.
+  clearKvCache();
 
   if (!mctx || !mtmd_support_vision(mctx)) {
     qWarning() << "[LlamaInferenceEngine] Multimodal requested but vision "
@@ -336,6 +342,13 @@ QString LlamaInferenceEngine::generate() {
   }
 
   return output;
+}
+
+// ── KV cache management ──────────────────────────────────────────
+
+void LlamaInferenceEngine::clearKvCache() {
+  auto mem = llama_get_memory(m_ctx);
+  llama_memory_clear(mem, true);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

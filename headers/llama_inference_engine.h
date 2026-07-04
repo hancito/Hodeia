@@ -84,6 +84,9 @@ private:
   /// cache; this samples tokens until EOS or a stop condition.
   QString generate();
 
+  /// Clear the KV cache so each inference starts from a clean slate.
+  void clearKvCache();
+
   /// Check whether the accumulated output ends with stop_sequence.
   bool shouldStop(const QString &output) const;
 
