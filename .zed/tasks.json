@@ -2,7 +2,7 @@
 [
   {
     "label": "CMake: Configure",
-    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug",
+    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug ",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -20,7 +20,7 @@
   },
   {
     "label": "Build & Run",
-    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build && ./build/Paperize",
+    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug   && cmake --build build && ./build/Paperize",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",

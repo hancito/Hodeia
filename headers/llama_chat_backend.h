@@ -7,6 +7,13 @@
 
 struct common_init_result;
 struct common_chat_templates;
+struct common_params;
+
+// MOC scanner needs a type for detectBestDevice() return value.
+#ifndef GGML_BACKEND_H
+struct ggml_backend_device {};
+using ggml_backend_dev_t = ggml_backend_device *;
+#endif
 
 /// Opaque returned by common_init_from_params; wrapped in a unique_ptr so
 /// the model + context are automatically freed when the backend unloads.
@@ -105,6 +112,22 @@ private:
   bool loadMmproj();
   /// Unload the projector to free its GPU VRAM.
   void unloadMmproj();
+
+  /// Build and probe a common_init_result from params (including hybrid FA
+  /// re-init).  Returns nullptr on failure.
+  common_init_result_ptr createInitResult(common_params &params,
+                                          bool hasMmprojOnGpu);
+
+  /// Detect which backend device to target (CUDA, Vulkan, CPU).
+  ggml_backend_dev_t detectBestDevice();
+
+  /// Backend-specific model loaders.
+  common_init_result_ptr loadModelCuda(const QString &path,
+                                       const QString &mmprojPath);
+  common_init_result_ptr loadModelVulkan(const QString &path,
+                                         const QString &mmprojPath);
+  common_init_result_ptr loadModelCpu(const QString &path,
+                                      const QString &mmprojPath);
 
   /// libcommon init result — owns the llama_model + llama_context.
   common_init_result_ptr m_commonInit;

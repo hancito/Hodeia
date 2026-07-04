@@ -128,7 +128,6 @@ set(EXTERNAL      ${CMAKE_SOURCE_DIR}/external)
 set(LLAMA_INC     ${EXTERNAL}/include/llamacpp)
 set(SQLITEVEC_INC ${EXTERNAL}/include/SqliteVec)
 set(MUPDF_LIB     ${EXTERNAL}/lib)
-set(SQLITEVEC_LIB ${EXTERNAL}/lib/sqlitevec)
 
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}            # for headers/*.h
@@ -139,103 +138,144 @@ target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}/src/thrdprty
 )
 
-# ── llama.cpp shared library selection (cuda > vulkan > cpu) ────────
-set(LLAMA_BASE ${EXTERNAL}/lib/llamacpp)
-
-# Detect CUDA toolkit on the host
-find_library(HOST_CUDART  cudart  PATHS /opt/cuda/lib64 /usr/local/cuda/lib64 NO_DEFAULT_PATH)
-find_library(HOST_CUBLAS  cublas  PATHS /opt/cuda/lib64 /usr/local/cuda/lib64 NO_DEFAULT_PATH)
-find_library(HOST_VULKAN  vulkan  PATHS /usr/lib /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
-
-if(HOST_CUDART AND HOST_CUBLAS AND EXISTS "${LLAMA_BASE}/cuda")
-  set(LLAMA_VARIANT cuda)
-elseif(HOST_VULKAN AND EXISTS "${LLAMA_BASE}/vulkan")
-  set(LLAMA_VARIANT vulkan)
-else()
-  set(LLAMA_VARIANT cpu)
-endif()
-message(STATUS "llama.cpp variant: ${LLAMA_VARIANT}")
-
-set(LLAMA_DIR "${LLAMA_BASE}/${LLAMA_VARIANT}")
-
-# GGml shared library version (keep in sync with external/lib/llamacpp/<variant>/)
-set(GGML_SO_VER 0.15.3)
-
-# Only real (non-symlink) .so files — the linker follows SONAME from these
-file(GLOB LLAMA_REAL_SO "${LLAMA_DIR}/lib*.so.*.*")
-# Also grab any backend-specific real .so with the right version pattern
-if(LLAMA_VARIANT STREQUAL "cuda")
-  list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-cuda.so.${GGML_SO_VER}")
-elseif(LLAMA_VARIANT STREQUAL "vulkan")
-  list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libggml-vulkan.so.${GGML_SO_VER}")
-endif()
-
-# Include libmtmd in the shared library set
-list(APPEND LLAMA_REAL_SO "${LLAMA_DIR}/libmtmd.so.0.0.0")
-
-# Link all llama.cpp / ggml shared libraries explicitly so the linker can
-# resolve transitive undefined symbols (linking a .so by absolute path does
-# NOT pull in its NEEDED dependencies for symbol resolution).
-# Order matters: dependents first, providers last.
-set(LLAMA_GGML_LIBS
-    ${LLAMA_DIR}/libllama-common.so.0.0.0
-    ${LLAMA_DIR}/libllama.so.0.0.0
-    ${LLAMA_DIR}/libmtmd.so.0.0.0
-    ${LLAMA_DIR}/libggml.so.${GGML_SO_VER}
-    ${LLAMA_DIR}/libggml-base.so.${GGML_SO_VER}
-    ${LLAMA_DIR}/libggml-cpu.so.${GGML_SO_VER}
-)
-if(LLAMA_VARIANT STREQUAL "cuda")
-  list(APPEND LLAMA_GGML_LIBS "${LLAMA_DIR}/libggml-cuda.so.${GGML_SO_VER}")
-elseif(LLAMA_VARIANT STREQUAL "vulkan")
-  list(APPEND LLAMA_GGML_LIBS "${LLAMA_DIR}/libggml-vulkan.so.${GGML_SO_VER}")
-endif()
-
-target_link_libraries(Paperize PRIVATE ${LLAMA_GGML_LIBS})
-
-# ── Link libraries (order: Qt, MuPDF, llama above) ─────────────────
 target_link_libraries(Paperize PRIVATE
     Qt6::Concurrent
     Qt6::Network
     Qt6::Quick
     Qt6::QuickControls2
-
-    # MuPDF (PDF parsing)
     ${MUPDF_LIB}/libmupdf.a
     ${MUPDF_LIB}/libmupdf-third.a
     ${MUPDF_LIB}/libmupdf-threads.a
-
-    # System libraries
     pthread
     dl
     m
 )
 
-# OpenMP — required by ggml-cpu backend (all variants)
+# ── llama.cpp shared libraries (ship ALL backend variants) ─────────
+# The runtime decides which backend to use via ggml_backend_load_all().
+# We ship every .so that exists alongside the binary and let the user's
+# code pick CPU / CUDA / Vulkan at runtime.
+#
+# Override with: cmake -DLLAMA_FORCE_BACKEND=cpu  (or cuda / vulkan / all)
+# When set to cpu/cuda/vulkan, only that backend's .so is shipped and the
+# compile defines PAPERIZE_BACKEND_<CPU|CUDA|VULKAN> so the C++ code can
+# default to that device.
+option(LLAMA_FORCE_BACKEND "" "Force a single backend: cpu, cuda, vulkan (default=all)")
+
+set(LLAMA_BASE ${EXTERNAL}/lib/llamacpp)
+
+# Backend-specific libraries that differ per variant.
+set(GGML_SO_VER 0.15.3)
+
+# Decide which backends to ship: forced single variant or all available.
+set(SHIP_VARIANTS "")
+if(LLAMA_FORCE_BACKEND)
+  string(TOLOWER "${LLAMA_FORCE_BACKEND}" _force)
+  if(_force STREQUAL "cpu")
+    set(SHIP_VARIANTS "cpu")
+  elseif(_force STREQUAL "cuda")
+    set(SHIP_VARIANTS "cuda")
+  elseif(_force STREQUAL "vulkan")
+    set(SHIP_VARIANTS "vulkan")
+  else()
+    message(FATAL_ERROR "LLAMA_FORCE_BACKEND must be cpu, cuda, or vulkan, got: ${LLAMA_FORCE_BACKEND}")
+  endif()
+else()
+  set(SHIP_VARIANTS "cpu" "cuda" "vulkan")
+endif()
+message(STATUS "llama.cpp backends shipped: ${SHIP_VARIANTS}")
+
+# Collect backend-specific .so to ship.
+set(BACKEND_LIBS "")
+foreach(VARIANT IN LISTS SHIP_VARIANTS)
+  if(VARIANT STREQUAL "cpu")
+    continue() # cpu has no extra backend .so beyond ggml-cpu
+  endif()
+  if(EXISTS "${LLAMA_BASE}/${VARIANT}")
+    list(APPEND BACKEND_LIBS "${LLAMA_BASE}/${VARIANT}/libggml-${VARIANT}.so.${GGML_SO_VER}")
+  endif()
+endforeach()
+
+# Define compile flag so C++ knows which backends are available.
+foreach(VARIANT IN ITEMS cpu cuda vulkan)
+  list(FIND SHIP_VARIANTS "${VARIANT}" _idx)
+  if(_idx GREATER -1)
+    add_compile_definitions("PAPERIZE_BACKEND_${VARIANT}")
+  endif()
+endforeach()
+
+# Link: always link the common libs (pick any variant — they're identical).
+set(_LLAMA_LINK_DIR "${LLAMA_BASE}/cpu")
+foreach(VARIANT IN LISTS SHIP_VARIANTS)
+  if(EXISTS "${LLAMA_BASE}/${VARIANT}")
+    set(_LLAMA_LINK_DIR "${LLAMA_BASE}/${VARIANT}")
+    break()
+  endif()
+endforeach()
+
+set(LLAMA_GGML_LIBS
+    ${_LLAMA_LINK_DIR}/libllama-common.so.0.0.0
+    ${_LLAMA_LINK_DIR}/libllama.so.0.0.0
+    ${_LLAMA_LINK_DIR}/libmtmd.so.0.0.0
+    ${_LLAMA_LINK_DIR}/libggml.so.${GGML_SO_VER}
+    ${_LLAMA_LINK_DIR}/libggml-base.so.${GGML_SO_VER}
+    ${_LLAMA_LINK_DIR}/libggml-cpu.so.${GGML_SO_VER}
+)
+
+target_link_libraries(Paperize PRIVATE ${LLAMA_GGML_LIBS})
+
+# System libs — only link for shipped variants.
+find_library(HOST_VULKAN  vulkan  PATHS /usr/lib /usr/lib/x86_64-linux-gnu NO_DEFAULT_PATH)
+find_library(HOST_CUDA    cuda    PATHS /usr/lib/x86_64-linux-gnu /usr/lib NO_DEFAULT_PATH)
+find_library(HOST_NCCL    nccl    PATHS /usr/lib/x86_64-linux-gnu /usr/lib /opt/cuda/lib64 NO_DEFAULT_PATH)
+
+list(FIND SHIP_VARIANTS "cuda" _cuda_idx)
+if(_cuda_idx GREATER -1)
+  if(HOST_CUDA)
+    target_link_libraries(Paperize PRIVATE ${HOST_CUDA})
+  endif()
+  if(HOST_NCCL)
+    target_link_libraries(Paperize PRIVATE ${HOST_NCCL})
+  endif()
+endif()
+
+list(FIND SHIP_VARIANTS "vulkan" _vulkan_idx)
+if(_vulkan_idx GREATER -1 AND HOST_VULKAN)
+  message(STATUS "Vulkan backend available — linking ${HOST_VULKAN}")
+  target_link_libraries(Paperize PRIVATE ${HOST_VULKAN})
+endif()
+
+# OpenMP — required by ggml-cpu backend
 find_package(OpenMP QUIET)
 if(OpenMP_CXX_FOUND)
   message(STATUS "OpenMP found")
   target_link_libraries(Paperize PRIVATE OpenMP::OpenMP_C)
 endif()
 
-# CUDA syslibs — required at runtime by the CUDA variant
-if(LLAMA_VARIANT STREQUAL "cuda")
-  find_library(CUDA_LIB  cuda      PATHS /usr/lib/x86_64-linux-gnu /usr/lib NO_DEFAULT_PATH)
-  find_library(NCCL_LIB  nccl      PATHS /usr/lib/x86_64-linux-gnu /usr/lib /opt/cuda/lib64 NO_DEFAULT_PATH)
-  if(CUDA_LIB)
-    target_link_libraries(Paperize PRIVATE ${CUDA_LIB})
-  endif()
-  if(NCCL_LIB)
-    target_link_libraries(Paperize PRIVATE ${NCCL_LIB})
-  endif()
-endif()
+# Copy llama.cpp shared libraries to build directory.
+# The base libs (llama, ggml, ggml-base, ggml-cpu, mtmd, llama-common) are
+# identical across variants — copy from the first available one.
+add_custom_command(TARGET Paperize POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${_LLAMA_LINK_DIR}/libllama.so.0.0.0
+        ${_LLAMA_LINK_DIR}/libllama-common.so.0.0.0
+        ${_LLAMA_LINK_DIR}/libmtmd.so.0.0.0
+        ${_LLAMA_LINK_DIR}/libggml.so.${GGML_SO_VER}
+        ${_LLAMA_LINK_DIR}/libggml-base.so.${GGML_SO_VER}
+        ${_LLAMA_LINK_DIR}/libggml-cpu.so.${GGML_SO_VER}
+        $<TARGET_FILE_DIR:Paperize>
+    COMMENT "Copying llama.cpp base .so"
+)
 
-# Vulkan syslib — required at runtime by the Vulkan variant
-if(LLAMA_VARIANT STREQUAL "vulkan")
-  if(HOST_VULKAN)
-    message(STATUS "Vulkan found — linking ${HOST_VULKAN}")
-    target_link_libraries(Paperize PRIVATE ${HOST_VULKAN})
-  endif()
+# Copy every backend-specific .so (cuda, vulkan) alongside the binary.
+# ggml_backend_load_all() discovers them dynamically at runtime.
+if(BACKEND_LIBS)
+  add_custom_command(TARGET Paperize POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${BACKEND_LIBS}
+          $<TARGET_FILE_DIR:Paperize>
+      COMMENT "Copying llama.cpp backend .so (${SHIP_VARIANTS})"
+  )
 endif()
 
 # Copy sqlite-vec extension to build directory
@@ -246,16 +286,7 @@ add_custom_command(TARGET Paperize POST_BUILD
     COMMENT "Copying sqlite-vec extension"
 )
 
-# Copy llama.cpp real (non-symlink) shared libraries to build directory
-add_custom_command(TARGET Paperize POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${LLAMA_REAL_SO}
-    $<TARGET_FILE_DIR:Paperize>
-    COMMENT "Copying llama.cpp ${LLAMA_VARIANT} .so"
-)
-
-# Recreate symlinks next to the binary so the dynamic linker resolves them
-# libNAME.so -> libNAME.so.0 -> libNAME.so.0.X.Y
+# Recreate symlinks next to the binary so the dynamic linker resolves them.
 add_custom_command(TARGET Paperize POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         libllama.so.0.0.0 $<TARGET_FILE_DIR:Paperize>/libllama.so.0
@@ -284,8 +315,9 @@ add_custom_command(TARGET Paperize POST_BUILD
     COMMENT "Creating llama.cpp .so symlinks"
 )
 
-# Backend-specific symlinks
-if(LLAMA_VARIANT STREQUAL "cuda")
+# Backend-specific symlinks — create for every shipped variant.
+list(FIND SHIP_VARIANTS "cuda" _cuda_idx)
+if(_cuda_idx GREATER -1)
   add_custom_command(TARGET Paperize POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
             libggml-cuda.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so.0
@@ -293,7 +325,9 @@ if(LLAMA_VARIANT STREQUAL "cuda")
             libggml-cuda.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-cuda.so
         COMMENT "Creating libggml-cuda symlinks"
     )
-elseif(LLAMA_VARIANT STREQUAL "vulkan")
+endif()
+list(FIND SHIP_VARIANTS "vulkan" _vulkan_idx)
+if(_vulkan_idx GREATER -1)
   add_custom_command(TARGET Paperize POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
             libggml-vulkan.so.${GGML_SO_VER} $<TARGET_FILE_DIR:Paperize>/libggml-vulkan.so.0
@@ -303,8 +337,7 @@ elseif(LLAMA_VARIANT STREQUAL "vulkan")
     )
 endif()
 
-# Fix rpath of all real .so so they find each other via $ORIGIN
-# Written at configure time to a temp script to avoid cmake expanding $ORIGIN
+# Fix rpath of all real .so so they find each other via $ORIGIN.
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     "#!/bin/bash\n"
     "DIR=\"$1\"\n"
@@ -312,10 +345,13 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
     " \"$DIR\"/libggml-base.so.${GGML_SO_VER} \"$DIR\"/libggml-cpu.so.${GGML_SO_VER}"
     " \"$DIR\"/libmtmd.so.0.0.0 \"$DIR\"/libllama-common.so.0.0.0"
 )
-if(LLAMA_VARIANT STREQUAL "cuda")
+list(FIND SHIP_VARIANTS "cuda" _cuda_idx)
+if(_cuda_idx GREATER -1)
   file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
         " \"$DIR\"/libggml-cuda.so.${GGML_SO_VER}")
-elseif(LLAMA_VARIANT STREQUAL "vulkan")
+endif()
+list(FIND SHIP_VARIANTS "vulkan" _vulkan_idx)
+if(_vulkan_idx GREATER -1)
   file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/fix_llama_rpath.sh"
         " \"$DIR\"/libggml-vulkan.so.${GGML_SO_VER}")
 endif()

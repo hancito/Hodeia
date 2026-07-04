@@ -13,6 +13,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QThread>
+#include <cstring>
 #include <vector>
 
 /// Static flag — ensures ggml + llama backends are initialised exactly once
@@ -57,86 +58,36 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
 
   emit statusUpdated("Loading model: " + path);
 
-  // ── Build common_params ──────────────────────────────────────────
-  // common_params drives the entire model-loading pipeline.  libcommon uses
-  // it to decide which GPUs to target, how many layers to offload, and
-  // whether to auto-shrink the context to fit available memory.
-  common_params params;
-  params.model.path = path.toStdString();
-
-  // Offload all layers to GPU; let fit_params reduce if VRAM is tight.
-  params.n_gpu_layers = -1;
-
-  // Context — 0 means use the model's trained context;
-  // fit_params will shrink it if needed.
-  params.n_ctx = MaxPromptTokens + MaxGenTokens;
-
-  // Batch sizing — keep modest to limit compute-meta buffer peak.
-  params.n_batch = 4096;
-  params.n_ubatch = 4096;
-
-  // Threads
-  params.cpuparams.n_threads = QThread::idealThreadCount();
-  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-
-  // Fit params — auto-adjust n_ctx / n_gpu_layers to fit device memory.
-  params.fit_params = true;
-  params.fit_params_print = true;
-  params.fit_params_min_ctx = 4096;
-  // Reserve 1 GiB per device for the mmproj, OS overhead, and compute
-  // buffers (which fit_params doesn't account for).  Without this buffer
-  // the allocator reserves enough for the weights but then fails when
-  // it tries to allocate the compute/workspace buffers on top.
-  params.fit_params_target.assign(llama_max_devices(), 1024ULL * 1024 * 1024);
-
-  // Flash attention — auto (disabled later for hybrid after model probe).
-  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-
   // ── Detect mmproj (lazy-loaded on first multimodal use) ──────────
   m_mmprojPath = resolveMmprojPath(path);
-  if (!m_mmprojPath.isEmpty()) {
-    m_hasVision = true;
-    params.mmproj.path = m_mmprojPath.toStdString();
-    params.mmproj_use_gpu = true;
-    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load on first "
-                "multimodal use:"
-             << m_mmprojPath;
+  m_hasVision = !m_mmprojPath.isEmpty();
+
+  // ── Detect target backend device ─────────────────────────────────
+  ggml_backend_dev_t dev = detectBestDevice();
+  struct ggml_backend_dev_props props;
+  ggml_backend_dev_get_props(dev, &props);
+
+  // Disambiguate CUDA vs Vulkan: both may report DEVICE_TYPE_GPU on NVIDIA.
+  // Check the device name string.
+  const char *devName = props.name ? props.name : "";
+  bool useCuda = strstr(devName, "CUDA") || strstr(devName, "cuda");
+  bool useVulkan = strstr(devName, "Vulkan") || strstr(devName, "vulkan");
+  bool useCpu = !useCuda && !useVulkan;
+
+  common_init_result_ptr result;
+
+  if (useCuda) {
+    result = loadModelCuda(path, m_mmprojPath);
+  } else if (useVulkan) {
+    result = loadModelVulkan(path, m_mmprojPath);
+  } else {
+    result = loadModelCpu(path, m_mmprojPath);
   }
 
-  // ── Initialize model + context via libcommon ─────────────────────
-  auto result = common_init_from_params(params);
-  if (!result) {
-    qCritical() << "[LlamaChatBackend] common_init_from_params returned null";
+  if (!result)
     return false;
-  }
 
   m_llamaModel = result->model();
-  if (!m_llamaModel || !result->context()) {
-    qCritical() << "[LlamaChatBackend] common_init failed — model:"
-                << (m_llamaModel ? "OK" : "NULL")
-                << "| context:" << (result->context() ? "OK" : "NULL");
-    emit statusUpdated("Failed to create context (VRAM may be insufficient)");
-    return false;
-  }
-
-  // Probe model capabilities and adjust if needed.
-  // Hybrid models (e.g. Siglip + LLaMA) have a fundamental incompatibility
-  // with flash attention: the vision encoder writes embeddings at positions
-  // that flash attention doesn't expect, producing garbled output.
-  const bool isHybrid = llama_model_is_hybrid(m_llamaModel);
-  if (isHybrid) {
-    // Re-init with flash attention disabled for hybrid models.
-    // common_init doesn't support re-opening, so we recreate.
-    result.reset();
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    qDebug() << "[LlamaChatBackend] Flash attention disabled (hybrid model)";
-    result = common_init_from_params(params);
-    if (!result || !result->model() || !result->context()) {
-      qCritical() << "[LlamaChatBackend] Failed to create context (hybrid)";
-      return false;
-    }
-    m_llamaModel = result->model();
-  }
 
   // Steal pointers from the result — the common_init_result owns them,
   // but we need direct pointers for the inference engine.
@@ -160,6 +111,202 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
            << "| vision:" << m_hasVision;
   emit statusUpdated("Model loaded: " + path);
   return true;
+}
+
+// ── Backend-specific model loaders ─────────────────────────────────
+
+/// Detect the best available GPU device (CUDA > Vulkan > CPU).
+ggml_backend_dev_t LlamaChatBackend::detectBestDevice() {
+  // Iterate all devices and prefer CUDA > Vulkan > CPU.
+  ggml_backend_dev_t cudaDev = nullptr;
+  ggml_backend_dev_t vulkanDev = nullptr;
+  ggml_backend_dev_t cpuDev = nullptr;
+
+  for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+    auto dev = ggml_backend_dev_get(i);
+    struct ggml_backend_dev_props p;
+    ggml_backend_dev_get_props(dev, &p);
+    const char *name = p.name ? p.name : "";
+    const char *type_str =
+        p.type == GGML_BACKEND_DEVICE_TYPE_CPU
+            ? "CPU"
+            : (p.type == GGML_BACKEND_DEVICE_TYPE_GPU ? "GPU" : "OTHER");
+    qDebug() << "[LlamaChatBackend] Device" << i << "—" << name << "["
+             << type_str << "]";
+
+    if (strstr(name, "CUDA") || strstr(name, "cuda")) {
+      if (!cudaDev)
+        cudaDev = dev;
+    } else if (strstr(name, "Vulkan") || strstr(name, "vulkan")) {
+      if (!vulkanDev)
+        vulkanDev = dev;
+    } else if (p.type == GGML_BACKEND_DEVICE_TYPE_CPU) {
+      if (!cpuDev)
+        cpuDev = dev;
+    }
+  }
+
+  if (cudaDev) {
+    qDebug() << "[LlamaChatBackend] Detected CUDA device";
+    return cudaDev;
+  }
+  if (vulkanDev) {
+    qDebug() << "[LlamaChatBackend] Detected Vulkan device";
+    return vulkanDev;
+  }
+  qDebug() << "[LlamaChatBackend] No GPU detected, falling back to CPU";
+  return cpuDev;
+}
+
+/// Build a common_init_result, handling hybrid model flash-attention
+/// re-init.  On failure returns nullptr and logs the error.
+common_init_result_ptr LlamaChatBackend::createInitResult(common_params &params,
+                                                          bool hasMmprojOnGpu) {
+  auto result = common_init_from_params(params);
+  if (!result)
+    return nullptr;
+  if (!result->model() || !result->context())
+    return nullptr;
+
+  // Hybrid models (Siglip + LLaMA) crash with flash attention because the
+  // vision encoder writes embeddings at unexpected positions.
+  if (llama_model_is_hybrid(result->model())) {
+    result.reset();
+    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    qDebug() << "[LlamaChatBackend] Flash attention disabled (hybrid model)";
+    result = common_init_from_params(params);
+    if (!result || !result->model() || !result->context())
+      return nullptr;
+  }
+  return result;
+}
+
+/// ── CUDA-optimized loader ────────────────────────────────────────
+common_init_result_ptr
+LlamaChatBackend::loadModelCuda(const QString &path,
+                                const QString &mmprojPath) {
+  qDebug() << "[LlamaChatBackend] Loading model on CUDA";
+
+  common_params params;
+  params.model.path = path.toStdString();
+  params.n_gpu_layers = -1;
+  params.n_ctx = MaxPromptTokens + MaxGenTokens;
+  params.n_batch = 8192;
+  params.n_ubatch = 8192;
+  params.cpuparams.n_threads = QThread::idealThreadCount();
+  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+
+  params.fit_params = true;
+  params.fit_params_print = true;
+  params.fit_params_min_ctx = 4096;
+  params.fit_params_target.assign(llama_max_devices(), 1024ULL * 1024 * 1024);
+
+  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+
+  if (!mmprojPath.isEmpty()) {
+    params.mmproj.path = mmprojPath.toStdString();
+    params.mmproj_use_gpu = true;
+    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load:"
+             << mmprojPath;
+  }
+
+  auto result = createInitResult(params, true);
+  if (!result) {
+    qCritical() << "[LlamaChatBackend] CUDA model load failed";
+    emit statusUpdated("Failed to create context on CUDA");
+    return nullptr;
+  }
+
+  qDebug() << "[LlamaChatBackend] CUDA model loaded | ctx:"
+           << llama_n_ctx(result->context())
+           << "| batch:" << llama_n_batch(result->context())
+           << "| ubatch:" << llama_n_ubatch(result->context());
+  return result;
+}
+
+/// ── Vulkan-optimized loader ──────────────────────────────────────
+common_init_result_ptr
+LlamaChatBackend::loadModelVulkan(const QString &path,
+                                  const QString &mmprojPath) {
+  qDebug() << "[LlamaChatBackend] Loading model on Vulkan";
+
+  common_params params;
+  params.model.path = path.toStdString();
+  params.n_gpu_layers = -1;
+  params.n_ctx = MaxPromptTokens + MaxGenTokens;
+  // Vulkan: smaller batches to avoid 4 GiB single allocations that fail.
+  params.n_batch = 4096;
+  params.n_ubatch = 2048;
+  params.cpuparams.n_threads = QThread::idealThreadCount();
+  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+
+  // Vulkan needs a larger safety margin (pipeline state + descriptors).
+  params.fit_params = true;
+  params.fit_params_print = true;
+  params.fit_params_min_ctx = 4096;
+  params.fit_params_target.assign(llama_max_devices(), 2560ULL * 1024 * 1024);
+
+  // Flash attention disabled — unstable on Vulkan with hybrid models
+  // and offers no measurable benefit at our batch sizes.
+  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+
+  if (!mmprojPath.isEmpty()) {
+    params.mmproj.path = mmprojPath.toStdString();
+    params.mmproj_use_gpu = true;
+    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load:"
+             << mmprojPath;
+  }
+
+  auto result = createInitResult(params, true);
+  if (!result) {
+    qCritical() << "[LlamaChatBackend] Vulkan model load failed";
+    emit statusUpdated("Failed to create context on Vulkan");
+    return nullptr;
+  }
+
+  qDebug() << "[LlamaChatBackend] Vulkan model loaded | ctx:"
+           << llama_n_ctx(result->context())
+           << "| batch:" << llama_n_batch(result->context())
+           << "| ubatch:" << llama_n_ubatch(result->context());
+  return result;
+}
+
+/// ── CPU-optimized loader ─────────────────────────────────────────
+common_init_result_ptr
+LlamaChatBackend::loadModelCpu(const QString &path, const QString &mmprojPath) {
+  qDebug() << "[LlamaChatBackend] Loading model on CPU";
+
+  common_params params;
+  params.model.path = path.toStdString();
+  params.n_gpu_layers = 0;
+  params.n_ctx = MaxPromptTokens + MaxGenTokens;
+  params.n_batch = 4096;
+  params.n_ubatch = 2048;
+  params.cpuparams.n_threads = QThread::idealThreadCount();
+  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+
+  params.fit_params = false;
+  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+
+  if (!mmprojPath.isEmpty()) {
+    params.mmproj.path = mmprojPath.toStdString();
+    params.mmproj_use_gpu = false;
+    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load on CPU:"
+             << mmprojPath;
+  }
+
+  auto result = createInitResult(params, false);
+  if (!result) {
+    qCritical() << "[LlamaChatBackend] CPU model load failed";
+    emit statusUpdated("Failed to create context on CPU");
+    return nullptr;
+  }
+
+  qDebug() << "[LlamaChatBackend] CPU model loaded | ctx:"
+           << llama_n_ctx(result->context())
+           << "| batch:" << llama_n_batch(result->context())
+           << "| ubatch:" << llama_n_ubatch(result->context());
+  return result;
 }
 
 void LlamaChatBackend::unloadModel() {
