@@ -132,7 +132,8 @@ set(SQLITEVEC_LIB ${EXTERNAL}/lib/sqlitevec)
 
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}            # for headers/*.h
-    ${LLAMA_INC}                   # for #include "llama.h", "common/*.h", "nlohmann/json.hpp"
+    ${LLAMA_INC}                   # for #include "llama.h", "common/*.h"
+    ${LLAMA_INC}/vendor            # for #include <nlohmann/json_fwd.hpp>
     ${EXTERNAL}/include            # for #include <Sqlite3/sqlite3.h>, <mupdf/fitz.h>
     ${SQLITEVEC_INC}               # for #include "sqlitevec.h"
     ${CMAKE_SOURCE_DIR}/src/thrdprty
