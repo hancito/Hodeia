@@ -83,8 +83,11 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
   params.fit_params = true;
   params.fit_params_print = true;
   params.fit_params_min_ctx = 4096;
-  // Reserve 512 MiB per device for the mmproj and OS overhead.
-  params.fit_params_target.assign(llama_max_devices(), 512ULL * 1024 * 1024);
+  // Reserve 1 GiB per device for the mmproj, OS overhead, and compute
+  // buffers (which fit_params doesn't account for).  Without this buffer
+  // the allocator reserves enough for the weights but then fails when
+  // it tries to allocate the compute/workspace buffers on top.
+  params.fit_params_target.assign(llama_max_devices(), 1024ULL * 1024 * 1024);
 
   // Flash attention — auto (disabled later for hybrid after model probe).
   params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
@@ -108,9 +111,11 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
   }
 
   m_llamaModel = result->model();
-  if (!m_llamaModel) {
-    qCritical() << "[LlamaChatBackend] Failed to load model:" << path;
-    emit statusUpdated("Failed to load model");
+  if (!m_llamaModel || !result->context()) {
+    qCritical() << "[LlamaChatBackend] common_init failed — model:"
+                << (m_llamaModel ? "OK" : "NULL")
+                << "| context:" << (result->context() ? "OK" : "NULL");
+    emit statusUpdated("Failed to create context (VRAM may be insufficient)");
     return false;
   }
 
