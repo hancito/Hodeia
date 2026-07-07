@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "headers/helpers.h"
-#include "headers/llama_chat_backend.h"
+#include "headers/localbackend.h"
 
 class ConfigManager;
 class DatabaseManager;
@@ -65,6 +65,6 @@ private:
 
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
-  LlamaChatBackend *m_chatBackend = nullptr;
+  LocalBackend *m_chatBackend = nullptr;
   RemoteBackend *m_remoteBackend = nullptr;
 };

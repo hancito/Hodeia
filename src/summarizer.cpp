@@ -1,7 +1,7 @@
 #include "headers/summarizer.h"
 #include "headers/configmanager.h"
 #include "headers/database.h"
-#include "headers/llama_chat_backend.h"
+#include "headers/localbackend.h"
 #include "headers/remotebackend.h"
 #include "headers/sqlitevec.h"
 
@@ -53,7 +53,7 @@ const QString &Summarizer::userPrompt() { return s_userPrompt; }
 Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
                        QObject *parent)
     : QObject(parent), m_config(config), m_database(database) {
-  m_chatBackend = new LlamaChatBackend(this);
+  m_chatBackend = new LocalBackend(this);
   m_remoteBackend = new RemoteBackend(this);
 }
 

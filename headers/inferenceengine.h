@@ -38,7 +38,7 @@ struct InferenceParams {
 /// multimodal prompts.
 ///
 /// The engine does NOT own the llama_context or llama_model — those
-/// are managed by the caller (LlamaChatBackend).  Callers pass a
+/// are managed by the caller (LocalBackend).  Callers pass a
 /// fully initialised context; the engine uses it for one inference
 /// pass (prompt + generation) and returns.
 ///
@@ -50,14 +50,14 @@ struct InferenceParams {
 ///
 /// All llama.h / mtmd.h details are hidden inside this class; callers
 /// never touch those headers directly.
-class LlamaInferenceEngine : public QObject {
+class InferenceEngine : public QObject {
   Q_OBJECT
 
 public:
-  LlamaInferenceEngine(struct llama_context *ctx, struct llama_model *model,
+  InferenceEngine(struct llama_context *ctx, struct llama_model *model,
                        const InferenceParams &params,
                        QObject *parent = nullptr);
-  ~LlamaInferenceEngine() override;
+  ~InferenceEngine() override;
 
   /// Run text-only inference.  `prompt` is the already-template-
   /// formatted chat string (e.g. after applyChatTemplate).

@@ -43,8 +43,8 @@ qt_add_qml_module(Paperize
         headers/enginemanager.h
         headers/sqlitedb.h
         headers/sqlitevec.h
-        headers/llama_chat_backend.h
-        headers/llama_inference_engine.h
+        headers/localbackend.h
+        headers/inferenceengine.h
         headers/remotebackend.h
         headers/summarizer.h
         headers/summarythreadmanager.h
@@ -60,8 +60,8 @@ qt_add_qml_module(Paperize
         src/enginemanager.cpp
         src/sqlitedb.cpp
         src/sqlitevec.cpp
-        src/llama_chat_backend.cpp
-        src/llama_inference_engine.cpp
+        src/localbackend.cpp
+        src/inferenceengine.cpp
         src/remotebackend.cpp
         src/summarizer.cpp
         src/summarythreadmanager.cpp

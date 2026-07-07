@@ -4,7 +4,7 @@
 #include <QString>
 #include <vector>
 
-#include "headers/llama_chat_backend.h"
+#include "headers/localbackend.h"
 
 class QNetworkAccessManager;
 class QNetworkReply;

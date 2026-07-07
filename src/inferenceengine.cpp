@@ -1,5 +1,5 @@
-#include "headers/llama_inference_engine.h"
-#include "headers/llama_chat_backend.h"
+#include "headers/inferenceengine.h"
+#include "headers/localbackend.h"
 
 #include "llama.h"
 #include "mtmd-helper.h"
@@ -13,10 +13,9 @@
 /// Construct the engine and build the sampler chain.
 /// The engine captures raw pointers to the context/model (owned by the
 /// backend) and initialises a sampler chain from the inference params.
-LlamaInferenceEngine::LlamaInferenceEngine(struct llama_context *ctx,
-                                           struct llama_model *model,
-                                           const InferenceParams &params,
-                                           QObject *parent)
+InferenceEngine::InferenceEngine(struct llama_context *ctx,
+                                 struct llama_model *model,
+                                 const InferenceParams &params, QObject *parent)
     : QObject(parent), m_ctx(ctx), m_model(model),
       m_vocab(llama_model_get_vocab(model)), m_n_batch(llama_n_batch(ctx)),
       m_params(params) {
@@ -38,7 +37,7 @@ LlamaInferenceEngine::LlamaInferenceEngine(struct llama_context *ctx,
 /// next.  The final stage (greedy or dist) picks the actual token.
 /// This pipeline approach lets us combine multiple sampling strategies
 /// without any single one dominating.
-void LlamaInferenceEngine::buildSampler() {
+void InferenceEngine::buildSampler() {
   auto chainParams = llama_sampler_chain_default_params();
   m_chain = llama_sampler_chain_init(chainParams);
 
@@ -78,14 +77,14 @@ void LlamaInferenceEngine::buildSampler() {
   }
 }
 
-void LlamaInferenceEngine::freeSampler() {
+void InferenceEngine::freeSampler() {
   if (m_chain) {
     llama_sampler_free(m_chain);
     m_chain = nullptr;
   }
 }
 
-LlamaInferenceEngine::~LlamaInferenceEngine() { freeSampler(); }
+InferenceEngine::~InferenceEngine() { freeSampler(); }
 
 // ── Text-only inference ───────────────────────────────────────────
 
@@ -96,7 +95,7 @@ LlamaInferenceEngine::~LlamaInferenceEngine() { freeSampler(); }
 /// buffer whose size scales with n_batch.  If the prompt exceeds n_batch
 /// tokens, we process it in chunks to avoid allocating excessively large
 /// temporary buffers.
-QString LlamaInferenceEngine::inferText(const QString &prompt) {
+QString InferenceEngine::inferText(const QString &prompt) {
   // Clear stale KV cache from any previous inference on this context.
   clearKvCache();
 
@@ -110,13 +109,13 @@ QString LlamaInferenceEngine::inferText(const QString &prompt) {
   int32_t nTokens = llama_tokenize(m_vocab, text, textLen, tokens.data(),
                                    MAX_TOKS, true, true);
   if (nTokens <= 0) {
-    qWarning() << "[LlamaInferenceEngine] Tokenization failed (n_tokens="
-               << nTokens << ")";
+    qWarning() << "[InferenceEngine] Tokenization failed (n_tokens=" << nTokens
+               << ")";
     return QString();
   }
   tokens.resize(static_cast<size_t>(nTokens));
 
-  qDebug() << "[LlamaInferenceEngine] Prompt tokens:" << nTokens;
+  qDebug() << "[InferenceEngine] Prompt tokens:" << nTokens;
 
   // Decode the prompt in chunks that fit within n_batch.
   // Each chunk advances the position counter so the KV cache keeps track
@@ -145,8 +144,8 @@ QString LlamaInferenceEngine::inferText(const QString &prompt) {
     llama_batch_free(batch);
 
     if (res != 0) {
-      qCritical() << "[LlamaInferenceEngine] Prompt decode failed at offset"
-                  << i << "with error:" << res;
+      qCritical() << "[InferenceEngine] Prompt decode failed at offset" << i
+                  << "with error:" << res;
       return QString();
     }
   }
@@ -166,16 +165,15 @@ QString LlamaInferenceEngine::inferText(const QString &prompt) {
 ///   - mtmd_helper_eval_chunks handles the mixed text/image decode loop
 ///     (text → normal decode, images → vision encode + embedding decode)
 ///   - M-RoPE positions are tracked by mtmd_helper_eval_chunks
-QString
-LlamaInferenceEngine::inferMultimodal(const QString &prompt,
-                                      const std::vector<PageImage> &images,
-                                      struct mtmd_context *mctx) {
+QString InferenceEngine::inferMultimodal(const QString &prompt,
+                                         const std::vector<PageImage> &images,
+                                         struct mtmd_context *mctx) {
 
   // Clear stale KV cache from any previous inference on this context.
   clearKvCache();
 
   if (!mctx || !mtmd_support_vision(mctx)) {
-    qWarning() << "[LlamaInferenceEngine] Multimodal requested but vision "
+    qWarning() << "[InferenceEngine] Multimodal requested but vision "
                   "not available";
     return QString();
   }
@@ -189,13 +187,13 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
     if (bmp) {
       bitmaps.push_back(bmp);
     } else {
-      qWarning() << "[LlamaInferenceEngine] Failed to create bitmap"
-                 << img.width << "x" << img.height;
+      qWarning() << "[InferenceEngine] Failed to create bitmap" << img.width
+                 << "x" << img.height;
     }
   }
 
   if (bitmaps.empty()) {
-    qWarning() << "[LlamaInferenceEngine] No valid bitmaps created";
+    qWarning() << "[InferenceEngine] No valid bitmaps created";
     for (auto *bmp : bitmaps) {
       mtmd_bitmap_free(const_cast<mtmd_bitmap *>(bmp));
     }
@@ -211,8 +209,7 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
                                  static_cast<size_t>(bitmaps.size()));
 
   if (result != 0) {
-    qCritical() << "[LlamaInferenceEngine] mtmd_tokenize failed with:"
-                << result;
+    qCritical() << "[InferenceEngine] mtmd_tokenize failed with:" << result;
     mtmd_input_chunks_free(chunks);
     for (auto *bmp : bitmaps) {
       mtmd_bitmap_free(const_cast<mtmd_bitmap *>(bmp));
@@ -222,7 +219,7 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
 
   size_t chunkCount = mtmd_input_chunks_size(chunks);
   size_t totalTokens = mtmd_helper_get_n_tokens(chunks);
-  qDebug() << "[LlamaInferenceEngine] mtmd chunks:" << chunkCount
+  qDebug() << "[InferenceEngine] mtmd chunks:" << chunkCount
            << "| total tokens:" << totalTokens;
 
   // mtmd_helper_eval_chunks handles the entire eval loop:
@@ -245,13 +242,11 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
   }
 
   if (res != 0) {
-    qCritical() << "[LlamaInferenceEngine] mtmd_helper_eval_chunks failed:"
-                << res;
+    qCritical() << "[InferenceEngine] mtmd_helper_eval_chunks failed:" << res;
     return QString();
   }
 
-  qDebug() << "[LlamaInferenceEngine] Multimodal prompt decoded, n_past="
-           << nPast;
+  qDebug() << "[InferenceEngine] Multimodal prompt decoded, n_past=" << nPast;
 
   return generate();
 }
@@ -266,7 +261,7 @@ LlamaInferenceEngine::inferMultimodal(const QString &prompt,
 /// KV cache for the highest occupied position via llama_memory_seq_pos_max.
 /// This works uniformly for both text-only and multimodal paths because
 /// mtmd_helper_eval_chunks already wrote its position into the cache.
-QString LlamaInferenceEngine::generate() {
+QString InferenceEngine::generate() {
   QString output;
 
   bool eosFound = false;
@@ -330,14 +325,14 @@ QString LlamaInferenceEngine::generate() {
     llama_batch_free(batch);
 
     if (res != 0) {
-      qCritical() << "[LlamaInferenceEngine] Decode failed at token" << i
+      qCritical() << "[InferenceEngine] Decode failed at token" << i
                   << "with error:" << res;
       break;
     }
   }
 
   if (!eosFound) {
-    qDebug() << "[LlamaInferenceEngine] Generation stopped after"
+    qDebug() << "[InferenceEngine] Generation stopped after"
              << m_params.max_tokens << "tokens (no EOS)";
   }
 
@@ -346,14 +341,14 @@ QString LlamaInferenceEngine::generate() {
 
 // ── KV cache management ──────────────────────────────────────────
 
-void LlamaInferenceEngine::clearKvCache() {
+void InferenceEngine::clearKvCache() {
   auto mem = llama_get_memory(m_ctx);
   llama_memory_clear(mem, true);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-bool LlamaInferenceEngine::shouldStop(const QString &output) const {
+bool InferenceEngine::shouldStop(const QString &output) const {
   if (m_params.stop_sequence.isEmpty()) {
     return false;
   }
@@ -364,7 +359,7 @@ bool LlamaInferenceEngine::shouldStop(const QString &output) const {
 /// Uses a reusable buffer (m_pieceBuf) to avoid per-token allocations.
 /// The lstrip_space flag strips the leading-space prefix that BPE tokenizers
 /// add to continuation tokens — this keeps output readable.
-QString LlamaInferenceEngine::tokenToPiece(llama_token tok) const {
+QString InferenceEngine::tokenToPiece(llama_token tok) const {
   m_pieceBuf.resize(32);
   int32_t n = llama_token_to_piece(m_vocab, tok, m_pieceBuf.data(),
                                    static_cast<int32_t>(m_pieceBuf.size()),

@@ -49,19 +49,19 @@ struct PromptPayload {
 ///   3. Chat templates are parsed once from GGUF metadata and cached for
 ///      the lifetime of the loaded model.
 ///   4. All heavy lifting (tokenize → decode → sample) is delegated to
-///      LlamaInferenceEngine; this class only orchestrates state.
+///      the inference engine; this class only orchestrates state.
 ///
 /// Ownership: common_init_result (m_commonInit) owns the llama_model and
 /// llama_context.  We keep raw pointers for convenience but the unique_ptr
 /// guarantees cleanup when the backend is destroyed or unloadModel() runs.
-class LlamaChatBackend : public QObject {
+class LocalBackend : public QObject {
   Q_OBJECT
 
 public:
   /// Construct the backend and initialise the global llama.cpp runtime
   /// (ggml backends + thread pool) exactly once via a static flag.
-  explicit LlamaChatBackend(QObject *parent = nullptr);
-  ~LlamaChatBackend() override;
+  explicit LocalBackend(QObject *parent = nullptr);
+  ~LocalBackend() override;
 
   /// Load a GGUF model (and optionally an mmproj) from disk.
   /// Returns true on success.  Calls unloadModel() internally if a model

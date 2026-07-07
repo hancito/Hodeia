@@ -1,6 +1,6 @@
-#include "headers/llama_chat_backend.h"
+#include "headers/localbackend.h"
 
-#include "headers/llama_inference_engine.h"
+#include "headers/inferenceengine.h"
 
 #include "common/chat.h"
 #include "common/common.h"
@@ -21,7 +21,7 @@
 /// are created.
 static bool s_llamaInitialized = false;
 
-LlamaChatBackend::LlamaChatBackend(QObject *parent) : QObject(parent) {
+LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
   if (!s_llamaInitialized) {
     ggml_backend_load_all(); // auto-detect CUDA, Metal, Vulkan, etc.
     llama_backend_init();    // start thread pools / memory allocators
@@ -29,7 +29,7 @@ LlamaChatBackend::LlamaChatBackend(QObject *parent) : QObject(parent) {
   }
 }
 
-LlamaChatBackend::~LlamaChatBackend() {
+LocalBackend::~LocalBackend() {
   unloadModel();
   if (s_llamaInitialized) {
     llama_backend_free();
@@ -46,12 +46,12 @@ LlamaChatBackend::~LlamaChatBackend() {
 /// it stays off the GPU until the first multimodal inference call.  This
 /// prevents the projector from competing with the model for VRAM during the
 /// initial load, which is already the most memory-pressured moment.
-bool LlamaChatBackend::loadModel(const QString &modelPath) {
+bool LocalBackend::loadModel(const QString &modelPath) {
   unloadModel();
 
   QString path = resolveModelPath(modelPath);
   if (path.isEmpty() || !QFile::exists(path)) {
-    qCritical() << "[LlamaChatBackend] Model file not found:" << path;
+    qCritical() << "[LocalBackend] Model file not found:" << path;
     emit statusUpdated("Model file not found: " + path);
     return false;
   }
@@ -105,7 +105,7 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
   m_modelPath = path;
   m_ready = true;
 
-  qDebug() << "[LlamaChatBackend] Model loaded | ctx:"
+  qDebug() << "[LocalBackend] Model loaded | ctx:"
            << llama_n_ctx(m_llamaCtx) << "| batch:" << llama_n_batch(m_llamaCtx)
            << "| ubatch:" << llama_n_ubatch(m_llamaCtx)
            << "| vision:" << m_hasVision;
@@ -116,7 +116,7 @@ bool LlamaChatBackend::loadModel(const QString &modelPath) {
 // ── Backend-specific model loaders ─────────────────────────────────
 
 /// Detect the best available GPU device (CUDA > Vulkan > CPU).
-ggml_backend_dev_t LlamaChatBackend::detectBestDevice() {
+ggml_backend_dev_t LocalBackend::detectBestDevice() {
   // Iterate all devices and prefer CUDA > Vulkan > CPU.
   ggml_backend_dev_t cudaDev = nullptr;
   ggml_backend_dev_t vulkanDev = nullptr;
@@ -131,7 +131,7 @@ ggml_backend_dev_t LlamaChatBackend::detectBestDevice() {
         p.type == GGML_BACKEND_DEVICE_TYPE_CPU
             ? "CPU"
             : (p.type == GGML_BACKEND_DEVICE_TYPE_GPU ? "GPU" : "OTHER");
-    qDebug() << "[LlamaChatBackend] Device" << i << "—" << name << "["
+    qDebug() << "[LocalBackend] Device" << i << "—" << name << "["
              << type_str << "]";
 
     if (strstr(name, "CUDA") || strstr(name, "cuda")) {
@@ -147,20 +147,20 @@ ggml_backend_dev_t LlamaChatBackend::detectBestDevice() {
   }
 
   if (cudaDev) {
-    qDebug() << "[LlamaChatBackend] Detected CUDA device";
+    qDebug() << "[LocalBackend] Detected CUDA device";
     return cudaDev;
   }
   if (vulkanDev) {
-    qDebug() << "[LlamaChatBackend] Detected Vulkan device";
+    qDebug() << "[LocalBackend] Detected Vulkan device";
     return vulkanDev;
   }
-  qDebug() << "[LlamaChatBackend] No GPU detected, falling back to CPU";
+  qDebug() << "[LocalBackend] No GPU detected, falling back to CPU";
   return cpuDev;
 }
 
 /// Build a common_init_result, handling hybrid model flash-attention
 /// re-init.  On failure returns nullptr and logs the error.
-common_init_result_ptr LlamaChatBackend::createInitResult(common_params &params,
+common_init_result_ptr LocalBackend::createInitResult(common_params &params,
                                                           bool hasMmprojOnGpu) {
   auto result = common_init_from_params(params);
   if (!result)
@@ -173,7 +173,7 @@ common_init_result_ptr LlamaChatBackend::createInitResult(common_params &params,
   if (llama_model_is_hybrid(result->model())) {
     result.reset();
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    qDebug() << "[LlamaChatBackend] Flash attention disabled (hybrid model)";
+    qDebug() << "[LocalBackend] Flash attention disabled (hybrid model)";
     result = common_init_from_params(params);
     if (!result || !result->model() || !result->context())
       return nullptr;
@@ -183,9 +183,9 @@ common_init_result_ptr LlamaChatBackend::createInitResult(common_params &params,
 
 /// ── CUDA-optimized loader ────────────────────────────────────────
 common_init_result_ptr
-LlamaChatBackend::loadModelCuda(const QString &path,
+LocalBackend::loadModelCuda(const QString &path,
                                 const QString &mmprojPath) {
-  qDebug() << "[LlamaChatBackend] Loading model on CUDA";
+  qDebug() << "[LocalBackend] Loading model on CUDA";
 
   common_params params;
   params.model.path = path.toStdString();
@@ -206,18 +206,18 @@ LlamaChatBackend::loadModelCuda(const QString &path,
   if (!mmprojPath.isEmpty()) {
     params.mmproj.path = mmprojPath.toStdString();
     params.mmproj_use_gpu = true;
-    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load:"
+    qDebug() << "[LocalBackend] mmproj found, will lazy-load:"
              << mmprojPath;
   }
 
   auto result = createInitResult(params, true);
   if (!result) {
-    qCritical() << "[LlamaChatBackend] CUDA model load failed";
+    qCritical() << "[LocalBackend] CUDA model load failed";
     emit statusUpdated("Failed to create context on CUDA");
     return nullptr;
   }
 
-  qDebug() << "[LlamaChatBackend] CUDA model loaded | ctx:"
+  qDebug() << "[LocalBackend] CUDA model loaded | ctx:"
            << llama_n_ctx(result->context())
            << "| batch:" << llama_n_batch(result->context())
            << "| ubatch:" << llama_n_ubatch(result->context());
@@ -226,9 +226,9 @@ LlamaChatBackend::loadModelCuda(const QString &path,
 
 /// ── Vulkan-optimized loader ──────────────────────────────────────
 common_init_result_ptr
-LlamaChatBackend::loadModelVulkan(const QString &path,
+LocalBackend::loadModelVulkan(const QString &path,
                                   const QString &mmprojPath) {
-  qDebug() << "[LlamaChatBackend] Loading model on Vulkan";
+  qDebug() << "[LocalBackend] Loading model on Vulkan";
 
   common_params params;
   params.model.path = path.toStdString();
@@ -253,18 +253,18 @@ LlamaChatBackend::loadModelVulkan(const QString &path,
   if (!mmprojPath.isEmpty()) {
     params.mmproj.path = mmprojPath.toStdString();
     params.mmproj_use_gpu = true;
-    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load:"
+    qDebug() << "[LocalBackend] mmproj found, will lazy-load:"
              << mmprojPath;
   }
 
   auto result = createInitResult(params, true);
   if (!result) {
-    qCritical() << "[LlamaChatBackend] Vulkan model load failed";
+    qCritical() << "[LocalBackend] Vulkan model load failed";
     emit statusUpdated("Failed to create context on Vulkan");
     return nullptr;
   }
 
-  qDebug() << "[LlamaChatBackend] Vulkan model loaded | ctx:"
+  qDebug() << "[LocalBackend] Vulkan model loaded | ctx:"
            << llama_n_ctx(result->context())
            << "| batch:" << llama_n_batch(result->context())
            << "| ubatch:" << llama_n_ubatch(result->context());
@@ -273,8 +273,8 @@ LlamaChatBackend::loadModelVulkan(const QString &path,
 
 /// ── CPU-optimized loader ─────────────────────────────────────────
 common_init_result_ptr
-LlamaChatBackend::loadModelCpu(const QString &path, const QString &mmprojPath) {
-  qDebug() << "[LlamaChatBackend] Loading model on CPU";
+LocalBackend::loadModelCpu(const QString &path, const QString &mmprojPath) {
+  qDebug() << "[LocalBackend] Loading model on CPU";
 
   common_params params;
   params.model.path = path.toStdString();
@@ -291,25 +291,25 @@ LlamaChatBackend::loadModelCpu(const QString &path, const QString &mmprojPath) {
   if (!mmprojPath.isEmpty()) {
     params.mmproj.path = mmprojPath.toStdString();
     params.mmproj_use_gpu = false;
-    qDebug() << "[LlamaChatBackend] mmproj found, will lazy-load on CPU:"
+    qDebug() << "[LocalBackend] mmproj found, will lazy-load on CPU:"
              << mmprojPath;
   }
 
   auto result = createInitResult(params, false);
   if (!result) {
-    qCritical() << "[LlamaChatBackend] CPU model load failed";
+    qCritical() << "[LocalBackend] CPU model load failed";
     emit statusUpdated("Failed to create context on CPU");
     return nullptr;
   }
 
-  qDebug() << "[LlamaChatBackend] CPU model loaded | ctx:"
+  qDebug() << "[LocalBackend] CPU model loaded | ctx:"
            << llama_n_ctx(result->context())
            << "| batch:" << llama_n_batch(result->context())
            << "| ubatch:" << llama_n_ubatch(result->context());
   return result;
 }
 
-void LlamaChatBackend::unloadModel() {
+void LocalBackend::unloadModel() {
   unloadMmproj();
   if (m_chatTemplates) {
     common_chat_templates_free(m_chatTemplates);
@@ -342,23 +342,23 @@ void LlamaChatBackend::unloadModel() {
       if (backend) {
         ggml_backend_synchronize(backend);
         ggml_backend_free(backend);
-        qDebug() << "[LlamaChatBackend] GPU" << i
+        qDebug() << "[LocalBackend] GPU" << i
                  << "synchronized after model unload";
       }
     }
   }
 }
 
-bool LlamaChatBackend::isReady() const { return m_ready; }
+bool LocalBackend::isReady() const { return m_ready; }
 
 // ── Summarize entry point ──────────────────────────────────────────
 
 /// Main public entry point. Computes how much prompt space is available
 /// (leaving room for generation), truncates the text context accordingly,
 /// and dispatches to text-only or multimodal inference.
-QString LlamaChatBackend::summarize(const PromptPayload &payload) {
+QString LocalBackend::summarize(const PromptPayload &payload) {
   if (!m_ready) {
-    qWarning() << "[LlamaChatBackend] Model not loaded";
+    qWarning() << "[LocalBackend] Model not loaded";
     return QString();
   }
 
@@ -383,7 +383,7 @@ QString LlamaChatBackend::summarize(const PromptPayload &payload) {
   return runTextInference(promptText);
 }
 
-QString LlamaChatBackend::generate(const QString &systemPrompt,
+QString LocalBackend::generate(const QString &systemPrompt,
                                    const QString &userPrompt) {
   PromptPayload p;
   p.systemPrompt = systemPrompt;
@@ -394,18 +394,18 @@ QString LlamaChatBackend::generate(const QString &systemPrompt,
 
 // ── Text-only inference ────────────────────────────────────────────
 
-QString LlamaChatBackend::runTextInference(const QString &formattedText) {
+QString LocalBackend::runTextInference(const QString &formattedText) {
   InferenceParams params;
   params.max_tokens = MaxGenTokens;
   params.temperature = Temperature;
   params.top_k = TopK;
   params.top_p = TopP;
 
-  LlamaInferenceEngine engine(m_llamaCtx, m_llamaModel, params);
+  InferenceEngine engine(m_llamaCtx, m_llamaModel, params);
   QString result = engine.inferText(formattedText);
 
   if (result.isEmpty()) {
-    qWarning() << "[LlamaChatBackend] Text inference returned empty output";
+    qWarning() << "[LocalBackend] Text inference returned empty output";
   }
   return result;
 }
@@ -416,21 +416,21 @@ QString LlamaChatBackend::runTextInference(const QString &formattedText) {
 /// and unloaded immediately after — this keeps VRAM pressure low between
 /// text-only and multimodal workloads.
 QString
-LlamaChatBackend::runMultimodalInference(const QString &formattedText,
+LocalBackend::runMultimodalInference(const QString &formattedText,
                                          const std::vector<PageImage> &images) {
   if (!m_hasVision) {
-    qWarning() << "[LlamaChatBackend] Multimodal inference requested but "
+    qWarning() << "[LocalBackend] Multimodal inference requested but "
                   "vision not available";
     return QString();
   }
 
   // Lazy-load mmproj on first use (or if previously unloaded).
   if (!m_mtmdCtx && !loadMmproj()) {
-    qWarning() << "[LlamaChatBackend] Failed to lazy-load mmproj";
+    qWarning() << "[LocalBackend] Failed to lazy-load mmproj";
     return QString();
   }
 
-  qDebug() << "[LlamaChatBackend] Multimodal inference with" << images.size()
+  qDebug() << "[LocalBackend] Multimodal inference with" << images.size()
            << "images";
 
   InferenceParams params;
@@ -444,7 +444,7 @@ LlamaChatBackend::runMultimodalInference(const QString &formattedText,
     // Engine is scoped here so it's destroyed (and its sampler chain freed)
     // before we unload the mmproj — avoids use-after-free if the engine
     // holds references into the mtmd context.
-    LlamaInferenceEngine engine(m_llamaCtx, m_llamaModel, params);
+    InferenceEngine engine(m_llamaCtx, m_llamaModel, params);
     result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
   }
 
@@ -455,14 +455,14 @@ LlamaChatBackend::runMultimodalInference(const QString &formattedText,
 
   if (result.isEmpty()) {
     qWarning()
-        << "[LlamaChatBackend] Multimodal inference returned empty output";
+        << "[LocalBackend] Multimodal inference returned empty output";
   }
   return result;
 }
 
 // ── Lazy mmproj load / unload ─────────────────────────────────────
 
-bool LlamaChatBackend::loadMmproj() {
+bool LocalBackend::loadMmproj() {
   if (m_mtmdCtx)
     return true;
   if (m_mmprojPath.isEmpty())
@@ -478,19 +478,19 @@ bool LlamaChatBackend::loadMmproj() {
   m_mtmdCtx = mtmd_init_from_file(m_mmprojPath.toUtf8().constData(),
                                   m_llamaModel, mtmdParams);
   if (!m_mtmdCtx) {
-    qWarning() << "[LlamaChatBackend] Failed to load mmproj:" << m_mmprojPath;
+    qWarning() << "[LocalBackend] Failed to load mmproj:" << m_mmprojPath;
     return false;
   }
 
-  qDebug() << "[LlamaChatBackend] mmproj loaded on GPU";
+  qDebug() << "[LocalBackend] mmproj loaded on GPU";
   return true;
 }
 
-void LlamaChatBackend::unloadMmproj() {
+void LocalBackend::unloadMmproj() {
   if (m_mtmdCtx) {
     mtmd_free(m_mtmdCtx);
     m_mtmdCtx = nullptr;
-    qDebug() << "[LlamaChatBackend] mmproj unloaded";
+    qDebug() << "[LocalBackend] mmproj unloaded";
   }
 }
 
@@ -499,7 +499,7 @@ void LlamaChatBackend::unloadMmproj() {
 /// Assemble the user prompt from visual markers + text context, then wrap
 /// in the model's chat template.  The marker is a special token placeholder
 /// (e.g. "<__media__>") that mtmd_tokenize replaces with image embeddings.
-QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
+QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
                                                int32_t maxChars) {
   const char *rawMarker =
       m_mtmdCtx != nullptr ? mtmd_get_marker(m_mtmdCtx) : nullptr;
@@ -525,10 +525,10 @@ QString LlamaChatBackend::buildFormattedPrompt(const PromptPayload &payload,
   return applyChatTemplate(payload.systemPrompt, userPrompt);
 }
 
-QString LlamaChatBackend::applyChatTemplate(const QString &systemPrompt,
+QString LocalBackend::applyChatTemplate(const QString &systemPrompt,
                                             const QString &userMessage) {
   if (!m_chatTemplates) {
-    qWarning() << "[LlamaChatBackend] Chat templates not initialized";
+    qWarning() << "[LocalBackend] Chat templates not initialized";
     return QString();
   }
 
@@ -555,7 +555,7 @@ QString LlamaChatBackend::applyChatTemplate(const QString &systemPrompt,
       common_chat_templates_apply(m_chatTemplates, inputs).prompt;
 
   if (formatted.empty()) {
-    qWarning() << "[LlamaChatBackend] Chat template produced empty output";
+    qWarning() << "[LocalBackend] Chat template produced empty output";
     return QString();
   }
 
@@ -566,7 +566,7 @@ QString LlamaChatBackend::applyChatTemplate(const QString &systemPrompt,
 
 /// Resolve model path: try absolute → relative to app dir → default bundled
 /// model.
-QString LlamaChatBackend::resolveModelPath(const QString &modelPath) const {
+QString LocalBackend::resolveModelPath(const QString &modelPath) const {
   if (modelPath.isEmpty()) {
     return QCoreApplication::applicationDirPath() +
            "/Models/Summarizers/default.gguf";
@@ -582,7 +582,7 @@ QString LlamaChatBackend::resolveModelPath(const QString &modelPath) const {
 /// Search for mmproj file: model directory → bundled Mmproj directory.
 /// We look for any file containing "mmproj" in the model's directory first,
 /// then fall back to well-known paths in the application bundle.
-QString LlamaChatBackend::resolveMmprojPath(const QString &modelPath) const {
+QString LocalBackend::resolveMmprojPath(const QString &modelPath) const {
   QString dir = QFileInfo(modelPath).absoluteDir().absolutePath();
   QString stem = QFileInfo(modelPath).completeBaseName();
 
@@ -602,11 +602,11 @@ QString LlamaChatBackend::resolveMmprojPath(const QString &modelPath) const {
 
   for (const QString &c : candidates) {
     if (QFile::exists(c)) {
-      qDebug() << "[LlamaChatBackend] Found mmproj:" << c;
+      qDebug() << "[LocalBackend] Found mmproj:" << c;
       return c;
     }
   }
 
-  qDebug() << "[LlamaChatBackend] No mmproj found for model:" << modelPath;
+  qDebug() << "[LocalBackend] No mmproj found for model:" << modelPath;
   return QString();
 }
