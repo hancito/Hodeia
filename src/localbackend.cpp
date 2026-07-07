@@ -62,27 +62,24 @@ bool LocalBackend::loadModel(const QString &modelPath) {
   m_mmprojPath = resolveMmprojPath(path);
   m_hasVision = !m_mmprojPath.isEmpty();
 
-  // ── Detect target backend device ─────────────────────────────────
-  ggml_backend_dev_t dev = detectBestDevice();
-  struct ggml_backend_dev_props props;
-  ggml_backend_dev_get_props(dev, &props);
-
-  // Disambiguate CUDA vs Vulkan: both may report DEVICE_TYPE_GPU on NVIDIA.
-  // Check the device name string.
-  const char *devName = props.name ? props.name : "";
-  bool useCuda = strstr(devName, "CUDA") || strstr(devName, "cuda");
-  bool useVulkan = strstr(devName, "Vulkan") || strstr(devName, "vulkan");
-  bool useCpu = !useCuda && !useVulkan;
-
-  common_init_result_ptr result;
-
-  if (useCuda) {
-    result = loadModelCuda(path, m_mmprojPath);
-  } else if (useVulkan) {
-    result = loadModelVulkan(path, m_mmprojPath);
-  } else {
-    result = loadModelCpu(path, m_mmprojPath);
+  // ── Detect devices (GPU + CPU for hybrid offloading) ─────────────
+  auto devices = detectDevices();
+  if (devices.empty()) {
+    qCritical() << "[LocalBackend] No backend devices found";
+    emit statusUpdated("No backend devices available");
+    return false;
   }
+
+  // Identify primary device for logging
+  const char *devName = "";
+  {
+    struct ggml_backend_dev_props props;
+    ggml_backend_dev_get_props(devices[0], &props);
+    devName = props.name ? props.name : "unknown";
+  }
+
+  common_init_result_ptr result =
+      loadModelWithDevices(path, m_mmprojPath, devices, devName);
 
   if (!result)
     return false;
@@ -105,8 +102,8 @@ bool LocalBackend::loadModel(const QString &modelPath) {
   m_modelPath = path;
   m_ready = true;
 
-  qDebug() << "[LocalBackend] Model loaded | ctx:"
-           << llama_n_ctx(m_llamaCtx) << "| batch:" << llama_n_batch(m_llamaCtx)
+  qDebug() << "[LocalBackend] Model loaded | ctx:" << llama_n_ctx(m_llamaCtx)
+           << "| batch:" << llama_n_batch(m_llamaCtx)
            << "| ubatch:" << llama_n_ubatch(m_llamaCtx)
            << "| vision:" << m_hasVision;
   emit statusUpdated("Model loaded: " + path);
@@ -115,9 +112,10 @@ bool LocalBackend::loadModel(const QString &modelPath) {
 
 // ── Backend-specific model loaders ─────────────────────────────────
 
-/// Detect the best available GPU device (CUDA > Vulkan > CPU).
-ggml_backend_dev_t LocalBackend::detectBestDevice() {
-  // Iterate all devices and prefer CUDA > Vulkan > CPU.
+/// Detect devices and return {gpu, cpu} for hybrid offloading.
+/// Priority: CUDA > Vulkan > CPU-only.
+/// Returns at least one device (CPU fallback).
+std::vector<ggml_backend_dev_t> LocalBackend::detectDevices() {
   ggml_backend_dev_t cudaDev = nullptr;
   ggml_backend_dev_t vulkanDev = nullptr;
   ggml_backend_dev_t cpuDev = nullptr;
@@ -131,8 +129,8 @@ ggml_backend_dev_t LocalBackend::detectBestDevice() {
         p.type == GGML_BACKEND_DEVICE_TYPE_CPU
             ? "CPU"
             : (p.type == GGML_BACKEND_DEVICE_TYPE_GPU ? "GPU" : "OTHER");
-    qDebug() << "[LocalBackend] Device" << i << "—" << name << "["
-             << type_str << "]";
+    qDebug() << "[LocalBackend] Device" << i << "—" << name << "[" << type_str
+             << "]";
 
     if (strstr(name, "CUDA") || strstr(name, "cuda")) {
       if (!cudaDev)
@@ -146,22 +144,31 @@ ggml_backend_dev_t LocalBackend::detectBestDevice() {
     }
   }
 
+  std::vector<ggml_backend_dev_t> devs;
+
   if (cudaDev) {
     qDebug() << "[LocalBackend] Detected CUDA device";
-    return cudaDev;
-  }
-  if (vulkanDev) {
+    devs.push_back(cudaDev);
+  } else if (vulkanDev) {
     qDebug() << "[LocalBackend] Detected Vulkan device";
-    return vulkanDev;
+    devs.push_back(vulkanDev);
+  } else {
+    qDebug() << "[LocalBackend] No GPU detected, CPU only";
   }
-  qDebug() << "[LocalBackend] No GPU detected, falling back to CPU";
-  return cpuDev;
+
+  // Always add CPU as fallback — llama will auto-split layers that don't
+  // fit in VRAM onto the CPU device.
+  if (cpuDev) {
+    devs.push_back(cpuDev);
+  }
+
+  return devs;
 }
 
 /// Build a common_init_result, handling hybrid model flash-attention
 /// re-init.  On failure returns nullptr and logs the error.
 common_init_result_ptr LocalBackend::createInitResult(common_params &params,
-                                                          bool hasMmprojOnGpu) {
+                                                      bool hasMmprojOnGpu) {
   auto result = common_init_from_params(params);
   if (!result)
     return nullptr;
@@ -181,132 +188,85 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params,
   return result;
 }
 
-/// ── CUDA-optimized loader ────────────────────────────────────────
-common_init_result_ptr
-LocalBackend::loadModelCuda(const QString &path,
-                                const QString &mmprojPath) {
-  qDebug() << "[LocalBackend] Loading model on CUDA";
-
-  common_params params;
-  params.model.path = path.toStdString();
-  params.n_gpu_layers = -1;
-  params.n_ctx = MaxPromptTokens + MaxGenTokens;
-  params.n_batch = 8192;
-  params.n_ubatch = 8192;
-  params.cpuparams.n_threads = QThread::idealThreadCount();
-  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-
-  params.fit_params = true;
-  params.fit_params_print = true;
-  params.fit_params_min_ctx = 4096;
-  params.fit_params_target.assign(llama_max_devices(), 1024ULL * 1024 * 1024);
-
-  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-
-  if (!mmprojPath.isEmpty()) {
-    params.mmproj.path = mmprojPath.toStdString();
-    params.mmproj_use_gpu = true;
-    qDebug() << "[LocalBackend] mmproj found, will lazy-load:"
-             << mmprojPath;
+/// Model loader: GPU-first with automatic CPU fallback.
+/// n_gpu_layers=999 tells llama to offload as many layers as fit on GPU
+/// without triggering the broken fit_params path.  Remaining layers stay on
+/// CPU automatically.  If GPU load fails entirely, falls back to pure CPU.
+common_init_result_ptr LocalBackend::loadModelWithDevices(
+    const QString &path, const QString &mmprojPath,
+    const std::vector<ggml_backend_dev_t> &devices, const char *primaryName) {
+  ggml_backend_dev_t gpuDev = nullptr;
+  ggml_backend_dev_t cpuDev = nullptr;
+  for (auto dev : devices) {
+    struct ggml_backend_dev_props p;
+    ggml_backend_dev_get_props(dev, &p);
+    if (p.type == GGML_BACKEND_DEVICE_TYPE_CPU) {
+      cpuDev = dev;
+    } else {
+      gpuDev = dev;
+    }
   }
 
-  auto result = createInitResult(params, true);
-  if (!result) {
-    qCritical() << "[LocalBackend] CUDA model load failed";
-    emit statusUpdated("Failed to create context on CUDA");
-    return nullptr;
+  // Try GPU first — n_gpu_layers=999 offloads max layers, rest on CPU.
+  if (gpuDev) {
+    qDebug() << "[LocalBackend] Loading model on" << primaryName;
+    common_params params;
+    params.model.path = path.toStdString();
+    params.devices = {gpuDev};
+    params.n_gpu_layers = 999;
+    params.n_ctx = MaxPromptTokens + MaxGenTokens;
+    params.n_batch = 8192;
+    params.n_ubatch = 8192;
+    params.cpuparams.n_threads = QThread::idealThreadCount();
+    params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+
+    if (!mmprojPath.isEmpty()) {
+      params.mmproj.path = mmprojPath.toStdString();
+      params.mmproj_use_gpu = true;
+      qDebug() << "[LocalBackend] mmproj found, will lazy-load:" << mmprojPath;
+    }
+
+    auto result = createInitResult(params, true);
+    if (result) {
+      qDebug() << "[LocalBackend] Model loaded | ctx:"
+               << llama_n_ctx(result->context())
+               << "| batch:" << llama_n_batch(result->context())
+               << "| ubatch:" << llama_n_ubatch(result->context());
+      return result;
+    }
   }
 
-  qDebug() << "[LocalBackend] CUDA model loaded | ctx:"
-           << llama_n_ctx(result->context())
-           << "| batch:" << llama_n_batch(result->context())
-           << "| ubatch:" << llama_n_ubatch(result->context());
-  return result;
-}
+  // GPU failed — fall back to pure CPU.
+  if (cpuDev) {
+    qDebug() << "[LocalBackend] GPU load failed, falling back to CPU";
+    common_params params;
+    params.model.path = path.toStdString();
+    params.devices = {cpuDev};
+    params.n_gpu_layers = 0;
+    params.n_ctx = MaxPromptTokens + MaxGenTokens;
+    params.n_batch = 4096;
+    params.n_ubatch = 2048;
+    params.cpuparams.n_threads = QThread::idealThreadCount();
+    params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
 
-/// ── Vulkan-optimized loader ──────────────────────────────────────
-common_init_result_ptr
-LocalBackend::loadModelVulkan(const QString &path,
-                                  const QString &mmprojPath) {
-  qDebug() << "[LocalBackend] Loading model on Vulkan";
+    if (!mmprojPath.isEmpty()) {
+      params.mmproj.path = mmprojPath.toStdString();
+      params.mmproj_use_gpu = false;
+    }
 
-  common_params params;
-  params.model.path = path.toStdString();
-  params.n_gpu_layers = -1;
-  params.n_ctx = MaxPromptTokens + MaxGenTokens;
-  // Vulkan: smaller batches to avoid 4 GiB single allocations that fail.
-  params.n_batch = 4096;
-  params.n_ubatch = 2048;
-  params.cpuparams.n_threads = QThread::idealThreadCount();
-  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-
-  // Vulkan needs a larger safety margin (pipeline state + descriptors).
-  params.fit_params = true;
-  params.fit_params_print = true;
-  params.fit_params_min_ctx = 4096;
-  params.fit_params_target.assign(llama_max_devices(), 2560ULL * 1024 * 1024);
-
-  // Flash attention disabled — unstable on Vulkan with hybrid models
-  // and offers no measurable benefit at our batch sizes.
-  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-
-  if (!mmprojPath.isEmpty()) {
-    params.mmproj.path = mmprojPath.toStdString();
-    params.mmproj_use_gpu = true;
-    qDebug() << "[LocalBackend] mmproj found, will lazy-load:"
-             << mmprojPath;
+    auto result = createInitResult(params, false);
+    if (result) {
+      qDebug() << "[LocalBackend] Model loaded on CPU | ctx:"
+               << llama_n_ctx(result->context());
+      return result;
+    }
   }
 
-  auto result = createInitResult(params, true);
-  if (!result) {
-    qCritical() << "[LocalBackend] Vulkan model load failed";
-    emit statusUpdated("Failed to create context on Vulkan");
-    return nullptr;
-  }
-
-  qDebug() << "[LocalBackend] Vulkan model loaded | ctx:"
-           << llama_n_ctx(result->context())
-           << "| batch:" << llama_n_batch(result->context())
-           << "| ubatch:" << llama_n_ubatch(result->context());
-  return result;
-}
-
-/// ── CPU-optimized loader ─────────────────────────────────────────
-common_init_result_ptr
-LocalBackend::loadModelCpu(const QString &path, const QString &mmprojPath) {
-  qDebug() << "[LocalBackend] Loading model on CPU";
-
-  common_params params;
-  params.model.path = path.toStdString();
-  params.n_gpu_layers = 0;
-  params.n_ctx = MaxPromptTokens + MaxGenTokens;
-  params.n_batch = 4096;
-  params.n_ubatch = 2048;
-  params.cpuparams.n_threads = QThread::idealThreadCount();
-  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-
-  params.fit_params = false;
-  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-
-  if (!mmprojPath.isEmpty()) {
-    params.mmproj.path = mmprojPath.toStdString();
-    params.mmproj_use_gpu = false;
-    qDebug() << "[LocalBackend] mmproj found, will lazy-load on CPU:"
-             << mmprojPath;
-  }
-
-  auto result = createInitResult(params, false);
-  if (!result) {
-    qCritical() << "[LocalBackend] CPU model load failed";
-    emit statusUpdated("Failed to create context on CPU");
-    return nullptr;
-  }
-
-  qDebug() << "[LocalBackend] CPU model loaded | ctx:"
-           << llama_n_ctx(result->context())
-           << "| batch:" << llama_n_batch(result->context())
-           << "| ubatch:" << llama_n_ubatch(result->context());
-  return result;
+  qCritical() << "[LocalBackend] Model load failed on" << primaryName;
+  emit statusUpdated("Failed to load model on " + QString(primaryName));
+  return nullptr;
 }
 
 void LocalBackend::unloadModel() {
@@ -384,7 +344,7 @@ QString LocalBackend::summarize(const PromptPayload &payload) {
 }
 
 QString LocalBackend::generate(const QString &systemPrompt,
-                                   const QString &userPrompt) {
+                               const QString &userPrompt) {
   PromptPayload p;
   p.systemPrompt = systemPrompt;
   p.userMessage = userPrompt;
@@ -394,14 +354,20 @@ QString LocalBackend::generate(const QString &systemPrompt,
 
 // ── Text-only inference ────────────────────────────────────────────
 
-QString LocalBackend::runTextInference(const QString &formattedText) {
-  InferenceParams params;
-  params.max_tokens = MaxGenTokens;
-  params.temperature = Temperature;
-  params.top_k = TopK;
-  params.top_p = TopP;
+common_params_sampling LocalBackend::makeSamplingParams() const {
+  common_params_sampling params;
+  params.temp = 0.1f;
+  params.top_k = 40;
+  params.top_p = 0.9f;
+  params.min_p = 0.05f;
+  params.penalty_repeat = 1.1f;
+  params.penalty_last_n = 64;
+  return params;
+}
 
-  InferenceEngine engine(m_llamaCtx, m_llamaModel, params);
+QString LocalBackend::runTextInference(const QString &formattedText) {
+  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams(),
+                         MaxGenTokens);
   QString result = engine.inferText(formattedText);
 
   if (result.isEmpty()) {
@@ -417,7 +383,7 @@ QString LocalBackend::runTextInference(const QString &formattedText) {
 /// text-only and multimodal workloads.
 QString
 LocalBackend::runMultimodalInference(const QString &formattedText,
-                                         const std::vector<PageImage> &images) {
+                                     const std::vector<PageImage> &images) {
   if (!m_hasVision) {
     qWarning() << "[LocalBackend] Multimodal inference requested but "
                   "vision not available";
@@ -433,20 +399,9 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
   qDebug() << "[LocalBackend] Multimodal inference with" << images.size()
            << "images";
 
-  InferenceParams params;
-  params.max_tokens = MaxGenTokens;
-  params.temperature = Temperature;
-  params.top_k = TopK;
-  params.top_p = TopP;
-
-  QString result;
-  {
-    // Engine is scoped here so it's destroyed (and its sampler chain freed)
-    // before we unload the mmproj — avoids use-after-free if the engine
-    // holds references into the mtmd context.
-    InferenceEngine engine(m_llamaCtx, m_llamaModel, params);
-    result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
-  }
+  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams(),
+                         MaxGenTokens);
+  QString result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
 
   // Unload mmproj to free GPU VRAM after inference.
   // This is critical: the mmproj can take 100-300 MiB of VRAM.  Keeping it
@@ -454,8 +409,7 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
   unloadMmproj();
 
   if (result.isEmpty()) {
-    qWarning()
-        << "[LocalBackend] Multimodal inference returned empty output";
+    qWarning() << "[LocalBackend] Multimodal inference returned empty output";
   }
   return result;
 }
@@ -500,7 +454,7 @@ void LocalBackend::unloadMmproj() {
 /// in the model's chat template.  The marker is a special token placeholder
 /// (e.g. "<__media__>") that mtmd_tokenize replaces with image embeddings.
 QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
-                                               int32_t maxChars) {
+                                           int32_t maxChars) {
   const char *rawMarker =
       m_mtmdCtx != nullptr ? mtmd_get_marker(m_mtmdCtx) : nullptr;
   const char *marker = rawMarker ? rawMarker : "<__media__>";
@@ -526,7 +480,7 @@ QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
 }
 
 QString LocalBackend::applyChatTemplate(const QString &systemPrompt,
-                                            const QString &userMessage) {
+                                        const QString &userMessage) {
   if (!m_chatTemplates) {
     qWarning() << "[LocalBackend] Chat templates not initialized";
     return QString();

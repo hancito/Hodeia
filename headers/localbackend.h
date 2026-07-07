@@ -8,6 +8,7 @@
 struct common_init_result;
 struct common_chat_templates;
 struct common_params;
+struct common_params_sampling;
 
 // MOC scanner needs a type for detectBestDevice() return value.
 #ifndef GGML_BACKEND_H
@@ -118,16 +119,14 @@ private:
   common_init_result_ptr createInitResult(common_params &params,
                                           bool hasMmprojOnGpu);
 
-  /// Detect which backend device to target (CUDA, Vulkan, CPU).
-  ggml_backend_dev_t detectBestDevice();
+  /// Detect devices and return {gpu, cpu} for hybrid offloading.
+  std::vector<ggml_backend_dev_t> detectDevices();
 
-  /// Backend-specific model loaders.
-  common_init_result_ptr loadModelCuda(const QString &path,
-                                       const QString &mmprojPath);
-  common_init_result_ptr loadModelVulkan(const QString &path,
-                                         const QString &mmprojPath);
-  common_init_result_ptr loadModelCpu(const QString &path,
-                                      const QString &mmprojPath);
+  /// Unified model loader with hybrid GPU+CPU offloading.
+  common_init_result_ptr
+  loadModelWithDevices(const QString &path, const QString &mmprojPath,
+                       const std::vector<ggml_backend_dev_t> &devices,
+                       const char *primaryName);
 
   /// libcommon init result — owns the llama_model + llama_context.
   common_init_result_ptr m_commonInit;
@@ -152,7 +151,6 @@ private:
 
   static constexpr int32_t MaxPromptTokens = 8192;
   static constexpr int32_t MaxGenTokens = 4096;
-  static constexpr float Temperature = 0.1f;
-  static constexpr int32_t TopK = 40;
-  static constexpr float TopP = 0.9f;
+
+  common_params_sampling makeSamplingParams() const;
 };

@@ -167,7 +167,7 @@ set(LLAMA_BASE ${EXTERNAL}/lib/llamacpp)
 # Backend-specific libraries that differ per variant.
 set(GGML_SO_VER 0.15.3)
 
-# Decide which backends to ship: forced single variant or all available.
+# Decide which backends to ship: forced single variant or auto-detect best.
 set(SHIP_VARIANTS "")
 if(LLAMA_FORCE_BACKEND)
   string(TOLOWER "${LLAMA_FORCE_BACKEND}" _force)
@@ -181,9 +181,19 @@ if(LLAMA_FORCE_BACKEND)
     message(FATAL_ERROR "LLAMA_FORCE_BACKEND must be cpu, cuda, or vulkan, got: ${LLAMA_FORCE_BACKEND}")
   endif()
 else()
-  set(SHIP_VARIANTS "cpu" "cuda" "vulkan")
+  # Auto-detect: pick the highest-priority backend whose libs exist.
+  # Priority: CUDA > Vulkan > CPU.
+  set(_DETECTED_BACKEND "cpu")
+  if(EXISTS "${LLAMA_BASE}/vulkan")
+    set(_DETECTED_BACKEND "vulkan")
+  endif()
+  if(EXISTS "${LLAMA_BASE}/cuda")
+    set(_DETECTED_BACKEND "cuda")
+  endif()
+  set(SHIP_VARIANTS "${_DETECTED_BACKEND}")
+  message(STATUS "llama.cpp backend auto-detected: ${_DETECTED_BACKEND}")
 endif()
-message(STATUS "llama.cpp backends shipped: ${SHIP_VARIANTS}")
+message(STATUS "llama.cpp backend shipped: ${SHIP_VARIANTS}")
 
 # Collect backend-specific .so to ship.
 set(BACKEND_LIBS "")
@@ -204,9 +214,10 @@ foreach(VARIANT IN ITEMS cpu cuda vulkan)
   endif()
 endforeach()
 
-# Link: always link the common libs (pick any variant — they're identical).
+# Link: pick the highest-priority available backend for the common libs
+# (llama, ggml, mtmd are identical across variants — any works).
 set(_LLAMA_LINK_DIR "${LLAMA_BASE}/cpu")
-foreach(VARIANT IN LISTS SHIP_VARIANTS)
+foreach(VARIANT IN ITEMS cuda vulkan cpu)
   if(EXISTS "${LLAMA_BASE}/${VARIANT}")
     set(_LLAMA_LINK_DIR "${LLAMA_BASE}/${VARIANT}")
     break()
