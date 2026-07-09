@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <expected>
 #include <memory>
 #include <vector>
 
@@ -65,9 +66,10 @@ public:
   ~LocalBackend() override;
 
   /// Load a GGUF model (and optionally an mmproj) from disk.
-  /// Returns true on success.  Calls unloadModel() internally if a model
-  /// is already loaded, so it's safe to call repeatedly.
-  bool loadModel(const QString &modelPath = QString());
+  /// Returns std::expected<void, QString> — error string on failure.
+  /// Calls unloadModel() internally if a model is already loaded, so it's
+  /// safe to call repeatedly.
+  std::expected<void, QString> loadModel(const QString &modelPath = QString());
 
   /// Returns true if a model is loaded and ready for inference.
   bool isReady() const;
@@ -110,7 +112,7 @@ private:
   QString resolveMmprojPath(const QString &modelPath) const;
 
   /// Lazy-load the multimodal projector onto the GPU.
-  bool loadMmproj();
+  std::expected<void, QString> loadMmproj();
   /// Unload the projector to free its GPU VRAM.
   void unloadMmproj();
 

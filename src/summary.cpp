@@ -81,7 +81,10 @@ void SummaryModel::loadAll() {
       "year, topics, llmodel, summary_json, date FROM Summaries "
       "ORDER BY id");
 
-  while (stmt.step()) {
+  while (true) {
+    auto stepResult = stmt.step();
+    if (!stepResult || !stepResult.value())
+      break;
     SummaryRow row;
     row.id = stmt.columnInt(0);
     row.paperHash = stmt.columnText(1);

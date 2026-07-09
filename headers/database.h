@@ -5,6 +5,7 @@
 #include "headers/summary.h"
 #include "headers/summaryproxymodel.h"
 #include <QObject>
+#include <expected>
 
 class ConfigManager;
 
@@ -28,7 +29,8 @@ public:
 
   Q_INVOKABLE bool isOpen() const;
   Q_INVOKABLE QString databasePath() const;
-  Q_INVOKABLE bool switchDatabase(const QString &dbPath);
+  Q_INVOKABLE std::expected<void, QString>
+  switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
 

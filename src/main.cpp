@@ -13,6 +13,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <print>
 
 /// Install a global llama.cpp log callback early (before any model loads)
 /// so that embedding model init and chat backend share the same filter.
@@ -20,7 +21,7 @@ static void initLlamaLogging() {
   llama_log_set(
       [](enum ggml_log_level level, const char *text, void *) {
         if (level >= GGML_LOG_LEVEL_ERROR) {
-          fprintf(stderr, "llama.cpp: %s", text);
+          std::print("llama.cpp: {}\n", text);
         }
       },
       nullptr);

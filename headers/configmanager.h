@@ -4,6 +4,7 @@
 #include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
+#include <expected>
 #include <qtmetamacros.h>
 
 #include "headers/hardwaredetector.h"
@@ -73,10 +74,13 @@ public:
   Q_INVOKABLE void removeBackend(const QString &name);
 
   // Project Operations
-  Q_INVOKABLE bool createProject(const QString &projectName);
-  Q_INVOKABLE bool switchToProject(const QString &projectName);
-  Q_INVOKABLE bool deleteProjects(const QStringList &projectNames);
-  Q_INVOKABLE bool resetActiveProject();
+  Q_INVOKABLE std::expected<void, QString>
+  createProject(const QString &projectName);
+  Q_INVOKABLE std::expected<void, QString>
+  switchToProject(const QString &projectName);
+  Q_INVOKABLE std::expected<void, QString>
+  deleteProjects(const QStringList &projectNames);
+  Q_INVOKABLE std::expected<void, QString> resetActiveProject();
   Q_INVOKABLE QString projectPath(const QString &projectName) const;
   Q_INVOKABLE QString projectDbPath(const QString &projectName) const;
   Q_INVOKABLE QString projectImgPath(const QString &projectName) const;

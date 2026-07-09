@@ -488,7 +488,7 @@ void ModelHelper::addLocalSummarizerWithMmproj(const QString &modelPath,
   ModelHelper *self = this;
 
   // Model copy
-  QtConcurrent::run(
+  QThreadPool::globalInstance()->start(
       [self, src = modelSrc, folder = modelFolder, done, modelOk]() {
         *modelOk = copyFileToDir(src, folder, self) ? 1 : 0;
         int remaining = done->fetchAndAddRelaxed(-1);
@@ -499,7 +499,7 @@ void ModelHelper::addLocalSummarizerWithMmproj(const QString &modelPath,
 
   // MMProj copy (optional)
   if (!mmprojSrc.isEmpty()) {
-    QtConcurrent::run(
+    QThreadPool::globalInstance()->start(
         [self, src = mmprojSrc, folder = modelFolder, done, mmprojOk]() {
           *mmprojOk = copyFileToDir(src, folder, self) ? 1 : 0;
           int remaining = done->fetchAndAddRelaxed(-1);

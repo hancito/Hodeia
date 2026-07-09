@@ -60,7 +60,10 @@ void QueryModel::loadAll() {
       m_db->prepare("SELECT id, query, response, date, llmodel FROM Queries "
                     "ORDER BY id");
 
-  while (stmt.step()) {
+  while (true) {
+    auto stepResult = stmt.step();
+    if (!stepResult || !stepResult.value())
+      break;
     QueryRow row;
     row.id = stmt.columnInt(0);
     row.queryText = stmt.columnText(1);

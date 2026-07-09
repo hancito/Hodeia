@@ -1,10 +1,10 @@
 #include "headers/sqlitedb.h"
 #include <QCoreApplication>
-#include <QDebug>
 #include <QLibraryInfo>
 extern "C" {
 #include <Sqlite3/sqlite3.h>
 }
+
 /* ── SqliteStatement ─────────────────────────────────────────── */
 
 SqliteStatement::SqliteStatement() = default;
@@ -30,50 +30,77 @@ SqliteStatement &SqliteStatement::operator=(SqliteStatement &&other) noexcept {
   return *this;
 }
 
-bool SqliteStatement::bind(int index, const QString &value) {
+std::expected<bool, QString> SqliteStatement::bind(int index,
+                                                   const QString &value) {
   QByteArray utf8 = value.toUtf8();
-  return sqlite3_bind_text(m_stmt, index, utf8.constData(), utf8.size(),
-                           SQLITE_TRANSIENT) == SQLITE_OK;
+  int rc = sqlite3_bind_text(m_stmt, index, utf8.constData(), utf8.size(),
+                             SQLITE_TRANSIENT);
+  if (rc != SQLITE_OK) {
+    return std::unexpected{
+        QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)))};
+  }
+  return true;
 }
 
-bool SqliteStatement::bind(int index, int value) {
-  return sqlite3_bind_int(m_stmt, index, value) == SQLITE_OK;
+std::expected<bool, QString> SqliteStatement::bind(int index, int value) {
+  int rc = sqlite3_bind_int(m_stmt, index, value);
+  if (rc != SQLITE_OK) {
+    return std::unexpected{
+        QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)))};
+  }
+  return true;
 }
 
-bool SqliteStatement::bind(int index, int64_t value) {
-  return sqlite3_bind_int64(m_stmt, index, value) == SQLITE_OK;
+std::expected<bool, QString> SqliteStatement::bind(int index, int64_t value) {
+  int rc = sqlite3_bind_int64(m_stmt, index, value);
+  if (rc != SQLITE_OK) {
+    return std::unexpected{
+        QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)))};
+  }
+  return true;
 }
 
-bool SqliteStatement::bind(int index, double value) {
-  return sqlite3_bind_double(m_stmt, index, value) == SQLITE_OK;
+std::expected<bool, QString> SqliteStatement::bind(int index, double value) {
+  int rc = sqlite3_bind_double(m_stmt, index, value);
+  if (rc != SQLITE_OK) {
+    return std::unexpected{
+        QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)))};
+  }
+  return true;
 }
 
-bool SqliteStatement::bind(int index, const QDateTime &dt) {
-  QString text = dt.toString(Qt::ISODate);
-  return bind(index, text);
+std::expected<bool, QString> SqliteStatement::bind(int index,
+                                                   const QDateTime &dt) {
+  return bind(index, dt.toString(Qt::ISODate));
 }
 
-bool SqliteStatement::bind(int index, const QByteArray &blob) {
-  return sqlite3_bind_blob(m_stmt, index, blob.constData(), blob.size(),
-                           SQLITE_TRANSIENT) == SQLITE_OK;
+std::expected<bool, QString> SqliteStatement::bind(int index,
+                                                   const QByteArray &blob) {
+  int rc = sqlite3_bind_blob(m_stmt, index, blob.constData(), blob.size(),
+                             SQLITE_TRANSIENT);
+  if (rc != SQLITE_OK) {
+    return std::unexpected{
+        QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)))};
+  }
+  return true;
 }
 
-bool SqliteStatement::step() {
+std::expected<bool, QString> SqliteStatement::step() {
   int rc = sqlite3_step(m_stmt);
   if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
     m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
         sqlite3_errmsg(sqlite3_db_handle(m_stmt))));
-    return false;
+    return std::unexpected{m_errorMsg};
   }
   return rc == SQLITE_ROW;
 }
 
-bool SqliteStatement::exec() {
+std::expected<bool, QString> SqliteStatement::exec() {
   int rc = sqlite3_step(m_stmt);
   if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
     m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
         sqlite3_errmsg(sqlite3_db_handle(m_stmt))));
-    return false;
+    return std::unexpected{m_errorMsg};
   }
   return rc == SQLITE_DONE;
 }
@@ -149,8 +176,7 @@ SqliteDb::SqliteDb() = default;
 
 SqliteDb::~SqliteDb() { close(); }
 
-SqliteDb::SqliteDb(SqliteDb &&other) noexcept
-    : m_db(other.m_db), m_lastError(std::move(other.m_lastError)) {
+SqliteDb::SqliteDb(SqliteDb &&other) noexcept : m_db(other.m_db) {
   other.m_db = nullptr;
 }
 
@@ -158,24 +184,22 @@ SqliteDb &SqliteDb::operator=(SqliteDb &&other) noexcept {
   if (this != &other) {
     close();
     m_db = other.m_db;
-    m_lastError = std::move(other.m_lastError);
     other.m_db = nullptr;
   }
   return *this;
 }
 
-bool SqliteDb::open(const QString &path) {
+std::expected<void, QString> SqliteDb::open(const QString &path) {
   if (m_db)
     close();
 
   int rc = sqlite3_open_v2(path.toUtf8().constData(), &m_db,
                            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
   if (rc != SQLITE_OK) {
-    m_lastError = QString::fromUtf8(sqlite3_errmsg(m_db));
-    qCritical() << "[SqliteDb] Failed to open:" << path << m_lastError;
+    QString err = QString::fromUtf8(sqlite3_errmsg(m_db));
     sqlite3_close_v2(m_db);
     m_db = nullptr;
-    return false;
+    return std::unexpected{err};
   }
 
   // Enable WAL mode for better concurrent read/write
@@ -190,14 +214,12 @@ bool SqliteDb::open(const QString &path) {
   rc = sqlite3_load_extension(m_db, vec0Path.toUtf8().constData(), nullptr,
                               &load_err);
   if (rc != SQLITE_OK) {
-    m_lastError = load_err ? QString::fromUtf8(load_err)
+    QString err = load_err ? QString::fromUtf8(load_err)
                            : QString("sqlite3_load_extension failed");
-    qCritical() << "[SqliteDb] Failed to load vec0.so from" << vec0Path << ":"
-                << m_lastError;
     if (load_err)
       sqlite3_free(load_err);
     close();
-    return false;
+    return std::unexpected{err};
   }
   if (load_err)
     sqlite3_free(load_err);
@@ -205,7 +227,7 @@ bool SqliteDb::open(const QString &path) {
   // Disable extension loading after init
   sqlite3_enable_load_extension(m_db, 0);
 
-  return true;
+  return {};
 }
 
 void SqliteDb::close() {
@@ -215,20 +237,19 @@ void SqliteDb::close() {
   }
 }
 
-bool SqliteDb::exec(const QString &sql) {
+std::expected<void, QString> SqliteDb::exec(const QString &sql) {
   if (!m_db)
-    return false;
+    return std::unexpected{"database not open"};
 
   char *errmsg = nullptr;
   int rc =
       sqlite3_exec(m_db, sql.toUtf8().constData(), nullptr, nullptr, &errmsg);
   if (rc != SQLITE_OK) {
-    m_lastError = QString::fromUtf8(errmsg);
+    QString err = QString::fromUtf8(errmsg);
     sqlite3_free(errmsg);
-    qWarning() << "[SqliteDb] exec failed:" << m_lastError;
-    return false;
+    return std::unexpected{err};
   }
-  return true;
+  return {};
 }
 
 SqliteStatement SqliteDb::prepare(const QString &sql) {
@@ -236,21 +257,21 @@ SqliteStatement SqliteDb::prepare(const QString &sql) {
   if (!m_db)
     return stmt;
 
-  int rc = sqlite3_prepare_v2(m_db, sql.toUtf8().constData(),
-                              sql.toUtf8().size(), &stmt.m_stmt, nullptr);
+  QByteArray sqlUtf8 = sql.toUtf8();
+  int rc = sqlite3_prepare_v2(m_db, sqlUtf8.constData(), sqlUtf8.size(),
+                              &stmt.m_stmt, nullptr);
   if (rc != SQLITE_OK) {
     stmt.m_errorMsg = QString::fromUtf8(sqlite3_errmsg(m_db));
-    qWarning() << "[SqliteDb] prepare failed:" << stmt.m_errorMsg;
     stmt.m_stmt = nullptr;
   }
   return stmt;
 }
 
-bool SqliteDb::transaction() { return exec("BEGIN TRANSACTION"); }
-
-bool SqliteDb::commit() { return exec("COMMIT"); }
-
-bool SqliteDb::rollback() { return exec("ROLLBACK"); }
+std::expected<void, QString> SqliteDb::transaction() {
+  return exec("BEGIN TRANSACTION");
+}
+std::expected<void, QString> SqliteDb::commit() { return exec("COMMIT"); }
+std::expected<void, QString> SqliteDb::rollback() { return exec("ROLLBACK"); }
 
 int64_t SqliteDb::lastInsertRowId() const {
   return m_db ? sqlite3_last_insert_rowid(m_db) : 0;

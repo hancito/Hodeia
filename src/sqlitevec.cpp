@@ -9,6 +9,7 @@
 #include <QMutex>
 #include <QThread>
 #include <algorithm>
+#include <expected>
 
 namespace {
 constexpr const char *PassagePrefix = "passage: ";
@@ -117,7 +118,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
 /* ── vec0 table creation ─────────────────────────────────────── */
 
-bool SqliteVecManager::createChunksTable(SqliteDb &db) {
+std::expected<void, QString> SqliteVecManager::createChunksTable(SqliteDb &db) {
   int dim = m_dim > 0 ? m_dim : 384;
   QString sql = QString("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
                         "embedding float[%1], "
@@ -238,7 +239,7 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
       "citation, clean_title) "
       "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?)");
   if (!stmt.isValid()) {
-    qCritical() << "[SqliteVec] Prepare failed:" << stmt.errorMsg();
+    qCritical() << "[SqliteVec] Prepare failed";
     return -1;
   }
 
@@ -265,16 +266,45 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
       QByteArray blob(reinterpret_cast<const char *>(rowPtr),
                       m_dim * sizeof(float));
 
-      stmt.bind(1, blob);
-      stmt.bind(2, c.paperHash);
-      stmt.bind(3, c.page);
-      stmt.bind(4, c.chunkIdx);
-      stmt.bind(5, c.text);
-      stmt.bind(6, QString()); // citation (empty for now)
-      stmt.bind(7, QString()); // clean_title (empty for now)
+      auto bindResult = stmt.bind(1, blob);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(2, c.paperHash);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(3, c.page);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(4, c.chunkIdx);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(5, c.text);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(6, QString()); // citation (empty for now)
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
+      bindResult = stmt.bind(7, QString()); // clean_title (empty for now)
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
 
-      if (!stmt.exec()) {
-        qCritical() << "[SqliteVec] Insert failed:" << stmt.errorMsg();
+      auto execResult = stmt.exec();
+      if (!execResult) {
+        qCritical() << "[SqliteVec] Insert failed:" << execResult.error();
         return -1;
       }
       stmt.resetAndClearBindings();
@@ -314,10 +344,21 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
   if (!stmt.isValid())
     return {};
 
-  stmt.bind(1, queryBlob);
+  auto bindResult = stmt.bind(1, queryBlob);
+  if (!bindResult) {
+    qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+    return {};
+  }
 
   QList<ChunkSearchResult> results;
-  while (stmt.step()) {
+  while (true) {
+    auto stepResult = stmt.step();
+    if (!stepResult) {
+      qCritical() << "[SqliteVec] Step failed:" << stepResult.error();
+      break;
+    }
+    if (!*stepResult)
+      break;
     ChunkSearchResult r;
     r.paperHash = stmt.columnText(0);
     r.page = stmt.columnInt(1);
@@ -347,10 +388,21 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
   if (!stmt.isValid())
     return {};
 
-  stmt.bind(1, paperHash);
+  auto bindResult = stmt.bind(1, paperHash);
+  if (!bindResult) {
+    qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+    return {};
+  }
 
   QList<ChunkSearchResult> results;
-  while (stmt.step()) {
+  while (true) {
+    auto stepResult = stmt.step();
+    if (!stepResult) {
+      qCritical() << "[SqliteVec] Step failed:" << stepResult.error();
+      break;
+    }
+    if (!*stepResult)
+      break;
     ChunkSearchResult r;
     r.paperHash = stmt.columnText(0);
     r.page = stmt.columnInt(1);

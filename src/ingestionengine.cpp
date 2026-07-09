@@ -227,37 +227,44 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     return;
 
   SqliteDb db;
-  if (!db.open(dbPath)) {
+  auto openResult = db.open(dbPath);
+  if (!openResult) {
     qCritical() << "[PdfWorker] Failed to open database for chunk ingestion:"
-                << db.lastError();
+                << openResult.error();
     return;
   }
 
   // Single transaction for the entire batch — much faster than per-row commits.
-  if (!db.transaction()) {
+  auto txResult = db.transaction();
+  if (!txResult) {
     qCritical() << "[PdfWorker] Failed to start transaction for chunks:"
-                << db.lastError();
+                << txResult.error();
     return;
   }
 
   int inserted = m_vecManager->insertChunks(db, chunks);
 
   if (inserted < 0) {
-    if (!db.rollback()) {
+    auto rbResult = db.rollback();
+    if (!rbResult) {
       qCritical() << "[PdfWorker] Chunk transaction rollback failed:"
-                  << db.lastError();
+                  << rbResult.error();
     }
     return;
   }
 
-  if (!db.commit()) {
+  auto commitResult = db.commit();
+  if (!commitResult) {
     qCritical() << "[PdfWorker] Chunk transaction commit failed:"
-                << db.lastError();
-    db.rollback();
+                << commitResult.error();
+    (void)db.rollback();
   }
 
   // Truncate the WAL file so it doesn't grow unbounded across batches.
-  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  if (!wpResult) {
+    qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
+  }
 }
 
 void PdfWorker::savePapers(const QList<SummaryRow> &rows,
@@ -266,14 +273,17 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
     return;
 
   SqliteDb db;
-  if (!db.open(dbPath)) {
+  auto openResult = db.open(dbPath);
+  if (!openResult) {
     qCritical() << "[PdfWorker] Failed to open database for saving in thread"
-                << QThread::currentThreadId() << ":" << db.lastError();
+                << QThread::currentThreadId() << ":" << openResult.error();
     return;
   }
 
-  if (!db.transaction()) {
-    qCritical() << "[PdfWorker] Failed to start transaction:" << db.lastError();
+  auto txResult = db.transaction();
+  if (!txResult) {
+    qCritical() << "[PdfWorker] Failed to start transaction:"
+                << txResult.error();
     return;
   }
 
@@ -285,32 +295,66 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
   for (const auto &row : rows) {
-    stmt.bind(1, row.paperHash);
-    stmt.bind(2, row.title);
-    stmt.bind(3, row.authors);
-    stmt.bind(4, row.pagesNum);
-    stmt.bind(5, row.journal);
-    stmt.bind(6, row.year);
-    stmt.bind(7, row.topics);
-    stmt.bind(8, row.llmodel);
-    stmt.bind(9, row.summaryJson.toByteArray());
-    stmt.bind(10, row.date);
+    auto b1 = stmt.bind(1, row.paperHash);
+    auto b2 = stmt.bind(2, row.title);
+    auto b3 = stmt.bind(3, row.authors);
+    auto b4 = stmt.bind(4, row.pagesNum);
+    auto b5 = stmt.bind(5, row.journal);
+    auto b6 = stmt.bind(6, row.year);
+    auto b7 = stmt.bind(7, row.topics);
+    auto b8 = stmt.bind(8, row.llmodel);
+    auto b9 = stmt.bind(9, row.summaryJson.toByteArray());
+    auto b10 = stmt.bind(10, row.date);
 
-    if (!stmt.exec()) {
+    if (!b1 || !b2 || !b3 || !b4 || !b5 || !b6 || !b7 || !b8 || !b9 || !b10) {
+      QString errMsg;
+      if (!b1)
+        errMsg = b1.error();
+      else if (!b2)
+        errMsg = b2.error();
+      else if (!b3)
+        errMsg = b3.error();
+      else if (!b4)
+        errMsg = b4.error();
+      else if (!b5)
+        errMsg = b5.error();
+      else if (!b6)
+        errMsg = b6.error();
+      else if (!b7)
+        errMsg = b7.error();
+      else if (!b8)
+        errMsg = b8.error();
+      else if (!b9)
+        errMsg = b9.error();
+      else
+        errMsg = b10.error();
+      qCritical() << "[PdfWorker] Error binding params for paper" << row.title
+                  << ":" << errMsg;
+      (void)db.rollback();
+      return;
+    }
+
+    auto execResult = stmt.exec();
+    if (!execResult) {
       qCritical() << "[PdfWorker] Error inserting paper" << row.title << ":"
-                  << stmt.errorMsg();
-      db.rollback();
+                  << execResult.error();
+      (void)db.rollback();
       return;
     }
     stmt.resetAndClearBindings();
   }
 
-  if (!db.commit()) {
-    qCritical() << "[PdfWorker] Transaction commit failed:" << db.lastError();
-    db.rollback();
+  auto commitResult = db.commit();
+  if (!commitResult) {
+    qCritical() << "[PdfWorker] Transaction commit failed:"
+                << commitResult.error();
+    (void)db.rollback();
   }
 
-  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  if (!wpResult) {
+    qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
+  }
 }
 
 // ─── Hash helpers ────────────────────────────────────────────────
@@ -319,14 +363,23 @@ QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
   QStringList hashes;
 
   SqliteDb db;
-  if (!db.open(dbPath)) {
+  auto openResult = db.open(dbPath);
+  if (!openResult) {
     qCritical() << "[PdfWorker] Failed to open database for reading:"
-                << db.lastError();
+                << openResult.error();
     return hashes;
   }
 
   SqliteStatement stmt = db.prepare("SELECT paper_hash FROM Summaries");
-  while (stmt.step()) {
+  while (true) {
+    auto stepResult = stmt.step();
+    if (!stepResult) {
+      qCritical() << "[PdfWorker] Error reading paper hashes:"
+                  << stepResult.error();
+      break;
+    }
+    if (!stepResult.value())
+      break; // SQLITE_DONE
     hashes << stmt.columnText(0);
   }
   return hashes;

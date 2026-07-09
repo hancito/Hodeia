@@ -183,7 +183,9 @@ QString Summarizer::summarizeLocal(const PromptPayload &payload,
   QElapsedTimer loadTimer;
   loadTimer.start();
 
-  if (!m_chatBackend->loadModel(backend.modelPath)) {
+  auto loadResult = m_chatBackend->loadModel(backend.modelPath);
+  if (!loadResult) {
+    qWarning() << "[Summarizer] Failed to load model:" << loadResult.error();
     return QString();
   }
   qDebug() << "[Summarizer] Model loaded in" << loadTimer.elapsed() << "ms";
@@ -343,19 +345,20 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
     return;
   }
 
-  stmt.bind(1, hash);
-  stmt.bind(2, summary.title);
-  stmt.bind(3, summary.authors.join("; "));
-  stmt.bind(4, summary.journal);
-  stmt.bind(5, QString::number(summary.year));
-  stmt.bind(6, summary.topics.join(", "));
-  stmt.bind(7, modelName);
-  stmt.bind(8, rawJson.toUtf8());
-  stmt.bind(9, QDateTime::currentDateTimeUtc());
+  (void)stmt.bind(1, hash);
+  (void)stmt.bind(2, summary.title);
+  (void)stmt.bind(3, summary.authors.join("; "));
+  (void)stmt.bind(4, summary.journal);
+  (void)stmt.bind(5, QString::number(summary.year));
+  (void)stmt.bind(6, summary.topics.join(", "));
+  (void)stmt.bind(7, modelName);
+  (void)stmt.bind(8, rawJson.toUtf8());
+  (void)stmt.bind(9, QDateTime::currentDateTimeUtc());
 
-  if (!stmt.exec()) {
+  auto execResult = stmt.exec();
+  if (!execResult) {
     qCritical() << "[Summarizer] Failed to save summary for" << hash << ":"
-                << stmt.errorMsg();
+                << execResult.error();
     return;
   }
 

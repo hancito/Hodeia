@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QString>
+#include <expected>
 
 struct sqlite3;
 struct sqlite3_stmt;
@@ -21,16 +22,16 @@ public:
   SqliteStatement(const SqliteStatement &) = delete;
   SqliteStatement &operator=(const SqliteStatement &) = delete;
 
-  bool bind(int index, const QString &value);
-  bool bind(int index, int value);
-  bool bind(int index, int64_t value);
-  bool bind(int index, double value);
-  bool bind(int index, const QDateTime &dt);
-  bool bind(int index, const QByteArray &blob);
+  std::expected<bool, QString> bind(int index, const QString &value);
+  std::expected<bool, QString> bind(int index, int value);
+  std::expected<bool, QString> bind(int index, int64_t value);
+  std::expected<bool, QString> bind(int index, double value);
+  std::expected<bool, QString> bind(int index, const QDateTime &dt);
+  std::expected<bool, QString> bind(int index, const QByteArray &blob);
 
-  bool step();
+  std::expected<bool, QString> step();
   // Execute a statement that returns no rows (INSERT, UPDATE, DELETE)
-  bool exec();
+  std::expected<bool, QString> exec();
   void reset();
   void resetAndClearBindings();
 
@@ -49,7 +50,6 @@ public:
   int columnBytes(int index) const;
 
   bool isValid() const { return m_stmt != nullptr; }
-  QString errorMsg() const { return m_errorMsg; }
 
   sqlite3_stmt *handle() const { return m_stmt; }
 
@@ -69,27 +69,25 @@ public:
   SqliteDb(const SqliteDb &) = delete;
   SqliteDb &operator=(const SqliteDb &) = delete;
 
-  bool open(const QString &path);
+  std::expected<void, QString> open(const QString &path);
   void close();
   bool isOpen() const { return m_db != nullptr; }
 
   // Execute a statement that returns no rows (CREATE, INSERT, DELETE, UPDATE)
-  bool exec(const QString &sql);
+  std::expected<void, QString> exec(const QString &sql);
 
   // Prepare a statement for repeated use
   SqliteStatement prepare(const QString &sql);
 
   // Transaction support
-  bool transaction();
-  bool commit();
-  bool rollback();
+  std::expected<void, QString> transaction();
+  std::expected<void, QString> commit();
+  std::expected<void, QString> rollback();
 
-  QString lastError() const { return m_lastError; }
   int64_t lastInsertRowId() const;
 
   sqlite3 *handle() const { return m_db; }
 
 private:
   sqlite3 *m_db = nullptr;
-  QString m_lastError;
 };

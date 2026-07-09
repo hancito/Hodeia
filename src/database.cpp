@@ -2,6 +2,7 @@
 #include "headers/configmanager.h"
 #include "headers/sqlitevec.h"
 #include <QDir>
+#include <expected>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
@@ -24,15 +25,16 @@ bool DatabaseManager::initDatabase() {
   m_dbPath = m_config->projectDbPath(m_config->lastProject());
   qDebug() << "Loading project database:" << m_dbPath;
 
-  if (!m_db.open(m_dbPath)) {
-    qCritical() << "Failed to open database:" << m_dbPath << m_db.lastError();
+  auto openResult = m_db.open(m_dbPath);
+  if (!openResult) {
+    qCritical() << "Failed to open database:" << m_dbPath << openResult.error();
     return false;
   }
 
   createTables();
 
   // Embedding model is loaded lazily on first use (see SqliteVecManager).
-  m_vecManager.createChunksTable(m_db);
+  (void)m_vecManager.createChunksTable(m_db);
 
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
@@ -41,45 +43,47 @@ bool DatabaseManager::initDatabase() {
 }
 
 void DatabaseManager::createTables() {
-  m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "paper_hash TEXT NOT NULL UNIQUE, "
-            "title TEXT, "
-            "authors TEXT, "
-            "pages_num INTEGER NOT NULL, "
-            "journal TEXT, "
-            "year TEXT, "
-            "topics TEXT, "
-            "llmodel TEXT, "
-            "summary_json TEXT, "
-            "date DATETIME)");
+  (void)m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
+                  "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "paper_hash TEXT NOT NULL UNIQUE, "
+                  "title TEXT, "
+                  "authors TEXT, "
+                  "pages_num INTEGER NOT NULL, "
+                  "journal TEXT, "
+                  "year TEXT, "
+                  "topics TEXT, "
+                  "llmodel TEXT, "
+                  "summary_json TEXT, "
+                  "date DATETIME)");
 
-  m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "query TEXT NOT NULL, "
-            "response TEXT NOT NULL, "
-            "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
-            "llmodel TEXT NOT NULL)");
+  (void)m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
+                  "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "query TEXT NOT NULL, "
+                  "response TEXT NOT NULL, "
+                  "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                  "llmodel TEXT NOT NULL)");
 
   // Create vec0 virtual table for text chunks with embeddings
-  m_vecManager.createChunksTable(m_db);
+  (void)m_vecManager.createChunksTable(m_db);
 }
 
 bool DatabaseManager::isOpen() const { return m_db.isOpen(); }
 
 QString DatabaseManager::databasePath() const { return m_dbPath; }
 
-bool DatabaseManager::switchDatabase(const QString &dbPath) {
+std::expected<void, QString>
+DatabaseManager::switchDatabase(const QString &dbPath) {
   if (dbPath.isEmpty()) {
     qWarning() << "Empty database path";
-    return false;
+    return std::unexpected("Empty database path");
   }
 
   m_db.close();
 
-  if (!m_db.open(dbPath)) {
-    qCritical() << "Failed to open database:" << dbPath << m_db.lastError();
-    return false;
+  auto openResult = m_db.open(dbPath);
+  if (!openResult) {
+    qCritical() << "Failed to open database:" << dbPath << openResult.error();
+    return std::unexpected(openResult.error());
   }
 
   m_dbPath = dbPath;
@@ -87,7 +91,7 @@ bool DatabaseManager::switchDatabase(const QString &dbPath) {
   createTables();
   reloadModels();
 
-  return true;
+  return {};
 }
 
 void DatabaseManager::reloadModels() {
@@ -102,9 +106,11 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
   SqliteStatement stmt =
       m_db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
   for (const QString &hash : hashes) {
-    stmt.bind(1, hash);
-    if (!stmt.exec()) {
-      qDebug() << "Delete by hash failed for" << hash << ":" << stmt.errorMsg();
+    (void)stmt.bind(1, hash);
+    auto execResult = stmt.exec();
+    if (!execResult) {
+      qDebug() << "Delete by hash failed for" << hash << ":"
+               << execResult.error();
     }
     stmt.resetAndClearBindings();
   }
@@ -113,10 +119,11 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
   SqliteStatement chunkStmt =
       m_db.prepare("DELETE FROM chunks WHERE paper_hash = ?");
   for (const QString &hash : hashes) {
-    chunkStmt.bind(1, hash);
-    if (!chunkStmt.exec()) {
+    (void)chunkStmt.bind(1, hash);
+    auto chunkExecResult = chunkStmt.exec();
+    if (!chunkExecResult) {
       qDebug() << "Delete chunks by hash failed for" << hash << ":"
-               << chunkStmt.errorMsg();
+               << chunkExecResult.error();
     }
     chunkStmt.resetAndClearBindings();
   }

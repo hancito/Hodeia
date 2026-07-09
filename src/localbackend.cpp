@@ -46,14 +46,13 @@ LocalBackend::~LocalBackend() {
 /// it stays off the GPU until the first multimodal inference call.  This
 /// prevents the projector from competing with the model for VRAM during the
 /// initial load, which is already the most memory-pressured moment.
-bool LocalBackend::loadModel(const QString &modelPath) {
+std::expected<void, QString> LocalBackend::loadModel(const QString &modelPath) {
   unloadModel();
 
   QString path = resolveModelPath(modelPath);
   if (path.isEmpty() || !QFile::exists(path)) {
     qCritical() << "[LocalBackend] Model file not found:" << path;
-    emit statusUpdated("Model file not found: " + path);
-    return false;
+    return std::unexpected{"Model file not found: " + path};
   }
 
   emit statusUpdated("Loading model: " + path);
@@ -66,8 +65,7 @@ bool LocalBackend::loadModel(const QString &modelPath) {
   auto devices = detectDevices();
   if (devices.empty()) {
     qCritical() << "[LocalBackend] No backend devices found";
-    emit statusUpdated("No backend devices available");
-    return false;
+    return std::unexpected{"No backend devices available"};
   }
 
   // Identify primary device for logging
@@ -82,7 +80,7 @@ bool LocalBackend::loadModel(const QString &modelPath) {
       loadModelWithDevices(path, m_mmprojPath, devices, devName);
 
   if (!result)
-    return false;
+    return std::unexpected{"Failed to load model: " + QString(path)};
 
   m_llamaModel = result->model();
 
@@ -107,7 +105,7 @@ bool LocalBackend::loadModel(const QString &modelPath) {
            << "| ubatch:" << llama_n_ubatch(m_llamaCtx)
            << "| vision:" << m_hasVision;
   emit statusUpdated("Model loaded: " + path);
-  return true;
+  return {};
 }
 
 // ── Backend-specific model loaders ─────────────────────────────────
@@ -391,8 +389,9 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
   }
 
   // Lazy-load mmproj on first use (or if previously unloaded).
-  if (!m_mtmdCtx && !loadMmproj()) {
-    qWarning() << "[LocalBackend] Failed to lazy-load mmproj";
+  auto r = loadMmproj();
+  if (!r) {
+    qWarning() << "[LocalBackend] Failed to lazy-load mmproj:" << r.error();
     return QString();
   }
 
@@ -416,11 +415,11 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
 
 // ── Lazy mmproj load / unload ─────────────────────────────────────
 
-bool LocalBackend::loadMmproj() {
+std::expected<void, QString> LocalBackend::loadMmproj() {
   if (m_mtmdCtx)
-    return true;
+    return {};
   if (m_mmprojPath.isEmpty())
-    return false;
+    return std::unexpected{"No mmproj path configured"};
 
   emit statusUpdated("Loading multimodal projector: " + m_mmprojPath);
 
@@ -433,11 +432,11 @@ bool LocalBackend::loadMmproj() {
                                   m_llamaModel, mtmdParams);
   if (!m_mtmdCtx) {
     qWarning() << "[LocalBackend] Failed to load mmproj:" << m_mmprojPath;
-    return false;
+    return std::unexpected{"Failed to load mmproj: " + m_mmprojPath};
   }
 
   qDebug() << "[LocalBackend] mmproj loaded on GPU";
-  return true;
+  return {};
 }
 
 void LocalBackend::unloadMmproj() {
