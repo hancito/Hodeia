@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(Paperize_CPP VERSION 0.1 LANGUAGES CXX C)
+project(Paperize VERSION 0.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD         23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -192,10 +192,20 @@ endif()
 # ---------------------------------------------------------------------------
 # 5. llama.cpp shared libraries
 # ---------------------------------------------------------------------------
-# Always link base libs from the CPU variant. They are functionally identical
-# across backends but avoid dragging in unresolved GPU symbols when the
-# toolkit isn't installed on the build machine.
-set(_LLAMA_LINK_DIR "${LLAMA_BASE}/cpu")
+# Each backend ships its own complete set of .so (libllama, libggml, etc.).
+# The CPU variant is a fallback; the CUDA/Vulkan variants are compiled with
+# the corresponding GPU backend baked in (libllama.so already links against
+# libggml-cuda.so / libggml-vulkan.so respectively).
+# Always fix RUNPATH of every .so we ship to $ORIGIN so they find siblings
+# in the deployment directory regardless of build-machine paths.
+
+if(LLAMA_BACKEND STREQUAL "cuda" OR LLAMA_BACKEND STREQUAL "all")
+  set(_LLAMA_LINK_DIR "${LLAMA_BASE}/cuda")
+elseif(LLAMA_BACKEND STREQUAL "vulkan" OR LLAMA_BACKEND STREQUAL "all")
+  set(_LLAMA_LINK_DIR "${LLAMA_BASE}/vulkan")
+else()
+  set(_LLAMA_LINK_DIR "${LLAMA_BASE}/cpu")
+endif()
 
 target_link_libraries(PaperizeEngine PRIVATE
     ${_LLAMA_LINK_DIR}/libllama-common.so.0.0.0
@@ -206,13 +216,20 @@ target_link_libraries(PaperizeEngine PRIVATE
     ${_LLAMA_LINK_DIR}/libggml-cpu.so.${GGML_SO_VER}
 )
 
-# Backend-specific .so (cuda / vulkan)
+# Backend-specific .so — only needed when mixing CPU libllama with a GPU
+# backend.  Since we now use the matching backend variant above, this is
+# redundant for single-backend builds, but kept for the "all" case.
 set(_BACKEND_LIBS "")
 if(LLAMA_BACKEND STREQUAL "cuda" OR LLAMA_BACKEND STREQUAL "all")
   list(APPEND _BACKEND_LIBS "${LLAMA_BASE}/cuda/libggml-cuda.so.${GGML_SO_VER}")
 endif()
 if(LLAMA_BACKEND STREQUAL "vulkan" OR LLAMA_BACKEND STREQUAL "all")
   list(APPEND _BACKEND_LIBS "${LLAMA_BASE}/vulkan/libggml-vulkan.so.${GGML_SO_VER}")
+endif()
+
+# Link backend .so so ggml_backend_load_all() can discover GPU backends at runtime
+if(_BACKEND_LIBS)
+  target_link_libraries(PaperizeEngine PRIVATE ${_BACKEND_LIBS})
 endif()
 
 # Link system libs for CUDA / Vulkan
@@ -249,7 +266,7 @@ set_source_files_properties(ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(ui/Fonts.qml  PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(Paperize
-    URI "Paperize_CPP"
+    URI "PaperizeCPP"
     QML_FILES
         ui/Colors.qml
         ui/Fonts.qml

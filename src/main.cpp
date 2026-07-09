@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
-  engine.loadFromModule("Paperize_CPP", "Main");
+  engine.loadFromModule("PaperizeCPP", "Main");
 
   return QGuiApplication::exec();
 }
