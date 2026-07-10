@@ -270,8 +270,17 @@ QString Summarizer::retrieveContext(const QString &paperHash) const {
   for (const auto &c : chunks)
     context += QString("Page %1: %2\n\n").arg(c.page).arg(c.text);
 
+  // Count total OCR chars across chunks
+  int totalOcrChars = 0;
+  for (const auto &c : chunks)
+    totalOcrChars += c.text.length();
+
   qDebug() << "[Summarizer] retrieved" << chunks.size()
-           << "chunks, length:" << context.length() << "for hash:" << paperHash;
+           << "chunks | OCR total:" << totalOcrChars
+           << "chars | assembled context:" << context.length()
+           << "chars | first chunk sample:" << chunks.first().text.left(80)
+           << "..."
+           << "for hash:" << paperHash;
   return context;
 }
 

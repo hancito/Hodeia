@@ -40,10 +40,19 @@ static QString blockToString(fz_stext_block *block) {
     if (line != block->u.t.first_line)
       result += '\n';
     for (fz_stext_char *ch = line->first_char; ch; ch = ch->next) {
-      int c = ch->c;
+      uint32_t c = ch->c;
       if (c < 0x20 && !QChar(c).isSpace())
         continue; // discard non-whitespace control characters
-      result += QChar(c);
+      // QChar only holds 16-bit codepoints (BMP).  Supplementary characters
+      // (U+10000 and above) must be stored as UTF-16 surrogate pairs.
+      if (c < 0x10000) {
+        result += QChar(c);
+      } else {
+        // Encode as high + low surrogate pair.
+        c -= 0x10000;
+        result += QChar(0xD800 + (c >> 10));
+        result += QChar(0xDC00 + (c & 0x3FF));
+      }
     }
   }
   return result;
@@ -130,8 +139,16 @@ QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
   char *text = api->GetUTF8Text();
   QString result;
   if (text) {
-    result = QString::fromUtf8(text).trimmed();
+    QByteArray utf8(text);
     delete[] text;
+
+    // QString::fromUtf8 correctly decodes supplementary characters as
+    // surrogate pairs.  However, some downstream code (chunking, search)
+    // may not handle them well.  We strip control characters and
+    // replacement characters that Tesseract sometimes emits.
+    result = QString::fromUtf8(utf8).trimmed();
+    result.remove(
+        QRegularExpression("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]"));
   }
   api->Clear();
   fz_drop_pixmap(ctx, pix);
@@ -203,6 +220,19 @@ QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
     tc.chunkIdx = chunkIdx++;
     chunks.append(tc);
   }
+
+  // Debug: total text in chunks vs input
+  int totalChunkChars = 0;
+  for (const auto &c : chunks)
+    totalChunkChars += c.text.length();
+  qDebug() << "[PdfWorker] chunkDocumentText:" << paperHash.left(12)
+           << "| input:" << fullText.length() << "chars"
+           << "| output:" << chunks.size() << "chunks," << totalChunkChars
+           << "chars total"
+           << "| avg chunk:"
+           << (chunks.isEmpty() ? 0 : totalChunkChars / chunks.size())
+           << "chars"
+           << "| first chunk:" << chunks.first().text.left(80) << "...";
 
   return chunks;
 }
@@ -305,6 +335,19 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     }
 
     if (!allChunks.isEmpty()) {
+      // Debug: chunk distribution per paper
+      QMap<QString, int> chunksByPaper;
+      int totalChunkChars = 0;
+      for (const auto &c : allChunks) {
+        chunksByPaper[c.paperHash]++;
+        totalChunkChars += c.text.length();
+      }
+      qDebug() << "[PdfWorker] Before embedding:" << allChunks.size()
+               << "chunks," << totalChunkChars << "chars total"
+               << "| papers:" << chunksByPaper.size();
+      for (auto it = chunksByPaper.begin(); it != chunksByPaper.end(); ++it)
+        qDebug() << "  " << it.key().left(12) << "→" << it.value() << "chunks";
+
       QString statusMsg =
           QString("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
@@ -312,6 +355,8 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       if (m_vecManager) {
         ingestChunks(allChunks, dbPath);
       } else {
+        qWarning() << "[PdfWorker] embedding model not loaded, skipping vector "
+                      "storage";
         emit status("Warning: embedding model not loaded, skipping vector "
                     "storage");
       }
@@ -356,6 +401,9 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
   }
 
   int inserted = m_vecManager->insertChunks(db, chunks);
+
+  qDebug() << "[PdfWorker] insertChunks returned:" << inserted << "out of"
+           << chunks.size() << "chunks";
 
   if (inserted < 0) {
     auto rbResult = db.rollback();
@@ -687,6 +735,11 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   }
 
   result.chunks = chunkDocumentText(fullText, pageMap, result.paperHash);
+
+  qDebug() << "[PdfWorker] extractText done:" << result.paperHash.left(12)
+           << "| pages:" << result.pageCount
+           << "| fullText:" << fullText.length() << "chars"
+           << "| chunks:" << result.chunks.size();
 
   fz_drop_document(ctx, doc);
   fz_drop_context(ctx);

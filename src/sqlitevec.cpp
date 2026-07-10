@@ -312,6 +312,9 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
     }
   }
 
+  qDebug() << "[SqliteVec] insertChunks: inserted" << totalInserted << "/"
+           << chunks.size() << "chunks";
+
   return totalInserted;
 }
 
@@ -413,6 +416,12 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
     r.distance = 0.0f;
     results.append(r);
   }
+
+  int totalChars = 0;
+  for (const auto &r : results)
+    totalChars += r.text.length();
+  qDebug() << "[SqliteVec] getChunksByHash:" << paperHash.left(12) << "→"
+           << results.size() << "chunks," << totalChars << "chars total";
 
   return results;
 }
