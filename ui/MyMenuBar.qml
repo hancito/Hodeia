@@ -36,7 +36,6 @@ MenuBar {
         Menu {
             id: deleteProjectMenu
             title: "Delete Project..."
-            visible: mainWin !== null
             Repeater {
                 model: configManager.projectList
                 delegate: Item {
@@ -130,16 +129,17 @@ MenuBar {
         }
         Menu {
             id: deleteModelMenu
-            title: "Delete Model..."
-            visible: mainWin !== null
+            title: "Delete Local Model..."
+            width: 280
             Repeater {
                 model: modelHelper.localModelList
                 delegate: Item {
                     required property var modelData
-                    width: deleteModelMenu.width
-                    height: 32
+                    width: contentItem.implicitWidth
+                    height: contentItem.implicitHeight
                     RowLayout {
-                        anchors.fill: parent
+                        id: contentItem
+                        anchors.centerIn: parent
                         anchors.margins: 4
                         CheckBox {
                             checked: mainWin.selectedModels.includes(modelData)
@@ -153,7 +153,6 @@ MenuBar {
                         }
                         Label {
                             text: modelData
-                            Layout.fillWidth: true
                         }
                     }
                 }

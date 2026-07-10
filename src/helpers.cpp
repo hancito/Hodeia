@@ -337,7 +337,7 @@ QStringList ModelHelper::listLocalModels() {
             .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
     for (const QString &f : ggufs) {
       if (!f.contains("mmproj", Qt::CaseInsensitive)) {
-        models.append(subdir + "/" + f);
+        models.append(subdir);
         break;
       }
     }

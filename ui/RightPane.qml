@@ -171,7 +171,20 @@ Rectangle {
             }
 
             Label {
-                text: "Elapsed Time: " + (rightPane.elapsedTime / 10).toFixed(1) + "s"
+                text: {
+                    var totalSec = Math.floor(rightPane.elapsedTime / 10);
+                    if (totalSec >= 3600) {
+                        var h = Math.floor(totalSec / 3600);
+                        var m = Math.floor((totalSec % 3600) / 60);
+                        return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
+                    } else if (totalSec >= 60) {
+                        var m = Math.floor(totalSec / 60);
+                        var s = totalSec % 60;
+                        return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
+                    } else {
+                        return "Elapsed Time: " + totalSec + "s";
+                    }
+                }
                 Layout.fillWidth: true
             }
         }

@@ -136,10 +136,16 @@ Summarizer::BackendInfo Summarizer::resolveBackend(ConfigManager *config) {
   info.config = config->backendConfig(config->activeBackend());
 
   if (info.isLocal) {
-    info.modelPath = info.modelName;
-    QString ggufPath = config->summarizersPath() + "/" + info.modelName;
-    if (QFile::exists(ggufPath))
-      info.modelPath = ggufPath;
+    QString folderPath = config->summarizersPath() + "/" + info.modelName;
+    QStringList ggufs =
+        QDir(folderPath)
+            .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
+    for (const QString &f : ggufs) {
+      if (!f.contains("mmproj", Qt::CaseInsensitive)) {
+        info.modelPath = folderPath + "/" + f;
+        break;
+      }
+    }
   }
   return info;
 }
