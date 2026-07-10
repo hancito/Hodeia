@@ -8,6 +8,10 @@
 #include <QUrl>
 #include <atomic>
 
+extern "C" {
+#include <mupdf/fitz.h>
+}
+
 class PdfWorker : public QObject {
   Q_OBJECT
 public:
@@ -29,7 +33,9 @@ signals:
 private:
   ExtractionResult extractText(const QUrl &fileUrl,
                                const QString &imgPath) const;
-  QString cleanPdfText(const QString &raw) const;
+  QString extractTextFromStextPage(fz_stext_page *textPage) const;
+  QString extractTextWithOcr(fz_context *ctx, fz_document *doc,
+                             int pageNum) const;
   QList<TextChunk> chunkDocumentText(const QString &fullText,
                                      const QVector<quint16> &pageMap,
                                      const QString &paperHash) const;

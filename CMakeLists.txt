@@ -113,6 +113,8 @@ set(SQLITEVEC_INC ${EXTERNAL}/include/SqliteVec)
 set(MUPDF_LIB     ${EXTERNAL}/lib)
 set(LLAMA_BASE    ${EXTERNAL}/lib/llamacpp)
 set(GGML_SO_VER   0.15.3)
+set(TESS_LIB      ${EXTERNAL}/lib)
+set(TESS_INC      ${EXTERNAL}/include/tesseract)
 
 # ---------------------------------------------------------------------------
 # 4. PaperizeEngine — static library for all C++ business logic
@@ -167,6 +169,7 @@ target_include_directories(PaperizeEngine PRIVATE
     ${LLAMA_INC}/vendor
     ${EXTERNAL}/include
     ${SQLITEVEC_INC}
+    ${TESS_INC}
     ${CMAKE_SOURCE_DIR}/src/thrdprty
 )
 
@@ -177,9 +180,15 @@ target_link_libraries(PaperizeEngine PRIVATE
     ${MUPDF_LIB}/libmupdf.a
     ${MUPDF_LIB}/libmupdf-third.a
     ${MUPDF_LIB}/libmupdf-threads.a
+    ${TESS_LIB}/libtesseract.a
+    ${TESS_LIB}/libleptonica.a
     pthread
     dl
     m
+    z
+    png
+    jpeg
+    tiff
 )
 
 # --- OpenMP (ggml-cpu) ---
@@ -347,6 +356,12 @@ if(PAPERIZE_PLATFORM_LINUX)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_SOURCE_DIR}/Fonts $<TARGET_FILE_DIR:Paperize>/Fonts
       COMMENT "Copying fonts")
+
+  # --- Tesseract tessdata ---
+  add_custom_command(TARGET Paperize POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:Paperize>/tessdata
+      COMMENT "Copying tessdata")
 
   # --- Base .so ---
   add_custom_command(TARGET Paperize POST_BUILD

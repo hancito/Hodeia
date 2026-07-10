@@ -1,32 +1,146 @@
 #include "headers/ingestionengine.h"
 #include "headers/sqlitedb.h"
 #include "headers/sqlitevec.h"
+
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
 #include <QRegularExpression>
+#include <QThreadStorage>
 #include <QtConcurrent>
 
 extern "C" {
 #include <mupdf/fitz.h>
 }
+#include <tesseract/baseapi.h>
 
-// ─── Text cleaning ───────────────────────────────────────────────
+// ============================================================================
+//  Layout-aware text extraction
+//
+//  MuPDF builds a per-page hierarchy:
+//    fz_stext_page
+//      └─ fz_stext_block  (TEXT | IMAGE | STRUCT | VECTOR | GRID)
+//           └─ fz_stext_line  (shared baseline)
+//                └─ fz_stext_char  (Unicode codepoint + position)
+//
+//  When FZ_STEXT_SEGMENT is enabled (and fz_segment_stext_page() is called),
+//  MuPDF splits the flat block list into STRUCT nodes that represent
+//  distinct page regions (e.g. separate columns).  A depth-first traversal
+//  then visits blocks in the correct reading order.
+// ============================================================================
 
-QString PdfWorker::cleanPdfText(const QString &raw) const {
-  // NFKC expands PDF ligatures (ﬁ → fi, ﬂ → fl) into base characters.
-  QString text = raw.normalized(QString::NormalizationForm_KC);
-  // Soft hyphens inserted by line-wrapping would split words incorrectly.
-  text.remove(QChar(0x00AD));
-  // Collapse multiple whitespace (spaces, tabs, stray newlines) into one.
-  QRegularExpression multiSpace(R"(\s+)");
-  text.replace(multiSpace, QString(" "));
-  return text.trimmed();
+/// Walk one TEXT block's lines → chars and produce a QString.
+static QString blockToString(fz_stext_block *block) {
+  QString result;
+  for (fz_stext_line *line = block->u.t.first_line; line; line = line->next) {
+    if (line != block->u.t.first_line)
+      result += '\n';
+    for (fz_stext_char *ch = line->first_char; ch; ch = ch->next) {
+      int c = ch->c;
+      if (c < 0x20 && !QChar(c).isSpace())
+        continue; // discard non-whitespace control characters
+      result += QChar(c);
+    }
+  }
+  return result;
 }
 
-// ─── Chunking ────────────────────────────────────────────────────
+QString PdfWorker::extractTextFromStextPage(fz_stext_page *textPage) const {
+  QString pageText;
+  bool firstBlock = true;
+
+  // DFS iterator respects segmentation STRUCT boundaries (column order).
+  fz_stext_page_block_iterator it =
+      fz_stext_page_block_iterator_begin_dfs(textPage);
+
+  while (!fz_stext_page_block_iterator_eod_dfs(it)) {
+    fz_stext_block *block = it.block;
+    if (block && block->type == FZ_STEXT_BLOCK_TEXT) {
+      QString blockText = blockToString(block);
+      blockText.remove(QChar(0x00AD)); // soft hyphens from line wrapping
+      QRegularExpression ws(R"(\s+)");
+      blockText.replace(ws, QString(" "));
+      blockText = blockText.trimmed();
+
+      if (!blockText.isEmpty()) {
+        if (!firstBlock)
+          pageText += "\n\n";
+        pageText += blockText;
+        firstBlock = false;
+      }
+    }
+    it = fz_stext_page_block_iterator_next_dfs(it);
+  }
+
+  return pageText;
+}
+
+// ============================================================================
+//  OCR fallback  (Tesseract via direct API — not through MuPDF)
+//
+//  We call Tesseract directly here.
+//  Each QtConcurrent worker thread gets its own TessBaseAPI instance.
+// ============================================================================
+
+static QThreadStorage<tesseract::TessBaseAPI *> g_ocrApi;
+
+static tesseract::TessBaseAPI *ensureOcrApi() {
+  if (!g_ocrApi.hasLocalData()) {
+    tesseract::TessBaseAPI *api = new tesseract::TessBaseAPI();
+
+    // Locate tessdata/ alongside the running binary.
+    QString tessdata =
+        QDir(QCoreApplication::applicationDirPath()).filePath("tessdata");
+
+    int rc = api->Init(qPrintable(tessdata), "eng+fra",
+                       tesseract::OcrEngineMode::OEM_LSTM_ONLY);
+    if (rc != 0) {
+      qCritical() << "[OCR] Tesseract Init failed (rc=" << rc << ")"
+                  << "tessdata:" << tessdata;
+      delete api;
+      return nullptr;
+    }
+    api->SetPageSegMode(tesseract::PageSegMode::PSM_AUTO);
+    g_ocrApi.setLocalData(api);
+  }
+  return g_ocrApi.localData();
+}
+
+QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
+                                      int pageNum) const {
+  tesseract::TessBaseAPI *api = ensureOcrApi();
+  if (!api)
+    return QString();
+
+  // Render at 300 DPI grayscale — optimal quality/speed trade-off.
+  fz_matrix ctm = fz_scale(300.0f / 72.0f, 300.0f / 72.0f);
+  fz_pixmap *pix = fz_new_pixmap_from_page_number(ctx, doc, pageNum, ctm,
+                                                  fz_device_gray(ctx), 0);
+  if (!pix)
+    return QString();
+
+  // Tesseract accepts raw grayscale bytes directly.
+  api->SetImage(pix->samples, pix->w, pix->h, 1, pix->stride);
+  api->SetSourceResolution(300);
+
+  char *text = api->GetUTF8Text();
+  QString result;
+  if (text) {
+    result = QString::fromUtf8(text).trimmed();
+    delete[] text;
+  }
+  api->Clear();
+  fz_drop_pixmap(ctx, pix);
+  return result;
+}
+
+// ============================================================================
+//  Chunking
+// ============================================================================
 
 QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
                                               const QVector<quint16> &pageMap,
@@ -93,7 +207,9 @@ QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
   return chunks;
 }
 
-// ─── File identity ───────────────────────────────────────────────
+// ============================================================================
+//  File identity
+// ============================================================================
 
 QString PdfWorker::computeFileHash(const QUrl &fileUrl) const {
   QString localPath = fileUrl.toLocalFile();
@@ -108,12 +224,13 @@ QString PdfWorker::computeFileHash(const QUrl &fileUrl) const {
   return QString();
 }
 
-// ─── Lifecycle ───────────────────────────────────────────────────
+// ============================================================================
+//  Lifecycle
+// ============================================================================
 
 PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
                      QObject *parent)
     : QObject(parent), m_vecManager(vecManager), m_config(config) {
-  // Forward embedding progress from the vector manager to the UI.
   if (m_vecManager) {
     connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
             &PdfWorker::embeddingProgress);
@@ -124,14 +241,15 @@ PdfWorker::~PdfWorker() = default;
 
 void PdfWorker::stop() { m_stopFlag.store(true); }
 
-// ─── Main ingestion pipeline ─────────────────────────────────────
+// ============================================================================
+//  Main ingestion pipeline
+// ============================================================================
 
 void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                            const QString &dbPath) {
   m_stopFlag.store(false);
   emit started();
 
-  // Deduplicate files by content hash, skip papers already in the DB.
   QString message =
       "Started with " + QString::number(filePath.size()) + " files";
   emit status(message);
@@ -142,8 +260,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
             QString::number(filePath.size() - urlsToProcess.size()) + " papers";
   emit status(message);
 
-  // Process in small batches to keep memory usage bounded and provide
-  // incremental progress feedback to the UI.
+  // Process in small batches to bound memory and provide incremental progress.
   const int batchSize = 10;
   int savedCount = 0;
   int errorCount = 0;
@@ -160,7 +277,6 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     message = QString("Extracting %1-%2/%3").arg(i + 1).arg(end).arg(total);
     emit status(message);
 
-    // Extract text + images in parallel across files in the batch.
     QList<ExtractionResult> extractions = parallelExtract(batchUrls, imgPath);
 
     QList<SummaryRow> rows;
@@ -180,11 +296,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       row.date = QDateTime::currentDateTimeUtc();
       rows.append(row);
 
-      // Move chunks out to free memory in extraction result early.
       allChunks << std::move(extraction.chunks);
     }
 
-    // Persist metadata and vector embeddings in separate transactions.
     if (!rows.isEmpty()) {
       savePapers(rows, dbPath);
       savedCount += rows.size();
@@ -196,8 +310,6 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       emit status(statusMsg);
 
       if (m_vecManager) {
-        // insertChunks() has its own lazy-load guard — it will call
-        // initialize() if m_ready is false.
         ingestChunks(allChunks, dbPath);
       } else {
         emit status("Warning: embedding model not loaded, skipping vector "
@@ -219,7 +331,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   emit finished();
 }
 
-// ─── Database writes ─────────────────────────────────────────────
+// ============================================================================
+//  Database writes
+// ============================================================================
 
 void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
                              const QString &dbPath) {
@@ -234,7 +348,6 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     return;
   }
 
-  // Single transaction for the entire batch — much faster than per-row commits.
   auto txResult = db.transaction();
   if (!txResult) {
     qCritical() << "[PdfWorker] Failed to start transaction for chunks:"
@@ -260,7 +373,6 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     (void)db.rollback();
   }
 
-  // Truncate the WAL file so it doesn't grow unbounded across batches.
   auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   if (!wpResult) {
     qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
@@ -357,7 +469,9 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
   }
 }
 
-// ─── Hash helpers ────────────────────────────────────────────────
+// ============================================================================
+//  Hash helpers
+// ============================================================================
 
 QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
   QStringList hashes;
@@ -379,7 +493,7 @@ QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
       break;
     }
     if (!stepResult.value())
-      break; // SQLITE_DONE
+      break;
     hashes << stmt.columnText(0);
   }
   return hashes;
@@ -389,7 +503,6 @@ QMap<QString, QUrl>
 PdfWorker::parallelHasher(const QList<QUrl> &fileList) const {
   QMap<QString, QUrl> hashToUrl;
 
-  // Compute MD5 hashes across all available cores.
   QList<QPair<QString, QUrl>> hashUrlPairs =
       QtConcurrent::blockingMapped(fileList, [this](const QUrl &url) {
         return qMakePair(computeFileHash(url), url);
@@ -418,7 +531,18 @@ PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
   return urlsToProcess;
 }
 
-// ─── PDF extraction (MuPDF) ──────────────────────────────────────
+// ============================================================================
+//  PDF extraction  (MuPDF + Tesseract fallback)
+//
+//  Per-page pipeline:
+//    1. Load page, build structured-text with segmentation options.
+//    2. Run fz_segment_stext_page + fz_paragraph_break to reorder columns.
+//    3. Walk the block tree (DFS) to extract text in reading order.
+//    4. If the page yields < 100 chars, re-render at 300 DPI grayscale
+//       and run Tesseract OCR as a fallback.
+//    5. Render a 150 DPI thumbnail for the UI.
+//    6. Accumulate full-text and a pageMap for cross-page chunking.
+// ============================================================================
 
 ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                                         const QString &imgPath) const {
@@ -454,7 +578,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   }
 
   int pageCount = 0;
-  float zoom = 150.0f / 72.0f;
+  float zoom = 150.0f / 72.0f; // thumbnail resolution
   fz_matrix ctm = fz_scale(zoom, zoom);
 
   fz_try(ctx) { pageCount = fz_count_pages(ctx, doc); }
@@ -469,11 +593,8 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   result.paperHash = computeFileHash(fileUrl);
   result.title = QFileInfo(localPath).baseName();
 
-  // Accumulate full document text across all pages and a parallel
-  // pageMap (char offset -> page number) so chunking can cross
-  // page boundaries without losing semantic continuity.
   QString fullText;
-  QVector<quint16> pageMap; // quint16: 2 bytes/char vs 4 for int
+  QVector<quint16> pageMap; // char offset → page number (compact: 2 bytes)
 
   for (int i = 0; i < pageCount; ++i) {
     fz_page *page = nullptr;
@@ -482,58 +603,75 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
     fz_pixmap *pix = nullptr;
 
     fz_try(ctx) {
+      // ------------------------------------------------------------------
+      // 1. Build structured text with layout-aware options
+      // ------------------------------------------------------------------
       page = fz_load_page(ctx, doc, i);
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
-      dev = fz_new_stext_device(ctx, textPage, nullptr);
+
+      fz_stext_options opts = {0};
+      opts.flags = FZ_STEXT_SEGMENT | FZ_STEXT_PARAGRAPH_BREAK |
+                   FZ_STEXT_DEHYPHENATE | FZ_STEXT_CLIP |
+                   FZ_STEXT_PRESERVE_SPANS;
+      opts.scale = 1.0f;
+      opts.clip = fz_empty_rect;
+
+      dev = fz_new_stext_device(ctx, textPage, &opts);
       fz_run_page(ctx, page, dev, fz_identity, nullptr);
       fz_close_device(ctx, dev);
+      dev = nullptr;
 
-      // --- Render page thumbnail ---
+      fz_segment_stext_page(ctx, textPage);
+      fz_paragraph_break(ctx, textPage);
+
+      // ------------------------------------------------------------------
+      // 2. Thumbnail (150 DPI RGB)
+      // ------------------------------------------------------------------
       pix = fz_new_pixmap_from_page_number(ctx, doc, i, ctm, fz_device_rgb(ctx),
                                            0);
       QImage img(pix->samples, pix->w, pix->h, pix->stride,
                  QImage::Format_RGB888);
-      img = img.copy(); // detach before MuPDF drops the pixmap
+      img = img.copy();
 
-      QString hash = computeFileHash(fileUrl);
-      QString fileName =
-          QString("%1_page_%2.png").arg(hash).arg(i + 1, 3, 10, QChar('0'));
-      QString fullOutputPath = QDir(imgPath).filePath(fileName);
-
-      if (!img.save(fullOutputPath, "PNG")) {
-        qCritical() << "Failed to save image to:" << fullOutputPath;
+      QString fileName = QString("%1_page_%2.png")
+                             .arg(result.paperHash)
+                             .arg(i + 1, 3, 10, QChar('0'));
+      if (!img.save(QDir(imgPath).filePath(fileName), "PNG")) {
+        qCritical() << "[PdfWorker] Failed to save thumbnail:" << i + 1;
       }
-
       fz_drop_pixmap(ctx, pix);
       pix = nullptr;
 
-      // --- Extract page text ---
-      fz_buffer *buf = fz_new_buffer(ctx, 256);
-      fz_output *out = fz_new_output_with_buffer(ctx, buf);
-      fz_print_stext_page_as_text(ctx, out, textPage);
-      fz_close_output(ctx, out);
-      fz_drop_output(ctx, out);
+      // ------------------------------------------------------------------
+      // 3. Extract text (layout-aware), with OCR fallback
+      // ------------------------------------------------------------------
+      QString pageTextStr = extractTextFromStextPage(textPage);
 
-      // fz_buffer_storage returns both the length and a pointer to the
-      // raw bytes — NOT null-terminated, so we must pass the length.
-      unsigned char *bufData = nullptr;
-      size_t bufLen = fz_buffer_storage(ctx, buf, &bufData);
-      QString pageTextStr = QString::fromUtf8(
-          reinterpret_cast<const char *>(bufData), static_cast<int>(bufLen));
+      if (pageTextStr.trimmed().length() < 100) {
+        qDebug() << QString("[OCR] page %1/%2: %3 chars, falling back to OCR")
+                        .arg(i + 1)
+                        .arg(pageCount)
+                        .arg(pageTextStr.trimmed().length());
+        pageTextStr = extractTextWithOcr(ctx, doc, i);
+        qDebug() << QString("[OCR] page %1/%2: %4 chars produced")
+                        .arg(i + 1)
+                        .arg(pageCount)
+                        .arg(pageTextStr.length());
+      }
 
-      // Clean and append to the running document text.
-      pageTextStr = cleanPdfText(pageTextStr);
+      // NFKC normalization expands ligatures (ﬁ → fi).
+      pageTextStr = pageTextStr.normalized(QString::NormalizationForm_KC);
 
+      // ------------------------------------------------------------------
+      // 4. Accumulate
+      // ------------------------------------------------------------------
       if (i > 0) {
         fullText.append('\n');
-        pageMap.push_back(i);
+        pageMap.push_back(i); // page-boundary marker
       }
-      for (int j = 0; j < pageTextStr.length(); ++j) {
+      for (int j = 0; j < pageTextStr.length(); ++j)
         pageMap.push_back(i);
-      }
       fullText.append(pageTextStr);
-
-      fz_drop_buffer(ctx, buf);
     }
     fz_always(ctx) {
       if (pix)
@@ -545,10 +683,9 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       if (page)
         fz_drop_page(ctx, page);
     }
-    fz_catch(ctx) { qWarning() << "Error extracting page" << i; }
+    fz_catch(ctx) { qWarning() << "[PdfWorker] Error extracting page" << i; }
   }
 
-  // Chunk the full document text across page boundaries.
   result.chunks = chunkDocumentText(fullText, pageMap, result.paperHash);
 
   fz_drop_document(ctx, doc);
@@ -557,12 +694,13 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   return result;
 }
 
-// ─── Parallel dispatch ───────────────────────────────────────────
+// ============================================================================
+//  Parallel dispatch
+// ============================================================================
 
 QList<ExtractionResult>
 PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
                            const QString &imgPath) const {
-  // Each file is extracted in its own thread.
   return QtConcurrent::blockingMapped(filePaths,
                                       [this, imgPath](const QUrl &url) {
                                         return this->extractText(url, imgPath);
