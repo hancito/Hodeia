@@ -389,9 +389,9 @@ static common_params lb_fit_params(const probe_info &probe,
 
   // 512 MiB safety margin for iGPUs, 1 GiB for discrete GPUs.
   bool integrated = bottleneck->is_integrated;
-  uint64_t effective_margin =
-      integrated ? 512UL * 1024 * 1024       // 512 MiB for iGPU
-                 : 1UL * 1024 * 1024 * 1024; // 1 GiB for discrete
+  uint64_t effective_margin = integrated
+                                  ? 512UL * 1024 * 1024  // 512 MiB for iGPU
+                                  : 512UL * 1024 * 1024; // 512 MiB for discrete
   if (bottleneck->memory_free <= effective_margin) {
     params.n_gpu_layers = 0;
     qWarning() << "[LocalBackend] lb_fit: GPU" << bottleneck->name
@@ -477,111 +477,171 @@ static common_params lb_fit_params(const probe_info &probe,
     return params;
   }
 
-  // --- Discrete GPU path: standard layer-reduction fit ---
+  // --- Discrete GPU path: progressive layer offload ---
+  // Strategy (priority order — cheapest first):
+  //   1. n_ubatch /2 (halves compute buffer, ~4 Go saved)
+  //   2. KV cache F16 → Q8_0 (halves KV cache, ~2 Go saved)
+  //   3. mmproj → CPU (free ~167 MiB)
+  //   4. Offload 1 layer to CPU at a time
+  //   5. After 30 % offload: n_ctx -10 %, KV Q8→Q4
+  // This ensures the _minimum_ number of layers ends up on CPU.
   (void)non_layer;
-  int n_gpu_layers = probe.n_layers; // try all layers on GPU
+  int total_layers = probe.n_layers;
+  int offloaded = 0; // layers moved to CPU so far
   uint32_t n_ctx = lb_pad256(desiredCtx);
   uint32_t n_ubatch = desiredUbatch;
   int type_k = GGML_TYPE_F16;
   int type_v = GGML_TYPE_F16;
   bool mmproj_gpu = probe.has_mmproj;
-  (void)non_layer; // used on CPU side, not needed for GPU fit
+  bool kv_quantized = false;
+  bool mmproj_moved = false;
+  bool post_30 = false; // enters here after 30% offload
 
   const int max_attempts = 200;
   int attempts = 0;
 
   while (attempts++ < max_attempts) {
-    // Estimate memory demand
+    int n_gpu_layers = total_layers - offloaded;
+    // Estimate memory demand (GPU-side only — CPU layers cost nothing here)
+    // Only GPU layers store their KV cache on GPU; CPU layers use system RAM.
+    int kv_layers = n_gpu_layers > 0 ? n_gpu_layers : probe.n_layers;
     uint64_t kv_size =
-        lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                             probe.n_layers, n_ctx, type_k, type_v);
-    int gpu_layers = std::min(n_gpu_layers, probe.n_layers);
-    uint64_t gpu_weight = static_cast<uint64_t>(gpu_layers) * per_layer;
+        lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa, kv_layers,
+                             n_ctx, type_k, type_v);
+    uint64_t gpu_weight =
+        n_gpu_layers > 0 ? static_cast<uint64_t>(n_gpu_layers) * per_layer : 0;
     uint64_t mmproj_mem =
         (probe.has_mmproj && mmproj_gpu) ? probe.mmproj_size : 0;
     uint64_t compute_buf =
-        static_cast<uint64_t>(n_ubatch) * std::max(probe.n_embd, 1) * 16;
-    uint64_t gpu_total = gpu_weight + mmproj_mem + kv_size + compute_buf;
+        n_gpu_layers > 0
+            // CUDA graph reserve allocates per-layer activations.
+            // Real measurement: 8433 MiB for 48 layers, 8192 ubatch, 3840 embd.
+            // Formula: n_ubatch * n_embd * n_layers * 8 / 1e6 ≈ 8024 MiB.
+            ? static_cast<uint64_t>(n_ubatch) * std::max(probe.n_embd, 1) *
+                  static_cast<uint64_t>(n_gpu_layers) * 8
+            : 0;
+    uint64_t gpu_total =
+        (gpu_weight + mmproj_mem + kv_size + compute_buf) * 11 / 10;
 
     if (gpu_total <= available) {
       // Fits!
       params.n_gpu_layers = n_gpu_layers;
+      params.n_batch = n_ctx;
+      params.n_ubatch = n_ubatch;
       params.devices = {bottleneck->dev};
+      params.cache_type_k = static_cast<ggml_type>(type_k);
+      params.cache_type_v = static_cast<ggml_type>(type_v);
+      // llama.cpp uses n_gpu_layers to decide how many layers go to the first
+      // device (GPU); the remaining layers are automatically placed on the
+      // CPU backend — no need to pass the CPU device explicitly here.
+      if (n_gpu_layers < total_layers && n_gpu_layers > 0) {
+        qDebug() << "[LocalBackend] lb_fit: OK (split GPU/CPU)"
+                 << "| n_gpu_layers=" << n_gpu_layers
+                 << "| n_cpu_layers=" << offloaded << "| n_ctx=" << n_ctx
+                 << "| n_ubatch=" << n_ubatch
+                 << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
+                 << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
+                 << "MiB"
+                 << "| weights=" << (gpu_weight >> 20) << "MiB"
+                 << "| kv=" << (kv_size >> 20) << "MiB"
+                 << "| mmproj=" << (mmproj_mem >> 20) << "MiB"
+                 << "| compute=" << (compute_buf >> 20) << "MiB";
+      } else if (n_gpu_layers <= 0) {
+        params.n_gpu_layers = 0;
+        qDebug() << "[LocalBackend] lb_fit: OK (CPU only)"
+                 << "| n_ctx=" << n_ctx << "| n_ubatch=" << n_ubatch;
+      } else {
+        qDebug() << "[LocalBackend] lb_fit: OK (GPU only)"
+                 << "| n_gpu_layers=" << n_gpu_layers << "| n_ctx=" << n_ctx
+                 << "| n_ubatch=" << n_ubatch
+                 << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
+                 << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
+                 << "MiB"
+                 << "| weights=" << (gpu_weight >> 20) << "MiB"
+                 << "| kv=" << (kv_size >> 20) << "MiB"
+                 << "| mmproj=" << (mmproj_mem >> 20) << "MiB"
+                 << "| compute=" << (compute_buf >> 20) << "MiB";
+      }
       if (probe.has_mmproj) {
         params.mmproj.path = mmprojPath.toStdString();
         params.mmproj_use_gpu = mmproj_gpu;
       }
-      qDebug() << "[LocalBackend] lb_fit: OK"
-               << "| n_gpu_layers=" << n_gpu_layers << "| n_ctx=" << n_ctx
-               << "| n_ubatch=" << n_ubatch << "| GPU" << (gpu_total >> 20)
-               << "MiB /" << (available >> 20) << "MiB"
-               << "| weights=" << (gpu_weight >> 20) << "MiB"
-               << "| kv=" << (kv_size >> 20) << "MiB"
-               << "| mmproj=" << (mmproj_mem >> 20) << "MiB"
-               << "| compute=" << (compute_buf >> 20) << "MiB";
       return params;
     }
 
-    // --- OOM: decide what to reduce (priority order) ---
+    // ── OOM: progressive reduction (cheapest first) ─────────────
 
-    // 1. Reduce GPU layers (biggest impact, least quality loss)
-    if (n_gpu_layers > 0) {
-      uint64_t excess = gpu_total - available;
-      int drop =
-          std::max(static_cast<int>(excess / std::max(per_layer, 1UL)), 1);
-      n_gpu_layers = std::max(0, n_gpu_layers - drop);
-      qDebug() << "[LocalBackend] lb_fit: OOM → GPU layers"
-               << (n_gpu_layers + drop) << "→" << n_gpu_layers;
+    // 1. n_ubatch /2 (halves compute buffer, biggest single win)
+    if (n_ubatch > 2048) {
+      uint32_t old = n_ubatch;
+      n_ubatch = std::max(n_ubatch / 2, 2048U);
+      qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << old << "→"
+               << n_ubatch;
       continue;
     }
 
-    // 1.5. Move mmproj to CPU
-    if (probe.has_mmproj && mmproj_gpu) {
+    // 2. KV cache F16 → Q8_0 (halves KV cache, ~2 Go saved)
+    if (!kv_quantized && type_k == GGML_TYPE_F16) {
+      kv_quantized = true;
+      type_k = type_v = GGML_TYPE_Q8_0;
+      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache F16 → Q8_0";
+      continue;
+    }
+
+    // 2. mmproj → CPU (~167 MiB freed)
+    if (!mmproj_moved && probe.has_mmproj && mmproj_gpu) {
+      mmproj_moved = true;
       mmproj_gpu = false;
-      qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU"
-               << (probe.mmproj_size >> 20) << "MiB freed";
+      qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
+               << (probe.mmproj_size >> 20) << "MiB freed)";
       continue;
     }
 
-    // 2. Reduce n_ctx (linear KV cache reduction)
+    // 3. Offload 1 layer to CPU at a time (granular, preserves GPU performance)
+    {
+      int next = offloaded + 1;
+      if (next <= total_layers) {
+        offloaded = next;
+        qDebug() << "[LocalBackend] lb_fit: OOM → offload 1 more layer to CPU"
+                 << "(total offloaded=" << offloaded << "/" << total_layers
+                 << ")";
+        // After 30 % offload, unlock the more aggressive parameter tweaks.
+        if (offloaded >= (total_layers * 30 + 9) / 10) {
+          post_30 = true;
+        }
+        continue;
+      }
+    }
+
+    // 4. After 30 % offload: touch other params
+    if (!post_30)
+      break; // nothing left to try
+
+    // 4a. Reduce n_ctx by 10 %
     if (n_ctx > lb_pad256(minCtx)) {
-      uint64_t kv_per_256 =
-          lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                               probe.n_layers, 256, type_k, type_v);
-      uint64_t excess = gpu_total - available;
-      uint32_t drop =
-          (kv_per_256 > 0)
-              ? std::max(static_cast<uint32_t>(excess / (kv_per_256 / 256)),
-                         256U)
-              : 256U;
       uint32_t old = n_ctx;
-      n_ctx = lb_pad256(std::max(n_ctx - drop, lb_pad256(minCtx)));
+      n_ctx = lb_pad256(std::max(n_ctx - n_ctx / 10, lb_pad256(minCtx)));
       if (n_ctx == old)
         n_ctx = lb_pad256(minCtx);
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ctx" << old << "→" << n_ctx;
       continue;
     }
 
-    // 3. Quantize KV cache: F16 → Q8_0 → Q4_K
-    if (type_k == GGML_TYPE_F16) {
-      type_k = type_v = GGML_TYPE_Q8_0;
-      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache F16 → Q8_0";
-      continue;
-    }
+    // 4b. Quantize KV cache: Q8_0 → Q4_K (last resort)
     if (type_k == GGML_TYPE_Q8_0) {
       type_k = type_v = GGML_TYPE_Q4_K;
       qDebug() << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_K";
       continue;
     }
 
-    // 4. Reduce n_ubatch (compute buffer)
+    // 4c. Reduce n_ubatch by half (floor 64)
     if (n_ubatch > 64) {
       n_ubatch = std::max(n_ubatch / 2, 64U);
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << n_ubatch;
       continue;
     }
 
-    // 5. Emergency: reduce n_ctx below minCtx
+    // 4d. Emergency: reduce n_ctx below minCtx
     if (n_ctx > 256) {
       uint32_t old = n_ctx;
       n_ctx = lb_pad256(std::max(n_ctx - 256U, 256U));
@@ -591,7 +651,7 @@ static common_params lb_fit_params(const probe_info &probe,
       continue;
     }
 
-    // Nothing left — give up, fall through to CPU
+    // Nothing left — give up
     qWarning() << "[LocalBackend] lb_fit: cannot fit on GPU,"
                << (gpu_total >> 20) << "MiB needed vs" << (available >> 20)
                << "MiB available";
@@ -672,8 +732,8 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params,
   // vision encoder writes embeddings at unexpected positions.
   if (llama_model_is_hybrid(result->model())) {
     result.reset();
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    qDebug() << "[LocalBackend] Flash attention disabled (hybrid model)";
+    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+    qDebug() << "[LocalBackend] Flash attention set to AUTO (hybrid model)";
     result = common_init_from_params(params);
     if (!result || !result->model() || !result->context())
       return nullptr;
@@ -753,27 +813,29 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   }
 
   auto result = createInitResult(params, params.mmproj_use_gpu);
-  delete cpuDev;
   if (!result) {
     qCritical() << "[LocalBackend] Fitted load failed, trying CPU fallback";
-    // Ultimate fallback: retry with pure CPU
     params =
         lb_fit_params(probe, {}, mmprojPath, desiredCtx, desiredUbatch, minCtx);
     params.model.path = path.toStdString();
-    params.devices = cpuDev ? std::vector{cpuDev->dev} : devices;
-    if (params.devices.empty())
-      return nullptr;
+    params.cpuparams.n_threads = QThread::idealThreadCount();
+    params.cpuparams_batch.n_threads = QThread::idealThreadCount();
+    delete cpuDev;
+    if (params.devices.empty()) {
+      params.devices = devices.empty() ? devices : std::vector{devices[0]};
+    }
     params.n_gpu_layers = 0;
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
     if (!mmprojPath.isEmpty()) {
       params.mmproj.path = mmprojPath.toStdString();
       params.mmproj_use_gpu = false;
     }
-    params.cpuparams.n_threads = QThread::idealThreadCount();
-    params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-    delete cpuDev;
+    if (params.devices.empty())
+      return nullptr;
     return createInitResult(params, false);
   }
+
+  delete cpuDev;
 
   qDebug() << "[LocalBackend] Model loaded | ctx:"
            << llama_n_ctx(result->context())

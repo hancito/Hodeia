@@ -110,9 +110,10 @@ endif()
 set(EXTERNAL      ${CMAKE_SOURCE_DIR}/external)
 set(LLAMA_INC     ${EXTERNAL}/include/llamacpp)
 set(SQLITEVEC_INC ${EXTERNAL}/include/SqliteVec)
+set(MUPDF_INC     ${EXTERNAL}/include/mupdf)
 set(MUPDF_LIB     ${EXTERNAL}/lib)
 set(LLAMA_BASE    ${EXTERNAL}/lib/llamacpp)
-set(GGML_SO_VER   0.15.3)
+set(GGML_SO_VER   0.16.0)
 set(TESS_LIB      ${EXTERNAL}/lib)
 set(TESS_INC      ${EXTERNAL}/include/tesseract)
 
@@ -168,6 +169,7 @@ target_include_directories(PaperizeEngine PRIVATE
     ${LLAMA_INC}
     ${LLAMA_INC}/vendor
     ${EXTERNAL}/include
+    ${MUPDF_INC}
     ${SQLITEVEC_INC}
     ${TESS_INC}
     ${CMAKE_SOURCE_DIR}/src/thrdprty
@@ -327,6 +329,7 @@ target_link_libraries(Paperize PRIVATE
 target_include_directories(Paperize PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${LLAMA_INC}
+    ${EXTERNAL}/include
 )
 
 # ---------------------------------------------------------------------------
