@@ -67,9 +67,18 @@ public:
 
   /// Load a GGUF model (and optionally an mmproj) from disk.
   /// Returns std::expected<void, QString> — error string on failure.
+  ///
+  /// \param estimatedPromptTokens  number of tokens the upcoming prompt will
+  ///                                consume (prompt + generation).  Pass 0
+  ///                                to use a sensible default (MaxPromptTokens
+  ///                                + MaxGenTokens).  The fitter uses this to
+  ///                                size the KV cache realistically, avoiding
+  ///                                wasted VRAM on unused context slots.
+  ///
   /// Calls unloadModel() internally if a model is already loaded, so it's
   /// safe to call repeatedly.
-  std::expected<void, QString> loadModel(const QString &modelPath = QString());
+  std::expected<void, QString> loadModel(const QString &modelPath = QString(),
+                                         uint32_t estimatedPromptTokens = 0);
 
   /// Returns true if a model is loaded and ready for inference.
   bool isReady() const;
@@ -125,10 +134,13 @@ private:
   std::vector<ggml_backend_dev_t> detectDevices();
 
   /// Unified model loader with hybrid GPU+CPU offloading.
+  /// \param estimatedCtxTokens  total tokens the KV cache needs to hold
+  ///                            (prompt + generation).  Pass 0 for default.
   common_init_result_ptr
   loadModelWithDevices(const QString &path, const QString &mmprojPath,
                        const std::vector<ggml_backend_dev_t> &devices,
-                       const char *primaryName);
+                       const char *primaryName,
+                       uint32_t estimatedCtxTokens = 0);
 
   /// libcommon init result — owns the llama_model + llama_context.
   common_init_result_ptr m_commonInit;

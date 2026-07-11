@@ -185,11 +185,21 @@ void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
 QString Summarizer::summarizeLocal(const PromptPayload &payload,
                                    const BackendInfo &backend,
                                    ConfigManager *config) {
-  qDebug() << "[Summarizer] Loading local model:" << backend.modelPath;
+  // Estimate the token budget the upcoming prompt will need.
+  // ~3 chars per token is a conservative upper bound for English text.
+  // We add 4096 tokens of headroom for the generated response.
+  uint64_t payloadChars = payload.textContext.length() +
+                          payload.systemPrompt.length() +
+                          payload.userMessage.length();
+  uint32_t estimatedCtxTokens = static_cast<uint32_t>(payloadChars / 3) + 4096;
+
+  qDebug() << "[Summarizer] Loading local model:" << backend.modelPath
+           << "| estimatedCtxTokens:" << estimatedCtxTokens;
   QElapsedTimer loadTimer;
   loadTimer.start();
 
-  auto loadResult = m_chatBackend->loadModel(backend.modelPath);
+  auto loadResult =
+      m_chatBackend->loadModel(backend.modelPath, estimatedCtxTokens);
   if (!loadResult) {
     qWarning() << "[Summarizer] Failed to load model:" << loadResult.error();
     return QString();

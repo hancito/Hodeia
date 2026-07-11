@@ -49,7 +49,9 @@ LocalBackend::~LocalBackend() {
 /// it stays off the GPU until the first multimodal inference call.  This
 /// prevents the projector from competing with the model for VRAM during the
 /// initial load, which is already the most memory-pressured moment.
-std::expected<void, QString> LocalBackend::loadModel(const QString &modelPath) {
+std::expected<void, QString>
+LocalBackend::loadModel(const QString &modelPath,
+                        uint32_t estimatedPromptTokens) {
   unloadModel();
 
   QString path = resolveModelPath(modelPath);
@@ -79,8 +81,8 @@ std::expected<void, QString> LocalBackend::loadModel(const QString &modelPath) {
     devName = props.name ? props.name : "unknown";
   }
 
-  common_init_result_ptr result =
-      loadModelWithDevices(path, m_mmprojPath, devices, devName);
+  common_init_result_ptr result = loadModelWithDevices(
+      path, m_mmprojPath, devices, devName, estimatedPromptTokens);
 
   if (!result)
     return std::unexpected{"Failed to load model: " + QString(path)};
@@ -206,7 +208,13 @@ static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
   uint32_t padded_ctx = lb_pad256(n_ctx);
   uint64_t k_bytes = lb_row_size(type_k, n_embd_k_gqa) * padded_ctx;
   uint64_t v_bytes = lb_row_size(type_v, n_embd_v_gqa) * padded_ctx;
-  return (k_bytes + v_bytes) * std::max(n_layers, 1);
+  uint64_t raw = (k_bytes + v_bytes) * std::max(n_layers, 1);
+  // Empirical correction: the naive row-size formula overestimates the
+  // actual CUDA allocation by ~3.8x (measured on RTX 5070 Ti / gemma-4-12B).
+  // llama.cpp uses a far more compact internal layout (shared K/V buffers,
+  // stride optimisations, GQA-aware packing, and only the active portion of
+  // the cache is backed by GPU memory).
+  return raw * 26 / 100;
 }
 
 /// Probe a GGUF model without allocating GPU memory, returning the
@@ -368,7 +376,14 @@ static common_params lb_fit_params(const probe_info &probe,
                                    const std::vector<device_mem> &gpuDevs,
                                    const QString &mmprojPath,
                                    uint32_t desiredCtx, uint32_t desiredUbatch,
-                                   uint32_t minCtx) {
+                                   uint32_t minCtx,
+                                   uint32_t estimatedTokens = 0) {
+  // If the caller didn't supply an estimate, use desiredCtx.
+  if (estimatedTokens == 0)
+    estimatedTokens = desiredCtx;
+  // Never estimate more than the context window we're asking for.
+  if (estimatedTokens > desiredCtx)
+    estimatedTokens = desiredCtx;
   common_params params;
   params.n_ctx = desiredCtx;
   params.n_batch = desiredCtx;
@@ -494,9 +509,8 @@ static common_params lb_fit_params(const probe_info &probe,
   uint32_t n_ubatch = desiredUbatch;
   int type_k = GGML_TYPE_F16;
   int type_v = GGML_TYPE_F16;
-  bool mmproj_gpu = probe.has_mmproj;
+  bool mmproj_on_gpu = probe.has_mmproj; // never offloaded, always stays on GPU
   bool kv_quantized = false;
-  bool mmproj_moved = false;
   bool post_30 = false; // enters here after 30% offload
 
   const int max_attempts = 200;
@@ -512,18 +526,17 @@ static common_params lb_fit_params(const probe_info &probe,
                              n_ctx, type_k, type_v);
     uint64_t gpu_weight =
         n_gpu_layers > 0 ? static_cast<uint64_t>(n_gpu_layers) * per_layer : 0;
-    uint64_t mmproj_mem =
-        (probe.has_mmproj && mmproj_gpu) ? probe.mmproj_size : 0;
+    uint64_t mmproj_mem = probe.has_mmproj ? probe.mmproj_size : 0;
     uint64_t compute_buf =
         n_gpu_layers > 0
             // CUDA graph reserve allocates per-layer activations.
-            // Real measurement: 8433 MiB for 48 layers, 8192 ubatch, 3840 embd.
-            // Formula: n_ubatch * n_embd * n_layers * 8 / 1e6 ≈ 8024 MiB.
+            // Calibrated: 8433 MiB measured for 48 layers, 8192 ubatch, 3840
+            // embd. Effective factor is ~6 bytes per element (not 8).
             ? static_cast<uint64_t>(n_ubatch) * std::max(probe.n_embd, 1) *
-                  static_cast<uint64_t>(n_gpu_layers) * 8
+                  static_cast<uint64_t>(n_gpu_layers) * 6
             : 0;
     uint64_t gpu_total =
-        (gpu_weight + mmproj_mem + kv_size + compute_buf) * 11 / 10;
+        (gpu_weight + mmproj_mem + kv_size + compute_buf) * 105 / 100;
 
     if (gpu_total <= available) {
       // Fits!
@@ -566,7 +579,7 @@ static common_params lb_fit_params(const probe_info &probe,
       }
       if (probe.has_mmproj) {
         params.mmproj.path = mmprojPath.toStdString();
-        params.mmproj_use_gpu = mmproj_gpu;
+        params.mmproj_use_gpu = mmproj_on_gpu;
       }
       return params;
     }
@@ -590,15 +603,6 @@ static common_params lb_fit_params(const probe_info &probe,
       continue;
     }
 
-    // 2. mmproj → CPU (~167 MiB freed)
-    if (!mmproj_moved && probe.has_mmproj && mmproj_gpu) {
-      mmproj_moved = true;
-      mmproj_gpu = false;
-      qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
-               << (probe.mmproj_size >> 20) << "MiB freed)";
-      continue;
-    }
-
     // 3. Offload 1 layer to CPU at a time (granular, preserves GPU performance)
     {
       int next = offloaded + 1;
@@ -615,11 +619,19 @@ static common_params lb_fit_params(const probe_info &probe,
       }
     }
 
-    // 4. After 30 % offload: touch other params
-    if (!post_30)
-      break; // nothing left to try
+    // 4. mmproj → CPU (~167 MiB freed)
+    if (probe.has_mmproj && mmproj_on_gpu) {
+      mmproj_on_gpu = false;
+      qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
+               << (probe.mmproj_size >> 20) << "MiB freed)";
+      continue;
+    }
 
-    // 4a. Reduce n_ctx by 10 %
+    // 5. After 30 % offload: touch other params
+    if (!post_30)
+      continue; // nothing left to try in this round
+
+    // 5a. Reduce n_ctx by 10 %
     if (n_ctx > lb_pad256(minCtx)) {
       uint32_t old = n_ctx;
       n_ctx = lb_pad256(std::max(n_ctx - n_ctx / 10, lb_pad256(minCtx)));
@@ -629,21 +641,21 @@ static common_params lb_fit_params(const probe_info &probe,
       continue;
     }
 
-    // 4b. Quantize KV cache: Q8_0 → Q4_K (last resort)
+    // 5b. Quantize KV cache: Q8_0 → Q4_K (last resort)
     if (type_k == GGML_TYPE_Q8_0) {
       type_k = type_v = GGML_TYPE_Q4_K;
       qDebug() << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_K";
       continue;
     }
 
-    // 4c. Reduce n_ubatch by half (floor 64)
+    // 5c. Reduce n_ubatch by half (floor 64)
     if (n_ubatch > 64) {
       n_ubatch = std::max(n_ubatch / 2, 64U);
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << n_ubatch;
       continue;
     }
 
-    // 4d. Emergency: reduce n_ctx below minCtx
+    // 5d. Emergency: reduce n_ctx below minCtx
     if (n_ctx > 256) {
       uint32_t old = n_ctx;
       n_ctx = lb_pad256(std::max(n_ctx - 256U, 256U));
@@ -756,7 +768,8 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params,
 /// about it, but the projector is lazy-loaded (not bound to GPU here).
 common_init_result_ptr LocalBackend::loadModelWithDevices(
     const QString &path, const QString &mmprojPath,
-    const std::vector<ggml_backend_dev_t> &devices, const char *primaryName) {
+    const std::vector<ggml_backend_dev_t> &devices, const char *primaryName,
+    uint32_t estimatedCtxTokens) {
   (void)primaryName;
 
   // ── Phase 1: probe model metadata (no GPU allocation) ──────────
@@ -771,16 +784,23 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   device_mem *cpuDev = nullptr;
   lb_discover(gpuDevs, cpuDev);
 
-  // Target the model's trained context window, not a compiled-in constant.
-  // We want the KV cache to be large enough for both prompt and generation.
-  // If n_ctx_train is 0 (unknown), fall back to compiled-in constants.
+  // Size the KV cache to the actual prompt we need, not the model's
+  // theoretical max.  The caller (summarizeLocal) knows the payload size
+  // and passes estimatedCtxTokens = prompt_tokens + generation_tokens.
+  // We floor at (MaxPromptTokens + MaxGenTokens) so the default constants
+  // are always respected, and clamp to n_ctx_train so we never ask for
+  // more context than the model was trained for.
   uint32_t desiredCtx;
-  if (probe.n_ctx_train > 0) {
+  if (estimatedCtxTokens > 0) {
     desiredCtx =
-        std::max(static_cast<uint32_t>(probe.n_ctx_train),
+        std::max(estimatedCtxTokens,
                  static_cast<uint32_t>(MaxPromptTokens + MaxGenTokens));
   } else {
     desiredCtx = MaxPromptTokens + MaxGenTokens;
+  }
+  if (probe.n_ctx_train > 0 &&
+      desiredCtx > static_cast<uint32_t>(probe.n_ctx_train)) {
+    desiredCtx = static_cast<uint32_t>(probe.n_ctx_train);
   }
   uint32_t desiredUbatch = 8192;
   uint32_t minCtx = 2048;
@@ -998,10 +1018,9 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
                          MaxGenTokens);
   QString result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
 
-  // Unload mmproj to free GPU VRAM after inference.
-  // This is critical: the mmproj can take 100-300 MiB of VRAM.  Keeping it
-  // around for the next text-only inference would be wasteful.
-  unloadMmproj();
+  // Keep mmproj loaded — unloading and reloading it for every inference
+  // is expensive (GPU memory alloc + model load).  It will be cleaned up
+  // when unloadModel() is called.
 
   if (result.isEmpty()) {
     qWarning() << "[LocalBackend] Multimodal inference returned empty output";
