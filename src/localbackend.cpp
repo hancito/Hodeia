@@ -216,6 +216,7 @@ struct probe_info {
   int32_t n_embd = 0;
   int32_t n_embd_k_gqa = 0;
   int32_t n_embd_v_gqa = 0;
+  int32_t n_ctx_train = 0;
   uint64_t model_size = 0;
   uint64_t mmproj_size = 0;
   bool has_mmproj = false;
@@ -241,6 +242,7 @@ static probe_info lb_probe_model(const QString &modelPath,
 
   info.n_layers = llama_model_n_layer(model);
   info.n_embd = llama_model_n_embd(model);
+  info.n_ctx_train = llama_model_n_ctx_train(model);
   {
     int n_head = std::max(llama_model_n_head(model), 1);
     int n_head_kv = std::max(llama_model_n_head_kv(model), 1);
@@ -769,7 +771,17 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   device_mem *cpuDev = nullptr;
   lb_discover(gpuDevs, cpuDev);
 
-  uint32_t desiredCtx = MaxPromptTokens + MaxGenTokens;
+  // Target the model's trained context window, not a compiled-in constant.
+  // We want the KV cache to be large enough for both prompt and generation.
+  // If n_ctx_train is 0 (unknown), fall back to compiled-in constants.
+  uint32_t desiredCtx;
+  if (probe.n_ctx_train > 0) {
+    desiredCtx =
+        std::max(static_cast<uint32_t>(probe.n_ctx_train),
+                 static_cast<uint32_t>(MaxPromptTokens + MaxGenTokens));
+  } else {
+    desiredCtx = MaxPromptTokens + MaxGenTokens;
+  }
   uint32_t desiredUbatch = 8192;
   uint32_t minCtx = 2048;
 

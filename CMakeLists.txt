@@ -283,13 +283,13 @@ qt_add_qml_module(Paperize
         ui/Fonts.qml
         ui/Main.qml
         ui/MyMenuBar.qml
-        ui/LeftPane.qml
         ui/CentralPane.qml
         ui/RightPane.qml
         ui/RagWindow.qml
         ui/RagDbPane.qml
         ui/QueryPane.qml
         ui/BackendWindow.qml
+        ui/MyToolBar.qml
 )
 
 # Resources

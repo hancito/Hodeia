@@ -225,17 +225,12 @@ Rectangle {
 
             Label {
                 id: numberPaper
-                text: "Paper Number: " + rightPane.npapers
+                text: "Documents: " + rightPane.npapers
             }
 
             Item {
                 Layout.fillWidth: true
             }
-        }
-
-        RowLayout {
-            spacing: 5
-            Layout.fillWidth: true
 
             Label {
                 text: "Sort by"
@@ -266,7 +261,6 @@ Rectangle {
                 onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
             }
         }
-
         // Paper List
         ListView {
             id: paperListView

@@ -59,10 +59,6 @@ ApplicationWindow {
     palette.disabled.link: Colors.surface0
     palette.disabled.linkVisited: Colors.surface0
 
-    menuBar: MyMenuBar {
-        id: topNavigation
-        // You can customize properties or add menus here
-    }
     // Apply theme to the entire window content
     background: Rectangle {
         color: Colors.base || Colors.background || "#1e1e1e"

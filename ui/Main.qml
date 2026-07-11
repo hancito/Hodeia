@@ -91,6 +91,37 @@ ApplicationWindow {
         onRequestDeleteModels: deleteModelDialog.open()
     }
 
+    header: MyToolBar {
+        id: toolBarContainer
+        statusBarLabel: footerLabel
+
+        onOpenRagWindow: {
+            // Check if the window instance already exists and is valid
+            if (root.secondaryWindow !== null) {
+                console.log("Window already open. Bringing to focus...");
+                root.secondaryWindow.raise();            // Brings the window to the top of the stack
+                root.secondaryWindow.requestActivate(); // Gives the window keyboard/mouse focus
+                return;
+            }
+
+            // 2. If it doesn't exist, create it
+            if (root.windowComponent.status === Component.Ready) {
+                let newWin = root.windowComponent.createObject(root);
+                if (newWin !== null) {
+                    root.secondaryWindow = newWin; // Store the reference
+
+                    // 3. Listen for the window closing so we can reset our reference to null
+                    newWin.closed.connect(function () {
+                        root.secondaryWindow = null;
+                        console.log("Window closed. Reference cleared.");
+                    });
+                }
+            } else {
+                console.log("Component not ready:", root.windowComponent.errorString());
+            }
+        }
+    }
+
     // Apply theme to the entire window content
     background: Rectangle {
         color: Colors.base || Colors.background || "#1e1e1e"
@@ -118,50 +149,16 @@ ApplicationWindow {
                 opacity: 0
             }
 
-            LeftPane {
-                id: leftPaneItem
-                SplitView.minimumWidth: 200
-                SplitView.maximumWidth: 400
+            RightPane {
+                id: rightPaneItem
+                SplitView.minimumWidth: 600
                 statusBarLabel: footerLabel
-                // 2. The effect that adds the shadow
-
-                onOpenRagWindow: {
-                    // Check if the window instance already exists and is valid
-                    if (root.secondaryWindow !== null) {
-                        console.log("Window already open. Bringing to focus...");
-                        root.secondaryWindow.raise();            // Brings the window to the top of the stack
-                        root.secondaryWindow.requestActivate(); // Gives the window keyboard/mouse focus
-                        return;
-                    }
-
-                    // 2. If it doesn't exist, create it
-                    if (root.windowComponent.status === Component.Ready) {
-                        let newWin = root.windowComponent.createObject(root);
-                        if (newWin !== null) {
-                            root.secondaryWindow = newWin; // Store the reference
-
-                            // 3. Listen for the window closing so we can reset our reference to null
-                            newWin.closed.connect(function () {
-                                root.secondaryWindow = null;
-                                console.log("Window closed. Reference cleared.");
-                            });
-                        }
-                    } else {
-                        console.log("Component not ready:", root.windowComponent.errorString());
-                    }
-                }
             }
 
             CentralPane {
                 id: centralPaneItem
                 SplitView.minimumWidth: 1000
                 activePaperHash: rightPaneItem.activePaperHash
-            }
-
-            RightPane {
-                id: rightPaneItem
-                SplitView.minimumWidth: 600
-                statusBarLabel: footerLabel
             }
         }
     }
