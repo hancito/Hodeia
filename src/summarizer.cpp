@@ -445,6 +445,28 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
   if (m_database->summaryModel())
     m_database->summaryModel()->loadAll();
 
+  // ── Update chunk metadata (clean_title + citation) ──
+  QString citation =
+      summary.authors.join(", ") + " (" + QString::number(summary.year) + ")";
+  citation = citation.trimmed();
+
+  // Escape single quotes for SQL literals.
+  QString sqlTitle = summary.title;
+  sqlTitle.replace("'", "''");
+  QString sqlCitation = citation;
+  sqlCitation.replace("'", "''");
+  QString sqlHash = hash;
+  sqlHash.replace("'", "''");
+
+  auto updateResult =
+      db.exec(QString("UPDATE chunks SET clean_title = '%1', citation = '%2' "
+                      "WHERE paper_hash = '%3'")
+                  .arg(sqlTitle, sqlCitation, sqlHash));
+  if (!updateResult) {
+    qWarning() << "[Summarizer] Failed to update chunks metadata for" << hash
+               << ":" << updateResult.error();
+  }
+
   qDebug() << "[Summarizer] Saved summary for" << hash
            << "— title:" << summary.title;
 }
