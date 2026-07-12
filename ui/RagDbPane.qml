@@ -6,6 +6,35 @@ import QtQuick.Layouts
 Rectangle {
     id: dbPane
     property var activeTheme: ({})
+    property list<int> selectedQueryIds: []
+    property int activeQueryId: 0
+    property int nqueries: databaseManager.queryModel.rowCount()
+
+    function addSelectedQuery(id) {
+        if (!selectedQueryIds.includes(id)) {
+            selectedQueryIds = selectedQueryIds.concat([id]);
+        }
+    }
+
+    function removeSelectedQuery(id) {
+        var result = [];
+        for (var i = 0; i < selectedQueryIds.length; i++) {
+            if (selectedQueryIds[i] !== id) {
+                result.push(selectedQueryIds[i]);
+            }
+        }
+        selectedQueryIds = result;
+    }
+
+    function deleteSelected() {
+        if (selectedQueryIds.length === 0) {
+            console.log("No queries selected");
+            return;
+        }
+        console.log("Deleting", selectedQueryIds.length, "queries");
+        databaseManager.removeQueriesByIds(selectedQueryIds);
+        selectedQueryIds = [];
+    }
 
     border.width: 1
     radius: 5
@@ -23,59 +52,138 @@ Rectangle {
                 Layout.fillWidth: true
                 font.pointSize: 16
                 font.weight: Font.Bold
-                // Align the text inside the 300x100 box
-                horizontalAlignment: Text.AlignHCenter // Options: AlignLeft, AlignRight, AlignHCenter, AlignJustify
-                verticalAlignment: Text.AlignVCenter   // Options: AlignTop, AlignBottom, AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
 
         RowLayout {
             spacing: 5
             Layout.fillWidth: true
-            CheckBox {
-                text: "Select All"
-            }
-            Label {
-                text: "Sort by"
-            }
 
-            ComboBox {
-                model: ["Title", "Date", "Pages", "Model"]
+            CheckBox {
+                id: selectAllCheckbox
+                text: "Select All"
+                checked: false
+                onCheckedChanged: {
+                    if (checked) {
+                        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
+                            var id = databaseManager.queryModel.dataAt(i, "id");
+                            dbPane.addSelectedQuery(id);
+                        }
+                    } else {
+                        selectedQueryIds = [];
+                    }
+                }
+            }
+            Item {
                 Layout.fillWidth: true
             }
 
-            CheckBox {
-                text: "Descending"
+            Label {
+                id: numberQuery
+                text: "Queries: " + dbPane.nqueries
             }
         }
 
-        ColumnLayout {
-            spacing: 5
-            ListView {
-                id: queryView
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+        ListView {
+            id: queryView
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            boundsBehavior: Flickable.DragAndOvershootBounds
+            Layout.minimumHeight: parent.height * 0.3
 
-                // Add bounds behavior for responsiveness
-                boundsBehavior: Flickable.DragAndOvershootBounds
+            model: databaseManager.queryModel
+            spacing: 5
+
+            delegate: Rectangle {
+                required property int id
+                required property string queryText
+                required property string response
+                required property string model
+                required property string formattedDate
+                width: queryView.width
+                height: 120
+                border.width: dbPane.activeQueryId === id ? 4 : 5
+                border.color: dbPane.activeQueryId === id ? Colors.primary : Colors.surface1
+                radius: 4
+                color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
+
+                MouseArea {
+                    id: mouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: dbPane.activeQueryId = id
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    spacing: 1
+                    RowLayout {
+                        CheckBox {
+                            checked: dbPane.selectedQueryIds.includes(id)
+                            icon.height: 8
+                            font.pixelSize: 10
+                            onCheckedChanged: {
+                                if (checked) {
+                                    dbPane.addSelectedQuery(id);
+                                } else {
+                                    dbPane.removeSelectedQuery(id);
+                                }
+                            }
+                        }
+                        Label {
+                            text: queryText || ""
+                            Layout.fillWidth: true
+                            elide: Text.ElideMiddle
+                            font.bold: true
+                        }
+                    }
+
+                    Label {
+                        text: response ? response.left(200) + (response.length > 200 ? "..." : "") : ""
+                        Layout.fillWidth: true
+                        elide: Text.ElideMiddle
+                        opacity: 0.7
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: model || ""
+                            font.family: Fonts.mono
+                            font.pixelSize: 12
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        Label {
+                            text: formattedDate || ""
+                            font.family: Fonts.mono
+                            font.pixelSize: 12
+                        }
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            id: buttonRowdbquery
+            spacing: 10
+            Layout.fillWidth: true
+
+            Item {
+                Layout.fillWidth: true
             }
 
-            RowLayout {
-                id: buttonRowdbquery
-                spacing: 10
-                Layout.fillWidth: true
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                Button {
-                    text: qsTr("Delete")
-                    icon.width: 24
-                    icon.height: 24
-                    icon.source: "qrc:/Resources/trash-can.svg"
-                    onClicked: console.log("Delete")
-                }
+            Button {
+                text: qsTr("Delete")
+                icon.width: 24
+                icon.height: 24
+                icon.source: "qrc:/Resources/trash-can.svg"
+                onClicked: dbPane.deleteSelected()
             }
         }
     }

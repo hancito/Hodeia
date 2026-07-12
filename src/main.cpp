@@ -2,6 +2,7 @@
 #include "headers/database.h"
 #include "headers/enginemanager.h"
 #include "headers/helpers.h"
+#include "headers/querycontroller.h"
 #include "headers/summarythreadmanager.h"
 #include "headers/thememanager.h"
 #include "llama.h"
@@ -89,6 +90,9 @@ int main(int argc, char *argv[]) {
   // Create the Summarizer (orchestrates local/remote backends)
   SummaryController summaryController(&configManager, &databaseManager);
 
+  // Create the Query controller (RAG over the paper library)
+  QueryController queryController(&configManager, &databaseManager);
+
   // Create the ModelHelper (manages model discovery for QML)
   ModelHelper modelHelper(&configManager);
 
@@ -100,6 +104,7 @@ int main(int argc, char *argv[]) {
                                            &engineController);
   engine.rootContext()->setContextProperty("summaryController",
                                            &summaryController);
+  engine.rootContext()->setContextProperty("queryController", &queryController);
   engine.rootContext()->setContextProperty("modelHelper", &modelHelper);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

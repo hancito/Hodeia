@@ -33,6 +33,7 @@ public:
   switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
+  Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
 
 private:
   bool initDatabase();

@@ -33,6 +33,7 @@ public:
   QHash<int, QByteArray> roleNames() const override;
 
   Q_INVOKABLE void loadAll();
+  Q_INVOKABLE QVariant dataAt(int index, const QString &role) const;
 
 private:
   SqliteDb *m_db = nullptr;

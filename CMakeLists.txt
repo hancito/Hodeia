@@ -138,6 +138,8 @@ add_library(PaperizeEngine STATIC
     headers/remotebackend.h
     headers/summarizer.h
     headers/summarythreadmanager.h
+    headers/queryworker.h
+    headers/querycontroller.h
     headers/helpers.h
 
     # --- sources ---
@@ -157,6 +159,8 @@ add_library(PaperizeEngine STATIC
     src/remotebackend.cpp
     src/summarizer.cpp
     src/summarythreadmanager.cpp
+    src/queryworker.cpp
+    src/querycontroller.cpp
     src/helpers.cpp
 
     # --- third-party C source (kept as C, not C++) ---

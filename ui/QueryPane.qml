@@ -6,10 +6,46 @@ import QtQuick.Layouts
 Rectangle {
     id: queryPane
     property var activeTheme: ({})
+    property int activeQueryId: 0
+    property string lastResponse: ""
+
+    // Live lookup of the active query from the model.
+    readonly property string activeQueryText: {
+        if (activeQueryId === 0)
+            return "";
+        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
+            var rowId = databaseManager.queryModel.dataAt(i, "id");
+            if (rowId === activeQueryId)
+                return databaseManager.queryModel.dataAt(i, "queryText");
+        }
+        return "";
+    }
+    readonly property string activeQueryResponse: {
+        if (activeQueryId === 0)
+            return "";
+        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
+            var rowId = databaseManager.queryModel.dataAt(i, "id");
+            if (rowId === activeQueryId)
+                return databaseManager.queryModel.dataAt(i, "response");
+        }
+        return "";
+    }
+
     border.width: 1
     radius: 5
     color: Colors.surface0
     opacity: 1.0
+
+    Connections {
+        target: queryController
+        function onQueryFinished(response, success, error) {
+            if (success) {
+                queryPane.lastResponse = response;
+            } else {
+                queryPane.lastResponse = "Error: " + error;
+            }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -21,7 +57,7 @@ Rectangle {
                 id: queryLlm
                 Layout.fillWidth: true
                 placeholderText: "Query your library"
-                //clearButtonEnabled: true
+                text: queryPane.activeQueryText
             }
 
             Button {
@@ -31,7 +67,7 @@ Rectangle {
                 icon.width: 24
                 icon.height: 24
                 icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
-                onClicked: console.log("Query")
+                onClicked: queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
             }
         }
 
@@ -46,10 +82,10 @@ Rectangle {
                 TextArea {
                     id: textEditor
                     readOnly: true
-
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
-                    text: "# TextArea Markdown\n\n" + "1. This is a scrollable area.\n" + "2. You can select this text.\n" + "3. **Bold** and *italics* work perfectly"
+                    // Prefer the active query response; fall back to lastResponse from a live query.
+                    text: queryPane.activeQueryResponse !== "" ? queryPane.activeQueryResponse : queryPane.lastResponse !== "" ? queryPane.lastResponse : "Ask a question about your paper library..."
                 }
             }
 
@@ -57,17 +93,6 @@ Rectangle {
                 id: buttonRowquery
                 spacing: 10
                 Layout.fillWidth: true
-                Label {
-                    text: qsTr("Context Window")
-                }
-                SpinBox {
-                    id: contextRagWindowSpinner
-                    from: 1000
-                    to: 256000
-                    value: 4000
-                    stepSize: 100
-                }
-
                 Label {
                     text: qsTr("Max Pages")
                 }

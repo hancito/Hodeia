@@ -13,6 +13,7 @@ Rectangle {
     property int totalPapers: 0
     property int elapsedTime: 0
     property bool summarizing: false
+    property bool ingesting: false
 
     function addSelectedPaper(hash) {
         if (!selectedPapers.includes(hash) && hash !== "") {
@@ -51,7 +52,11 @@ Rectangle {
 
     Connections {
         target: engineController
+        function onIngestionStarted() {
+            rightPane.ingesting = true;
+        }
         function onIngestionFinished() {
+            rightPane.ingesting = false;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
         }
@@ -108,7 +113,7 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 5
             Button {
-                enabled: !rightPane.summarizing
+                enabled: !rightPane.summarizing && !rightPane.ingesting
                 ToolTip.visible: hovered
                 ToolTip.text: "Summarize"
                 icon.width: 24
@@ -153,7 +158,7 @@ Rectangle {
             }
 
             Button {
-                enabled: !rightPane.summarizing
+                enabled: !rightPane.summarizing && !rightPane.ingesting
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete"
                 icon.width: 24
@@ -230,7 +235,7 @@ Rectangle {
 
             CheckBox {
                 id: selectAllCheckbox
-                enabled: !rightPane.summarizing
+                enabled: !rightPane.summarizing && !rightPane.ingesting
                 text: "Select All"
                 checked: false
                 onCheckedChanged: {
@@ -325,7 +330,7 @@ Rectangle {
                     spacing: 1
                     RowLayout {
                         CheckBox {
-                            enabled: !rightPane.summarizing
+                            enabled: !rightPane.summarizing && !rightPane.ingesting
                             checked: rightPane.selectedPapers.includes(paperHash)
                             icon.height: 8
                             font.pixelSize: 10

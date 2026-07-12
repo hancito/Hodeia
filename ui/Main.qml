@@ -234,9 +234,11 @@ ApplicationWindow {
         id: cleanProjectDialog
         anchors.centerIn: parent
         modal: true
+        width: 420
         title: "Clean Project"
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
+            width: cleanProjectDialog.width
             text: "Clean project \"" + activeProject + "\"? All files and data will be permanently removed."
             wrapMode: Text.WordWrap
         }
@@ -254,11 +256,14 @@ ApplicationWindow {
         id: deleteConfirmDialog
         anchors.centerIn: parent
         modal: true
+        width: 420
         title: "Delete Projects"
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
+            anchors.fill: parent
             spacing: 5
             Label {
+                Layout.fillWidth: true
                 text: "Delete the selected project(s)? This cannot be undone."
                 wrapMode: Text.WordWrap
             }
@@ -289,11 +294,14 @@ ApplicationWindow {
         id: deleteModelDialog
         anchors.centerIn: parent
         modal: true
+        width: 420
         title: "Delete Models"
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
+            anchors.fill: parent
             spacing: 5
             Label {
+                Layout.fillWidth: true
                 text: "Delete the selected model(s)? This cannot be undone."
                 wrapMode: Text.WordWrap
             }

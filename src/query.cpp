@@ -75,3 +75,20 @@ void QueryModel::loadAll() {
 
   endResetModel();
 }
+
+QVariant QueryModel::dataAt(int index, const QString &role) const {
+  if (index < 0 || index >= m_rows.size())
+    return QVariant();
+  auto names = roleNames();
+  int roleKey = -1;
+  for (auto it = names.begin(); it != names.end(); ++it) {
+    if (it.value() == role.toUtf8()) {
+      roleKey = it.key();
+      break;
+    }
+  }
+  if (roleKey < 0)
+    return QVariant();
+  QModelIndex idx = createIndex(index, 0);
+  return data(idx, roleKey);
+}

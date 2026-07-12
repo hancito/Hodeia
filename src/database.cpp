@@ -127,7 +127,27 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
     }
     chunkStmt.resetAndClearBindings();
   }
+}
 
-  m_summaryModel->loadAll();
+void DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
+  if (ids.isEmpty())
+    return;
+
+  SqliteStatement stmt = m_db.prepare("DELETE FROM Queries WHERE id = ?");
+  if (!stmt.isValid()) {
+    qCritical() << "Failed to prepare query delete";
+    return;
+  }
+
+  for (const QVariant &id : ids) {
+    (void)stmt.bind(1, id.toInt());
+    auto execResult = stmt.exec();
+    if (!execResult) {
+      qDebug() << "Delete query failed for id" << id.toInt() << ":"
+               << execResult.error();
+    }
+    stmt.resetAndClearBindings();
+  }
+
   m_queryModel->loadAll();
 }

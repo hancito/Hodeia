@@ -91,6 +91,7 @@ ApplicationWindow {
             QueryPane {
                 id: queryPaneItem
                 SplitView.minimumWidth: 600
+                activeQueryId: dbPaneItem.activeQueryId
             }
         }
     }
