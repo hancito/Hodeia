@@ -76,6 +76,15 @@ Rectangle {
             if (rightPane.statusBarLabel)
                 rightPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
         }
+        function onSummaryStopped() {
+            summarizeTimer.stop();
+            rightPane.summarizing = false;
+            rightPane.totalPapers = 0;
+            rightPane.paperProgress = 0;
+            rightPane.elapsedTime = 0;
+            if (rightPane.statusBarLabel)
+                rightPane.statusBarLabel.text = "Summarization stopped by user";
+        }
     }
 
     ColumnLayout {
@@ -165,27 +174,38 @@ Rectangle {
                 Layout.fillWidth: true
             }
 
-            Label {
-                text: "Summarizing " + rightPane.paperProgress + "/" + rightPane.totalPapers + " papers"
-                Layout.fillWidth: true
-            }
+            RowLayout {
+                Label {
+                    text: "Summarizing " + rightPane.paperProgress + "/" + rightPane.totalPapers + " papers"
+                    Layout.fillWidth: true
+                }
 
-            Label {
-                text: {
-                    var totalSec = Math.floor(rightPane.elapsedTime / 10);
-                    if (totalSec >= 3600) {
-                        var h = Math.floor(totalSec / 3600);
-                        var m = Math.floor((totalSec % 3600) / 60);
-                        return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
-                    } else if (totalSec >= 60) {
-                        var m = Math.floor(totalSec / 60);
-                        var s = totalSec % 60;
-                        return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
-                    } else {
-                        return "Elapsed Time: " + totalSec + "s";
+                Label {
+                    text: {
+                        var totalSec = Math.floor(rightPane.elapsedTime / 10);
+                        if (totalSec >= 3600) {
+                            var h = Math.floor(totalSec / 3600);
+                            var m = Math.floor((totalSec % 3600) / 60);
+                            return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
+                        } else if (totalSec >= 60) {
+                            var m = Math.floor(totalSec / 60);
+                            var s = totalSec % 60;
+                            return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
+                        } else {
+                            return "Elapsed Time: " + totalSec + "s";
+                        }
+                    }
+                    Layout.fillWidth: true
+                }
+
+                Button {
+                    id: stopSummarize
+                    text: "Stop"
+                    icon.source: "qrc:/Resources/circle-xmark.svg"
+                    onClicked: {
+                        summaryController.stopSummarize();
                     }
                 }
-                Layout.fillWidth: true
             }
         }
 

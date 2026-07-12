@@ -20,6 +20,7 @@ public slots:
 signals:
   void summaryStarted();
   void summaryFinished();
+  void summaryStopped();
   void paperFinished(const QString &hash, bool success, const QString &message);
   void allFinished(int successCount, int total);
 

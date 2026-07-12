@@ -5,6 +5,7 @@
 #include "headers/remotebackend.h"
 #include "headers/sqlitevec.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
@@ -102,6 +103,11 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
 
   int successCount = 0;
   for (int i = 0; i < hashes.size(); ++i) {
+    // Process pending events so that a queued stop() is handled.
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 100);
+    if (isStopping())
+      break;
+
     const QString &hash = hashes[i];
     qDebug() << "[Summarizer] Processing paper" << i + 1 << "/" << hashes.size()
              << "—" << hash;
@@ -270,7 +276,7 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
                               payload.visualContext);
   }
 
-  loop.exec();
+  loop.exec(QEventLoop::ExcludeUserInputEvents);
 
   qDebug() << "[Summarizer] Remote generation completed in"
            << genTimer.elapsed() << "ms"
@@ -368,7 +374,25 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
 }
 
 void Summarizer::stop() {
-  // TODO: forward cancel to the current inference pipeline
+  m_stopping = true;
+
+  // Cancel in-flight remote request
+  m_remoteBackend->cancel();
+
+  // Unload local model
+  m_chatBackend->unloadModel();
+
+  // Restore embedding model if it was unloaded
+  if (m_database) {
+    SqliteVecManager &vecMgr = m_database->vecManager();
+    if (!vecMgr.isReady()) {
+      vecMgr.initialize();
+      qDebug() << "[Summarizer] Embedding model reloaded after stop";
+    }
+  }
+
+  emit stopped();
+  qDebug() << "[Summarizer] Stop requested";
 }
 
 /* ── Database persistence ───────────────────────────────────────── */

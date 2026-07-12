@@ -50,6 +50,13 @@ void SummaryController::startSummarize(const QStringList &hashes) {
   connect(m_worker, &Summarizer::allFinished, this,
           &SummaryController::summaryFinished);
 
+  connect(m_worker, &Summarizer::stopped, this,
+          &SummaryController::summaryStopped);
+
+  // When the worker signals stopped, ask its thread to quit.
+  connect(m_worker, &Summarizer::stopped, m_thread, &QThread::quit,
+          Qt::QueuedConnection);
+
   connect(m_worker, &Summarizer::paperFinished, this,
           &SummaryController::paperFinished);
 
@@ -61,9 +68,19 @@ void SummaryController::startSummarize(const QStringList &hashes) {
 }
 
 void SummaryController::stopSummarize() {
-  if (m_worker && m_thread && m_thread->isRunning()) {
-    m_worker->stop();
-    m_thread->quit();
-    m_thread->wait();
-  }
+  if (!m_worker || !m_thread)
+    return;
+
+  // Post stop() into the worker's event loop so it runs in the correct
+  // thread (the same thread that owns m_chatBackend / m_remoteBackend).
+  // The worker emits stopped() after cleanup, which quits the thread
+  // (connected in startSummarize).
+  QMetaObject::invokeMethod(m_worker, "stop", Qt::QueuedConnection);
+
+  // Wait for the thread to finish (up to 3s).
+  // The thread will quit when:
+  //   - remote: cancelled request finishes → loop exits → stopped() → quit
+  //   - local: current paper finishes → loop sees m_stopping → stopped() → quit
+  if (m_thread->isRunning())
+    m_thread->wait(3000);
 }

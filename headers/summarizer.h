@@ -29,6 +29,7 @@ signals:
   void paperFinished(const QString &hash, bool success, const QString &message);
   void allFinished(int successCount, int total);
   void started();
+  void stopped();
 
 private:
   /* backend resolution */
@@ -63,6 +64,9 @@ private:
   static const QString &systemPrompt();
   static const QString &userPrompt();
 
+  bool isStopping() const { return m_stopping; }
+
+  bool m_stopping = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
   LocalBackend *m_chatBackend = nullptr;
