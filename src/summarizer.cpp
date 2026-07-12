@@ -19,8 +19,8 @@
 
 /* ── Prompts ───────────────────────────────────────────────────── */
 
-static const QString s_systemPrompt = []() {
-  return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper yo will:
+static const QString s_systemPromptVisual = []() {
+  return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
   1. Read the provided text context
   2. Look at the provided images of the document to gather broader context and verify data/tables.
   3. And respond with high details following this structured schema in english and don't put icons:
@@ -41,11 +41,32 @@ static const QString s_systemPrompt = []() {
 Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
 }();
 
+static const QString s_systemPromptText = []() {
+  return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
+  1. Read the provided text context extracted from the paper
+  2. And respond with high details following this structured schema in english and don't put icons:
+  3. Use mathematical description when pertinent
+{
+  "title": "The full title of the paper",
+  "authors": [A list of author names],
+  "journal": "journal or conference name",
+  "year": "The publication year as an integer",
+  "topics": [A list the 5 most relevant topics or keywords from the paper.],
+  "researchObjective": "Identify the primary question or hypothesis in 1 sentence",
+  "methodology": "Describe the study design, sample size, and key variables. Use a paragraph",
+  "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
+  "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
+  "citableSummary": "A two-sentence summary suitable for a literature review"
+  "references": ["A list of the fully detailed paper cited by the paper in the references or bibliography section"]
+}
+Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
+}();
+
 static const QString s_userPrompt = []() {
   return R"(Summarize this paper:)";
 }();
 
-const QString &Summarizer::systemPrompt() { return s_systemPrompt; }
+const QString &Summarizer::systemPrompt() { return s_systemPromptVisual; }
 const QString &Summarizer::userPrompt() { return s_userPrompt; }
 
 /* ── Construction / destruction ─────────────────────────────────── */
@@ -230,7 +251,8 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
   m_remoteBackend->setModelName(backend.modelName);
 
   qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
-           << "| Model:" << backend.modelName;
+           << "| Model:" << backend.modelName << "| Visual context:"
+           << (payload.visualContext.empty() ? "disabled" : "enabled");
 
   QElapsedTimer genTimer;
   genTimer.start();
@@ -247,9 +269,17 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
       },
       Qt::SingleShotConnection);
 
-  m_remoteBackend->generate(payload.systemPrompt,
-                            payload.userMessage + "\n\n" + payload.textContext,
-                            payload.visualContext);
+  if (payload.visualContext.empty()) {
+    m_remoteBackend->generate(payload.systemPrompt, payload.userMessage +
+                                                        "\n\n" +
+                                                        payload.textContext);
+  } else {
+    m_remoteBackend->generate(payload.systemPrompt,
+                              payload.userMessage + "\n\n" +
+                                  payload.textContext,
+                              payload.visualContext);
+  }
+
   loop.exec();
 
   qDebug() << "[Summarizer] Remote generation completed in"
@@ -329,10 +359,21 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
 
 PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   PromptPayload payload;
-  payload.systemPrompt = s_systemPrompt;
   payload.userMessage = s_userPrompt;
   payload.textContext = retrieveContext(paperHash);
-  payload.visualContext = retrieveVisualContext(paperHash);
+
+  if (m_config->useVisualContext()) {
+    payload.systemPrompt = s_systemPromptVisual;
+    payload.visualContext = retrieveVisualContext(paperHash);
+    qDebug() << "[Summarizer] Visual context ENABLED —"
+             << payload.visualContext.size() << "image(s) loaded for"
+             << paperHash;
+  } else {
+    payload.systemPrompt = s_systemPromptText;
+    qDebug() << "[Summarizer] Visual context DISABLED — text-only mode for"
+             << paperHash;
+  }
+
   return payload;
 }
 

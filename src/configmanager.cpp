@@ -74,6 +74,7 @@ void ConfigManager::loadConfig() {
     m_contextWindow =
         static_cast<unsigned int>(obj.value("contextWindow").toInt(4000));
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
+    m_useVisualContext = obj.value("useVisualContext").toBool(true);
 
     // Load backend list from JSON array
     // Expected format: [{"name":"..", "url":"..", "api_key":".."}, ...]
@@ -99,6 +100,7 @@ void ConfigManager::saveConfig() {
   obj["activeModel"] = m_activeModel;
   obj["contextWindow"] = static_cast<qint64>(m_contextWindow);
   obj["modelTemperature"] = m_modelTemperature;
+  obj["useVisualContext"] = m_useVisualContext;
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;

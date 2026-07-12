@@ -30,6 +30,8 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
   Q_PROPERTY(
       QVariantMap hardwareInfo READ hardwareInfo NOTIFY hardwareInfoChanged)
+  Q_PROPERTY(bool useVisualContext READ useVisualContext WRITE
+                 setUseVisualContext NOTIFY useVisualContextChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -44,6 +46,7 @@ public:
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
   QStringList projectList() const { return m_projectList; }
+  bool useVisualContext() const { return m_useVisualContext; }
 
   /// Return the hardware info as a QVariantMap (QML-friendly).
   QVariantMap hardwareInfo() const;
@@ -61,6 +64,13 @@ public:
   Q_INVOKABLE void setActiveModel(const QString &model);
   void setContextWindow(unsigned int window);
   void setModelTemperature(double temperature);
+  void setUseVisualContext(bool use) {
+    if (m_useVisualContext != use) {
+      m_useVisualContext = use;
+      emit useVisualContextChanged();
+      saveConfig();
+    }
+  }
 
   /// Replace the entire backend list.
   /// Each entry is a QVariantMap with keys: "name", "url", "api_key".
@@ -128,6 +138,7 @@ signals:
   void modelCopied();
 
   void hardwareInfoChanged();
+  void useVisualContextChanged();
 
 private:
   void refreshProjectList();
@@ -152,4 +163,5 @@ private:
   QStringList m_projectList;
 
   HardwareInfo m_hardwareInfo;
+  bool m_useVisualContext = true;
 };

@@ -208,7 +208,8 @@ ToolBar {
         CheckBox {
             id: visualCheckBox
             text: "Use visual context"
-            checked: true
+            checked: configManager.useVisualContext
+            onCheckedChanged: configManager.useVisualContext = checked
         }
 
         ToolSeparator {}
