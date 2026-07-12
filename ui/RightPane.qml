@@ -82,6 +82,8 @@ Rectangle {
             rightPane.totalPapers = 0;
             rightPane.paperProgress = 0;
             rightPane.elapsedTime = 0;
+            databaseManager.summaryModel.loadAll();
+            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
             if (rightPane.statusBarLabel)
                 rightPane.statusBarLabel.text = "Summarization stopped by user";
         }
@@ -106,6 +108,7 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 5
             Button {
+                enabled: !rightPane.summarizing
                 ToolTip.visible: hovered
                 ToolTip.text: "Summarize"
                 icon.width: 24
@@ -150,6 +153,7 @@ Rectangle {
             }
 
             Button {
+                enabled: !rightPane.summarizing
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete"
                 icon.width: 24
@@ -226,6 +230,7 @@ Rectangle {
 
             CheckBox {
                 id: selectAllCheckbox
+                enabled: !rightPane.summarizing
                 text: "Select All"
                 checked: false
                 onCheckedChanged: {
@@ -320,6 +325,7 @@ Rectangle {
                     spacing: 1
                     RowLayout {
                         CheckBox {
+                            enabled: !rightPane.summarizing
                             checked: rightPane.selectedPapers.includes(paperHash)
                             icon.height: 8
                             font.pixelSize: 10

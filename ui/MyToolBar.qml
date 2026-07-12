@@ -11,6 +11,7 @@ ToolBar {
     property int elapsedTime: 0
     signal openRagWindow
     property var statusBarLabel: null
+    property bool busy: false
 
     // Load models for the active backend when this component is ready.
     Component.onCompleted: modelHelper.loadActiveBackendModels()
@@ -61,8 +62,7 @@ ToolBar {
             spinner.visible = false;
             spinner.running = false;
             executionTimer.stop();
-            addfilebtn.enabled = true;
-            addfolderbtn.enabled = true;
+            toolBar.busy = false;
             if (toolBar.statusBarLabel) {
                 toolBar.statusBarLabel.text = statusLabel.text;
             }
@@ -72,10 +72,25 @@ ToolBar {
         function onIngestionStarted() {
             toolBar.elapsedTime = 0;
             statusLabel.visible = true;
+            toolBar.busy = true;
         }
 
         function onIngestionStatus(statusLog) {
             statusLabel.text = statusLog;
+        }
+    }
+
+    // ── React to summarizer state ──
+    Connections {
+        target: summaryController
+        function onSummaryStarted() {
+            toolBar.busy = true;
+        }
+        function onSummaryFinished() {
+            toolBar.busy = false;
+        }
+        function onSummaryStopped() {
+            toolBar.busy = false;
         }
     }
 
@@ -120,6 +135,7 @@ ToolBar {
         // Add file button
         Button {
             id: addfilebtn
+            enabled: !toolBar.busy
             ToolTip.text: "Add a file"
             ToolTip.visible: hovered
             display: AbstractButton.IconOnly
@@ -133,6 +149,7 @@ ToolBar {
         // Add folder button
         Button {
             id: addfolderbtn
+            enabled: !toolBar.busy
             ToolTip.text: "Add a folder"
             ToolTip.visible: hovered
             padding: 0
