@@ -5,17 +5,11 @@
 #include "headers/remotebackend.h"
 #include "headers/sqlitevec.h"
 
-#include <QBuffer>
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QEventLoop>
-#include <QFile>
 #include <QImage>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QVector>
 
 /* ── Prompts ───────────────────────────────────────────────────── */
 
@@ -89,8 +83,7 @@ struct BackendInfo {
   QVariantMap config;
 };
 
-void Summarizer::summarizePapers(const QStringList &hashes,
-                                 ConfigManager *config) {
+void Summarizer::summarizePapers(const QStringList &hashes) {
   emit started();
   if (hashes.isEmpty())
     return;
@@ -101,7 +94,7 @@ void Summarizer::summarizePapers(const QStringList &hashes,
   QElapsedTimer totalTimer;
   totalTimer.start();
 
-  BackendInfo backend = resolveBackend(config);
+  BackendInfo backend = resolveBackend();
   qDebug() << "[Summarizer] Backend:" << (backend.isLocal ? "local" : "remote")
            << "| Model:" << backend.modelName;
 
@@ -120,9 +113,9 @@ void Summarizer::summarizePapers(const QStringList &hashes,
 
     QString result;
     if (backend.isLocal)
-      result = summarizeLocal(payload, backend, config);
+      result = summarizeLocal(payload, backend);
     else
-      result = summarizeRemote(payload, backend, config);
+      result = summarizeRemote(payload, backend);
 
     if (result.isEmpty()) {
       QString msg = "Empty response";
@@ -150,14 +143,14 @@ void Summarizer::summarizePapers(const QStringList &hashes,
 
 /* ── Backend resolution ─────────────────────────────────────────── */
 
-Summarizer::BackendInfo Summarizer::resolveBackend(ConfigManager *config) {
+Summarizer::BackendInfo Summarizer::resolveBackend() {
   BackendInfo info;
-  info.isLocal = (config->activeBackend() == "Llama.cpp");
-  info.modelName = config->activeModel();
-  info.config = config->backendConfig(config->activeBackend());
+  info.isLocal = (m_config->activeBackend() == "Llama.cpp");
+  info.modelName = m_config->activeModel();
+  info.config = m_config->backendConfig(m_config->activeBackend());
 
   if (info.isLocal) {
-    QString folderPath = config->summarizersPath() + "/" + info.modelName;
+    QString folderPath = m_config->summarizersPath() + "/" + info.modelName;
     QStringList ggufs =
         QDir(folderPath)
             .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
@@ -204,8 +197,7 @@ void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
 /* ── Local summarization ────────────────────────────────────────── */
 
 QString Summarizer::summarizeLocal(const PromptPayload &payload,
-                                   const BackendInfo &backend,
-                                   ConfigManager *config) {
+                                   const BackendInfo &backend) {
   // Estimate the token budget the upcoming prompt will need.
   // ~3 chars per token is a conservative upper bound for English text.
   // We add 4096 tokens of headroom for the generated response.
@@ -239,9 +231,7 @@ QString Summarizer::summarizeLocal(const PromptPayload &payload,
 /* ── Remote summarization ───────────────────────────────────────── */
 
 QString Summarizer::summarizeRemote(const PromptPayload &payload,
-                                    const BackendInfo &backend,
-                                    ConfigManager *config) {
-  Q_UNUSED(config);
+                                    const BackendInfo &backend) {
 
   QString apiUrl = backend.config.value("url").toString();
   QString apiKey = backend.config.value("api_key").toString();

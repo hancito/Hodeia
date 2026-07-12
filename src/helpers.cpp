@@ -5,7 +5,6 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDevice>
-#include <QFutureWatcher>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -13,9 +12,9 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QStandardPaths>
+#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
-#include <QtConcurrent>
 
 /* ── Summary parsing ─────────────────────────────────────────── */
 
@@ -442,7 +441,7 @@ void ModelHelper::loadActiveBackendModels() {
   }
 }
 
-/* ── Model copy (QtConcurrent, parallel, non-blocking) ─────────── */
+/* ── Model copy (parallel, non-blocking) ───────────────────── */
 
 void ModelHelper::addLocalSummarizer(const QString &sourcePath) {
   addLocalSummarizerWithMmproj(sourcePath, QString());

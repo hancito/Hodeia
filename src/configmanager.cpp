@@ -3,7 +3,6 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
-#include <QFileDevice>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>

@@ -32,7 +32,7 @@ void SummaryController::startSummarize(const QStringList &hashes) {
 
   // Trigger work
   connect(m_thread, &QThread::started, m_worker,
-          [this]() { m_worker->summarizePapers(m_hashes, m_config); });
+          [this]() { m_worker->summarizePapers(m_hashes); });
 
   // When done: quit thread, then delete objects in the main thread's event loop
   connect(m_worker, &Summarizer::allFinished, m_thread, &QThread::quit);

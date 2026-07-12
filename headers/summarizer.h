@@ -1,8 +1,8 @@
 #pragma once
 
-#include <QDateTime>
 #include <QObject>
 #include <QStringList>
+#include <QVariantMap>
 #include <vector>
 
 #include "headers/helpers.h"
@@ -22,7 +22,7 @@ public:
   ~Summarizer() override;
 
 public slots:
-  void summarizePapers(const QStringList &hashes, ConfigManager *config);
+  void summarizePapers(const QStringList &hashes);
   void stop();
 
 signals:
@@ -39,7 +39,7 @@ private:
     QVariantMap config;
   };
 
-  BackendInfo resolveBackend(ConfigManager *config);
+  BackendInfo resolveBackend();
 
   /* GPU lifecycle */
   bool prepareGpu(bool isLocal);
@@ -47,9 +47,9 @@ private:
 
   /* inference */
   QString summarizeLocal(const PromptPayload &payload,
-                         const BackendInfo &backend, ConfigManager *config);
+                         const BackendInfo &backend);
   QString summarizeRemote(const PromptPayload &payload,
-                          const BackendInfo &backend, ConfigManager *config);
+                          const BackendInfo &backend);
 
   /* prompt building */
   PromptPayload buildPrompt(const QString &paperHash) const;
