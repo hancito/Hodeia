@@ -30,9 +30,6 @@ private:
 
   QThread *m_thread = nullptr;
   PdfWorker *m_worker = nullptr;
-  QList<QUrl> m_pdfFiles;
-  QString m_dbPath;
-  QString m_imgPath;
   ConfigManager *m_config = nullptr;
   SqliteVecManager *m_vecManager = nullptr;
 };

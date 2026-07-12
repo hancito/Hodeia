@@ -75,6 +75,17 @@ ApplicationWindow {
         //   backendDialog.open();
         //}
     }
+
+    onClosing: {
+        // Stop any in-flight operations before exiting
+        if (root.secondaryWindow !== null) {
+            root.secondaryWindow.close();
+        }
+        engineController.stopEngine();
+        summaryController.stopSummarize();
+        queryController.stopQuery();
+    }
+
     menuBar: MyMenuBar {
         id: topNavigation
         mainWin: root

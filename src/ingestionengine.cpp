@@ -9,8 +9,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QMutex>
 #include <QRegularExpression>
-#include <QThreadStorage>
 #include <QtConcurrent>
 
 extern "C" {
@@ -91,17 +91,26 @@ QString PdfWorker::extractTextFromStextPage(fz_stext_page *textPage) const {
 // ============================================================================
 //  OCR fallback  (Tesseract via direct API — not through MuPDF)
 //
-//  We call Tesseract directly here.
-//  Each QtConcurrent worker thread gets its own TessBaseAPI instance.
+//  Each QtConcurrent worker thread keeps one TessBaseAPI (cached per
+//  thread in a hash protected by a mutex).  The pool is bounded to the
+//  CPU core count, so memory usage is bounded.
+//  api->Clear() frees per-page results; the model stays cached for reuse.
+//
+//  After each batch, cleanupOcrApi() destroys every cached API sequentially
+//  from the caller thread.  Because all pool tasks have finished
+//  (blockingMap returned), no thread accesses its API concurrently.
 // ============================================================================
 
-static QThreadStorage<tesseract::TessBaseAPI *> g_ocrApi;
+static QMutex g_ocrMutex;
+static QHash<QThread *, tesseract::TessBaseAPI *> g_ocrCache;
 
 static tesseract::TessBaseAPI *ensureOcrApi() {
-  if (!g_ocrApi.hasLocalData()) {
-    tesseract::TessBaseAPI *api = new tesseract::TessBaseAPI();
+  QMutexLocker locker(&g_ocrMutex);
+  QThread *current = QThread::currentThread();
+  tesseract::TessBaseAPI *api = g_ocrCache.value(current, nullptr);
+  if (!api) {
+    api = new tesseract::TessBaseAPI();
 
-    // Locate tessdata/ alongside the running binary.
     QString tessdata =
         QDir(QCoreApplication::applicationDirPath()).filePath("tessdata");
 
@@ -114,9 +123,24 @@ static tesseract::TessBaseAPI *ensureOcrApi() {
       return nullptr;
     }
     api->SetPageSegMode(tesseract::PageSegMode::PSM_AUTO);
-    g_ocrApi.setLocalData(api);
+    g_ocrCache.insert(current, api);
   }
-  return g_ocrApi.localData();
+  return api;
+}
+
+/// Destroy all TessBaseAPI instances sequentially from the caller's thread.
+///  Safe to call after blockingMap/Mapped returns (all pool workers idle).
+static void cleanupOcrApi() {
+  QMutexLocker locker(&g_ocrMutex);
+  for (auto it = g_ocrCache.begin(); it != g_ocrCache.end(); ++it) {
+    tesseract::TessBaseAPI *api = it.value();
+    if (api) {
+      api->End();
+      delete api;
+    }
+  }
+  g_ocrCache.clear();
+  qDebug() << "[OCR] Cleanup complete";
 }
 
 QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
@@ -141,16 +165,12 @@ QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
   if (text) {
     QByteArray utf8(text);
     delete[] text;
-
-    // QString::fromUtf8 correctly decodes supplementary characters as
-    // surrogate pairs.  However, some downstream code (chunking, search)
-    // may not handle them well.  We strip control characters and
-    // replacement characters that Tesseract sometimes emits.
     result = QString::fromUtf8(utf8).trimmed();
     result.remove(
         QRegularExpression("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]"));
   }
-  api->Clear();
+
+  api->Clear(); // free per-page results, keep model cached for reuse
   fz_drop_pixmap(ctx, pix);
   return result;
 }
@@ -364,6 +384,10 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       allChunks.clear();
       allChunks.squeeze();
     }
+
+    // Free Tesseract APIs from the thread pool after each batch so that
+    // memory is released incrementally rather than held until process exit.
+    cleanupOcrApi();
 
     message =
         QString("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);

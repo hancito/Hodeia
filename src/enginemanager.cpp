@@ -34,14 +34,16 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
     m_worker = nullptr;
   }
   if (m_thread) {
+    m_thread->wait(3000); // ensure the old thread is fully stopped
     m_thread->deleteLater();
     m_thread = nullptr;
   }
 
-  // Save parameters
-  m_pdfFiles = pdfFiles;
-  m_dbPath = dbPath;
-  m_imgPath = imgPath;
+  // Capture parameters by value so the lambda is self-contained and
+  // immune to the controller being destroyed or restarted.
+  QList<QUrl> files = pdfFiles;
+  QString img = imgPath;
+  QString db = dbPath;
 
   m_thread = new QThread();
   m_worker = new PdfWorker(m_config, m_vecManager);
@@ -52,10 +54,11 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
   QThread *thisThread = m_thread;
   PdfWorker *thisWorker = m_worker;
 
-  // Trigger work
-  connect(thisThread, &QThread::started, thisWorker, [thisWorker, this]() {
-    thisWorker->processPDF(m_pdfFiles, m_imgPath, m_dbPath);
-  });
+  // Trigger work — parameters captured by value, no `this` reference.
+  connect(thisThread, &QThread::started, thisWorker,
+          [thisWorker, files, img, db]() {
+            thisWorker->processPDF(files, img, db);
+          });
 
   // When done: quit thread, then delete objects in the main thread's event loop
   connect(thisWorker, &PdfWorker::finished, thisThread, &QThread::quit);
@@ -89,9 +92,6 @@ void EngineController::stopEngine() {
 }
 
 void EngineController::releaseAndReloadModel() {
-  // Unload the embedding model to free its arena (RAM + VRAM) that would
-  // otherwise stay allocated for the lifetime of the process.
-  // The model will be reloaded lazily on the next embed/search/insert call.
   m_vecManager->shutdown();
   emit ingestionFinished();
 }

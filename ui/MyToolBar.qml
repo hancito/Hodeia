@@ -1,4 +1,3 @@
-pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
@@ -27,8 +26,7 @@ ToolBar {
             spinner.running = true;
             executionTimer.running = true;
             executionTimer.start();
-            addfilebtn.enabled = false;
-            addfolderbtn.enabled = false;
+            toolBar.busy = true;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
             var dbPath = configManager.projectDbPath(configManager.lastProject);
             engineController.startEngine(selectedFiles, imgPath, dbPath);
@@ -47,8 +45,7 @@ ToolBar {
             spinner.running = true;
             executionTimer.running = true;
             executionTimer.start();
-            addfilebtn.enabled = false;
-            addfolderbtn.enabled = false;
+            toolBar.busy = true;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
             var dbPath = configManager.projectDbPath(configManager.lastProject);
             engineController.startEngine(engineController.findPdfFiles(selectedFolder), imgPath, dbPath);

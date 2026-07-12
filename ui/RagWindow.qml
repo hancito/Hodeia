@@ -18,6 +18,8 @@ ApplicationWindow {
     signal closed
 
     onClosing: {
+        // Stop any in-flight query before closing
+        queryController.stopQuery();
         ragwindow.closed(); // Fire our custom signal
         ragwindow.destroy(); // Free memory
     }
