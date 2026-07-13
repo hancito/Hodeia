@@ -129,6 +129,7 @@ add_library(PaperizeEngine STATIC
     headers/summary.h
     headers/query.h
     headers/summaryproxymodel.h
+    headers/queryproxymodel.h
     headers/ingestionengine.h
     headers/enginemanager.h
     headers/sqlitedb.h
@@ -150,6 +151,7 @@ add_library(PaperizeEngine STATIC
     src/summary.cpp
     src/query.cpp
     src/summaryproxymodel.cpp
+    src/queryproxymodel.cpp
     src/ingestionengine.cpp
     src/enginemanager.cpp
     src/sqlitedb.cpp

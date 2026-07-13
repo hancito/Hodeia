@@ -9,24 +9,24 @@ Rectangle {
     property int activeQueryId: 0
     property string lastResponse: ""
 
-    // Live lookup of the active query from the model.
+    // Live lookup of the active query from the proxy model.
     readonly property string activeQueryText: {
         if (activeQueryId === 0)
             return "";
-        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
-            var rowId = databaseManager.queryModel.dataAt(i, "id");
+        for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
+            var rowId = databaseManager.queryProxyModel.get(i, "id");
             if (rowId === activeQueryId)
-                return databaseManager.queryModel.dataAt(i, "queryText");
+                return databaseManager.queryProxyModel.get(i, "queryText");
         }
         return "";
     }
     readonly property string activeQueryResponse: {
         if (activeQueryId === 0)
             return "";
-        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
-            var rowId = databaseManager.queryModel.dataAt(i, "id");
+        for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
+            var rowId = databaseManager.queryProxyModel.get(i, "id");
             if (rowId === activeQueryId)
-                return databaseManager.queryModel.dataAt(i, "response");
+                return databaseManager.queryProxyModel.get(i, "response");
         }
         return "";
     }

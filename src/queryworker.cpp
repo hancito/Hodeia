@@ -11,18 +11,18 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QImage>
-#include <QSet>
 
 /* ── Prompts ───────────────────────────────────────────────────── */
 
 static const QString s_systemPrompt = []() {
   return R"(You are an expert academic research assistant.
 You are provided with highly relevant pages extracted from multiple research papers.
-Each page context includes its textual fragments along with its visual page image rendering.
-When you cite the context use a clean academic citation.
-Synthesize a cohesive, comprehensive response answering the user's query utilizing both
+Each page context includes its textual fragments alongside its visual page image rendering.
+Synthesize a cohesive, detailled, comprehensive response answering the user's query utilizing both
 the textual evidence and visual figures/tables/charts provided. Cite sources explicitly.
-Use LaTeX for mathematics.)";
+When you cite the context use a clean academic citation.
+Use LaTeX for mathematics.
+Output the response in Markdown.)";
 }();
 
 /* ── Construction / destruction ─────────────────────────────────── */
@@ -248,47 +248,6 @@ QList<PageContext> QueryWorker::retrieveAndGroupPages(const QString &queryText,
     return {};
   }
 
-  // ── Collect unique paper hashes missing metadata ────────────────
-  QSet<QString> hashesNeeded;
-  for (const auto &c : chunks) {
-    if (c.cleanTitle.isEmpty())
-      hashesNeeded.insert(c.paperHash);
-  }
-
-  // Lookup missing metadata from Summaries table (populated after summary)
-  QMap<QString, QString> hashToTitle;
-  QMap<QString, QString> hashToCitation;
-  if (!hashesNeeded.isEmpty()) {
-    auto &db = m_database->db();
-    QStringList hashList;
-    for (const auto &h : hashesNeeded)
-      hashList.append(h);
-    QString inClause = hashList.join("', '").prepend("('").append("')");
-    QString sql =
-        QString("SELECT paper_hash, title, authors, year FROM Summaries "
-                "WHERE paper_hash IN (%1)")
-            .arg(inClause);
-    SqliteStatement stmt = db.prepare(sql);
-    if (stmt.isValid()) {
-      while (true) {
-        auto stepResult = stmt.step();
-        if (!stepResult || !stepResult.value())
-          break;
-        QString h = stmt.columnText(0);
-        QString title = stmt.columnText(1);
-        QString authors = stmt.columnText(2);
-        QString year = stmt.columnText(3);
-        hashToTitle[h] = title;
-        QString citation;
-        if (!authors.isEmpty())
-          citation = authors;
-        if (!year.isEmpty())
-          citation += " (" + year + ")";
-        hashToCitation[h] = citation.trimmed();
-      }
-    }
-  }
-
   // ── Group and deduplicate by (paperHash, page) ──────────────────
   // Key: "hash|page"  →  index into the ordered result list
   QMap<QString, int> pageKeyToIndex;
@@ -319,14 +278,8 @@ QList<PageContext> QueryWorker::retrieveAndGroupPages(const QString &queryText,
     pc.paperHash = c.paperHash;
     pc.page = c.page;
     pc.textChunks.append(c.text);
-
-    // Prefer chunk metadata, fall back to Summaries table.
     pc.cleanTitle = c.cleanTitle;
-    if (pc.cleanTitle.isEmpty())
-      pc.cleanTitle = hashToTitle.value(c.paperHash);
     pc.citation = c.citation;
-    if (pc.citation.isEmpty())
-      pc.citation = hashToCitation.value(c.paperHash);
 
     // Resolve image path: hash_page_NNN.png
     if (imgDir.exists()) {

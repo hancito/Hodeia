@@ -10,6 +10,8 @@ struct TextChunk {
   QString paperHash;
   int page = 0;
   int chunkIdx = 0;
+  QString cleanTitle;
+  QString citation;
 };
 
 struct SummaryRow {

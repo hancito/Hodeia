@@ -291,12 +291,12 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
         qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
         return -1;
       }
-      bindResult = stmt.bind(6, QString()); // citation (empty for now)
+      bindResult = stmt.bind(6, c.citation);
       if (!bindResult) {
         qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
         return -1;
       }
-      bindResult = stmt.bind(7, QString()); // clean_title (empty for now)
+      bindResult = stmt.bind(7, c.cleanTitle);
       if (!bindResult) {
         qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
         return -1;

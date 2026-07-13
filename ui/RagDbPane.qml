@@ -8,7 +8,7 @@ Rectangle {
     property var activeTheme: ({})
     property list<int> selectedQueryIds: []
     property int activeQueryId: 0
-    property int nqueries: databaseManager.queryModel.rowCount()
+    property int nqueries: databaseManager.queryProxyModel.rowCount()
 
     function addSelectedQuery(id) {
         if (!selectedQueryIds.includes(id)) {
@@ -67,8 +67,8 @@ Rectangle {
                 checked: false
                 onCheckedChanged: {
                     if (checked) {
-                        for (var i = 0; i < databaseManager.queryModel.rowCount(); i++) {
-                            var id = databaseManager.queryModel.dataAt(i, "id");
+                        for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
+                            var id = databaseManager.queryProxyModel.get(i, "id");
                             dbPane.addSelectedQuery(id);
                         }
                     } else {
@@ -79,7 +79,26 @@ Rectangle {
             Item {
                 Layout.fillWidth: true
             }
+            ComboBox {
+                id: sortComboBox
+                model: [ "Date", "Model"]
+                Layout.fillWidth: true
+                onCurrentIndexChanged: {
+                    // QueryTextRole=258, DateRole=260, LlmModelRole=261
+                    var roleMap = {
+                        0: 260  // Date
+                        ,
+                        1: 261  // LlmModel
+                    };
+                    databaseManager.queryProxyModel.sortRole = roleMap[currentIndex] || 260;
+                }
+            }
 
+            CheckBox {
+                id: descendingQueries
+                text: "Descending"
+                onCheckedChanged: databaseManager.queryProxyModel.sortDescending = checked
+            }
             Label {
                 id: numberQuery
                 text: "Queries: " + dbPane.nqueries
@@ -94,7 +113,7 @@ Rectangle {
             boundsBehavior: Flickable.DragAndOvershootBounds
             Layout.minimumHeight: parent.height * 0.3
 
-            model: databaseManager.queryModel
+            model: databaseManager.queryProxyModel
             spacing: 5
 
             delegate: Rectangle {
@@ -104,7 +123,7 @@ Rectangle {
                 required property string model
                 required property string formattedDate
                 width: queryView.width
-                height: 120
+                height: 80
                 border.width: dbPane.activeQueryId === id ? 4 : 5
                 border.color: dbPane.activeQueryId === id ? Colors.primary : Colors.surface1
                 radius: 4
@@ -140,13 +159,6 @@ Rectangle {
                             elide: Text.ElideMiddle
                             font.bold: true
                         }
-                    }
-
-                    Label {
-                        text: response ? response.left(200) + (response.length > 200 ? "..." : "") : ""
-                        Layout.fillWidth: true
-                        elide: Text.ElideMiddle
-                        opacity: 0.7
                     }
 
                     RowLayout {

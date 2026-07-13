@@ -346,6 +346,13 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       row.date = QDateTime::currentDateTimeUtc();
       rows.append(row);
 
+      // Propagate title as initial cleanTitle and citation on every chunk.
+      // The summarizer will overwrite both with proper authors/year later.
+      for (auto &tc : extraction.chunks) {
+        tc.cleanTitle = extraction.title;
+        tc.citation = extraction.title;
+      }
+
       allChunks << std::move(extraction.chunks);
     }
 

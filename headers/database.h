@@ -1,5 +1,6 @@
 #pragma once
 #include "headers/query.h"
+#include "headers/queryproxymodel.h"
 #include "headers/sqlitedb.h"
 #include "headers/sqlitevec.h"
 #include "headers/summary.h"
@@ -16,6 +17,7 @@ class DatabaseManager : public QObject {
   Q_PROPERTY(QueryModel *queryModel READ queryModel CONSTANT)
   Q_PROPERTY(
       SummaryProxyModel *summaryProxyModel READ summaryProxyModel CONSTANT)
+  Q_PROPERTY(QueryProxyModel *queryProxyModel READ queryProxyModel CONSTANT)
 
 public:
   explicit DatabaseManager(ConfigManager *config, QObject *parent = nullptr);
@@ -24,6 +26,7 @@ public:
   SummaryModel *summaryModel() const { return m_summaryModel; }
   QueryModel *queryModel() const { return m_queryModel; }
   SummaryProxyModel *summaryProxyModel() const { return m_summaryProxyModel; }
+  QueryProxyModel *queryProxyModel() const { return m_queryProxyModel; }
   SqliteDb &db() { return m_db; }
   SqliteVecManager &vecManager() { return m_vecManager; }
 
@@ -45,5 +48,6 @@ private:
   SummaryModel *m_summaryModel = nullptr;
   QueryModel *m_queryModel = nullptr;
   SummaryProxyModel *m_summaryProxyModel = nullptr;
+  QueryProxyModel *m_queryProxyModel = nullptr;
   SqliteVecManager m_vecManager;
 };
