@@ -82,6 +82,7 @@ Rectangle {
                 TextArea {
                     id: textEditor
                     readOnly: true
+                    font.pointSize: 12
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
                     // Prefer the active query response; fall back to lastResponse from a live query.
