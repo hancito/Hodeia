@@ -42,6 +42,10 @@ public:
   /// Whether the backend has a valid URL and model name.
   bool isReady() const { return !m_apiUrl.isEmpty() && !m_modelName.isEmpty(); }
 
+  /// Force JSON response format (for structured outputs like summaries).
+  void setForceJson(bool on) { m_forceJson = on; }
+  bool forceJson() const { return m_forceJson; }
+
   /// Generate a completion (text-only).
   void generate(const QString &systemPrompt, const QString &userPrompt);
 
@@ -81,4 +85,5 @@ private:
   QString m_modelName;
   float m_temperature = 0.1f;
   int m_maxTokens = 8192;
+  bool m_forceJson = false;
 };

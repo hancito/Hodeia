@@ -136,9 +136,11 @@ QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
   body["max_tokens"] = m_maxTokens;
   body["stream"] = false;
 
-  QJsonObject responseFormat;
-  responseFormat["type"] = "json_object";
-  body["response_format"] = responseFormat;
+  if (m_forceJson) {
+    QJsonObject responseFormat;
+    responseFormat["type"] = "json_object";
+    body["response_format"] = responseFormat;
+  }
 
   if (isOllamaLocal()) {
     body["options"] = ollamaOptions();

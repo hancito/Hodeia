@@ -245,6 +245,7 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
   m_remoteBackend->setApiUrl(apiUrl);
   m_remoteBackend->setApiKey(apiKey);
   m_remoteBackend->setModelName(backend.modelName);
+  m_remoteBackend->setForceJson(true);
 
   qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
            << "| Model:" << backend.modelName << "| Visual context:"
