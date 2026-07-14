@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD         23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Windows: hint CMake where Qt6 lives (adjust if your Qt is elsewhere)
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_PREFIX_PATH)
+  set(CMAKE_PREFIX_PATH "F:/Qt/6.11.1/msvc2022_64" CACHE STRING "Qt6 prefix" FORCE)
+endif()
+
 # Parallel build — use all cores by default (override: -DCMAKE_BUILD_PARALLEL_LEVEL=4)
 if(NOT DEFINED CMAKE_BUILD_PARALLEL_LEVEL)
   include(ProcessorCount)
