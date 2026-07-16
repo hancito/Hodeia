@@ -34,7 +34,7 @@ class InferenceEngine : public QObject {
 public:
   InferenceEngine(struct llama_context *ctx, struct llama_model *model,
                   const common_params_sampling &samplingParams,
-                  int32_t maxTokens = 4096, QObject *parent = nullptr);
+                  QObject *parent = nullptr);
   ~InferenceEngine() override;
 
   /// Run text-only inference.  `prompt` is the already-template-
@@ -73,7 +73,6 @@ private:
   struct llama_model *m_model = nullptr;
   const struct llama_vocab *m_vocab = nullptr;
   int32_t m_n_batch = 0;
-  int32_t m_maxTokens = 4096;
   QString m_stopSequence;
 
   /// common_sampler wraps the full sampling chain (sampling.h).

@@ -434,16 +434,41 @@ static common_params lb_fit_params(const probe_info &probe,
   // allocations).  The mmproj is lazy-loaded later (excluded from estimate).
   // The compute buffer is transient — freed between decode calls (excluded).
   if (integrated) {
+    // Vulkan on AMD radv iGPU is unreliable with large contexts (>30k tokens).
+    // Context loss propagates from internal Vulkan threads and cannot be
+    // caught with try/catch — it aborts the whole process.  For contexts
+    // below 30k tokens the driver is stable enough.
+    const uint32_t iGPU_safe_ctx = 30000;
+    if (desiredCtx > iGPU_safe_ctx) {
+      qWarning() << "[LocalBackend] lb_fit: iGPU skipped — context"
+                 << desiredCtx << "exceeds safe limit (" << iGPU_safe_ctx
+                 << "), falling back to CPU";
+      params.n_gpu_layers = 0;
+      return params;
+    }
+
+    // Use n_gpu_layers=999 (all layers on GPU) — splitting layers between
+    // iGPU and CPU triggers GGML_SCHED_MAX_SPLIT_INPUTS overflow in the
+    // Vulkan scheduler.  n_batch stays at 8192 regardless of n_ctx to keep
+    // Vulkan command buffers manageable.
     params.n_gpu_layers = 999;
     params.n_ctx = desiredCtx;
-    params.n_batch = desiredCtx;
-    params.n_ubatch = desiredUbatch;
+    params.n_batch = 8192;
+    params.n_ubatch = std::max(desiredUbatch / 8, 128U);
     params.devices = {bottleneck->dev};
 
-    // Persistent GPU estimate: model weights + KV cache
+    // Use Q8_0 KV cache on iGPU to reduce memory pressure (~120 MiB for a
+    // 36k context vs ~240 MiB for F16).  Q4_K is not viable — the Vulkan
+    // backend cannot execute SET_ROWS on Q4_K view tensors.
+    int iGPU_type_k = GGML_TYPE_Q8_0;
+    int iGPU_type_v = GGML_TYPE_Q8_0;
+    params.cache_type_k = static_cast<ggml_type>(iGPU_type_k);
+    params.cache_type_v = static_cast<ggml_type>(iGPU_type_v);
+
+    // Persistent GPU estimate: model weights + KV cache (quantized)
     uint64_t kv_size = lb_estimate_kv_cache(
         probe.n_embd_k_gqa, probe.n_embd_v_gqa, probe.n_layers, desiredCtx,
-        GGML_TYPE_F16, GGML_TYPE_F16);
+        iGPU_type_k, iGPU_type_v);
     uint64_t persistent = probe.model_size + kv_size;
 
     if (persistent <= available) {
@@ -457,7 +482,8 @@ static common_params lb_fit_params(const probe_info &probe,
                << (available >> 20) << "MiB"
                << "| model=" << (probe.model_size >> 20) << "MiB"
                << "| kv=" << (kv_size >> 20) << "MiB"
-               << "| n_ctx=" << desiredCtx;
+               << "| n_ctx=" << desiredCtx << "| n_ubatch=" << params.n_ubatch
+               << "| kv_type=Q8_0";
       return params;
     }
 
@@ -467,9 +493,9 @@ static common_params lb_fit_params(const probe_info &probe,
     uint32_t floor_ctx = std::max(minCtx, 4096U);
 
     while (fit_ctx > lb_pad256(floor_ctx)) {
-      uint64_t fit_kv = lb_estimate_kv_cache(
-          probe.n_embd_k_gqa, probe.n_embd_v_gqa, probe.n_layers, fit_ctx,
-          GGML_TYPE_F16, GGML_TYPE_F16);
+      uint64_t fit_kv = lb_estimate_kv_cache(probe.n_embd_k_gqa,
+                                             probe.n_embd_v_gqa, probe.n_layers,
+                                             fit_ctx, iGPU_type_k, iGPU_type_v);
       if (probe.model_size + fit_kv <= available) {
         params.n_ctx = fit_ctx;
         params.n_batch = fit_ctx;
@@ -480,7 +506,8 @@ static common_params lb_fit_params(const probe_info &probe,
         qDebug() << "[LocalBackend] lb_fit: iGPU OK (reduced ctx)"
                  << "| n_ctx=" << fit_ctx
                  << "| persistent=" << ((probe.model_size + fit_kv) >> 20)
-                 << "MiB /" << (available >> 20) << "MiB";
+                 << "MiB /" << (available >> 20) << "MiB"
+                 << "| kv_type=Q8_0";
         return params;
       }
       fit_ctx = lb_pad256(fit_ctx - 1024U);
@@ -541,7 +568,8 @@ static common_params lb_fit_params(const probe_info &probe,
     if (gpu_total <= available) {
       // Fits!
       params.n_gpu_layers = n_gpu_layers;
-      params.n_batch = n_ctx;
+      params.n_batch =
+          8192; // fixed: keeps Vulkan/CUDA command buffers manageable
       params.n_ubatch = n_ubatch;
       params.devices = {bottleneck->dev};
       params.cache_type_k = static_cast<ggml_type>(type_k);
@@ -784,19 +812,13 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   device_mem *cpuDev = nullptr;
   lb_discover(gpuDevs, cpuDev);
 
-  // Size the KV cache to the actual prompt we need, not the model's
-  // theoretical max.  The caller (summarizeLocal) knows the payload size
-  // and passes estimatedCtxTokens = prompt_tokens + generation_tokens.
-  // We floor at (MaxPromptTokens + MaxGenTokens) so the default constants
-  // are always respected, and clamp to n_ctx_train so we never ask for
-  // more context than the model was trained for.
+  // Size the KV cache.  The caller passes estimatedCtxTokens = prompt_tokens
+  // + generation_tokens.  If not provided, use the model's trained context.
   uint32_t desiredCtx;
   if (estimatedCtxTokens > 0) {
-    desiredCtx =
-        std::max(estimatedCtxTokens,
-                 static_cast<uint32_t>(MaxPromptTokens + MaxGenTokens));
+    desiredCtx = estimatedCtxTokens;
   } else {
-    desiredCtx = MaxPromptTokens + MaxGenTokens;
+    desiredCtx = probe.n_ctx_train > 0 ? probe.n_ctx_train : 8192;
   }
   if (probe.n_ctx_train > 0 &&
       desiredCtx > static_cast<uint32_t>(probe.n_ctx_train)) {
@@ -808,13 +830,30 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   common_params params = lb_fit_params(probe, gpuDevs, mmprojPath, desiredCtx,
                                        desiredUbatch, minCtx);
 
+  // Remember whether we're on an integrated GPU — needed later to keep
+  // the mmproj off the GPU and preserve VRAM.
+  m_isIntegratedGPU = false;
+  for (auto &dm : gpuDevs) {
+    if (dm.is_integrated) {
+      m_isIntegratedGPU = true;
+      break;
+    }
+  }
+
   // Apply remaining common settings
   params.model.path = path.toStdString();
   params.cpuparams.n_threads = QThread::idealThreadCount();
   params.cpuparams_batch.n_threads = QThread::idealThreadCount();
 
-  if (params.n_gpu_layers > 0) {
-    // GPU path: the fitter already set params.devices to {bottleneck_gpu}
+  // Remember how many GPU layers we're actually using — needed later to
+  // decide whether the mmproj can live on the GPU (when model is on CPU,
+  // the iGPU is free for the mmproj).
+  m_gpuLayers = params.n_gpu_layers;
+
+  if (params.n_gpu_layers != 0) {
+    // GPU path: the fitter already set params.devices to {bottleneck_gpu}.
+    // Apply global GPU settings — flash attention and auto layer split are
+    // used on all GPU backends (Vulkan, CUDA, Metal).
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
     if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
       // lb_fit_params only sets mmproj if probe confirmed it exists
@@ -887,6 +926,7 @@ void LocalBackend::unloadModel() {
   m_commonInit.reset();
   m_llamaCtx = nullptr;
   m_llamaModel = nullptr;
+  m_gpuLayers = 0;
   m_hasVision = false;
   m_ready = false;
   m_modelPath.clear();
@@ -929,14 +969,12 @@ QString LocalBackend::summarize(const PromptPayload &payload) {
     return QString();
   }
 
-  // Calculate available prompt budget: the KV cache must hold both the prompt
-  // and the generated output.  We reserve MaxGenTokens for the response, so
-  // the prompt can use the remainder.  The 3-char heuristic is a conservative
-  // upper bound on average token length (accounts for multi-byte UTF-8).
-  // If n_ctx is smaller than MaxGenTokens (unlikely), clamp gen budget.
+  // Calculate available prompt budget.  The caller already sized the KV cache
+  // via estimatedCtxTokens (prompt + generation room).  We don't impose an
+  // arbitrary split — the prompt gets the full context, and generation stops
+  // naturally on EOS / stop-sequence or when the KV cache is full.
   int32_t ctxSize = llama_n_ctx(m_llamaCtx);
-  int32_t genBudget = std::min(MaxGenTokens, ctxSize / 2);
-  int32_t maxPromptToks = std::max(1, ctxSize - genBudget);
+  int32_t maxPromptToks = ctxSize;
   int maxChars = maxPromptToks * 3;
 
   qDebug() << "[LocalBackend] summarize() — ctxSize:" << ctxSize
@@ -980,8 +1018,7 @@ common_params_sampling LocalBackend::makeSamplingParams() const {
 }
 
 QString LocalBackend::runTextInference(const QString &formattedText) {
-  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams(),
-                         MaxGenTokens);
+  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
   QString result = engine.inferText(formattedText);
 
   if (result.isEmpty()) {
@@ -1014,8 +1051,7 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
   qDebug() << "[LocalBackend] Multimodal inference with" << images.size()
            << "images";
 
-  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams(),
-                         MaxGenTokens);
+  InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
   QString result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
 
   // Keep mmproj loaded — unloading and reloading it for every inference
@@ -1039,7 +1075,10 @@ std::expected<void, QString> LocalBackend::loadMmproj() {
   emit statusUpdated("Loading multimodal projector: " + m_mmprojPath);
 
   auto mtmdParams = mtmd_context_params_default();
-  mtmdParams.use_gpu = true;
+  // On iGPU, keep mmproj on CPU only if the model itself is on the GPU.
+  // When the model is on CPU (context > 30k tokens), the iGPU is free
+  // and can accelerate the mmproj.
+  mtmdParams.use_gpu = !m_isIntegratedGPU || m_gpuLayers == 0;
   mtmdParams.n_threads = QThread::idealThreadCount();
   mtmdParams.warmup = false;
 

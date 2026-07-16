@@ -14,10 +14,9 @@
 InferenceEngine::InferenceEngine(struct llama_context *ctx,
                                  struct llama_model *model,
                                  const common_params_sampling &samplingParams,
-                                 int32_t maxTokens, QObject *parent)
+                                 QObject *parent)
     : QObject(parent), m_ctx(ctx), m_model(model),
       m_vocab(llama_model_get_vocab(model)), m_n_batch(llama_n_batch(ctx)),
-      m_maxTokens(maxTokens),
       m_sampler(common_sampler_init(model, const_cast<common_params_sampling &>(
                                                samplingParams)),
                 &common_sampler_free) {
@@ -158,6 +157,7 @@ QString InferenceEngine::generate() {
   }
 
   QString output;
+  int32_t i = 0;
 
   llama_pos nPast = 0;
   {
@@ -168,7 +168,7 @@ QString InferenceEngine::generate() {
     }
   }
 
-  for (int32_t i = 0; i < m_maxTokens; ++i) {
+  while (true) {
     llama_token tokenId = common_sampler_sample(m_sampler.get(), m_ctx, -1);
     common_sampler_accept(m_sampler.get(), tokenId, true);
 
@@ -185,9 +185,7 @@ QString InferenceEngine::generate() {
       break;
     }
 
-    // Decode the single token.  llama_batch_get_one leaves logits NULL
-    // (it is a legacy helper), so we use llama_batch_init + common_batch_add
-    // which properly allocates all internal arrays.
+    // Decode the single token.
     {
       struct llama_batch batch = llama_batch_init(1, 0, 1);
       common_batch_add(batch, tokenId, nPast + i, {0}, true);
@@ -201,6 +199,7 @@ QString InferenceEngine::generate() {
         break;
       }
     }
+    ++i;
   }
 
   return output;

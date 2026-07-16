@@ -69,11 +69,11 @@ public:
   /// Returns std::expected<void, QString> — error string on failure.
   ///
   /// \param estimatedPromptTokens  number of tokens the upcoming prompt will
-  ///                                consume (prompt + generation).  Pass 0
-  ///                                to use a sensible default (MaxPromptTokens
-  ///                                + MaxGenTokens).  The fitter uses this to
-  ///                                size the KV cache realistically, avoiding
-  ///                                wasted VRAM on unused context slots.
+  ///                                consume (prompt + generation).  Pass 0 to
+  ///                                use the model's trained context size.  The
+  ///                                fitter uses this to size the KV cache
+  ///                                realistically, avoiding wasted VRAM on
+  ///                                unused context slots.
   ///
   /// Calls unloadModel() internally if a model is already loaded, so it's
   /// safe to call repeatedly.
@@ -162,9 +162,8 @@ private:
 
   /// Set to true when an mmproj was found next to the model.
   bool m_hasVision = false;
-
-  static constexpr int32_t MaxPromptTokens = 8192;
-  static constexpr int32_t MaxGenTokens = 4096;
+  bool m_isIntegratedGPU = false;
+  int32_t m_gpuLayers = 0; // actual n_gpu_layers used on last load
 
   common_params_sampling makeSamplingParams() const;
 };

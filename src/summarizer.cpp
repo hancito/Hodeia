@@ -304,19 +304,31 @@ QString Summarizer::retrieveContext(const QString &paperHash) const {
   }
 
   QString context;
-  for (const auto &c : chunks)
-    context += QString("Page %1: %2\n\n").arg(c.page).arg(c.text);
+  const int overlapChars = 200; // matches PdfWorker::m_overlapChars
 
-  // Count total OCR chars across chunks
+  for (int i = 0; i < chunks.size(); ++i) {
+    const auto &c = chunks[i];
+    QString text = c.text;
+
+    // Strip the trailing overlap that will be repeated in the next chunk.
+    // The last chunk keeps its full text — there's no successor to deduplicate.
+    if (i < chunks.size() - 1 && text.length() > overlapChars) {
+      text = text.left(text.length() - overlapChars);
+    }
+
+    context += QString("Page %1: %2\n\n").arg(c.page).arg(text);
+  }
+
+  // Count total OCR chars across all (pre-dedup) chunks
   int totalOcrChars = 0;
   for (const auto &c : chunks)
     totalOcrChars += c.text.length();
 
   qDebug() << "[Summarizer] retrieved" << chunks.size()
            << "chunks | OCR total:" << totalOcrChars
-           << "chars | assembled context:" << context.length()
-           << "chars | first chunk sample:" << chunks.first().text.left(80)
-           << "..."
+           << "chars (with overlap) | assembled context:" << context.length()
+           << "chars (deduplicated) | first chunk sample:"
+           << chunks.first().text.left(80) << "..."
            << "for hash:" << paperHash;
   return context;
 }
