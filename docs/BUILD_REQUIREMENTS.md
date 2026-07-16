@@ -1,6 +1,54 @@
 # Build Requirements — Windows & macOS (Apple Silicon)
 
-Compiler : **Clang/LLVM** sur les deux plateformes.
+Compiler : **Clang/LLVM** sur les trois plateformes.
+
+---
+
+## Linux
+
+### Dépendances par gestionnaire de paquets
+
+Installez **un seul** des blocs ci-dessous selon votre distribution.
+
+#### Arch Linux / Manjaro
+
+```bash
+sudo pacman -S clang cmake ninja qt6-base qt6-declarative patchelf pkgconf \
+  vulkan-icd-loader libomp make git wget
+```
+
+#### Debian / Ubuntu
+
+```bash
+sudo apt install -y clang cmake ninja-build patchelf pkg-config git wget \
+  libclang-rt-dev libomp-dev \
+  qt6-base-dev qt6-declarative-dev \
+  libvulkan1
+```
+
+#### Fedora
+
+```bash
+sudo dnf install clang cmake ninja qt6-qtbase qt6-qtquickcontrols2 \
+  patchelf pkgconf-pkg-config libomp git wget vulkan-loader
+```
+
+### Build
+
+```bash
+mkdir build && cd build
+
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release
+
+cmake --build .
+```
+
+> Le CMake détecte automatiquement le backend GPU (Vulkan ou CUDA) disponible
+> sur la machine. Pour forcer un backend :
+> `-DLLAMA_FORCE_BACKEND=cpu` | `cuda` | `vulkan`
 
 ---
 
@@ -212,63 +260,56 @@ Résultat : `Paperize.app` (~300 Mo) — standalone, drag & drop vers `/Applicat
 
 ---
 
-## Windows (Clang/LLVM)
+## Windows (MSYS2 + Clang/LLVM)
 
-### Outils système
+> **Recommandé** : Utiliser MSYS2 avec l'environnement **clang64**. Cela fournit un shell
+> Unix complet (bash, make, pkg-config) et un gestionnaire de paquets (`pacman`) qui résout
+> toutes les dépendances de build automatiquement. Le produit final est **identique** —
+> l'utilisateur final n'a aucune dépendance MSYS2.
 
-| Outil            | Version        | Installation                                                                                                                           |
-| ---------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| LLVM for Windows | ≥ 18.0         | [llvm.org/downloads](https://llvm.org/builds/) — installer `LLVM-x64.msi`                                                              |
-| CMake            | ≥ 3.25         | [cmake.org](https://cmake.org/download/)                                                                                               |
-| Ninja            | latest         | `pip install ninja` ou [GitHub releases](https://github.com/ninja-build/ninja/releases)                                                |
-| Windows 10 SDK   | ≥ 10.0.22621.0 | Inclus avec [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) — cocher seulement "Windows 11 SDK" + "MSBuild" |
+### Installation MSYS2
 
-> **Important** : Clang sur Windows (`clang-cl`) a besoin de `link.exe` et `lib.exe` du Windows SDK pour le lien. Installez **Visual Studio Build Tools** (gratuit) et cochez uniquement la charge de travail "Compilation C++ prise en charge par les outils v143".
+1. Télécharger et installer [MSYS2 x86_64](https://www.msys2.org/download/)
+2. Ouvrir **MSYS2 clang64** (pas MSYS2 mingw64, pas MSYS2 MSYS)
+3. Installer les paquets :
 
-### Runtime Qt6
-
-| Composant                                             | Installation                                                                                         |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Qt 6.10+ (Quick, QuickControls2, Concurrent, Network) | [Qt Online Installer](https://www.qt.io/download) — sélectionner le kit **Qt 6.x.x for Win64 Clang** |
-
-> **Important** : L'outil **`windeployqt`** est livré avec Qt. Il est appelé automatiquement par CMake pour copier toutes les DLLs Qt dans le dossier de sortie. Il faut l'installation complète via le Qt Online Installer (pas une version minimale).
-
-### OpenMP
-
-```powershell
-# Via vcpkg
-vcpkg install llvm-openmp
+```bash
+pacman -S --needed mingw-w64-clang-x86_64-{toolchain,cmake,ninja,llvm-openmp}
+pacman -S --needed mingw-w64-clang-x86_64-{libpng,libjpeg-turbo,libtiff,zlib,freetype,harfbuzz,openjpeg}
+pacman -S --needed mingw-w64-clang-x86_64-{qt6-base,qt6-declarative,qt6-tools}
+pacman -S --needed git wget curl
 ```
 
-Ou téléchargez `libomp.dll` + `libomp.lib` depuis les [releases LLVM](https://github.com/llvm/llvm-project/releases). Placez `libomp.dll` dans le même répertoire que `clang-cl` (généralement `C:\Program Files\LLVM\bin\`).
+Qt6 de MSYS2 inclut automatiquement `windeployqt` (`mingw64/bin/windeployqt.exe`).
 
-> **Note** : Le runtime `libomp.dll` est automatiquement copié à côté de `Paperize.exe` par CMake au moment du build. L'utilisateur final n'a **pas** besoin d'installer OpenMP.
-
-### GPU (optionnel)
+### GPU (optionnel — hors MSYS2)
 
 | Backend | Installation                                                                                                                                                             |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | CUDA    | [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) — installe `cudart.lib`, `cublas.lib` dans `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\<ver>\lib\x64\` |
 | Vulkan  | [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) — définit `$env:VULKAN_SDK` automatiquement                                                                             |
 
+> Les GPU backends s'installent en dehors de MSYS2. Le SDK définit les variables
+> d'environnement visibles depuis toutes les sessions.
+
 ### Bibliothèques à compiler
 
-Toutes les commandes utilisent `clang-cl`. Lancez-les dans un **LLVM x64 Native Tools Command Prompt** ou configurez manuellement le chemin vers les headers Windows SDK.
+Toutes les commandes s'exécutent dans **MSYS2 clang64**.
 
 #### 1. llama.cpp (CPU) → `.dll` + `.lib`
 
-```powershell
+```bash
 git clone https://github.com/ggml-org/llama.cpp.git
 cd llama.cpp
-mkdir build; cd build
+mkdir build && cd build
 
-cmake .. -G Ninja ^
-  -DCMAKE_C_COMPILER=clang-cl ^
-  -DCMAKE_CXX_COMPILER=clang-cl ^
-  -DCMAKE_BUILD_TYPE=Release ^
-  -DBUILD_SHARED_LIBS=ON ^
-  -DLLAMA_OPENMP=ON ^
-  -DLLAMA_CUDA=OFF ^
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=ON \
+  -DLLAMA_OPENMP=ON \
+  -DLLAMA_CUDA=OFF \
   -DLLAMA_VULKAN=OFF
 
 cmake --build .
@@ -280,45 +321,48 @@ Pour Vulkan : `-DLLAMA_VULKAN=ON` + Vulkan SDK installé.
 Fichiers à copier dans `external/lib/windows/llamacpp/cpu/` :
 
 ```
-llama.dll          (+ llama.lib import lib)
-llama-common.dll   (+ .lib)
-mtmd.dll           (+ .lib)
-ggml.dll           (+ .lib)
-ggml-base.dll      (+ .lib)
-ggml-cpu.dll       (+ .lib)
+llama.dll          (+ llama.dll.a import lib)
+llama-common.dll   (+ .dll.a)
+mtmd.dll           (+ .dll.a)
+ggml.dll           (+ .dll.a)
+ggml-base.dll      (+ .dll.a)
+ggml-cpu.dll       (+ .dll.a)
 ```
 
-> Copie les `.lib` correspondants dans le même dossier — le linker Clang en a besoin.
+> Sous MSYS2, les import libs portent l'extension `.dll.a` (équivalent de `.lib`).
+> Copiez-les dans le même dossier — le linker en a besoin.
 
-Pour CUDA, répète avec `-DLLAMA_CUDA=ON` → copie dans `external/lib/windows/llamacpp/cuda/` :
+Pour CUDA, répétez avec `-DLLAMA_CUDA=ON` → `external/lib/windows/llamacpp/cuda/` :
 
 ```
 llama.dll, llama-common.dll, mtmd.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll
 ggml-cuda.dll      ← backend GPU
 ```
 
-Pour Vulkan, répète avec `-DLLAMA_VULKAN=ON` → `external/lib/windows/llamacpp/vulkan/` :
+Pour Vulkan, répétez avec `-DLLAMA_VULKAN=ON` → `external/lib/windows/llamacpp/vulkan/` :
 
 ```
 ggml-vulkan.dll    ← backend GPU
 ```
 
-#### 2. MuPDF → `.lib` (statique)
+#### 2. MuPDF → `.a` (statique)
 
-> **Important** : Utiliser `MUPDF_BUILD_THIRD_PARTY=ON` (pas `MUPDF_THIRD_PARTY=ON`) pour embedder toutes les dépendances (libpng, libjpeg, libtiff, zlib, FreeType, HarfBuzz, etc.) dans les `.lib` statiques.
+> **Important** : `MUPDF_BUILD_THIRD_PARTY=ON` embed toutes les dépendances (libpng,
+> libjpeg, libtiff, zlib, FreeType, HarfBuzz, etc.) dans les archives statiques.
+> Avec MSYS2, `pkg-config` trouve automatiquement ces bibliothèques.
 
-```powershell
+```bash
 git clone https://github.com/ArtifexSoftware/mupdf.git
 cd mupdf
 git submodule update --init
 
-mkdir build; cd build
+mkdir build && cd build
 
-cmake .. -G Ninja ^
-  -DCMAKE_C_COMPILER=clang-cl ^
-  -DCMAKE_CXX_COMPILER=clang-cl ^
-  -DMUPDF_BUILD_TYPE=Release ^
-  -DMUPDF_BUILD_THIRD_PARTY=ON ^
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DMUPDF_BUILD_TYPE=Release \
+  -DMUPDF_BUILD_THIRD_PARTY=ON \
   -DBUILD_SHARED_LIBS=OFF
 
 cmake --build .
@@ -327,110 +371,118 @@ cmake --build .
 Copier dans `external/lib/windows/` :
 
 ```
-libmupdf.lib
-libmupdf-third.lib
-libmupdf-threads.lib
+libmupdf.a
+libmupdf-third.a
+libmupdf-threads.a
 ```
 
-#### 3. Leptonica → `.lib` (statique)
+#### 3. Leptonica → `.a` (statique)
 
-> **Important** : Lier contre les `.lib` statiques produits par le build MuPDF (`_deps\...`) pour éviter toute dépendance dynamique.
+> Avec MSYS2 et MuPDF compilé avec `MUPDF_BUILD_THIRD_PARTY=ON`, les bibliothèques
+> png/jpeg/tiff/zlib sont disponibles via `pkg-config` — Leptonica les trouve
+> automatiquement.
 
-```powershell
-# Télécharger leptonica-1.87.0.tar.gz, extraire
+```bash
+wget https://github.com/DanBloomberg/leptonica/releases/download/1.87.0/leptonica-1.87.0.tar.gz
+tar xzf leptonica-1.87.0.tar.gz
 cd leptonica-1.87.0
-mkdir build; cd build
+mkdir build && cd build
 
-$MUPDF_BUILD = "C:\chemin\vers\mupdf\build"
-
-cmake .. -G Ninja ^
-  -DCMAKE_C_COMPILER=clang-cl ^
-  -DCMAKE_CXX_COMPILER=clang-cl ^
-  -DBUILD_SHARED_LIBS=OFF ^
-  -DBUILD_PROG=OFF ^
-  -DENABLE_PNG=ON ^
-  -DENABLE_JPEG=ON ^
-  -DENABLE_TIFF=ON ^
-  -DENABLE_ZLIB=ON ^
-  -DPNG_LIBRARY="${MUPDF_BUILD}\_deps\libpng-build\Release\png16.lib" ^
-  -DJPEG_LIBRARY="${MUPDF_BUILD}\_deps\libjpeg-build\jpeg-static.lib" ^
-  -DTIFF_LIBRARY="${MUPDF_BUILD}\_deps\libtiff-build\libtiff.lib" ^
-  -DZ_LIBRARY="${MUPDF_BUILD}\_deps\zlib-build\zlib.lib"
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DBUILD_PROG=OFF \
+  -DENABLE_PNG=ON \
+  -DENABLE_JPEG=ON \
+  -DENABLE_TIFF=ON \
+  -DENABLE_ZLIB=ON \
+  -DENABLE_GIF=OFF \
+  -DENABLE_WEBP=OFF \
+  -DENABLE_OPENJPEG=OFF
 
 cmake --build .
 ```
 
-Copier `build\libleptonica.lib` → `external/lib/windows/`
+Copier `build/src/libleptonica.a` → `external/lib/windows/`
 
-> **Vérification** : `dumpbin /symbols libleptonica.lib | findstr "png\|jpeg\|tiff\|zlib"` ne doit montrer aucun symbole external non résolu.
+> **Vérification** : `nm libleptonica.a | grep " U " | grep -iE "png|jpeg|tiff|zlib"` doit retourner **rien** si les libs sont bien liées statiquement. Si des symboles persistent, passez manuellement les archives MuPDF : `-DPNG_LIBRARY=...` etc.
 
-#### 4. Tesseract → `.lib` (statique)
+#### 4. Tesseract → `.a` (statique)
 
-```powershell
-# Télécharger tesseract-5.5.2.tar.gz, extraire
+```bash
+wget https://github.com/tesseract-ocr/tesseract/releases/download/5.5.2/tesseract-5.5.2.tar.gz
+tar xzf tesseract-5.5.2.tar.gz
 cd tesseract-5.5.2
-mkdir build; cd build
+mkdir build && cd build
 
-cmake .. -G Ninja ^
-  -DCMAKE_C_COMPILER=clang-cl ^
-  -DCMAKE_CXX_COMPILER=clang-cl ^
-  -DBUILD_SHARED_LIBS=OFF ^
-  -DBUILD_TRAINING_TOOLS=OFF ^
-  -DBUILD_TESTS=OFF ^
-  -DDISABLED_LEGACY_ENGINE=ON ^
-  -DGRAPHICS_DISABLED=ON ^
-  -DLeptonica_DIR=C:\chemin\vers\leptonica-1.87.0\build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DBUILD_TRAINING_TOOLS=OFF \
+  -DBUILD_TESTS=OFF \
+  -DDISABLED_LEGACY_ENGINE=ON \
+  -DGRAPHICS_DISABLED=ON \
+  -DLeptonica_DIR=/chemin/vers/leptonica-1.87.0/build
 
 cmake --build .
 ```
 
-Copier `build\libtesseract.lib` → `external/lib/windows/`
+Copier `build/libtesseract.a` → `external/lib/windows/`
 
-#### 5. sqlite-vec → `.dll` + `.lib`
+#### 5. sqlite-vec → `.dll` + `.a`
 
-```powershell
+```bash
 curl -fSL -o vec0.c "https://github.com/asg017/sqlite-vec/raw/main/dist/vec0.c"
-clang-cl /shared /LD vec0.c /Fevec0.dll /Fevec0.lib
+clang -shared -o vec0.dll vec0.c
 ```
 
-Copier `vec0.dll` + `vec0.lib` → `external/lib/windows/sqlitevec/`
+Copier `vec0.dll` → `external/lib/windows/sqlitevec/`
 
 #### 6. Tesseract traineddata
 
-```powershell
-New-Item -ItemType Directory -Force -Path Resources\tessdata
-curl -fSL -o Resources\tessdata\eng.traineddata `
+```bash
+mkdir -p Resources/tessdata
+curl -fSL -o Resources/tessdata/eng.traineddata \
   "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
 ```
 
-### Build final (Windows)
+### Build final (Windows via MSYS2)
 
-```powershell
-mkdir build; cd build
+```bash
+mkdir build && cd build
 
-cmake .. -G Ninja ^
-  -DCMAKE_C_COMPILER=clang-cl ^
-  -DCMAKE_CXX_COMPILER=clang-cl ^
-  -DCMAKE_BUILD_TYPE=Release ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.10.0\msvc2022_64"   # adapter selon ton kit Qt
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH=/mingw64   # Qt6 de MSYS2
 
 cmake --build .
 ```
 
+> Si vous utilisez Qt de l'**Online Installer** au lieu de MSYS2, remplacez
+> `CMAKE_PREFIX_PATH` par le chemin du kit Qt :
+> `-DCMAKE_PREFIX_PATH="C:/Qt/6.10.0/msvc2022_64"`
+
 Le CMake appelle automatiquement **`windeployqt`** en POST_BUILD. Le dossier de sortie contient :
 
-| Catégorie                | Contenu                                                                                                                                                    |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Qt runtime** (~150 Mo) | `Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Quick.dll`, `Qt6QuickControls2.dll`, `Qt6Network.dll`, ICU data, image formats, platform plugins, styles, etc.            |
-| **LLaMA.cpp**            | `llama.dll`, `ggml.dll`, `ggml-cpu.dll`, `ggml-cuda.dll` (ou `ggml-vulkan.dll`), `libllama-common.dll`, `libmtmd.dll`                                      |
-| **GPU backend**          | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si CUDA) — copiés depuis le CUDA Toolkit / `vulkan-1.dll` (si Vulkan) — copié depuis le Vulkan SDK |
-| **Extensions**           | `vec0.dll` (sqlite-vec), `libomp.dll` (OpenMP)                                                                                                             |
-| **Ressources**           | themes/, Fonts/, tessdata/                                                                                                                                 |
-| **Exécutable**           | `Paperize.exe`                                                                                                                                             |
+| Catégorie                | Contenu                                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Qt runtime** (~150 Mo) | `Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Quick.dll`, `Qt6QuickControls2.dll`, `Qt6Network.dll`, ICU data, image formats, platform plugins, styles, etc. |
+| **LLaMA.cpp**            | `llama.dll`, `ggml.dll`, `ggml-cpu.dll`, `ggml-cuda.dll` (ou `ggml-vulkan.dll`), `llama-common.dll`, `mtmd.dll`                                 |
+| **GPU backend**          | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si CUDA) / `vulkan-1.dll` (si Vulkan)                                                   |
+| **Extensions**           | `vec0.dll` (sqlite-vec), `libomp.dll` (OpenMP)                                                                                                  |
+| **Ressources**           | themes/, Fonts/, tessdata/                                                                                                                      |
+| **Exécutable**           | `Paperize.exe`                                                                                                                                  |
 
-> **VC++ Redistributable** : `windeployqt` copie automatiquement les DLLs runtime MSVC (`vcruntime140.dll`, `msvcp140.dll`, `ucrtbase.dll`) depuis l'installation Visual Studio Build Tools. Si elles sont absentes, l'utilisateur doit installer le [VC++ Redist](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).
+> **Runtime C/C++ (UCRT)** : Le runtime universel Windows (`ucrtbase.dll`, `vcruntime140.dll`)
+> fait partie de Windows 10/11 et est toujours présent. Pas besoin de shipper le VC++ Redist
+> tant que votre cible est Windows 10+. `windeployqt` les copie quand même s'il trouve
+> les Visual Studio Build Tools.
 
-Résultat : un dossier autonome (~250-400 Mo selon le backend GPU). L'utilisateur lance `Paperize.exe` — zéro installation requise.
+Résultat : un dossier autonome (~250-400 Mo selon le backend GPU). L'utilisateur lance `Paperize.exe` — zéro installation requise, zéro dépendance MSYS2.
 
 Pour créer un installateur, empaquete le dossier avec [Inno Setup](https://jrsoftware.org/isinfo.php) ou [NSIS](https://nsis.sourceforge.io/).
 

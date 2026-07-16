@@ -75,6 +75,9 @@ elseif(PAPERIZE_PLATFORM_MAC)
   set(_VECTOREC_EXT       "vec0.dylib")
   set(_STATIC_EXT         ".a")
 elseif(PAPERIZE_PLATFORM_WIN)
+  # Windows: clang-cl produces .lib, MSYS2/MinGW-Clang produces .a.
+  # CMake handles both — but we normalise to .a (MSYS2 convention) and
+  # fall back to .lib for clang-cl native builds.
   set(_PLAT               "windows")
   set(_SHARED_LLAMA       "llama.dll")
   set(_SHARED_LLAMA_COMM  "llama-common.dll")
@@ -86,7 +89,7 @@ elseif(PAPERIZE_PLATFORM_WIN)
   set(_SHARED_GGML_VK     "ggml-vulkan.dll")
   set(_SHARED_GGML_METAL  "")
   set(_VECTOREC_EXT       "vec0.dll")
-  set(_STATIC_EXT         ".lib")
+  set(_STATIC_EXT         ".a")
 endif()
 
 # Platform-specific static library paths

@@ -2,7 +2,7 @@
 [
   {
     "label": "CMake: Configure",
-    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug",
+    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -20,7 +20,7 @@
   },
   {
     "label": "Build & Run",
-    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug  && cmake --build build && ./build/Paperize",
+    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build && ./build/Paperize",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
@@ -30,7 +30,7 @@
   },
   {
     "label": "CMake: Build Release",
-    "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build",
+    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
