@@ -191,6 +191,102 @@ void RemoteBackend::generate(const QString &systemPrompt,
       QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
 }
 
+void RemoteBackend::generateInterleaved(const QString &systemPrompt,
+                                        const PromptPayload &payload,
+                                        bool hasImages) {
+  if (!isReady()) {
+    emit finished(QString(), "Backend not configured (URL or model missing)");
+    return;
+  }
+  cancel();
+
+  if (!hasImages) {
+    // Text-only: concatenate all page text
+    QString fullText = payload.userMessage + "\n\n## DOCUMENT\n\n";
+    for (const auto &pb : payload.pageBlocks)
+      fullText += QString("## Page %1\n%2\n\n").arg(pb.pageNumber).arg(pb.text);
+
+    QJsonArray messages;
+    if (!systemPrompt.isEmpty())
+      messages.append(systemMessage(systemPrompt));
+    messages.append(textUserMessage(fullText));
+
+    // ── Debug ──
+    qDebug() << "========== PROMPT DEBUG (remote/text-only) ==========";
+    qDebug() << "SYSTEM:" << systemPrompt.left(200) << "...";
+    QString dbg = fullText;
+    if (dbg.length() > 4000)
+      dbg =
+          dbg.left(4000) +
+          QString("\n... [truncated, total: %1 chars]").arg(fullText.length());
+    qDebug().noquote() << "USER:" << dbg;
+    qDebug() << "====================================================";
+
+    sendRequest(
+        buildRequest(buildCompletionUrl()),
+        QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
+    return;
+  }
+
+  // Multimodal: interleaved multi-part content
+  // Format: text → image → text → image … per page
+  QJsonArray contentParts;
+  {
+    QJsonObject part;
+    part["type"] = "text";
+    part["text"] = payload.userMessage + "\n\n## DOCUMENT\n\n";
+    contentParts.append(part);
+  }
+
+  for (const auto &pb : payload.pageBlocks) {
+    // Image FIRST, then text
+    if (!pb.visualContext.data.empty())
+      contentParts.append(imageToPart(pb.visualContext));
+
+    {
+      QJsonObject part;
+      part["type"] = "text";
+      part["text"] =
+          QString("## Page %1\n%2\n\n").arg(pb.pageNumber).arg(pb.text);
+      contentParts.append(part);
+    }
+  }
+
+  QJsonObject msg;
+  msg["role"] = "user";
+  msg["content"] = contentParts;
+
+  QJsonArray messages;
+  if (!systemPrompt.isEmpty())
+    messages.append(systemMessage(systemPrompt));
+  messages.append(msg);
+
+  // ── Debug ──
+  qDebug() << "========== PROMPT DEBUG (remote/multimodal) ==========";
+  qDebug() << "SYSTEM:" << systemPrompt.left(200) << "...";
+  qDebug() << "Content parts:" << contentParts.size() << "(for"
+           << payload.pageBlocks.size() << "pages)";
+  for (int i = 0; i < contentParts.size(); ++i) {
+    QJsonObject part = contentParts[i].toObject();
+    if (part.value("type") == "text") {
+      QString t = part.value("text").toString();
+      if (t.length() > 800)
+        t = t.left(800) + "...";
+      qDebug().noquote() << "  part[" << i << "] text:" << t;
+    } else {
+      qDebug()
+          << "  part[" << i << "] image ("
+          << part.value("image_url").toObject().value("url").toString().left(60)
+          << "...)";
+    }
+  }
+  qDebug() << "======================================================";
+
+  sendRequest(
+      buildRequest(buildCompletionUrl()),
+      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
+}
+
 void RemoteBackend::cancel() {
   if (m_currentReply) {
     m_currentReply->abort();

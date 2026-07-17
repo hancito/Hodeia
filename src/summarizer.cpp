@@ -11,13 +11,17 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QImage>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSet>
+#include <algorithm>
 
 /* ── Prompts ───────────────────────────────────────────────────── */
 
 static const QString s_systemPromptVisual = []() {
   return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
-  1. Read the provided text context
-  2. Look at the provided images of the document to gather broader context and verify data/tables.
+  1. The document is provided page by page. Each page's image (when available) precedes its extracted text.
+  2. Use the images to gather broader context and verify data, tables, and figures alongside the OCR text.
   3. And respond with high details following this structured schema in english and don't put icons:
   4. Use mathematical description when pertinent
 {
@@ -38,7 +42,7 @@ Use latex format for mathematics. Don't use markdown formating. Return only vali
 
 static const QString s_systemPromptText = []() {
   return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
-  1. Read the provided text context extracted from the paper
+  1. Read the provided text context extracted from the paper, organized page by page.
   2. And respond with high details following this structured schema in english and don't put icons:
   3. Use mathematical description when pertinent
 {
@@ -247,9 +251,14 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
   m_remoteBackend->setModelName(backend.modelName);
   m_remoteBackend->setForceJson(true);
 
+  // Count images across page blocks
+  int imageCount = 0;
+  for (const auto &pb : payload.pageBlocks)
+    if (!pb.visualContext.data.empty())
+      imageCount++;
+
   qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
-           << "| Model:" << backend.modelName << "| Visual context:"
-           << (payload.visualContext.empty() ? "disabled" : "enabled");
+           << "| Model:" << backend.modelName << "| images:" << imageCount;
 
   QElapsedTimer genTimer;
   genTimer.start();
@@ -266,7 +275,10 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
       },
       Qt::SingleShotConnection);
 
-  if (payload.visualContext.empty()) {
+  if (!payload.pageBlocks.empty()) {
+    m_remoteBackend->generateInterleaved(payload.systemPrompt, payload,
+                                         imageCount > 0);
+  } else if (payload.visualContext.empty()) {
     m_remoteBackend->generate(payload.systemPrompt, payload.userMessage +
                                                         "\n\n" +
                                                         payload.textContext);
@@ -369,18 +381,119 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
 PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   PromptPayload payload;
   payload.userMessage = s_userPrompt;
+
+  if (!m_database || !m_database->isOpen()) {
+    qWarning() << "[Summarizer] database not open";
+    return payload;
+  }
+
+  QList<ChunkSearchResult> chunks =
+      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
+  if (chunks.isEmpty()) {
+    qDebug() << "[Summarizer] no chunks for hash:" << paperHash;
+    return payload;
+  }
+
+  VisualMode mode = static_cast<VisualMode>(m_config->visualMode());
+
+  // ── Merge chunks per page (0-based page → text) ──
+  QMap<int, QString> pageTextMap;
+  const int overlapChars = 200; // matches PdfWorker::m_overlapChars
+
+  for (int i = 0; i < chunks.size(); ++i) {
+    const auto &c = chunks[i];
+    QString text = c.text;
+    if (i < chunks.size() - 1 && text.length() > overlapChars)
+      text = text.left(text.length() - overlapChars);
+    pageTextMap[c.page] += text;
+  }
+
+  // ── Which pages get an image? ──
+  QSet<int> pagesWithImage;
+  if (mode == VisualMode::Full) {
+    for (int p : pageTextMap.keys())
+      pagesWithImage.insert(p);
+  } else if (mode == VisualMode::Reduced) {
+    for (const auto &c : chunks) {
+      if (!c.pageMetadata.isEmpty()) {
+        QJsonObject meta =
+            QJsonDocument::fromJson(c.pageMetadata.toUtf8()).object();
+        if (meta.value("has_figure").toBool(false) ||
+            meta.value("has_vector_graphics").toBool(false) ||
+            meta.value("has_table").toBool(false))
+          pagesWithImage.insert(c.page);
+      }
+    }
+  }
+
+  // ── Load page images from disk ──
+  QMap<int, QImage> pageImages;
+  if (!pagesWithImage.isEmpty()) {
+    QString imgPath = m_config->projectImgPath(m_config->lastProject());
+    QDir imgDir(imgPath);
+    if (imgDir.exists()) {
+      for (int page0 : pagesWithImage) {
+        QString fileName = QString("%1_page_%2.png")
+                               .arg(paperHash)
+                               .arg(page0 + 1, 3, 10, QChar('0'));
+        QImage img(imgDir.absoluteFilePath(fileName));
+        if (!img.isNull())
+          pageImages[page0] = img.convertToFormat(QImage::Format_RGB888);
+      }
+    }
+  }
+
+  // ── Build ordered PageBlocks (1-based) ──
+  auto sortedPages = pageTextMap.keys();
+  std::sort(sortedPages.begin(), sortedPages.end());
+
+  for (int page0 : sortedPages) {
+    PageBlock pb;
+    pb.pageNumber = page0 + 1;
+    pb.text = pageTextMap[page0];
+    auto it = pageImages.find(page0);
+    if (it != pageImages.end()) {
+      const QImage &rgb = it.value();
+      pb.visualContext = {rgb.width(),
+                          rgb.height(),
+                          {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
+    }
+    payload.pageBlocks.push_back(std::move(pb));
+  }
+
+  // ── Legacy fields (kept for backward compat) ──
   payload.textContext = retrieveContext(paperHash);
 
-  if (m_config->useVisualContext()) {
+  // ── System prompt selection ──
+  switch (mode) {
+  case VisualMode::TextOnly:
+    payload.systemPrompt = s_systemPromptText;
+    qDebug() << "[Summarizer] Visual: TEXT-ONLY mode —"
+             << payload.pageBlocks.size() << "page(s) for" << paperHash;
+    break;
+  case VisualMode::Full: {
     payload.systemPrompt = s_systemPromptVisual;
     payload.visualContext = retrieveVisualContext(paperHash);
-    qDebug() << "[Summarizer] Visual context ENABLED —"
-             << payload.visualContext.size() << "image(s) loaded for"
-             << paperHash;
-  } else {
-    payload.systemPrompt = s_systemPromptText;
-    qDebug() << "[Summarizer] Visual context DISABLED — text-only mode for"
-             << paperHash;
+    int imgCount = 0;
+    for (const auto &pb : payload.pageBlocks)
+      if (!pb.visualContext.data.empty())
+        imgCount++;
+    qDebug() << "[Summarizer] Visual: FULL mode —" << payload.pageBlocks.size()
+             << "page(s), " << imgCount << "image(s) for" << paperHash;
+    break;
+  }
+  case VisualMode::Reduced: {
+    payload.systemPrompt = s_systemPromptVisual;
+    payload.visualContext = retrieveReducedVisualContext(paperHash);
+    int imgCount = 0;
+    for (const auto &pb : payload.pageBlocks)
+      if (!pb.visualContext.data.empty())
+        imgCount++;
+    qDebug() << "[Summarizer] Visual: REDUCED mode —"
+             << payload.pageBlocks.size() << "page(s), " << imgCount
+             << "with image(s) for" << paperHash;
+    break;
+  }
   }
 
   return payload;

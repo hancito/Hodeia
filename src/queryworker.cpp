@@ -17,7 +17,7 @@
 static const QString s_systemPrompt = []() {
   return R"(You are an expert academic research assistant.
 You are provided with highly relevant pages extracted from multiple research papers.
-Each page context includes its textual fragments alongside its visual page image rendering.
+Each page is presented with its image (when available) followed by its extracted text.
 Synthesize a cohesive, detailled, comprehensive response answering the user's query utilizing both
 the textual evidence and visual figures/tables/charts provided. Cite sources explicitly.
 When you cite the context use a clean academic citation.
@@ -207,7 +207,10 @@ QString QueryWorker::queryRemote(const PromptPayload &payload,
       },
       Qt::SingleShotConnection);
 
-  if (payload.visualContext.empty()) {
+  if (!payload.pageBlocks.empty()) {
+    m_remoteBackend->generateInterleaved(payload.systemPrompt, payload,
+                                         !payload.visualContext.empty());
+  } else if (payload.visualContext.empty()) {
     m_remoteBackend->generate(payload.systemPrompt, payload.userMessage +
                                                         "\n\n" +
                                                         payload.textContext);
@@ -365,13 +368,29 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
 
     block += "Citation: " + pc.citation + "\n\n";
     blocks.append(block);
+
+    // Build PageBlock with image
+    PageBlock pb;
+    pb.pageNumber = i + 1;
+    pb.text = block;
+
+    if (m_config->useVisualContext() && !pc.imageFile.isEmpty()) {
+      QImage img(pc.imageFile);
+      if (!img.isNull()) {
+        QImage rgb = img.convertToFormat(QImage::Format_RGB888);
+        pb.visualContext = {rgb.width(),
+                            rgb.height(),
+                            {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
+      }
+    }
+    payload.pageBlocks.push_back(std::move(pb));
   }
 
   payload.textContext = blocks.join("\n");
   payload.userMessage = "Core Task Query: " + queryText +
                         "\n\nSynthesize your final cross-paper response now:";
 
-  // Load page images for multimodal backends.
+  // Load page images for multimodal backends (legacy).
   if (m_config->useVisualContext()) {
     for (const auto &pc : pages) {
       if (pc.imageFile.isEmpty())

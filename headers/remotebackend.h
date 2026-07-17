@@ -53,6 +53,11 @@ public:
   void generate(const QString &systemPrompt, const QString &userPrompt,
                 const std::vector<PageImage> &images);
 
+  /// Generate with interleaved page-by-page content (image before text per
+  /// page).
+  void generateInterleaved(const QString &systemPrompt,
+                           const PromptPayload &payload, bool hasImages);
+
   /// Cancel an in-flight request.
   void cancel();
 

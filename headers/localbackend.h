@@ -30,6 +30,14 @@ struct PageImage {
   std::vector<unsigned char> data; ///< RGB888, width*height*3 bytes
 };
 
+/// One page: OCR text paired with an optional rendered page image.
+/// Used to build interleaved prompts: <--image--> <--text--> per page.
+struct PageBlock {
+  int pageNumber;          ///< 1-based page number
+  QString text;            ///< OCR text for this page
+  PageImage visualContext; ///< page image (empty data = no image)
+};
+
 /// All inputs needed to produce a summarization response.
 /// The backend assembles these fields into a formatted chat prompt, applies
 /// the model's chat template, and feeds it to the inference engine.
@@ -38,6 +46,8 @@ struct PromptPayload {
   QString userMessage;
   QString textContext;
   std::vector<PageImage> visualContext; ///< raw RGB page images
+  std::vector<PageBlock> pageBlocks;    ///< interleaved page-by-page (takes
+                                        ///< precedence when non-empty)
 };
 
 /// Local llama.cpp backend for chat completion (summarization).

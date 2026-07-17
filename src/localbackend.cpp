@@ -977,10 +977,27 @@ QString LocalBackend::summarize(const PromptPayload &payload) {
   int32_t maxPromptToks = ctxSize;
   int maxChars = maxPromptToks * 3;
 
+  // Collect images from pageBlocks (preserving page order)
+  std::vector<PageImage> images;
+  if (!payload.pageBlocks.empty()) {
+    for (const auto &pb : payload.pageBlocks)
+      if (!pb.visualContext.data.empty())
+        images.push_back(pb.visualContext);
+  } else {
+    images = payload.visualContext; // legacy fallback
+  }
+
+  uint64_t totalTextChars = 0;
+  for (const auto &pb : payload.pageBlocks)
+    totalTextChars += pb.text.length();
+  if (payload.pageBlocks.empty())
+    totalTextChars = payload.textContext.length();
+
   qDebug() << "[LocalBackend] summarize() — ctxSize:" << ctxSize
-           << "| maxPromptToks:" << maxPromptToks << "| maxChars:" << maxChars
-           << "| textContext:" << payload.textContext.length() << "chars"
-           << "| visuals:" << payload.visualContext.size();
+           << "| maxChars:" << maxChars
+           << "| pages:" << payload.pageBlocks.size()
+           << "| text:" << totalTextChars << "chars"
+           << "| images:" << images.size();
 
   QString promptText = buildFormattedPrompt(payload, maxChars);
 
@@ -989,8 +1006,8 @@ QString LocalBackend::summarize(const PromptPayload &payload) {
   // Note: m_mtmdCtx check is intentional here — if the mmproj hasn't been
   // loaded yet we fall through to text-only.  The caller can retry after
   // an explicit loadMmproj() call if needed.
-  if (m_hasVision && m_mtmdCtx && !payload.visualContext.empty()) {
-    return runMultimodalInference(promptText, payload.visualContext);
+  if (m_hasVision && m_mtmdCtx && !images.empty()) {
+    return runMultimodalInference(promptText, images);
   }
   return runTextInference(promptText);
 }
@@ -1103,9 +1120,11 @@ void LocalBackend::unloadMmproj() {
 
 // ── Prompt building ────────────────────────────────────────────────
 
-/// Assemble the user prompt from visual markers + text context, then wrap
-/// in the model's chat template.  The marker is a special token placeholder
-/// (e.g. "<__media__>") that mtmd_tokenize replaces with image embeddings.
+/// Assemble the user prompt from page blocks in interleaved format:
+/// <--image--> <--text--> <--image--> <--text--> …
+/// Then wrap in the model's chat template.  The marker is a special token
+/// placeholder (e.g. "<__media__>") that mtmd_tokenize replaces with image
+/// embeddings.
 QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
                                            int32_t maxChars) {
   const char *rawMarker =
@@ -1113,25 +1132,48 @@ QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
   const char *marker = rawMarker ? rawMarker : "<__media__>";
 
   QString userPrompt;
-  if (!payload.visualContext.empty()) {
-    userPrompt += "## VISUAL CONTEXT\n";
-    for (size_t i = 0; i < payload.visualContext.size(); ++i) {
-      userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
-    }
-    userPrompt += "\n";
-  }
-  userPrompt += payload.userMessage + "\n\n";
-  userPrompt += "## TEXT CONTEXT\n\n";
+  userPrompt += payload.userMessage + "\n\n## DOCUMENT\n\n";
 
-  QString ctx = payload.textContext;
-  bool truncated = ctx.length() > maxChars;
-  if (truncated) {
-    ctx = ctx.left(maxChars) + "\n\n... [truncated]";
-    qDebug() << "[LocalBackend] buildFormattedPrompt: textContext truncated"
-             << payload.textContext.length() << "→" << ctx.length()
-             << "chars (maxChars=" << maxChars << ")";
+  // ── Interleaved path (pageBlocks non-empty) ──
+  if (!payload.pageBlocks.empty()) {
+    for (const auto &pb : payload.pageBlocks) {
+      userPrompt += QString("## Page %1\n").arg(pb.pageNumber);
+      if (!pb.visualContext.data.empty())
+        userPrompt += QString("%1\n").arg(marker);
+      userPrompt += pb.text + "\n\n";
+    }
   }
-  userPrompt += ctx;
+  // ── Legacy path (textContext + visualContext) ──
+  else {
+    if (!payload.visualContext.empty()) {
+      userPrompt += "## VISUAL CONTEXT\n";
+      for (size_t i = 0; i < payload.visualContext.size(); ++i) {
+        userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
+      }
+      userPrompt += "\n";
+    }
+    userPrompt += payload.userMessage + "\n\n## TEXT CONTEXT\n\n";
+    QString ctx = payload.textContext;
+    bool truncated = ctx.length() > maxChars;
+    if (truncated) {
+      ctx = ctx.left(maxChars) + "\n\n... [truncated]";
+      qDebug() << "[LocalBackend] buildFormattedPrompt: textContext truncated"
+               << payload.textContext.length() << "→" << ctx.length()
+               << "chars (maxChars=" << maxChars << ")";
+    }
+    userPrompt += ctx;
+  }
+
+  // ── Debug: show prompt before chat template ──
+  qDebug() << "========== PROMPT DEBUG ==========";
+  qDebug() << "SYSTEM:" << payload.systemPrompt.left(200) << "...";
+  QString dbg = userPrompt;
+  if (dbg.length() > 4000)
+    dbg =
+        dbg.left(4000) + QString("\n... [truncated for debug, total: %1 chars]")
+                             .arg(userPrompt.length());
+  qDebug().noquote() << "USER:" << dbg;
+  qDebug() << "====================================";
 
   return applyChatTemplate(payload.systemPrompt, userPrompt);
 }

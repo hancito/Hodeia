@@ -84,10 +84,14 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
 }
 
 void EngineController::stopEngine() {
-  if (m_worker && m_thread && m_thread->isRunning()) {
-    m_worker->stop();
-    m_thread->quit();
-    m_thread->wait();
+  if (!m_worker || !m_thread || !m_thread->isRunning())
+    return;
+
+  m_worker->stop();
+  m_thread->requestInterruption();
+  m_thread->quit();
+  if (!m_thread->wait(5000)) {
+    qWarning() << "[EngineController] Thread did not stop in 5s, forcing";
   }
 }
 

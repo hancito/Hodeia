@@ -184,21 +184,27 @@ QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
                                               const QString &paperHash) const {
   QList<TextChunk> chunks;
 
+  // Rejoin words broken by OCR line-wraps (e.g. "punish-\nment" →
+  // "punishment").
+  QString text = fullText;
+  text.replace(QRegularExpression("-\\s*\\n\\s*"), "");
+  text.replace(QRegularExpression("(?<=[a-zA-Z])\\n(?=[a-zA-Z])"), " ");
+
   // 1) Sentence segmentation — split after . ! ? followed by whitespace.
   QStringList sentences;
   int lastEnd = 0;
   QRegularExpression sentRe(R"((?<=[.!?])\s+)");
-  auto matchIter = sentRe.globalMatch(fullText);
+  auto matchIter = sentRe.globalMatch(text);
   while (matchIter.hasNext()) {
     auto match = matchIter.next();
-    QString sentence = fullText.mid(lastEnd, match.capturedStart() - lastEnd +
-                                                 match.capturedLength());
+    QString sentence = text.mid(lastEnd, match.capturedStart() - lastEnd +
+                                             match.capturedLength());
     if (!sentence.trimmed().isEmpty())
       sentences.append(sentence.trimmed());
     lastEnd = match.capturedEnd();
   }
-  if (lastEnd < fullText.length()) {
-    QString remainder = fullText.mid(lastEnd).trimmed();
+  if (lastEnd < text.length()) {
+    QString remainder = text.mid(lastEnd).trimmed();
     if (!remainder.isEmpty())
       sentences.append(remainder);
   }
@@ -785,8 +791,11 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 QList<ExtractionResult>
 PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
                            const QString &imgPath) const {
-  return QtConcurrent::blockingMapped(filePaths,
-                                      [this, imgPath](const QUrl &url) {
-                                        return this->extractText(url, imgPath);
-                                      });
+  QList<ExtractionResult> results;
+  for (const auto &url : filePaths) {
+    if (m_stopFlag.load())
+      break;
+    results.append(extractText(url, imgPath));
+  }
+  return results;
 }
