@@ -36,9 +36,10 @@ private:
   QString extractTextFromStextPage(fz_stext_page *textPage) const;
   QString extractTextWithOcr(fz_context *ctx, fz_document *doc,
                              int pageNum) const;
-  QList<TextChunk> chunkDocumentText(const QString &fullText,
-                                     const QVector<quint16> &pageMap,
-                                     const QString &paperHash) const;
+  QList<TextChunk>
+  chunkDocumentText(const QString &fullText, const QVector<quint16> &pageMap,
+                    const QString &paperHash,
+                    const QVector<PageMetadata> &pageMeta) const;
   QString computeFileHash(const QUrl &fileUrl) const;
 
   QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList) const;

@@ -378,6 +378,63 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
   return result;
 }
 
+/// Load only images from pages that contain figures or tables.
+std::vector<PageImage>
+Summarizer::retrieveReducedVisualContext(const QString &paperHash) const {
+  std::vector<PageImage> result;
+
+  // Find which pages have figures or tables from chunk metadata.
+  QList<ChunkSearchResult> chunks =
+      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
+
+  QSet<int> pagesWithVisuals;
+  for (const auto &c : chunks) {
+    if (!c.pageMetadata.isEmpty()) {
+      QJsonObject meta =
+          QJsonDocument::fromJson(c.pageMetadata.toUtf8()).object();
+      if (meta.value("has_figure").toBool(false) ||
+          meta.value("has_vector_graphics").toBool(false) ||
+          meta.value("has_table").toBool(false)) {
+        pagesWithVisuals.insert(c.page);
+      }
+    }
+  }
+
+  if (pagesWithVisuals.isEmpty()) {
+    qDebug() << "[Summarizer] reduced visual: no pages with figures/tables for"
+             << paperHash;
+    return result;
+  }
+
+  QString imgPath = m_config->projectImgPath(m_config->lastProject());
+  QDir imgDir(imgPath);
+  if (!imgDir.exists())
+    return result;
+
+  // Page numbers in the DB are 0-based; image files use 1-based (_page_001).
+  for (int page0 : pagesWithVisuals) {
+    QString fileName = QString("%1_page_%2.png")
+                           .arg(paperHash)
+                           .arg(page0 + 1, 3, 10, QChar('0'));
+    QString fullPath = imgDir.absoluteFilePath(fileName);
+
+    QImage img(fullPath);
+    if (img.isNull()) {
+      continue;
+    }
+    QImage rgb = img.convertToFormat(QImage::Format_RGB888);
+    PageImage pi{rgb.width(),
+                 rgb.height(),
+                 {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
+    result.push_back(std::move(pi));
+  }
+
+  qDebug() << "[Summarizer] reduced visual:" << result.size()
+           << "page image(s) for" << pagesWithVisuals.size()
+           << "pages with figures/tables in" << paperHash;
+  return result;
+}
+
 PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   PromptPayload payload;
   payload.userMessage = s_userPrompt;

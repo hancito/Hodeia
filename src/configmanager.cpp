@@ -58,7 +58,14 @@ void ConfigManager::loadConfig() {
     m_contextWindow =
         static_cast<unsigned int>(obj.value("contextWindow").toInt(4000));
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
-    m_useVisualContext = obj.value("useVisualContext").toBool(true);
+    // Support both old "useVisualContext" bool and new "visualMode" int.
+    if (obj.contains("visualMode")) {
+      int mode = obj.value("visualMode").toInt(1);
+      m_visualMode = static_cast<VisualMode>(mode);
+    } else {
+      bool useVisual = obj.value("useVisualContext").toBool(true);
+      m_visualMode = useVisual ? VisualMode::Reduced : VisualMode::TextOnly;
+    }
 
     // Load backend list from JSON array
     // Expected format: [{"name":"..", "url":"..", "api_key":".."}, ...]
@@ -84,7 +91,7 @@ void ConfigManager::saveConfig() {
   obj["activeModel"] = m_activeModel;
   obj["contextWindow"] = static_cast<qint64>(m_contextWindow);
   obj["modelTemperature"] = m_modelTemperature;
-  obj["useVisualContext"] = m_useVisualContext;
+  obj["visualMode"] = static_cast<int>(m_visualMode);
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;

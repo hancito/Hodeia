@@ -127,7 +127,8 @@ std::expected<void, QString> SqliteVecManager::createChunksTable(SqliteDb &db) {
                         "chunk_idx integer, "
                         "chunk_text text, "
                         "citation text, "
-                        "clean_title text)")
+                        "clean_title text, "
+                        "page_metadata text)")
                     .arg(dim);
   return db.exec(sql);
 }
@@ -236,8 +237,8 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 
   SqliteStatement stmt = db.prepare(
       "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, chunk_text, "
-      "citation, clean_title) "
-      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?)");
+      "citation, clean_title, page_metadata) "
+      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?, ?)");
   if (!stmt.isValid()) {
     qCritical() << "[SqliteVec] Prepare failed";
     return -1;
@@ -301,6 +302,11 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
         qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
         return -1;
       }
+      bindResult = stmt.bind(8, c.pageMetadata);
+      if (!bindResult) {
+        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+        return -1;
+      }
 
       auto execResult = stmt.exec();
       if (!execResult) {
@@ -338,7 +344,7 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
 
   QString sql =
       QString("SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
-              "clean_title, distance "
+              "clean_title, page_metadata, distance "
               "FROM chunks WHERE embedding MATCH vec_f32(?) "
               "LIMIT %1")
           .arg(k);
@@ -369,7 +375,8 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
     r.text = stmt.columnText(3);
     r.citation = stmt.columnText(4);
     r.cleanTitle = stmt.columnText(5);
-    r.distance = stmt.columnDouble(6);
+    r.pageMetadata = stmt.columnText(6);
+    r.distance = stmt.columnDouble(7);
     results.append(r);
   }
 
@@ -384,7 +391,7 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
     return {};
 
   QString sql = "SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
-                "clean_title FROM chunks WHERE paper_hash = ? "
+                "clean_title, page_metadata FROM chunks WHERE paper_hash = ? "
                 "ORDER BY page, chunk_idx";
 
   SqliteStatement stmt = db.prepare(sql);
@@ -413,6 +420,7 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
     r.text = stmt.columnText(3);
     r.citation = stmt.columnText(4);
     r.cleanTitle = stmt.columnText(5);
+    r.pageMetadata = stmt.columnText(6);
     r.distance = 0.0f;
     results.append(r);
   }

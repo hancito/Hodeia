@@ -219,11 +219,22 @@ ToolBar {
                 }
             }
         }
-        CheckBox {
-            id: visualCheckBox
-            text: "Use visual context"
-            checked: configManager.useVisualContext
-            onCheckedChanged: configManager.useVisualContext = checked
+        ComboBox {
+            id: visualModeCombo
+            model: ["Text only", "Reduced (figures/tables)", "Full (all pages)"]
+            Layout.preferredWidth: 220
+            Component.onCompleted: currentIndex = configManager.visualMode
+            onCurrentIndexChanged: {
+                if (currentIndex !== configManager.visualMode) {
+                    configManager.visualMode = currentIndex;
+                }
+            }
+        }
+        Connections {
+            target: configManager
+            function onVisualModeChanged() {
+                visualModeCombo.currentIndex = configManager.visualMode;
+            }
         }
 
         ToolSeparator {}

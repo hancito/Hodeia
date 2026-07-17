@@ -14,6 +14,7 @@ struct ChunkSearchResult {
   float distance;
   QString citation;
   QString cleanTitle;
+  QString pageMetadata; ///< JSON: figures, tables, scanned flags
 };
 
 class ConfigManager;

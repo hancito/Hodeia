@@ -12,6 +12,18 @@ struct TextChunk {
   int chunkIdx = 0;
   QString cleanTitle;
   QString citation;
+  QString pageMetadata; ///< JSON metadata: figures, tables, scanned, etc.
+};
+
+/// Per-page metadata detected during PDF extraction.
+struct PageMetadata {
+  int page = 0;
+  bool hasFigure = false;         ///< Page contains at least one image block
+  int figureCount = 0;            ///< Number of embedded images
+  bool hasVectorGraphics = false; ///< Vector graphics (charts, diagrams)
+  bool hasTable = false;  ///< Page contains table-like structure (heuristic)
+  bool isScanned = false; ///< Page was OCR'd by Tesseract fallback
+  int ocrChars = 0;       ///< Characters produced by OCR (0 = native text)
 };
 
 struct SummaryRow {
@@ -33,6 +45,7 @@ struct ExtractionResult {
   QString paperHash;
   QString title;
   QList<TextChunk> chunks;
+  QVector<PageMetadata> pageMetadata; ///< Per-page figure/table/scanned flags
 };
 
 class SummaryModel : public QAbstractListModel {

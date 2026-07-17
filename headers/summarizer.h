@@ -56,6 +56,8 @@ private:
   PromptPayload buildPrompt(const QString &paperHash) const;
   QString retrieveContext(const QString &paperHash) const;
   std::vector<PageImage> retrieveVisualContext(const QString &paperHash) const;
+  std::vector<PageImage>
+  retrieveReducedVisualContext(const QString &paperHash) const;
 
   /* result handling */
   void saveSummary(const QString &hash, const PaperSummary &summary,

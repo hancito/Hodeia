@@ -9,6 +9,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMutex>
 #include <QRegularExpression>
 #include <QtConcurrent>
@@ -179,9 +181,9 @@ QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
 //  Chunking
 // ============================================================================
 
-QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
-                                              const QVector<quint16> &pageMap,
-                                              const QString &paperHash) const {
+QList<TextChunk> PdfWorker::chunkDocumentText(
+    const QString &fullText, const QVector<quint16> &pageMap,
+    const QString &paperHash, const QVector<PageMetadata> &pageMeta) const {
   QList<TextChunk> chunks;
 
   // Rejoin words broken by OCR line-wraps (e.g. "punish-\nment" →
@@ -251,6 +253,30 @@ QList<TextChunk> PdfWorker::chunkDocumentText(const QString &fullText,
   int totalChunkChars = 0;
   for (const auto &c : chunks)
     totalChunkChars += c.text.length();
+
+  // Attach page metadata JSON to each chunk.
+  if (!pageMeta.isEmpty()) {
+    for (auto &chunk : chunks) {
+      // pageMap stores 0-based page indices; PageMetadata.page is 1-based.
+      int page0 = chunk.page; // 0-based from pageMap
+      if (page0 >= 0 && page0 < pageMeta.size()) {
+        const PageMetadata &meta = pageMeta[page0];
+
+        // Build JSON metadata string.
+        QJsonObject obj;
+        obj["page"] = meta.page;
+        obj["figures"] = meta.figureCount;
+        obj["has_figure"] = meta.hasFigure;
+        obj["has_vector_graphics"] = meta.hasVectorGraphics;
+        obj["has_table"] = meta.hasTable;
+        obj["scanned"] = meta.isScanned;
+        if (meta.isScanned)
+          obj["ocr_chars"] = meta.ocrChars;
+
+        chunk.pageMetadata = QJsonDocument(obj).toJson(QJsonDocument::Compact);
+      }
+    }
+  }
   qDebug() << "[PdfWorker] chunkDocumentText:" << paperHash.left(12)
            << "| input:" << fullText.length() << "chars"
            << "| output:" << chunks.size() << "chunks," << totalChunkChars
@@ -677,6 +703,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   result.pageCount = pageCount;
   result.paperHash = computeFileHash(fileUrl);
   result.title = QFileInfo(localPath).baseName();
+  result.pageMetadata.reserve(pageCount);
 
   QString fullText;
   QVector<quint16> pageMap; // char offset → page number (compact: 2 bytes)
@@ -687,9 +714,13 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
     fz_device *dev = nullptr;
     fz_pixmap *pix = nullptr;
 
+    // Per-page metadata
+    PageMetadata pageMeta;
+    pageMeta.page = i + 1;
+
     fz_try(ctx) {
       // ------------------------------------------------------------------
-      // 1. Build structured text with layout-aware options
+      // 1. Build structured text with layout-aware options + image detection
       // ------------------------------------------------------------------
       page = fz_load_page(ctx, doc, i);
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
@@ -697,7 +728,8 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       fz_stext_options opts = {0};
       opts.flags = FZ_STEXT_SEGMENT | FZ_STEXT_PARAGRAPH_BREAK |
                    FZ_STEXT_DEHYPHENATE | FZ_STEXT_CLIP |
-                   FZ_STEXT_PRESERVE_SPANS;
+                   FZ_STEXT_PRESERVE_SPANS | FZ_STEXT_PRESERVE_IMAGES |
+                   FZ_STEXT_COLLECT_VECTORS;
       opts.scale = 1.0f;
       opts.clip = fz_empty_rect;
 
@@ -708,6 +740,54 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 
       fz_segment_stext_page(ctx, textPage);
       fz_paragraph_break(ctx, textPage);
+
+      // Hunt for tables → creates GRID blocks.
+      fz_table_hunt(ctx, textPage);
+
+      // ------------------------------------------------------------------
+      // 1b. Detect figures, vector graphics, and tables
+      // ------------------------------------------------------------------
+      {
+        fz_stext_page_block_iterator it =
+            fz_stext_page_block_iterator_begin_dfs(textPage);
+        while (!fz_stext_page_block_iterator_eod_dfs(it)) {
+          fz_stext_block *block = it.block;
+          if (block && block->type == FZ_STEXT_BLOCK_IMAGE) {
+            pageMeta.figureCount++;
+            pageMeta.hasFigure = true;
+          }
+          if (block && block->type == FZ_STEXT_BLOCK_VECTOR) {
+            // Vector blocks: lines, curves, rects drawn as paths.
+            // These represent charts, graphs, diagrams, decorative elements.
+            // Filter out tiny vectors (underlines, diacritics, rules) by bbox.
+            fz_rect vb = block->bbox;
+            float area = (vb.x1 - vb.x0) * (vb.y1 - vb.y0);
+            if (area > 500) { // > ~22x22 pts — meaningful graphic
+              pageMeta.hasVectorGraphics = true;
+              // Count vector graphics as figures too.
+              pageMeta.figureCount++;
+              pageMeta.hasFigure = true;
+            }
+          }
+          if (block && block->type == FZ_STEXT_BLOCK_GRID) {
+            // fz_table_hunt creates GRID blocks for any aligned text structure.
+            // This includes real tables but also justified text that looks
+            // column-aligned. The caller (LLM) decides if it's meaningful.
+            fz_stext_grid_info *grid = block->u.b.info;
+            if (grid && grid->w >= 2 && grid->h >= 2) {
+              int contentCells = 0;
+              for (int g = 0; g < grid->w * grid->h; ++g) {
+                if (grid->info[g].flags & FZ_STEXT_GRID_FULL)
+                  contentCells++;
+              }
+              if (contentCells >= 4) {
+                pageMeta.hasTable = true;
+              }
+            }
+          }
+          it = fz_stext_page_block_iterator_next_dfs(it);
+        }
+      }
 
       // ------------------------------------------------------------------
       // 2. Thumbnail (150 DPI RGB)
@@ -733,11 +813,13 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       QString pageTextStr = extractTextFromStextPage(textPage);
 
       if (pageTextStr.trimmed().length() < 100) {
+        pageMeta.isScanned = true;
         qDebug() << QString("[OCR] page %1/%2: %3 chars, falling back to OCR")
                         .arg(i + 1)
                         .arg(pageCount)
                         .arg(pageTextStr.trimmed().length());
         pageTextStr = extractTextWithOcr(ctx, doc, i);
+        pageMeta.ocrChars = pageTextStr.length();
         qDebug() << QString("[OCR] page %1/%2: %4 chars produced")
                         .arg(i + 1)
                         .arg(pageCount)
@@ -769,14 +851,33 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
         fz_drop_page(ctx, page);
     }
     fz_catch(ctx) { qWarning() << "[PdfWorker] Error extracting page" << i; }
+
+    // Store page metadata (outside fz_try/fz_catch so it always runs)
+    result.pageMetadata.append(pageMeta);
   }
 
-  result.chunks = chunkDocumentText(fullText, pageMap, result.paperHash);
+  result.chunks = chunkDocumentText(fullText, pageMap, result.paperHash,
+                                    result.pageMetadata);
 
   qDebug() << "[PdfWorker] extractText done:" << result.paperHash.left(12)
            << "| pages:" << result.pageCount
            << "| fullText:" << fullText.length() << "chars"
            << "| chunks:" << result.chunks.size();
+
+  // Log page metadata summary
+  int totalFigures = 0, totalPages = 0, scannedPages = 0;
+  for (const auto &m : result.pageMetadata) {
+    if (m.hasFigure)
+      totalFigures += m.figureCount;
+    if (m.hasTable)
+      totalPages++;
+    if (m.isScanned)
+      scannedPages++;
+  }
+  qDebug() << "[PdfWorker] metadata:" << totalFigures << "figures,"
+           << totalPages << "pages with tables," << scannedPages
+           << "scanned pages | across" << result.pageMetadata.size()
+           << "pages total";
 
   fz_drop_document(ctx, doc);
   fz_drop_context(ctx);

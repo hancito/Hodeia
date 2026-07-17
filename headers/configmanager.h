@@ -7,6 +7,9 @@
 #include <expected>
 #include <qtmetamacros.h>
 
+/// Visual context mode for summarization.
+enum class VisualMode : int { TextOnly = 0, Reduced = 1, Full = 2 };
+
 class ConfigManager : public QObject {
   Q_OBJECT
 
@@ -26,8 +29,8 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
                  activeModelChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
-  Q_PROPERTY(bool useVisualContext READ useVisualContext WRITE
-                 setUseVisualContext NOTIFY useVisualContextChanged)
+  Q_PROPERTY(int visualMode READ visualMode WRITE setVisualMode NOTIFY
+                 visualModeChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -42,7 +45,7 @@ public:
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
   QStringList projectList() const { return m_projectList; }
-  bool useVisualContext() const { return m_useVisualContext; }
+  int visualMode() const { return static_cast<int>(m_visualMode); }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -57,12 +60,22 @@ public:
   Q_INVOKABLE void setActiveModel(const QString &model);
   void setContextWindow(unsigned int window);
   void setModelTemperature(double temperature);
-  void setUseVisualContext(bool use) {
-    if (m_useVisualContext != use) {
-      m_useVisualContext = use;
-      emit useVisualContextChanged();
+  void setVisualMode(int mode) {
+    VisualMode m = static_cast<VisualMode>(mode);
+    if (m_visualMode != m) {
+      m_visualMode = m;
+      emit visualModeChanged();
       saveConfig();
     }
+  }
+
+  /// Backward compat: treats true → Reduced, false → TextOnly.
+  inline void setUseVisualContext(bool use) {
+    setVisualMode(
+        static_cast<int>(use ? VisualMode::Full : VisualMode::TextOnly));
+  }
+  inline bool useVisualContext() const {
+    return m_visualMode != VisualMode::TextOnly;
   }
 
   /// Replace the entire backend list.
@@ -129,7 +142,7 @@ signals:
   /// Emitted when a model file was successfully copied.
   void modelCopied();
 
-  void useVisualContextChanged();
+  void visualModeChanged();
 
 private:
   void refreshProjectList();
@@ -149,5 +162,5 @@ private:
   QVariantList m_backendList;
   QStringList m_projectList;
 
-  bool m_useVisualContext = true;
+  VisualMode m_visualMode = VisualMode::Reduced;
 };
