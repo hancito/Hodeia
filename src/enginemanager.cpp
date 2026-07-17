@@ -8,7 +8,14 @@ EngineController::EngineController(ConfigManager *config,
                                    QObject *parent)
     : QObject(parent), m_config(config), m_vecManager(vecManager) {}
 
-EngineController::~EngineController() { stopEngine(); }
+EngineController::~EngineController() {
+  // Invalidate m_vecManager before stopEngine() so that any queued
+  // releaseAndReloadModel() (from the worker's finished signal) becomes
+  // a no-op. databaseManager is destroyed after us on the stack, so the
+  // raw pointer would otherwise dangle once we're gone.
+  m_vecManager = nullptr;
+  stopEngine();
+}
 
 QList<QUrl> EngineController::findPdfFiles(const QUrl &folderPath) const {
   QString localPath = folderPath.toLocalFile();
@@ -62,10 +69,15 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
 
   // When done: quit thread, then delete objects in the main thread's event loop
   connect(thisWorker, &PdfWorker::finished, thisThread, &QThread::quit);
-  connect(thisThread, &QThread::finished, this, [thisThread, thisWorker]() {
-    thisWorker->deleteLater();
-    thisThread->deleteLater();
-  });
+  connect(thisThread, &QThread::finished, this,
+          [this, thisThread, thisWorker]() {
+            thisWorker->deleteLater();
+            thisThread->deleteLater();
+            // Clear the controller's raw pointers to prevent use-after-free
+            // if stopEngine() is called again (e.g. from the destructor).
+            m_worker = nullptr;
+            m_thread = nullptr;
+          });
 
   // Forward signals to QML (auto-disconnected when worker is deleted)
   connect(thisWorker, &PdfWorker::started, this,
@@ -93,9 +105,15 @@ void EngineController::stopEngine() {
   if (!m_thread->wait(5000)) {
     qWarning() << "[EngineController] Thread did not stop in 5s, forcing";
   }
+  // Clear pointers after stop so the destructor's stopEngine() call is safe.
+  // The lambda above also nullifies these when the thread finishes naturally.
+  m_worker = nullptr;
+  m_thread = nullptr;
 }
 
 void EngineController::releaseAndReloadModel() {
+  if (!m_vecManager)
+    return; // databaseManager already destroyed during shutdown
   m_vecManager->shutdown();
   emit ingestionFinished();
 }
