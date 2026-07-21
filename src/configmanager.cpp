@@ -1,6 +1,5 @@
 #include "headers/configmanager.h"
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -11,20 +10,6 @@
 #include <QUrl>
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
-  // Probe hardware only when hardware.json does not yet exist.
-  // On subsequent launches the cached file is loaded directly.
-  if (!QFile::exists(hardwareJsonPath())) {
-    detectAndSaveHardware();
-  } else {
-    QFile hwFile(hardwareJsonPath());
-    if (hwFile.open(QIODevice::ReadOnly)) {
-      QJsonDocument doc = QJsonDocument::fromJson(hwFile.readAll());
-      if (doc.isObject()) {
-        m_hardwareInfo = hardwareFromVariantMap(doc.object().toVariantMap());
-      }
-    }
-  }
-
   loadConfig(); // Automatically load the file when instantiated
 
   // If no backends were loaded, seed the default llama.cpp backend
@@ -251,7 +236,6 @@ ConfigManager::createProject(const QString &projectName) {
   QDir rootDir;
   rootDir.mkpath(projectDir);
   rootDir.mkpath(projectDir + "/IMG");
-  rootDir.mkpath(projectDir + "/PDF");
 
   // Create project database file
   QString dbPath = projectDir + "/" + projectName.trimmed() + ".db";
@@ -380,7 +364,6 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
 
   // Recreate subdirectories
   dir.mkpath(projectDir + "/IMG");
-  dir.mkpath(projectDir + "/PDF");
 
   // Recreate empty database
   QString dbPath = projectDir + "/" + name + ".db";
@@ -443,10 +426,6 @@ QString ConfigManager::projectDbPath(const QString &projectName) const {
 QString ConfigManager::projectImgPath(const QString &projectName) const {
   return projectsRoot() + "/" + projectName + "/" + "IMG";
 }
-QString ConfigManager::projectPdfPath(const QString &projectName) const {
-  return projectsRoot() + "/" + projectName + "/" + "PDF";
-}
-
 void ConfigManager::deleteImages(const QStringList &hashList,
                                  const QString &imgPath) const {
   QDir imgDir(imgPath);
@@ -470,136 +449,4 @@ void ConfigManager::deleteImages(const QStringList &hashList,
       qDebug() << "No images found for hash:" << hash;
     }
   }
-}
-
-// ── Hardware detection ──────────────────────────────────────────────
-
-void ConfigManager::detectAndSaveHardware() {
-  m_hardwareInfo = detectHardware();
-
-  QFile file(hardwareJsonPath());
-  if (!file.open(QIODevice::WriteOnly)) {
-    qWarning() << "[ConfigManager] Could not write" << hardwareJsonPath();
-    return;
-  }
-  QVariantMap v = hardwareToVariantMap(m_hardwareInfo);
-  QJsonObject obj;
-  for (auto it = v.constBegin(); it != v.constEnd(); ++it) {
-    if (it.key() == "gpus") {
-      QJsonArray arr;
-      for (const auto &gpuVar : it.value().toList()) {
-        QJsonObject gpuObj;
-        QVariantMap m = gpuVar.toMap();
-        gpuObj["name"] = m["name"].toString();
-        gpuObj["vram_bytes"] = m["vram_bytes"].toDouble();
-        gpuObj["vendor"] = m["vendor"].toString();
-        gpuObj["has_vulkan"] = m["has_vulkan"].toBool();
-        gpuObj["has_metal"] = m["has_metal"].toBool();
-        gpuObj["has_cuda"] = m["has_cuda"].toBool();
-        arr.append(gpuObj);
-      }
-      obj["gpus"] = arr;
-    } else if (it.key() == "numa_nodes") {
-      QJsonArray arr;
-      for (const auto &nodeVar : it.value().toList()) {
-        QJsonObject nodeObj;
-        QVariantMap m = nodeVar.toMap();
-        nodeObj["node_id"] = m["node_id"].toInt();
-        nodeObj["memory_bytes"] = m["memory_bytes"].toDouble();
-        QJsonArray cpuArr;
-        for (const auto &cpu : m["cpus"].toList())
-          cpuArr.append(cpu.toInt());
-        nodeObj["cpus"] = cpuArr;
-        arr.append(nodeObj);
-      }
-      obj["numa_nodes"] = arr;
-    } else {
-      obj[it.key()] = QJsonValue::fromVariant(it.value());
-    }
-  }
-  QJsonDocument doc(obj);
-  file.write(doc.toJson());
-  emit hardwareInfoChanged();
-  qDebug() << "[ConfigManager] Hardware detected and saved to"
-           << hardwareJsonPath();
-}
-
-QVariantMap
-ConfigManager::hardwareToVariantMap(const HardwareInfo &info) const {
-  QVariantMap v;
-  v["cpu_threads"] = info.cpu_threads;
-  v["cpu_cores"] = info.cpu_cores;
-  v["cpu_model"] = info.cpu_model;
-  v["total_ram_bytes"] = static_cast<double>(info.total_ram_bytes);
-  QVariantList gpuList;
-  for (const auto &gpu : info.gpus) {
-    QVariantMap g;
-    g["name"] = gpu.name;
-    g["vram_bytes"] = static_cast<double>(gpu.vram_bytes);
-    g["vendor"] = gpu.vendor;
-    g["has_vulkan"] = gpu.has_vulkan;
-    g["has_metal"] = gpu.has_metal;
-    g["has_cuda"] = gpu.has_cuda;
-    gpuList.append(g);
-  }
-  v["gpus"] = gpuList;
-  v["has_npu"] = info.has_npu;
-
-  QVariantList numaList;
-  for (const auto &node : info.numa_nodes) {
-    QVariantMap n;
-    n["node_id"] = node.node_id;
-    n["memory_bytes"] = static_cast<double>(node.memory_bytes);
-    QVariantList cpuList;
-    for (int c : node.cpus)
-      cpuList.append(c);
-    n["cpus"] = cpuList;
-    numaList.append(n);
-  }
-  v["numa_nodes"] = numaList;
-
-  v["detection_time"] = info.detection_time;
-  return v;
-}
-
-HardwareInfo ConfigManager::hardwareFromVariantMap(const QVariantMap &v) const {
-  HardwareInfo info;
-  info.cpu_threads = v["cpu_threads"].toInt();
-  info.cpu_cores = v["cpu_cores"].toInt();
-  info.cpu_model = v["cpu_model"].toString();
-  info.total_ram_bytes = static_cast<qint64>(v["total_ram_bytes"].toDouble());
-  info.has_npu = v["has_npu"].toBool();
-  info.detection_time = v["detection_time"].toString();
-  for (const auto &entry : v["gpus"].toList()) {
-    QVariantMap g = entry.toMap();
-    GpuInfo gpu;
-    gpu.name = g["name"].toString();
-    gpu.vram_bytes = static_cast<qint64>(g["vram_bytes"].toDouble());
-    gpu.vendor = g["vendor"].toString();
-    gpu.has_vulkan = g["has_vulkan"].toBool();
-    gpu.has_metal = g["has_metal"].toBool();
-    gpu.has_cuda = g["has_cuda"].toBool();
-    info.gpus.append(gpu);
-  }
-  for (const auto &entry : v["numa_nodes"].toList()) {
-    QVariantMap n = entry.toMap();
-    NumaNodeInfo node;
-    node.node_id = n["node_id"].toInt();
-    node.memory_bytes = static_cast<qint64>(n["memory_bytes"].toDouble());
-    for (const auto &cpu : n["cpus"].toList())
-      node.cpus.append(cpu.toInt());
-    info.numa_nodes.append(node);
-  }
-  return info;
-}
-
-QVariantMap ConfigManager::hardwareInfo() const {
-  return hardwareToVariantMap(m_hardwareInfo);
-}
-
-QString ConfigManager::hardwareJsonPath() const {
-  QString dirPath =
-      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  QDir().mkpath(dirPath);
-  return dirPath + "/hardware.json";
 }

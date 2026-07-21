@@ -7,8 +7,6 @@
 #include <expected>
 #include <qtmetamacros.h>
 
-#include "headers/hardwaredetector.h"
-
 class ConfigManager : public QObject {
   Q_OBJECT
 
@@ -28,8 +26,6 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
                  activeModelChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
-  Q_PROPERTY(
-      QVariantMap hardwareInfo READ hardwareInfo NOTIFY hardwareInfoChanged)
   Q_PROPERTY(bool useVisualContext READ useVisualContext WRITE
                  setUseVisualContext NOTIFY useVisualContextChanged)
 
@@ -47,9 +43,6 @@ public:
   QString activeModel() const { return m_activeModel; }
   QStringList projectList() const { return m_projectList; }
   bool useVisualContext() const { return m_useVisualContext; }
-
-  /// Return the hardware info as a QVariantMap (QML-friendly).
-  QVariantMap hardwareInfo() const;
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -94,7 +87,6 @@ public:
   Q_INVOKABLE QString projectPath(const QString &projectName) const;
   Q_INVOKABLE QString projectDbPath(const QString &projectName) const;
   Q_INVOKABLE QString projectImgPath(const QString &projectName) const;
-  Q_INVOKABLE QString projectPdfPath(const QString &projectName) const;
   Q_INVOKABLE void deleteImages(const QStringList &hashList,
                                 const QString &imgPath) const;
 
@@ -137,17 +129,12 @@ signals:
   /// Emitted when a model file was successfully copied.
   void modelCopied();
 
-  void hardwareInfoChanged();
   void useVisualContextChanged();
 
 private:
   void refreshProjectList();
   void ensureModelsDirectory();
-  void detectAndSaveHardware();
-  QVariantMap hardwareToVariantMap(const HardwareInfo &info) const;
-  HardwareInfo hardwareFromVariantMap(const QVariantMap &v) const;
   QString getFilePath() const;
-  QString hardwareJsonPath() const;
   QString projectsRoot() const;
   QString modelsRoot() const;
 
@@ -162,6 +149,5 @@ private:
   QVariantList m_backendList;
   QStringList m_projectList;
 
-  HardwareInfo m_hardwareInfo;
   bool m_useVisualContext = true;
 };

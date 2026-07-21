@@ -220,7 +220,6 @@ add_library(PaperizeEngine STATIC
     # --- headers ---
     headers/thememanager.h
     headers/configmanager.h
-    headers/hardwaredetector.h
     headers/database.h
     headers/summary.h
     headers/query.h
@@ -242,7 +241,6 @@ add_library(PaperizeEngine STATIC
     # --- sources ---
     src/thememanager.cpp
     src/configmanager.cpp
-    src/hardwaredetector.cpp
     src/database.cpp
     src/summary.cpp
     src/query.cpp
