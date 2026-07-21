@@ -411,8 +411,8 @@ qt_add_qml_module(Paperize
         ui/Fonts.qml
         ui/Main.qml
         ui/MyMenuBar.qml
-        ui/CentralPane.qml
-        ui/RightPane.qml
+        ui/DisplayPane.qml
+        ui/SummaryDbPane.qml
         ui/RagWindow.qml
         ui/RagDbPane.qml
         ui/QueryPane.qml

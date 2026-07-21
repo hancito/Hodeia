@@ -5,7 +5,7 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   QML UI Layer                          │
-│  Main.qml │ RagWindow.qml │ CentralPane │ RightPane     │
+│  Main.qml │ RagWindow.qml │ DisplayPane │ SummaryDbPane │
 │  RagDbPane │ QueryPane │ MyMenuBar │ MyToolBar          │
 │  BackendWindow │ Colors.qml │ Fonts.qml                  │
 ├─────────────────────────────────────────────────────────┤
@@ -32,21 +32,21 @@
 
 ## Tech Stack
 
-| Component | Technology |
-|---|---|
-| UI Framework | Qt 6.10+ (Qt Quick / QML, QuickControls2, Fusion style) |
-| Language | C++23 |
-| Build System | CMake 3.25+ |
-| Local LLM Inference | llama.cpp (GGUF models, libcommon) |
-| Multimodal | mtmd (llama.cpp) with mmproj projectors |
-| Remote LLM | OpenAI-compatible REST API |
-| PDF Parsing | MuPDF (layout-aware structured text + page rendering) |
-| OCR | Tesseract 5.5.2 + Leptonica 1.87.0 |
-| Database | SQLite3 (embedded, WAL mode) |
-| Vector Search | sqlite-vec (`vec0` virtual table) |
-| Embedding Model | multilingual-e5-small (~384 dims, via llama.cpp) |
-| GPU Backends | CUDA, Vulkan, CPU (auto-detected) |
-| Threading | Qt Concurrent, QThread, QThreadPool |
+| Component           | Technology                                              |
+| ------------------- | ------------------------------------------------------- |
+| UI Framework        | Qt 6.10+ (Qt Quick / QML, QuickControls2, Fusion style) |
+| Language            | C++23                                                   |
+| Build System        | CMake 3.25+                                             |
+| Local LLM Inference | llama.cpp (GGUF models, libcommon)                      |
+| Multimodal          | mtmd (llama.cpp) with mmproj projectors                 |
+| Remote LLM          | OpenAI-compatible REST API                              |
+| PDF Parsing         | MuPDF (layout-aware structured text + page rendering)   |
+| OCR                 | Tesseract 5.5.2 + Leptonica 1.87.0                      |
+| Database            | SQLite3 (embedded, WAL mode)                            |
+| Vector Search       | sqlite-vec (`vec0` virtual table)                       |
+| Embedding Model     | multilingual-e5-small (~384 dims, via llama.cpp)        |
+| GPU Backends        | CUDA, Vulkan, CPU (auto-detected)                       |
+| Threading           | Qt Concurrent, QThread, QThreadPool                     |
 
 ## Project Structure
 
@@ -89,8 +89,8 @@ Paperize_CPP/
 ├── ui/                             # QML files
 │   ├── Main.qml                    # Main window (split view: paper list + detail)
 │   ├── RagWindow.qml               # Secondary window for RAG queries + history
-│   ├── CentralPane.qml             # Paper detail: text / LaTeX / references / PDF tabs
-│   ├── RightPane.qml               # Paper list with search, sort, select, summarize
+│   ├── DisplayPane.qml             # Paper detail: text / LaTeX / references / PDF tabs
+│   ├── SummaryDbPane.qml           # Paper list with search, sort, select, summarize
 │   ├── RagDbPane.qml               # Query history list
 │   ├── QueryPane.qml               # Query input + response display
 │   ├── MyMenuBar.qml               # File menu (projects), Settings (themes, backends, models)
@@ -175,6 +175,7 @@ cmake .. -DLLAMA_FORCE_BACKEND=all      # All available backends
 ### Post-Build Deployment (Linux)
 
 CMake automatically handles deployment on Linux:
+
 - Copies themes, fonts, and Tesseract data to the build directory
 - Deploys llama.cpp `.so` files with proper symlinks
 - Sets `$ORIGIN` RPATH on all `.so` files via `patchelf`
@@ -215,42 +216,42 @@ CMake automatically handles deployment on Linux:
 
 ### `Summaries` table
 
-| Column | Type | Description |
-|---|---|---|
-| `id` | INTEGER PRIMARY KEY | Auto-increment |
-| `paper_hash` | TEXT UNIQUE | MD5 of the PDF file |
-| `title` | TEXT | Extracted paper title |
-| `authors` | TEXT | Comma-separated authors |
-| `pages_num` | INTEGER | Page count |
-| `journal` | TEXT | Source journal/conference |
-| `year` | TEXT | Publication year |
-| `topics` | TEXT | Comma-separated topics |
-| `llmodel` | TEXT | Model used for summarization |
-| `summary_json` | BLOB | Full structured summary as JSON |
-| `date` | TEXT | ISO 8601 timestamp |
+| Column         | Type                | Description                     |
+| -------------- | ------------------- | ------------------------------- |
+| `id`           | INTEGER PRIMARY KEY | Auto-increment                  |
+| `paper_hash`   | TEXT UNIQUE         | MD5 of the PDF file             |
+| `title`        | TEXT                | Extracted paper title           |
+| `authors`      | TEXT                | Comma-separated authors         |
+| `pages_num`    | INTEGER             | Page count                      |
+| `journal`      | TEXT                | Source journal/conference       |
+| `year`         | TEXT                | Publication year                |
+| `topics`       | TEXT                | Comma-separated topics          |
+| `llmodel`      | TEXT                | Model used for summarization    |
+| `summary_json` | BLOB                | Full structured summary as JSON |
+| `date`         | TEXT                | ISO 8601 timestamp              |
 
 ### `Queries` table
 
-| Column | Type | Description |
-|---|---|---|
-| `id` | INTEGER PRIMARY KEY | Auto-increment |
-| `query` | TEXT | User's natural language question |
-| `response` | TEXT | LLM-generated answer |
-| `date` | TEXT | ISO 8601 timestamp |
-| `llmodel` | TEXT | Model used |
+| Column     | Type                | Description                      |
+| ---------- | ------------------- | -------------------------------- |
+| `id`       | INTEGER PRIMARY KEY | Auto-increment                   |
+| `query`    | TEXT                | User's natural language question |
+| `response` | TEXT                | LLM-generated answer             |
+| `date`     | TEXT                | ISO 8601 timestamp               |
+| `llmodel`  | TEXT                | Model used                       |
 
 ### `chunks` (sqlite-vec `vec0` virtual table)
 
-| Column | Type | Description |
-|---|---|---|
-| `rowid` | INTEGER | Auto-increment |
-| `embedding` | float[N] | 384-dim vector (E5) |
-| `paper_hash` | TEXT | MD5 of source PDF |
-| `page` | INTEGER | 0-based page number |
-| `chunk_idx` | INTEGER | Chunk index within page |
-| `chunk_text` | TEXT | Raw text segment (~1500 chars) |
-| `citation` | TEXT | Generated citation string |
-| `clean_title` | TEXT | Paper title for citation formatting |
+| Column        | Type     | Description                         |
+| ------------- | -------- | ----------------------------------- |
+| `rowid`       | INTEGER  | Auto-increment                      |
+| `embedding`   | float[N] | 384-dim vector (E5)                 |
+| `paper_hash`  | TEXT     | MD5 of source PDF                   |
+| `page`        | INTEGER  | 0-based page number                 |
+| `chunk_idx`   | INTEGER  | Chunk index within page             |
+| `chunk_text`  | TEXT     | Raw text segment (~1500 chars)      |
+| `citation`    | TEXT     | Generated citation string           |
+| `clean_title` | TEXT     | Paper title for citation formatting |
 
 ## Configuration
 
@@ -326,6 +327,7 @@ Themes are JSON files in `ui/themes/` with a Catppuccin-style palette:
 ## Hardware Detection
 
 The `HardwareDetector` probes:
+
 - CPU model, core count, thread count
 - Total and available RAM
 - GPU(s) — vendor, model, VRAM (via `nvidia-smi`, Vulkan enumerate, or sysfs)
@@ -336,12 +338,12 @@ Results are cached in `hardware.json` and used by the `LocalBackend` to make ada
 
 ## Key Design Decisions
 
-| Decision | Rationale |
-|---|---|
-| SQLite + sqlite-vec over dedicated vector DB | Minimal dependencies, single-file database, per-project isolation |
-| MuPDF over Poppler | Layout-aware structured text extraction with column segmentation |
-| Tesseract as fallback, not primary | OCR is slow; most PDFs have extractable text layers |
-| Pre-compiled llama.cpp .so files | Avoids building llama.cpp from source; supports multiple GPU backends side by side |
-| E5 multilingual embeddings | Strong cross-language retrieval without a separate embedding service |
-| Chunking at ~1500 chars | Balances embedding quality with context window efficiency |
-| Unloading models between pipelines | GPU VRAM is the bottleneck; never hold chat + embedding models simultaneously |
+| Decision                                     | Rationale                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| SQLite + sqlite-vec over dedicated vector DB | Minimal dependencies, single-file database, per-project isolation                  |
+| MuPDF over Poppler                           | Layout-aware structured text extraction with column segmentation                   |
+| Tesseract as fallback, not primary           | OCR is slow; most PDFs have extractable text layers                                |
+| Pre-compiled llama.cpp .so files             | Avoids building llama.cpp from source; supports multiple GPU backends side by side |
+| E5 multilingual embeddings                   | Strong cross-language retrieval without a separate embedding service               |
+| Chunking at ~1500 chars                      | Balances embedding quality with context window efficiency                          |
+| Unloading models between pipelines           | GPU VRAM is the bottleneck; never hold chat + embedding models simultaneously      |

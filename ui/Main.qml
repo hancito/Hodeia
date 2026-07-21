@@ -160,16 +160,16 @@ ApplicationWindow {
                 opacity: 0
             }
 
-            RightPane {
-                id: rightPaneItem
+            SummaryDbPane {
+                id: summaryDbPaneItem
                 SplitView.minimumWidth: 600
                 statusBarLabel: footerLabel
             }
 
-            CentralPane {
-                id: centralPaneItem
+            DisplayPane {
+                id: displayPaneItem
                 SplitView.minimumWidth: 1000
-                activePaperHash: rightPaneItem.activePaperHash
+                activePaperHash: summaryDbPaneItem.activePaperHash
             }
         }
     }

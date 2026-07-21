@@ -4,7 +4,7 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 Rectangle {
-    id: rightPane
+    id: summaryDbPane
     property int npapers: databaseManager.summaryModel.rowCount()
     property list<string> selectedPapers: []
     property string activePaperHash: ""
@@ -53,10 +53,10 @@ Rectangle {
     Connections {
         target: engineController
         function onIngestionStarted() {
-            rightPane.ingesting = true;
+            summaryDbPane.ingesting = true;
         }
         function onIngestionFinished() {
-            rightPane.ingesting = false;
+            summaryDbPane.ingesting = false;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
         }
@@ -66,31 +66,31 @@ Rectangle {
     Connections {
         target: summaryController
         function onPaperFinished(hash, success, message) {
-            rightPane.paperProgress += 1;
-            if (rightPane.statusBarLabel)
-                rightPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
+            summaryDbPane.paperProgress += 1;
+            if (summaryDbPane.statusBarLabel)
+                summaryDbPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
         }
         function onAllFinished(successCount, total) {
             summarizeTimer.stop();
-            rightPane.summarizing = false;
-            rightPane.totalPapers = 0;
-            rightPane.paperProgress = 0;
-            rightPane.elapsedTime = 0;
+            summaryDbPane.summarizing = false;
+            summaryDbPane.totalPapers = 0;
+            summaryDbPane.paperProgress = 0;
+            summaryDbPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
-            if (rightPane.statusBarLabel)
-                rightPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
+            if (summaryDbPane.statusBarLabel)
+                summaryDbPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
         }
         function onSummaryStopped() {
             summarizeTimer.stop();
-            rightPane.summarizing = false;
-            rightPane.totalPapers = 0;
-            rightPane.paperProgress = 0;
-            rightPane.elapsedTime = 0;
+            summaryDbPane.summarizing = false;
+            summaryDbPane.totalPapers = 0;
+            summaryDbPane.paperProgress = 0;
+            summaryDbPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
-            if (rightPane.statusBarLabel)
-                rightPane.statusBarLabel.text = "Summarization stopped by user";
+            if (summaryDbPane.statusBarLabel)
+                summaryDbPane.statusBarLabel.text = "Summarization stopped by user";
         }
     }
 
@@ -113,7 +113,7 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 5
             Button {
-                enabled: !rightPane.summarizing && !rightPane.ingesting
+                enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 ToolTip.visible: hovered
                 ToolTip.text: "Summarize"
                 icon.width: 24
@@ -121,17 +121,17 @@ Rectangle {
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
                 onClicked: {
-                    if (rightPane.selectedPapers.length === 0) {
+                    if (summaryDbPane.selectedPapers.length === 0) {
                         console.log("No papers selected");
                         return;
                     }
-                    rightPane.totalPapers = rightPane.selectedPapers.length;
-                    rightPane.paperProgress = 0;
-                    rightPane.elapsedTime = 0;
-                    rightPane.summarizing = true;
+                    summaryDbPane.totalPapers = summaryDbPane.selectedPapers.length;
+                    summaryDbPane.paperProgress = 0;
+                    summaryDbPane.elapsedTime = 0;
+                    summaryDbPane.summarizing = true;
                     summarizeTimer.start();
-                    summaryController.startSummarize(rightPane.selectedPapers);
-                    rightPane.selectedPapers = [];
+                    summaryController.startSummarize(summaryDbPane.selectedPapers);
+                    summaryDbPane.selectedPapers = [];
                 }
             }
 
@@ -154,18 +154,18 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/list.svg"
-                onClicked: console.log("Generate Report from", rightPane.selectedPapers.length, "selected papers")
+                onClicked: console.log("Generate Report from", summaryDbPane.selectedPapers.length, "selected papers")
             }
 
             Button {
-                enabled: !rightPane.summarizing && !rightPane.ingesting
+                enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 ToolTip.visible: hovered
                 ToolTip.text: "Delete"
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/trash-can.svg"
-                onClicked: rightPane.deleteSelected()
+                onClicked: summaryDbPane.deleteSelected()
             }
         }
 
@@ -173,25 +173,25 @@ Rectangle {
         ColumnLayout {
             spacing: 5
             Layout.fillWidth: true
-            visible: rightPane.summarizing
+            visible: summaryDbPane.summarizing
 
             ProgressBar {
                 id: summarizeProgress
                 from: 0
                 to: 100
-                value: rightPane.totalPapers > 0 ? (rightPane.paperProgress / rightPane.totalPapers) * 100 : 0
+                value: summaryDbPane.totalPapers > 0 ? (summaryDbPane.paperProgress / summaryDbPane.totalPapers) * 100 : 0
                 Layout.fillWidth: true
             }
 
             RowLayout {
                 Label {
-                    text: "Summarizing " + rightPane.paperProgress + "/" + rightPane.totalPapers + " papers"
+                    text: "Summarizing " + summaryDbPane.paperProgress + "/" + summaryDbPane.totalPapers + " papers"
                     Layout.fillWidth: true
                 }
 
                 Label {
                     text: {
-                        var totalSec = Math.floor(rightPane.elapsedTime / 10);
+                        var totalSec = Math.floor(summaryDbPane.elapsedTime / 10);
                         if (totalSec >= 3600) {
                             var h = Math.floor(totalSec / 3600);
                             var m = Math.floor((totalSec % 3600) / 60);
@@ -224,7 +224,7 @@ Rectangle {
             running: false
             repeat: true
             onTriggered: {
-                rightPane.elapsedTime += 1;
+                summaryDbPane.elapsedTime += 1;
             }
         }
 
@@ -235,17 +235,17 @@ Rectangle {
 
             CheckBox {
                 id: selectAllCheckbox
-                enabled: !rightPane.summarizing && !rightPane.ingesting
+                enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 text: "Select All"
                 checked: false
                 onCheckedChanged: {
                     if (checked) {
                         for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
                             var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
-                            rightPane.addSelectedPaper(hash);
+                            summaryDbPane.addSelectedPaper(hash);
                         }
                     } else {
-                        rightPane.selectedPapers = [];
+                        summaryDbPane.selectedPapers = [];
                     }
                 }
             }
@@ -255,7 +255,7 @@ Rectangle {
 
             Label {
                 id: numberPaper
-                text: "Documents: " + rightPane.npapers
+                text: "Documents: " + summaryDbPane.npapers
             }
 
             Item {
@@ -312,8 +312,8 @@ Rectangle {
                 required property string paperHash
                 width: paperListView.width
                 height: 120
-                border.width: rightPane.activePaperHash === paperHash ? 4 : 5
-                border.color: rightPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
+                border.width: summaryDbPane.activePaperHash === paperHash ? 4 : 5
+                border.color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
                 radius: 4
                 color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
 
@@ -321,7 +321,7 @@ Rectangle {
                     id: mouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: rightPane.activePaperHash = paperHash
+                    onClicked: summaryDbPane.activePaperHash = paperHash
                 }
 
                 ColumnLayout {
@@ -330,15 +330,15 @@ Rectangle {
                     spacing: 1
                     RowLayout {
                         CheckBox {
-                            enabled: !rightPane.summarizing && !rightPane.ingesting
-                            checked: rightPane.selectedPapers.includes(paperHash)
+                            enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
+                            checked: summaryDbPane.selectedPapers.includes(paperHash)
                             icon.height: 8
                             font.pixelSize: 10
                             onCheckedChanged: {
                                 if (checked) {
-                                    rightPane.addSelectedPaper(paperHash);
+                                    summaryDbPane.addSelectedPaper(paperHash);
                                 } else {
-                                    rightPane.removeSelectedPaper(paperHash);
+                                    summaryDbPane.removeSelectedPaper(paperHash);
                                 }
                             }
                         }

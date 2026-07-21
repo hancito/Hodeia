@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Pdf
 
 Rectangle {
-    id: centralPane
+    id: displayPane
     property var activeTheme: ({})
     property string activePaperHash: ""
     color: Colors.surface0
@@ -27,7 +27,7 @@ Rectangle {
 
     // Reset page spinner and zoom when the active paper changes
     Connections {
-        target: centralPane
+        target: displayPane
         function onActivePaperHashChanged() {
             pageSpinner.value = 1;
             pdfTab.pdfZoomLevel = 1;
@@ -72,7 +72,7 @@ Rectangle {
             visible: tabBar.currentIndex === 3
             Layout.fillWidth: true
             spacing: 8
-            opacity: centralPane.pageImages.length > 0 ? 1 : 0
+            opacity: displayPane.pageImages.length > 0 ? 1 : 0
 
             Label {
                 text: qsTr("Page")
@@ -88,13 +88,13 @@ Rectangle {
             SpinBox {
                 id: pageSpinner
                 from: 1
-                to: Math.max(centralPane.pageImages.length, 1)
+                to: Math.max(displayPane.pageImages.length, 1)
                 value: 1
                 editable: true
             }
 
             Label {
-                text: "/" + centralPane.pageImages.length
+                text: "/" + displayPane.pageImages.length
                 opacity: 0.7
             }
             ToolButton {
@@ -168,7 +168,7 @@ Rectangle {
                             textFormat: TextEdit.MarkdownText
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-                            text: centralPane.activeSummaryJson ? modelHelper.summaryToMarkdown(centralPane.activeSummaryJson) : "Please make a summary of this paper"
+                            text: displayPane.activeSummaryJson ? modelHelper.summaryToMarkdown(displayPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
 
@@ -186,7 +186,7 @@ Rectangle {
                             icon.width: 24
                             icon.height: 24
                             icon.source: "qrc:/Resources/save.svg"
-                            onClicked: console.log(centralPane.activeSummaryJson)
+                            onClicked: console.log(displayPane.activeSummaryJson)
                         }
 
                         Button {
@@ -217,7 +217,7 @@ Rectangle {
                             wrapMode: TextEdit.WordWrap
                             font.family: Fonts.mono
                             placeholderText: "Select a paper to see its LaTeX summary"
-                            text: centralPane.activeSummaryJson ? modelHelper.summaryToLatex(centralPane.activeSummaryJson) : "Please make a summary of this paper"
+                            text: displayPane.activeSummaryJson ? modelHelper.summaryToLatex(displayPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
 
@@ -266,7 +266,7 @@ Rectangle {
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
                             placeholderText: "Select a paper to see its LaTeX summary"
-                            text: centralPane.activeSummaryJson ? modelHelper.summaryToRef(centralPane.activeSummaryJson) : "Please make a summary of this paper"
+                            text: displayPane.activeSummaryJson ? modelHelper.summaryToRef(displayPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
                 }
@@ -296,8 +296,8 @@ Rectangle {
                         asynchronous: true
                         scale: pdfTab.pdfZoomLevel
                         source: {
-                            if (centralPane.pageImages.length > 0)
-                                "file://" + centralPane.pageImages[Math.max(pageSpinner.value - 1, 0)];
+                            if (displayPane.pageImages.length > 0)
+                                "file://" + displayPane.pageImages[Math.max(pageSpinner.value - 1, 0)];
                             else
                                 "";
                         }
@@ -307,8 +307,8 @@ Rectangle {
                 // Empty state
                 Label {
                     anchors.centerIn: parent
-                    opacity: centralPane.pageImages.length === 0 ? 0.5 : 0
-                    text: centralPane.activePaperHash === "" ? "Select a paper to view its pages" : "No page images found"
+                    opacity: displayPane.pageImages.length === 0 ? 0.5 : 0
+                    text: displayPane.activePaperHash === "" ? "Select a paper to view its pages" : "No page images found"
                     font.pixelSize: 14
                     horizontalAlignment: Text.AlignHCenter
                 }
