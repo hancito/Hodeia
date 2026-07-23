@@ -2,14 +2,13 @@
 #include "headers/configmanager.h"
 
 #include "llama.h"
+#include "llamacpp/common/common.h"
 
 #include <QCoreApplication>
 #include <QDebug>
-#include <QDir>
-#include <QMutex>
-#include <QThread>
-#include <algorithm>
+#include <QFile>
 #include <expected>
+#include <mutex>
 
 namespace {
 constexpr const char *PassagePrefix = "passage: ";
@@ -62,22 +61,20 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
   emit statusUpdated(QString("Loading embedding model: %1").arg(resolvedPath));
 
-  // Init llama backends on this thread if not already done.
-  static QMutex initMutex;
-  {
-    QMutexLocker lock(&initMutex);
-    static bool s_initialized = false;
-    if (!s_initialized) {
-      ggml_backend_load_all();
-      llama_backend_init();
-      s_initialized = true;
-    }
-  }
+  // Init llama backends (idempotent, safe to call from any thread).
+  common_init();
+
+  // Load GGML backend plugins (e.g. Vulkan, CPU) — required before any
+  // llama context or batch allocation.  Idempotent; safe to call repeatedly.
+  static std::once_flag s_initFlag;
+  std::call_once(s_initFlag, []() {
+    ggml_backend_load_all();
+    llama_backend_init();
+  });
 
   QByteArray pathUtf8 = resolvedPath.toUtf8();
 
   llama_model_params mparams = llama_model_default_params();
-  mparams.vocab_only = false;
 
   auto *model = llama_model_load_from_file(pathUtf8.constData(), mparams);
   if (!model) {
@@ -94,8 +91,8 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   cparams.n_seq_max = 1; // we embed one passage at a time
   cparams.embeddings = true;
   cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
-  cparams.n_threads = QThread::idealThreadCount();
-  cparams.n_threads_batch = QThread::idealThreadCount();
+  cparams.n_threads = common_cpu_get_num_physical_cores();
+  cparams.n_threads_batch = common_cpu_get_num_physical_cores();
 
   auto *ctx = llama_init_from_model(model, cparams);
   if (!ctx) {
@@ -139,15 +136,13 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
                                        EmbedMode mode) {
   if (texts.isEmpty())
     return {};
-  // Lazy load the embedding model on first use.
   if (!m_ready && !initialize())
     return {};
-  if (!m_ready || !m_llamaCtx || !m_llamaModel)
+  if (!m_ready)
     return {};
 
-  auto *ctx = static_cast<struct llama_context *>(m_llamaCtx);
-  auto *model = static_cast<struct llama_model *>(m_llamaModel);
-  auto *vocab = llama_model_get_vocab(model);
+  auto *ctx = m_llamaCtx;
+  auto *vocab = llama_model_get_vocab(m_llamaModel);
 
   const char *prefix = (mode == EmbedMode::Query) ? QueryPrefix : PassagePrefix;
 
@@ -158,58 +153,58 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     QString prefixed = QString::fromUtf8(prefix) + text;
     QByteArray utf8 = prefixed.toUtf8();
 
-    std::vector<llama_token> tokens(MaxSeqLen);
-    // First pass: discover how many tokens are needed.
-    // llama_tokenize returns -N when the output buffer is too small.
-    int32_t nTok = llama_tokenize(
-        vocab, utf8.constData(), (int32_t)utf8.size(), nullptr, 0,
-        /*add_special=*/false, /*parse_special=*/true);
-    if (nTok < 0)
-      nTok = -nTok; // flip to positive count
-    if (nTok <= 0) {
+    auto tokens =
+        common_tokenize(vocab, std::string(utf8.constData()),
+                        /*add_special=*/false, /*parse_special=*/true);
+
+    if (tokens.empty()) {
       // Empty or whitespace-only text — embed as zero vector
-      results.resize(m_dim);
-      std::fill(results.begin(), results.end(), 0.0f);
-      continue;
-    }
-    // Truncate to context window
-    nTok = qMin(nTok, MaxSeqLen);
-    // Second pass: actually tokenize into the buffer
-    int32_t written = llama_tokenize(
-        vocab, utf8.constData(), (int32_t)utf8.size(), tokens.data(), nTok,
-        /*add_special=*/false, /*parse_special=*/true);
-    if (written < 0)
-      written = -written;
-    nTok = qMin(nTok, written);
-    if (nTok <= 0) {
-      qWarning() << "[SqliteVec] Tokenization produced 0 tokens for text len"
-                 << utf8.size();
-      results.resize(m_dim);
-      std::fill(results.begin(), results.end(), 0.0f);
+      for (int d = 0; d < m_dim; ++d)
+        results.append(0.0f);
       continue;
     }
 
-    llama_batch batch = llama_batch_get_one(tokens.data(), nTok);
+    // Truncate to context window
+    if ((int)tokens.size() > MaxSeqLen)
+      tokens.resize(MaxSeqLen);
+
+    // Build the batch using llama_batch_init (heap-allocated, safe).
+    auto batch_tokens = std::min((int32_t)tokens.size(), MaxSeqLen);
+    struct llama_batch batch =
+        llama_batch_init(batch_tokens, /*embd=*/0, /*n_seq_max=*/1);
+    batch.n_tokens = batch_tokens;
+    for (int32_t i = 0; i < batch_tokens; i++) {
+      batch.token[i] = tokens[i];
+      batch.pos[i] = i;
+      batch.n_seq_id[i] = 1;
+      batch.seq_id[i][0] = 0;
+      batch.logits[i] = 1; // mark all tokens as outputs for embedding mode
+    }
 
     // E5 is an encoder-only (BERT) model — use llama_encode, not llama_decode
     if (llama_encode(ctx, batch) != 0) {
+      llama_batch_free(batch);
       qWarning() << "[SqliteVec] llama_encode failed";
-      results.resize(m_dim);
-      std::fill(results.begin(), results.end(), 0.0f);
+      for (int d = 0; d < m_dim; ++d)
+        results.append(0.0f);
       continue;
     }
-    // NOTE: do NOT call llama_batch_free() — llama_batch_get_one uses stack
-    // memory
+    llama_batch_free(batch);
 
-    float *embd = llama_get_embeddings_seq(ctx, 0);
-    if (!embd) {
+    float *embd_raw = llama_get_embeddings_seq(ctx, 0);
+    if (!embd_raw) {
       qWarning() << "[SqliteVec] No embeddings available for sequence";
-      results.resize(m_dim);
-      std::fill(results.begin(), results.end(), 0.0f);
+      for (int d = 0; d < m_dim; ++d)
+        results.append(0.0f);
       continue;
     }
-    for (int d = 0; d < m_dim; ++d)
-      results.append(embd[d]);
+
+    // L2-normalize the raw mean-pooled embedding (required by E5 for correct
+    // cosine similarity)
+    QVector<float> normalized(m_dim);
+    common_embd_normalize(embd_raw, normalized.data(), m_dim,
+                          /*embd_norm=*/2); // 2 = L2 / euclidean
+    results.append(normalized);
 
     // Free the memory/KV cache slot — encoder models accumulate slots on
     // each llama_encode call and leak VRAM if never cleared.
@@ -227,7 +222,6 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
                                    const QList<TextChunk> &chunks) {
   if (chunks.isEmpty())
     return 0;
-  // Lazy load on first use.
   if (!m_ready && !initialize())
     return -1;
   if (!m_ready)
@@ -328,7 +322,6 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 
 QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
                                                   const QString &query, int k) {
-  // Lazy load on first use.
   if (!m_ready && !initialize())
     return {};
   if (!m_ready)
@@ -441,11 +434,11 @@ bool SqliteVecManager::isReady() const { return m_ready; }
 
 void SqliteVecManager::shutdown() {
   if (m_llamaCtx) {
-    llama_free(static_cast<struct llama_context *>(m_llamaCtx));
+    llama_free(m_llamaCtx);
     m_llamaCtx = nullptr;
   }
   if (m_llamaModel) {
-    llama_model_free(static_cast<struct llama_model *>(m_llamaModel));
+    llama_model_free(m_llamaModel);
     m_llamaModel = nullptr;
   }
   m_ready = false;

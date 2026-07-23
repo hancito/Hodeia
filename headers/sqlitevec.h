@@ -1,6 +1,7 @@
 #pragma once
 
 #include "headers/summary.h"
+#include "llama.h"
 #include <QList>
 #include <QString>
 #include <QVector>
@@ -67,9 +68,9 @@ signals:
   void embeddingProgress(int current, int total);
 
 private:
+  struct llama_context *m_llamaCtx = nullptr;
+  struct llama_model *m_llamaModel = nullptr;
   bool m_ready = false;
   int m_dim = 0;
-  void *m_llamaCtx = nullptr;   // llama_context*
-  void *m_llamaModel = nullptr; // llama_model*
   ConfigManager *m_config = nullptr;
 };
