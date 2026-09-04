@@ -1,5 +1,5 @@
-#include "headers/enginemanager.h"
-#include "headers/ingestionengine.h"
+#include "enginemanager.h"
+#include "ingestionengine.h"
 #include <QDebug>
 #include <QDirIterator>
 

@@ -1,4 +1,4 @@
-#include "headers/sqlitedb.h"
+#include "sqlitedb.h"
 #include <QCoreApplication>
 #include <QLibraryInfo>
 extern "C" {

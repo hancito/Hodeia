@@ -5,8 +5,8 @@
 #include <QVariantMap>
 #include <vector>
 
-#include "headers/helpers.h"
-#include "headers/localbackend.h"
+#include "helpers.h"
+#include "localbackend.h"
 
 class ConfigManager;
 class DatabaseManager;

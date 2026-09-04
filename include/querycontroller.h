@@ -1,6 +1,6 @@
 #pragma once
 
-#include "headers/queryworker.h"
+#include "queryworker.h"
 #include <QObject>
 #include <QString>
 #include <QThread>

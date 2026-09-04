@@ -1,6 +1,6 @@
 #pragma once
 
-#include "headers/summarizer.h"
+#include "summarizer.h"
 #include <QObject>
 #include <QString>
 #include <QThread>

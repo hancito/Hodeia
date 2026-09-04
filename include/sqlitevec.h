@@ -1,6 +1,6 @@
 #pragma once
 
-#include "headers/summary.h"
+#include "summary.h"
 #include "llama.h"
 #include <QList>
 #include <QString>

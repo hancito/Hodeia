@@ -1,4 +1,4 @@
-#include "headers/remotebackend.h"
+#include "remotebackend.h"
 
 #include <QBuffer>
 #include <QDebug>

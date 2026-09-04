@@ -1,4 +1,4 @@
-#include "headers/configmanager.h"
+#include "configmanager.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>

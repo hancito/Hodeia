@@ -1,10 +1,10 @@
-#include "headers/configmanager.h"
-#include "headers/database.h"
-#include "headers/enginemanager.h"
-#include "headers/helpers.h"
-#include "headers/querycontroller.h"
-#include "headers/summarythreadmanager.h"
-#include "headers/thememanager.h"
+#include "configmanager.h"
+#include "database.h"
+#include "enginemanager.h"
+#include "helpers.h"
+#include "querycontroller.h"
+#include "summarythreadmanager.h"
+#include "thememanager.h"
 #include "llama.h"
 
 #include <QDir>

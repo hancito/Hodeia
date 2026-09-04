@@ -1,4 +1,4 @@
-#include "headers/thememanager.h"
+#include "thememanager.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>

@@ -52,14 +52,23 @@
 
 ```
 Paperize_CPP/
-├── CMakeLists.txt                  # Build configuration
-├── resources.qrc                   # Qt resource file (SVG icons, PNG)
-├── build_ocr.sh                    # Tesseract + Leptonica build script
+├── CMakeLists.txt                  # Slim build entry: project, Qt, platform routing
+├── cmake/                          # Modular CMake scripts
+│   ├── CompilerFlags.cmake         # C++23, warnings, optimisation, LTO (opt-in)
+│   ├── PlatformLinux.cmake         # Static .a + system libs, GPU discovery, patchelf deploy
+│   ├── PlatformWindows.cmake       # MSYS2 (ucrt64) shared-DLL discovery, windeployqt
+│   └── PlatformMac.cmake           # .dylib map, Metal, install_name_tool, macdeployqt
+├── resources.qrc                   # (legacy, unused — qt_add_resources uses explicit files)
+├── build_ocr.sh                    # Tesseract + Leptonica build script (Linux)
 ├── README.md                       # User-facing README
 ├── docs/
 │   └── TECHNICAL.md               # This file
 │
-├── src/                            # C++ source files
+├── include/                        # Public C++ headers (flat, isolated from external/)
+│   └── <thememanager.h, database.h, localbackend.h, ...>
+│
+├── src/                            # C++ source files + target definitions
+│   ├── CMakeLists.txt              # add_library(PaperizeEngine) + qt_add_executable(Paperize)
 │   ├── main.cpp                    # Entry point: QML engine + C++ object registration
 │   ├── configmanager.cpp           # JSON config, project CRUD, hardware detection
 │   ├── database.cpp                # SQLite DB init, table/schema creation, project switch
@@ -80,11 +89,7 @@ Paperize_CPP/
 │   ├── queryproxymodel.cpp         # Sort/filter proxy for queries
 │   ├── hardwaredetector.cpp        # CPU/GPU/RAM/NUMA/NPU detection (cross-platform)
 │   ├── thememanager.cpp            # JSON-based theme loading
-│   ├── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
-│   └── thrdprty/
-│       └── sqlite3.c               # SQLite amalgamation (compiled as C)
-│
-├── headers/                        # Headers mirroring src/
+│   └── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
 │
 ├── ui/                             # QML files
 │   ├── Main.qml                    # Main window (split view: paper list + detail)
@@ -100,7 +105,7 @@ Paperize_CPP/
 │   ├── Fonts.qml                   # Singleton: font family names
 │   └── themes/                     # 19 JSON theme files
 │
-├── external/                       # Third-party libraries (pre-compiled)
+├── external/                       # Third-party libraries (pre-compiled, per-platform)
 │   ├── include/
 │   │   ├── llamacpp/               # llama.cpp headers
 │   │   ├── mupdf/                  # MuPDF headers
@@ -108,17 +113,13 @@ Paperize_CPP/
 │   │   ├── SqliteVec/              # sqlite-vec headers
 │   │   ├── tesseract/              # Tesseract headers
 │   │   └── leptonica/              # Leptonica headers
+│   ├── sqlite3/
+│   │   └── sqlite3.c               # SQLite amalgamation (compiled as C)
 │   └── lib/
-│       ├── llamacpp/               # llama.cpp .so files
-│       │   ├── cpu/
-│       │   ├── cuda/
-│       │   └── vulkan/
-│       ├── sqlitevec/              # vec0.so
-│       ├── libmupdf.a
-│       ├── libmupdf-third.a
-│       ├── libmupdf-threads.a
-│       ├── libtesseract.a
-│       └── libleptonica.a
+│       ├── linux/                  # static .a + llama.cpp .so (cpu/cuda/vulkan) + sqlitevec/
+│       ├── mac/                    # static .a + llama.cpp .dylib (cpu/metal) + sqlitevec/
+│       └── windows/                # llama.cpp .dll (cpu/cuda/vulkan) + sqlitevec/
+│                                   # (MuPDF/Tesseract/Leptonica come from MSYS2 on Windows)
 │
 ├── Resources/                      # Icons, Tesseract data
 │   └── tessdata/
@@ -153,13 +154,49 @@ The script builds both as static libraries and installs artefacts into `external
 
 ## Build
 
-### Standard Build
+The build is modular: the top-level `CMakeLists.txt` detects the platform and
+includes the matching `cmake/Platform<OS>.cmake`, which sets up third-party
+linking, GPU-backend discovery, and POST_BUILD deployment. Target definitions
+live in `src/CMakeLists.txt`.
+
+### Standard Build (Linux)
 
 ```bash
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
 cmake --build . -j$(nproc)
 ```
+
+Linux links the in-tree **static** third-party libs (`external/lib/linux/*.a`)
+plus system image-codec/shared libs.
+
+### Windows Build (MSYS2, ucrt64)
+
+Windows links **shared DLLs** from MSYS2 for MuPDF / Tesseract / Leptonica
+(llama.cpp still comes from `external/lib/windows/llamacpp/`). In the ucrt64
+shell:
+
+```bash
+pacman -S mingw-w64-ucrt-x86_64-mupdf \
+          mingw-w64-ucrt-x86_64-tesseract-ocr \
+          mingw-w64-ucrt-x86_64-leptonica
+# optional — use MSYS2's Qt6 instead of a separate Qt install:
+pacman -S mingw-w64-ucrt-x86_64-qt6-base \
+          mingw-w64-ucrt-x86_64-qt6-declarative \
+          mingw-w64-ucrt-x86_64-qt6-shadertools
+```
+
+```bash
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja \
+  -DPAPERIZE_MINGW_PREFIX=C:/msys64/ucrt64 \
+  [-DPAPERIZE_QT_FROM_MSYS2=ON]
+cmake --build .
+```
+
+`PAPERIZE_MINGW_PREFIX` (or the `MINGW_PREFIX` env var) points CMake at the
+MSYS2 prefix; `PAPERIZE_QT_FROM_MSYS2=ON` makes `find_package(Qt6)` resolve
+from MSYS2 and ships the Qt6 DLLs from there instead of via a Qt installer.
 
 ### GPU Backend Selection
 
@@ -172,14 +209,17 @@ cmake .. -DLLAMA_FORCE_BACKEND=vulkan   # Force Vulkan
 cmake .. -DLLAMA_FORCE_BACKEND=all      # All available backends
 ```
 
-### Post-Build Deployment (Linux)
+### Post-Build Deployment
 
-CMake automatically handles deployment on Linux:
+Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
 
-- Copies themes, fonts, and Tesseract data to the build directory
-- Deploys llama.cpp `.so` files with proper symlinks
-- Sets `$ORIGIN` RPATH on all `.so` files via `patchelf`
-- Copies the `vec0.so` sqlite-vec extension
+- **Linux** — copies themes/fonts/tessdata, deploys llama.cpp `.so` with
+  symlinks, sets `$ORIGIN` RUNPATH via `patchelf`, copies `vec0.so`.
+- **Windows** — copies themes/fonts/tessdata, llama.cpp `.dll` + MSYS2 runtime
+  DLLs, `vec0.dll`, `libomp.dll`, and runs `windeployqt` (or ships the MSYS2
+  Qt6 DLLs).
+- **macOS** — copies dylibs, sets `@executable_path` install names, ships
+  `vec0.dylib` + `libomp.dylib`, and runs `macdeployqt`.
 
 ## Core Pipelines
 

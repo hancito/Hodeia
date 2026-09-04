@@ -1,6 +1,6 @@
-#include "headers/ingestionengine.h"
-#include "headers/sqlitedb.h"
-#include "headers/sqlitevec.h"
+#include "ingestionengine.h"
+#include "sqlitedb.h"
+#include "sqlitevec.h"
 
 #include <QCoreApplication>
 #include <QCryptographicHash>

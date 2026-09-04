@@ -1,5 +1,5 @@
 #pragma once
-#include "headers/sqlitedb.h"
+#include "sqlitedb.h"
 #include <QAbstractListModel>
 #include <QDateTime>
 

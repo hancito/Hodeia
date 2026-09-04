@@ -1,4 +1,4 @@
-#include "headers/query.h"
+#include "query.h"
 
 QueryModel::QueryModel(QObject *parent) : QAbstractListModel(parent) {}
 

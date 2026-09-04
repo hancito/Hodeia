@@ -1,6 +1,6 @@
 #pragma once
-#include "headers/sqlitevec.h"
-#include "headers/summary.h"
+#include "sqlitevec.h"
+#include "summary.h"
 #include <QList>
 #include <QMap>
 #include <QObject>

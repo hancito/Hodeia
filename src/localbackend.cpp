@@ -1,6 +1,6 @@
-#include "headers/localbackend.h"
+#include "localbackend.h"
 
-#include "headers/inferenceengine.h"
+#include "inferenceengine.h"
 
 #include "common/chat.h"
 #include "common/common.h"

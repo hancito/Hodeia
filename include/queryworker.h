@@ -4,7 +4,7 @@
 #include <QVariantMap>
 #include <vector>
 
-#include "headers/localbackend.h"
+#include "localbackend.h"
 
 class ConfigManager;
 class DatabaseManager;

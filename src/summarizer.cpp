@@ -1,9 +1,9 @@
-#include "headers/summarizer.h"
-#include "headers/configmanager.h"
-#include "headers/database.h"
-#include "headers/localbackend.h"
-#include "headers/remotebackend.h"
-#include "headers/sqlitevec.h"
+#include "summarizer.h"
+#include "configmanager.h"
+#include "database.h"
+#include "localbackend.h"
+#include "remotebackend.h"
+#include "sqlitevec.h"
 
 #include <QCoreApplication>
 #include <QDateTime>

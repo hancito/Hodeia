@@ -4,7 +4,7 @@
 #include <QString>
 #include <vector>
 
-#include "headers/localbackend.h"
+#include "localbackend.h"
 
 class QNetworkAccessManager;
 class QNetworkReply;

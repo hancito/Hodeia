@@ -1,8 +1,8 @@
-#include "headers/inferenceengine.h"
+#include "inferenceengine.h"
 
 #include "common/common.h"
 #include "common/sampling.h"
-#include "headers/localbackend.h"
+#include "localbackend.h"
 #include "llama.h"
 #include "mtmd-helper.h"
 #include "mtmd.h"

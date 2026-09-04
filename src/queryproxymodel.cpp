@@ -1,5 +1,5 @@
-#include "headers/queryproxymodel.h"
-#include "headers/query.h"
+#include "queryproxymodel.h"
+#include "query.h"
 
 QueryProxyModel::QueryProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent) {

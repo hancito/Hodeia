@@ -1,5 +1,5 @@
-#include "headers/helpers.h"
-#include "headers/configmanager.h"
+#include "helpers.h"
+#include "configmanager.h"
 
 #include <QAtomicInt>
 #include <QDir>

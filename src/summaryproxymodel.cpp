@@ -1,5 +1,5 @@
-#include "headers/summaryproxymodel.h"
-#include "headers/summary.h" // Needed for the roles
+#include "summaryproxymodel.h"
+#include "summary.h" // Needed for the roles
 
 SummaryProxyModel::SummaryProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent) {

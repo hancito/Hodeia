@@ -1,5 +1,5 @@
-#include "headers/summarythreadmanager.h"
-#include "headers/database.h"
+#include "summarythreadmanager.h"
+#include "database.h"
 
 #include <QDebug>
 

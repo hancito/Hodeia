@@ -1,5 +1,5 @@
-#include "headers/querycontroller.h"
-#include "headers/database.h"
+#include "querycontroller.h"
+#include "database.h"
 
 #include <QDebug>
 

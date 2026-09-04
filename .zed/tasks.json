@@ -20,7 +20,7 @@
   },
   {
     "label": "Build & Run",
-    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build && ./build/Paperize",
+    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build && ./build/src/Paperize",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
@@ -57,7 +57,7 @@
   },
   {
     "label": "Run: Paperize",
-    "command": "./build/Paperize",
+    "command": "./build/src/Paperize",
     "cwd": ".",
     "use_new_terminal": true,
     "reveal": "always",

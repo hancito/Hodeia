@@ -1,5 +1,5 @@
-#include "headers/sqlitevec.h"
-#include "headers/configmanager.h"
+#include "sqlitevec.h"
+#include "configmanager.h"
 
 #include "llama.h"
 #include "llamacpp/common/common.h"

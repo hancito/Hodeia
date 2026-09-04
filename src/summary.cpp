@@ -1,4 +1,4 @@
-#include "headers/summary.h"
+#include "summary.h"
 
 SummaryModel::SummaryModel(QObject *parent) : QAbstractListModel(parent) {}
 

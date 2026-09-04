@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(node *)",
-      "Agent(Explore)"
+      "Agent(Explore)",
+      "Bash(cd *)",
+      "Bash(echo *)",
+      "Bash(find *)",
+      "Bash(sort)",
+      "Bash(head *)",
+      "Bash(grep *)",
+      "Bash(uniq *)",
+      "Bash(sort *)",
+      "Bash(do *)",
+      "Bash(then *)",
+      "Bash(else *)",
+      "Bash(fi)",
+      "Bash(done)",
+      "WebFetch(packages.msys2.org)",
+      "Bash(which *)",
+      "Bash(pkg-config *)"
     ]
   },
   "$version": 4

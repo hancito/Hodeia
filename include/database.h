@@ -1,10 +1,10 @@
 #pragma once
-#include "headers/query.h"
-#include "headers/queryproxymodel.h"
-#include "headers/sqlitedb.h"
-#include "headers/sqlitevec.h"
-#include "headers/summary.h"
-#include "headers/summaryproxymodel.h"
+#include "query.h"
+#include "queryproxymodel.h"
+#include "sqlitedb.h"
+#include "sqlitevec.h"
+#include "summary.h"
+#include "summaryproxymodel.h"
 #include <QObject>
 #include <expected>
 

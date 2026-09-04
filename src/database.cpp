@@ -1,6 +1,6 @@
-#include "headers/database.h"
-#include "headers/configmanager.h"
-#include "headers/sqlitevec.h"
+#include "database.h"
+#include "configmanager.h"
+#include "sqlitevec.h"
 #include <QDir>
 #include <expected>
 
