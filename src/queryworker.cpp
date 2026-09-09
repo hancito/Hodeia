@@ -263,7 +263,7 @@ QList<PageContext> QueryWorker::retrieveAndGroupPages(const QString &queryText,
   int totalChars = 0;
 
   for (const auto &c : chunks) {
-    if (pages.size() >= static_cast<size_t>(maxPages))
+    if (pages.size() >= static_cast<qsizetype>(maxPages))
       break;
 
     QString key = c.paperHash + "|" + QString::number(c.page);

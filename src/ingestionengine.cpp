@@ -725,7 +725,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       page = fz_load_page(ctx, doc, i);
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
 
-      fz_stext_options opts = {0};
+      fz_stext_options opts = {};
       opts.flags = FZ_STEXT_SEGMENT | FZ_STEXT_PARAGRAPH_BREAK |
                    FZ_STEXT_DEHYPHENATE | FZ_STEXT_CLIP |
                    FZ_STEXT_PRESERVE_SPANS | FZ_STEXT_PRESERVE_IMAGES |

@@ -57,9 +57,6 @@ Rectangle {
                 text: qsTr("Text")
             }
             TabButton {
-                text: qsTr("Latex")
-            }
-            TabButton {
                 text: qsTr("References")
             }
             TabButton {
@@ -200,54 +197,6 @@ Rectangle {
                 }
             }
 
-            Item {
-                id: latexTab
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.rightMargin: 5
-                    anchors.leftMargin: 5
-                    spacing: 10
-                    ScrollView {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                        TextArea {
-                            id: latexEditor
-                            readOnly: true
-                            wrapMode: TextEdit.WordWrap
-                            font.family: Fonts.mono
-                            placeholderText: "Select a paper to see its LaTeX summary"
-                            text: displayPane.activeSummaryJson ? modelHelper.summaryToLatex(displayPane.activeSummaryJson) : "Please make a summary of this paper"
-                        }
-                    }
-
-                    RowLayout {
-                        id: buttonRow2
-                        spacing: 10
-                        Layout.fillWidth: true
-
-                        Item {
-                            Layout.fillWidth: true
-                        }
-
-                        Button {
-                            text: qsTr("Save")
-                            icon.width: 24
-                            icon.height: 24
-                            icon.source: "qrc:/Resources/save.svg"
-                            onClicked: console.log("Save Text")
-                        }
-
-                        Button {
-                            text: qsTr("Edit")
-                            icon.width: 24
-                            icon.height: 24
-                            icon.source: "qrc:/Resources/edit.svg"
-                            onClicked: textEditor.readOnly = !textEditor.readOnly
-                        }
-                    }
-                }
-            }
             Item {
                 id: refTab
                 ColumnLayout {

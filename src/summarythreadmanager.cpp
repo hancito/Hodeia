@@ -5,7 +5,7 @@
 
 SummaryController::SummaryController(ConfigManager *config,
                                      DatabaseManager *database, QObject *parent)
-    : QObject(parent), m_config(config), m_database(database) {}
+    : QObject(parent), m_database(database), m_config(config) {}
 
 SummaryController::~SummaryController() { stopSummarize(); }
 
