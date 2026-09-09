@@ -100,6 +100,7 @@ ApplicationWindow {
         onRequestDeleteProject: deleteConfirmDialog.open()
         onRequestCleanProject: cleanProjectDialog.open()
         onRequestDeleteModels: deleteModelDialog.open()
+        onRequestOpenAlexApiKey: openAlexKeyDialog.open()
     }
 
     header: MyToolBar {
@@ -331,6 +332,35 @@ ApplicationWindow {
         }
         onRejected: {
             root.selectedModels = [];
+        }
+    }
+
+    // OpenAlex API key dialog
+    Dialog {
+        id: openAlexKeyDialog
+        anchors.centerIn: parent
+        modal: true
+        width: 420
+        title: "OpenAlex API Key"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+            Label {
+                text: "Enter your OpenAlex API key:"
+                Layout.fillWidth: true
+            }
+            TextField {
+                id: openAlexKeyField
+                Layout.fillWidth: true
+                placeholderText: "Paste your API key..."
+                text: configManager.openAlexApiKey
+                focus: true
+                onAccepted: openAlexKeyDialog.accept()
+            }
+        }
+        onAccepted: {
+            configManager.openAlexApiKey = openAlexKeyField.text.trim();
         }
     }
 

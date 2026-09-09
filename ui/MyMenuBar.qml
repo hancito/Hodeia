@@ -12,6 +12,7 @@ MenuBar {
     signal requestDeleteProject
     signal requestCleanProject
     signal requestDeleteModels
+    signal requestOpenAlexApiKey
     Menu {
         title: "File"
         MenuItem {
@@ -162,6 +163,10 @@ MenuBar {
                 enabled: mainWin.selectedModels.length > 0
                 onTriggered: menuBar.requestDeleteModels()
             }
+        }
+        MenuItem {
+            text: "Add or Modify OpenAlex API key"
+            onTriggered: menuBar.requestOpenAlexApiKey()
         }
     }
 }

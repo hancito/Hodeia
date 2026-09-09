@@ -55,6 +55,7 @@ void ConfigManager::loadConfig() {
     m_lastProject = obj.value("lastProject").toString("");
     m_activeBackend = obj.value("activeBackend").toString("");
     m_activeModel = obj.value("activeModel").toString("");
+    m_openAlexApiKey = obj.value("openAlexApiKey").toString("");
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
     // Support both old "useVisualContext" bool and new "visualMode" int.
     if (obj.contains("visualMode")) {
@@ -87,6 +88,7 @@ void ConfigManager::saveConfig() {
   obj["lastProject"] = m_lastProject;
   obj["activeBackend"] = m_activeBackend;
   obj["activeModel"] = m_activeModel;
+  obj["openAlexApiKey"] = m_openAlexApiKey;
   obj["modelTemperature"] = m_modelTemperature;
   obj["visualMode"] = static_cast<int>(m_visualMode);
 
@@ -135,6 +137,14 @@ void ConfigManager::setActiveModel(const QString &model) {
   if (m_activeModel != model) {
     m_activeModel = model;
     emit activeModelChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setOpenAlexApiKey(const QString &key) {
+  if (m_openAlexApiKey != key) {
+    m_openAlexApiKey = key;
+    emit openAlexApiKeyChanged();
     saveConfig();
   }
 }

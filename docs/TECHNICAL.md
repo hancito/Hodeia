@@ -303,6 +303,7 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
   "lastProject": "Default",
   "activeBackend": "Llama.cpp",
   "activeModel": "qwq32b",
+  "openAlexApiKey": "",
   "modelTemperature": 0.1,
   "useVisualContext": true,
   "maxPages": 50,

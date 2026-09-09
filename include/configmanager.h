@@ -26,6 +26,8 @@ class ConfigManager : public QObject {
                  NOTIFY backendListChanged)
   Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
                  activeModelChanged)
+  Q_PROPERTY(QString openAlexApiKey READ openAlexApiKey WRITE setOpenAlexApiKey
+                 NOTIFY openAlexApiKeyChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
   Q_PROPERTY(int visualMode READ visualMode WRITE setVisualMode NOTIFY
                  visualModeChanged)
@@ -41,6 +43,7 @@ public:
   float modelTemperature() const { return m_modelTemperature; }
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
+  QString openAlexApiKey() const { return m_openAlexApiKey; }
   QStringList projectList() const { return m_projectList; }
   int visualMode() const { return static_cast<int>(m_visualMode); }
 
@@ -55,6 +58,7 @@ public:
   void setLastProject(const QString &path);
   Q_INVOKABLE void setActiveBackend(const QString &backend);
   Q_INVOKABLE void setActiveModel(const QString &model);
+  void setOpenAlexApiKey(const QString &key);
   void setModelTemperature(double temperature);
   void setVisualMode(int mode) {
     VisualMode m = static_cast<VisualMode>(mode);
@@ -123,6 +127,7 @@ signals:
   void lastProjectChanged();
   void activeBackendChanged();
   void activeModelChanged();
+  void openAlexApiKeyChanged();
   void modelTemperatureChanged();
   void backendListChanged();
 
@@ -150,6 +155,7 @@ private:
   QString m_lastProject = "";
   QString m_activeBackend = "";
   QString m_activeModel = "";
+  QString m_openAlexApiKey = "";
   double m_modelTemperature = 0.1;
 
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
