@@ -55,8 +55,6 @@ void ConfigManager::loadConfig() {
     m_lastProject = obj.value("lastProject").toString("");
     m_activeBackend = obj.value("activeBackend").toString("");
     m_activeModel = obj.value("activeModel").toString("");
-    m_contextWindow =
-        static_cast<unsigned int>(obj.value("contextWindow").toInt(4000));
     m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
     // Support both old "useVisualContext" bool and new "visualMode" int.
     if (obj.contains("visualMode")) {
@@ -89,7 +87,6 @@ void ConfigManager::saveConfig() {
   obj["lastProject"] = m_lastProject;
   obj["activeBackend"] = m_activeBackend;
   obj["activeModel"] = m_activeModel;
-  obj["contextWindow"] = static_cast<qint64>(m_contextWindow);
   obj["modelTemperature"] = m_modelTemperature;
   obj["visualMode"] = static_cast<int>(m_visualMode);
 
@@ -138,14 +135,6 @@ void ConfigManager::setActiveModel(const QString &model) {
   if (m_activeModel != model) {
     m_activeModel = model;
     emit activeModelChanged();
-    saveConfig();
-  }
-}
-
-void ConfigManager::setContextWindow(unsigned int window) {
-  if (m_contextWindow != window) {
-    m_contextWindow = window;
-    emit contextWindowChanged();
     saveConfig();
   }
 }

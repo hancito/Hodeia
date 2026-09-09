@@ -20,8 +20,6 @@ class ConfigManager : public QObject {
                  lastProjectChanged)
   Q_PROPERTY(QString activeBackend READ activeBackend WRITE setActiveBackend
                  NOTIFY activeBackendChanged)
-  Q_PROPERTY(unsigned int contextWindow READ contextWindow WRITE
-                 setContextWindow NOTIFY contextWindowChanged)
   Q_PROPERTY(double modelTemperature READ modelTemperature WRITE
                  setModelTemperature NOTIFY modelTemperatureChanged)
   Q_PROPERTY(QVariantList backendList READ backendList WRITE setBackendList
@@ -40,7 +38,6 @@ public:
   unsigned short activeThemeIndex() const { return m_activeThemeIndex; }
   QString lastProject() const { return m_lastProject; }
   QString activeBackend() const { return m_activeBackend; }
-  unsigned int contextWindow() const { return m_contextWindow; }
   float modelTemperature() const { return m_modelTemperature; }
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
@@ -58,7 +55,6 @@ public:
   void setLastProject(const QString &path);
   Q_INVOKABLE void setActiveBackend(const QString &backend);
   Q_INVOKABLE void setActiveModel(const QString &model);
-  void setContextWindow(unsigned int window);
   void setModelTemperature(double temperature);
   void setVisualMode(int mode) {
     VisualMode m = static_cast<VisualMode>(mode);
@@ -127,7 +123,6 @@ signals:
   void lastProjectChanged();
   void activeBackendChanged();
   void activeModelChanged();
-  void contextWindowChanged();
   void modelTemperatureChanged();
   void backendListChanged();
 
@@ -155,7 +150,6 @@ private:
   QString m_lastProject = "";
   QString m_activeBackend = "";
   QString m_activeModel = "";
-  unsigned int m_contextWindow = 4000;
   double m_modelTemperature = 0.1;
 
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}

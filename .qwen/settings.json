@@ -18,7 +18,8 @@
       "Bash(done)",
       "WebFetch(packages.msys2.org)",
       "Bash(which *)",
-      "Bash(pkg-config *)"
+      "Bash(pkg-config *)",
+      "Bash(cmake *)"
     ]
   },
   "$version": 4
