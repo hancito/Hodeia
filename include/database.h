@@ -37,6 +37,7 @@ public:
   Q_INVOKABLE void reloadModels();
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
   Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
+  Q_INVOKABLE QString getReferencesForHash(const QString &paperHash);
 
 private:
   bool initDatabase();

@@ -35,7 +35,6 @@ static const QString s_systemPromptVisual = []() {
   "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
   "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
-  "references": ["A list of the fully detailed paper cited by the paper in the references or bibliography section"]
 }
 Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
 }();
@@ -56,7 +55,6 @@ static const QString s_systemPromptText = []() {
   "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
   "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
-  "references": ["A list of the fully detailed paper cited by the paper in the references or bibliography section"]
 }
 Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
 }();
@@ -648,6 +646,18 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
   if (!updateResult) {
     qWarning() << "[Summarizer] Failed to update chunks metadata for" << hash
                << ":" << updateResult.error();
+  }
+
+  // ── Register in Citations table (OpenAlex will fill cites/cited_by) ──
+  SqliteStatement refStmt =
+      db.prepare("INSERT INTO Citations (paper_hash, clean_title, work_id, "
+                 "cites, cited_by) VALUES (?, ?, '', '', '') "
+                 "ON CONFLICT(paper_hash) DO UPDATE SET clean_title = "
+                 "excluded.clean_title");
+  if (refStmt.isValid()) {
+    (void)refStmt.bind(1, hash);
+    (void)refStmt.bind(2, summary.title);
+    (void)refStmt.exec();
   }
 
   qDebug() << "[Summarizer] Saved summary for" << hash

@@ -32,6 +32,8 @@ SqliteStatement &SqliteStatement::operator=(SqliteStatement &&other) noexcept {
 
 std::expected<bool, QString> SqliteStatement::bind(int index,
                                                    const QString &value) {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   QByteArray utf8 = value.toUtf8();
   int rc = sqlite3_bind_text(m_stmt, index, utf8.constData(), utf8.size(),
                              SQLITE_TRANSIENT);
@@ -43,6 +45,8 @@ std::expected<bool, QString> SqliteStatement::bind(int index,
 }
 
 std::expected<bool, QString> SqliteStatement::bind(int index, int value) {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_bind_int(m_stmt, index, value);
   if (rc != SQLITE_OK) {
     return std::unexpected{
@@ -52,6 +56,8 @@ std::expected<bool, QString> SqliteStatement::bind(int index, int value) {
 }
 
 std::expected<bool, QString> SqliteStatement::bind(int index, int64_t value) {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_bind_int64(m_stmt, index, value);
   if (rc != SQLITE_OK) {
     return std::unexpected{
@@ -61,6 +67,8 @@ std::expected<bool, QString> SqliteStatement::bind(int index, int64_t value) {
 }
 
 std::expected<bool, QString> SqliteStatement::bind(int index, double value) {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_bind_double(m_stmt, index, value);
   if (rc != SQLITE_OK) {
     return std::unexpected{
@@ -76,6 +84,8 @@ std::expected<bool, QString> SqliteStatement::bind(int index,
 
 std::expected<bool, QString> SqliteStatement::bind(int index,
                                                    const QByteArray &blob) {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_bind_blob(m_stmt, index, blob.constData(), blob.size(),
                              SQLITE_TRANSIENT);
   if (rc != SQLITE_OK) {
@@ -86,6 +96,8 @@ std::expected<bool, QString> SqliteStatement::bind(int index,
 }
 
 std::expected<bool, QString> SqliteStatement::step() {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_step(m_stmt);
   if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
     m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
@@ -96,6 +108,8 @@ std::expected<bool, QString> SqliteStatement::step() {
 }
 
 std::expected<bool, QString> SqliteStatement::exec() {
+  if (!m_stmt)
+    return std::unexpected{m_errorMsg};
   int rc = sqlite3_step(m_stmt);
   if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
     m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
@@ -105,9 +119,14 @@ std::expected<bool, QString> SqliteStatement::exec() {
   return rc == SQLITE_DONE;
 }
 
-void SqliteStatement::reset() { sqlite3_reset(m_stmt); }
+void SqliteStatement::reset() {
+  if (m_stmt)
+    sqlite3_reset(m_stmt);
+}
 
 void SqliteStatement::resetAndClearBindings() {
+  if (!m_stmt)
+    return;
   sqlite3_reset(m_stmt);
   sqlite3_clear_bindings(m_stmt);
 }

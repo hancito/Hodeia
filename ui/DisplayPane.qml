@@ -66,7 +66,7 @@ Rectangle {
 
         // Page navigation row (visible only on PDF tab)
         RowLayout {
-            visible: tabBar.currentIndex === 3
+            visible: tabBar.currentIndex === 2
             Layout.fillWidth: true
             spacing: 8
             opacity: displayPane.pageImages.length > 0 ? 1 : 0
@@ -214,8 +214,43 @@ Rectangle {
                             textFormat: TextEdit.MarkdownText
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-                            placeholderText: "Select a paper to see its LaTeX summary"
-                            text: displayPane.activeSummaryJson ? modelHelper.summaryToRef(displayPane.activeSummaryJson) : "Please make a summary of this paper"
+                            placeholderText: "Select a paper to see its references"
+                            text: {
+                                var json = databaseManager.getReferencesForHash(displayPane.activePaperHash);
+                                if (!json)
+                                    return "No references found for this paper";
+                                var data;
+                                try {
+                                    data = JSON.parse(json);
+                                } catch (e) {
+                                    return json;
+                                }
+                                var lines = [];
+                                function formatSection(header, arr) {
+                                    lines.push("## " + header, "");
+                                    if (!Array.isArray(arr) || arr.length === 0) {
+                                        lines.push("None found on OpenAlex.", "");
+                                        return;
+                                    }
+                                    for (var i = 0; i < arr.length; i++) {
+                                        var r = arr[i];
+                                        var line = "- " + (r.display_name || "Unknown");
+                                        var meta = [];
+                                        if (r.publication_year)
+                                            meta.push(r.publication_year);
+                                        if (r.journal)
+                                            meta.push(r.journal);
+                                        if (meta.length)
+                                            line += " (" + meta.join(", ") + ")";
+                                        if (r.doi)
+                                            line += " — " + r.doi;
+                                        lines.push(line);
+                                    }
+                                }
+                                formatSection("References", data.cites);
+                                formatSection("Cited by", data.cited_by);
+                                return lines.join("\n");
+                            }
                         }
                     }
                 }

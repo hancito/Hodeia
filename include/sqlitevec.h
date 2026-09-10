@@ -1,7 +1,7 @@
 #pragma once
 
-#include "summary.h"
 #include "llama.h"
+#include "summary.h"
 #include <QList>
 #include <QString>
 #include <QVector>
@@ -72,5 +72,6 @@ private:
   struct llama_model *m_llamaModel = nullptr;
   bool m_ready = false;
   int m_dim = 0;
+  int m_maxTokens = 0;
   ConfigManager *m_config = nullptr;
 };

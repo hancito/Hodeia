@@ -97,8 +97,6 @@ PaperSummary parseSummaryJson(const QString &raw) {
     summary.coreFindingsAndSignificance.append(f.toString());
   for (const auto &l : obj.value("criticalLimitations").toArray())
     summary.criticalLimitations.append(l.toString());
-  for (const auto &l : obj.value("references").toArray())
-    summary.references.append(l.toString());
   summary.citableSummary = obj.value("citableSummary").toString();
   for (const auto &a : obj.value("authors").toArray())
     summary.authors.append(a.toString());
@@ -138,14 +136,6 @@ QString toMarkdown(const PaperSummary &s) {
   parts.append("");
   parts.append("## Citable summary");
   parts.append(s.citableSummary);
-  return parts.join("\n");
-}
-
-QString toRef(const PaperSummary &s) {
-  QStringList parts;
-  parts.append("## References");
-  parts.append(QString("- %1").arg(s.references.join("\n- ")));
-  parts.append("");
   return parts.join("\n");
 }
 
@@ -270,9 +260,6 @@ ModelHelper::~ModelHelper() = default;
 
 QString ModelHelper::summaryToMarkdown(const QString &json) const {
   return SummaryHelpers::toMarkdown(SummaryHelpers::parseSummaryJson(json));
-}
-QString ModelHelper::summaryToRef(const QString &json) const {
-  return SummaryHelpers::toRef(SummaryHelpers::parseSummaryJson(json));
 }
 QString ModelHelper::summaryToLatex(const QString &json) const {
   return SummaryHelpers::toLatex(SummaryHelpers::parseSummaryJson(json));

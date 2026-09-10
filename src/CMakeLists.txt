@@ -31,6 +31,7 @@ add_library(PaperizeEngine STATIC
     ../include/summarythreadmanager.h
     ../include/queryworker.h
     ../include/querycontroller.h
+    ../include/openalex.h
     ../include/helpers.h
 
     # --- sources ---
@@ -50,6 +51,7 @@ add_library(PaperizeEngine STATIC
     remotebackend.cpp
     summarizer.cpp
     summarythreadmanager.cpp
+    openalex.cpp
     queryworker.cpp
     querycontroller.cpp
     helpers.cpp

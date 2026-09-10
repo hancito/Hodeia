@@ -2,10 +2,11 @@
 #include "database.h"
 #include "enginemanager.h"
 #include "helpers.h"
+#include "llama.h"
+#include "openalex.h"
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
 #include "thememanager.h"
-#include "llama.h"
 
 #include <QDir>
 #include <QFontDatabase>
@@ -14,6 +15,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QTimer>
 #include <print>
 
 /// Install a global llama.cpp log callback early (before any model loads)
@@ -95,6 +97,14 @@ int main(int argc, char *argv[]) {
 
   // Create the ModelHelper (manages model discovery for QML)
   ModelHelper modelHelper(&configManager);
+
+  // Create the OpenAlex reference service (independent background thread)
+  OpenAlexClient openAlexClient(&configManager, &databaseManager);
+  QObject::connect(&summaryController, &SummaryController::summaryFinished,
+                   &openAlexClient, &OpenAlexClient::checkEmptyReferences);
+
+  // Startup catch-up: fetch references for papers summarized in prior sessions
+  QTimer::singleShot(0, &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);

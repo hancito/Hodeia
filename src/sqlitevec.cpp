@@ -13,7 +13,6 @@
 namespace {
 constexpr const char *PassagePrefix = "passage: ";
 constexpr const char *QueryPrefix = "query: ";
-constexpr int32_t MaxSeqLen = 512;
 constexpr int BatchSize = 64;
 } // namespace
 
@@ -30,7 +29,7 @@ static QString resolveModelPath(ConfigManager *config,
                                 const QString &modelPath) {
   QString path = modelPath;
   if (path.isEmpty() && config) {
-    path = config->embeddersPath() + "/multilingual-e5-small.gguf";
+    path = config->embeddersPath() + "/multilingual-e5-small-q8_0.gguf";
   }
 
   if (path.isEmpty())
@@ -85,9 +84,14 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   }
 
   llama_context_params cparams = llama_context_default_params();
-  cparams.n_ctx = (uint32_t)MaxSeqLen;
-  cparams.n_batch = (uint32_t)MaxSeqLen;
-  cparams.n_ubatch = (uint32_t)MaxSeqLen;
+  // Use the model's actual training context to avoid out-of-bounds
+  // position-embedding access (E5 is trained on 512 = 511 + BOS).
+  int32_t ctxTrain = llama_model_n_ctx_train(model);
+  uint32_t safeCtx = (ctxTrain > 0) ? static_cast<uint32_t>(ctxTrain)
+                                    : static_cast<uint32_t>(511);
+  cparams.n_ctx = safeCtx;
+  cparams.n_batch = safeCtx;
+  cparams.n_ubatch = safeCtx;
   cparams.n_seq_max = 1; // we embed one passage at a time
   cparams.embeddings = true;
   cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
@@ -105,9 +109,11 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   m_llamaModel = model;
   m_llamaCtx = ctx;
   m_dim = llama_model_n_embd(model);
+  m_maxTokens = static_cast<int>(safeCtx);
   m_ready = true;
 
-  qInfo() << "[SqliteVec] E5 model loaded, dim=" << m_dim;
+  qInfo() << "[SqliteVec] E5 model loaded, dim=" << m_dim
+          << "| maxTokens=" << m_maxTokens;
   emit statusUpdated(
       QString("E5 embedding model loaded (%1 dimensions)").arg(m_dim));
   return true;
@@ -116,18 +122,15 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 /* ── vec0 table creation ─────────────────────────────────────── */
 
 std::expected<void, QString> SqliteVecManager::createChunksTable(SqliteDb &db) {
-  int dim = m_dim > 0 ? m_dim : 384;
-  QString sql = QString("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
-                        "embedding float[%1], "
-                        "paper_hash text, "
-                        "page integer, "
-                        "chunk_idx integer, "
-                        "chunk_text text, "
-                        "citation text, "
-                        "clean_title text, "
-                        "page_metadata text)")
-                    .arg(dim);
-  return db.exec(sql);
+  return db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
+                 "embedding float[384], "
+                 "paper_hash text, "
+                 "page integer, "
+                 "chunk_idx integer, "
+                 "chunk_text text, "
+                 "citation text, "
+                 "clean_title text, "
+                 "page_metadata text)");
 }
 
 /* ── Embedding ───────────────────────────────────────────────── */
@@ -165,11 +168,11 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     }
 
     // Truncate to context window
-    if ((int)tokens.size() > MaxSeqLen)
-      tokens.resize(MaxSeqLen);
+    if ((int)tokens.size() > m_maxTokens)
+      tokens.resize(m_maxTokens);
 
     // Build the batch using llama_batch_init (heap-allocated, safe).
-    auto batch_tokens = std::min((int32_t)tokens.size(), MaxSeqLen);
+    auto batch_tokens = std::min((int32_t)tokens.size(), (int32_t)m_maxTokens);
     struct llama_batch batch =
         llama_batch_init(batch_tokens, /*embd=*/0, /*n_seq_max=*/1);
     batch.n_tokens = batch_tokens;
@@ -443,5 +446,6 @@ void SqliteVecManager::shutdown() {
   }
   m_ready = false;
   m_dim = 0;
+  m_maxTokens = 0;
   qInfo() << "[SqliteVec] Model unloaded";
 }

@@ -2,6 +2,9 @@
 #include "configmanager.h"
 #include "sqlitevec.h"
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <expected>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
@@ -45,25 +48,43 @@ bool DatabaseManager::initDatabase() {
 }
 
 void DatabaseManager::createTables() {
-  (void)m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
-                  "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                  "paper_hash TEXT NOT NULL UNIQUE, "
-                  "title TEXT, "
-                  "authors TEXT, "
-                  "pages_num INTEGER NOT NULL, "
-                  "journal TEXT, "
-                  "year TEXT, "
-                  "topics TEXT, "
-                  "llmodel TEXT, "
-                  "summary_json TEXT, "
-                  "date DATETIME)");
+  qInfo() << "[Database] createTables() — ensuring schema";
 
-  (void)m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
-                  "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                  "query TEXT NOT NULL, "
-                  "response TEXT NOT NULL, "
-                  "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
-                  "llmodel TEXT NOT NULL)");
+  auto r1 = m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                      "paper_hash TEXT NOT NULL UNIQUE, "
+                      "title TEXT, "
+                      "authors TEXT, "
+                      "pages_num INTEGER NOT NULL, "
+                      "journal TEXT, "
+                      "year TEXT, "
+                      "topics TEXT, "
+                      "llmodel TEXT, "
+                      "summary_json TEXT, "
+                      "date DATETIME)");
+  if (!r1)
+    qCritical() << "[Database] Summaries table failed:" << r1.error();
+
+  auto r2 = m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                      "query TEXT NOT NULL, "
+                      "response TEXT NOT NULL, "
+                      "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                      "llmodel TEXT NOT NULL)");
+  if (!r2)
+    qCritical() << "[Database] Queries table failed:" << r2.error();
+
+  auto r3 = m_db.exec("CREATE TABLE IF NOT EXISTS Citations ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                      "paper_hash TEXT NOT NULL UNIQUE, "
+                      "clean_title TEXT NOT NULL, "
+                      "work_id TEXT NOT NULL DEFAULT '', "
+                      "cites TEXT NOT NULL DEFAULT '', "
+                      "cited_by TEXT NOT NULL DEFAULT '')");
+  if (!r3)
+    qCritical() << "[Database] Citations table failed:" << r3.error();
+  else
+    qInfo() << "[Database] Citations table OK";
 
   // Create vec0 virtual table for text chunks with embeddings
   (void)m_vecManager.createChunksTable(m_db);
@@ -129,6 +150,17 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
     }
     chunkStmt.resetAndClearBindings();
   }
+
+  // Also remove associated citations
+  SqliteStatement refStmt =
+      m_db.prepare("DELETE FROM Citations WHERE paper_hash = ?");
+  if (refStmt.isValid()) {
+    for (const QString &hash : hashes) {
+      (void)refStmt.bind(1, hash);
+      (void)refStmt.exec();
+      refStmt.resetAndClearBindings();
+    }
+  }
 }
 
 void DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
@@ -152,4 +184,28 @@ void DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
   }
 
   m_queryModel->loadAll();
+}
+
+QString DatabaseManager::getReferencesForHash(const QString &paperHash) {
+  if (paperHash.isEmpty())
+    return {};
+
+  SqliteStatement stmt = m_db.prepare("SELECT cites, cited_by FROM Citations "
+                                      "WHERE paper_hash = ?");
+  if (!stmt.isValid())
+    return {};
+
+  (void)stmt.bind(1, paperHash);
+  auto stepResult = stmt.step();
+  if (!stepResult || !stepResult.value())
+    return {};
+
+  QString cites = stmt.columnText(0);
+  QString citedBy = stmt.columnText(1);
+
+  // Return a JSON object: {"cites": [...], "cited_by": [...]}
+  QJsonObject obj;
+  obj["cites"] = QJsonDocument::fromJson(cites.toUtf8()).array();
+  obj["cited_by"] = QJsonDocument::fromJson(citedBy.toUtf8()).array();
+  return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
