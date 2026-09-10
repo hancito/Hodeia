@@ -16,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # --- Options -----------------------------------------------------------------
-option(PAPERIZE_ENABLE_LTO "Enable link-time optimisation (slower builds)" OFF)
+option(HODEIA_ENABLE_LTO "Enable link-time optimisation (slower builds)" OFF)
 
 # --- Warnings ----------------------------------------------------------------
 # GCC / Clang
@@ -33,11 +33,11 @@ endif()
 
 # --- Link-time optimisation --------------------------------------------------
 # Applied per-target in src/CMakeLists.txt (INTERFACE so the executable too).
-if(PAPERIZE_ENABLE_LTO)
+if(HODEIA_ENABLE_LTO)
   if(NOT CMAKE_INTERPROCEDURAL_OPTIMIZATION)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
   endif()
   message(STATUS "LTO: enabled")
 else()
-  message(STATUS "LTO: disabled (enable with -DPAPERIZE_ENABLE_LTO=ON)")
+  message(STATUS "LTO: disabled (enable with -DHODEIA_ENABLE_LTO=ON)")
 endif()

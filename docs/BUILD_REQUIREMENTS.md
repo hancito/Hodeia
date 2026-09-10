@@ -262,25 +262,46 @@ Résultat : `Hodeia.app` (~300 Mo) — standalone, drag & drop vers `/Applicatio
 
 ## Windows (MSYS2 + Clang/LLVM)
 
-> **Recommandé** : Utiliser MSYS2 avec l'environnement **clang64**. Cela fournit un shell
+> **Recommandé** : Utiliser MSYS2 avec l'environnement **ucrt64**. Cela fournit un shell
 > Unix complet (bash, make, pkg-config) et un gestionnaire de paquets (`pacman`) qui résout
 > toutes les dépendances de build automatiquement. Le produit final est **identique** —
 > l'utilisateur final n'a aucune dépendance MSYS2.
+>
+> **Important** : Sur Windows, MuPDF / Tesseract / Leptonica sont consommées comme
+> **DLL partagées depuis MSYS2** — elles ne sont **pas** compilées depuis le source.
+> Seuls llama.cpp et sqlite-vec sont compilés localement.
 
 ### Installation MSYS2
 
 1. Télécharger et installer [MSYS2 x86_64](https://www.msys2.org/download/)
-2. Ouvrir **MSYS2 clang64** (pas MSYS2 mingw64, pas MSYS2 MSYS)
+2. Ouvrir **MSYS2 UCRT64** (pas mingw64, pas MSYS)
 3. Installer les paquets :
 
 ```bash
-pacman -S --needed mingw-w64-clang-x86_64-{toolchain,cmake,ninja,llvm-openmp}
-pacman -S --needed mingw-w64-clang-x86_64-{libpng,libjpeg-turbo,libtiff,zlib,freetype,harfbuzz,openjpeg}
-pacman -S --needed mingw-w64-clang-x86_64-{qt6-base,qt6-declarative,qt6-tools}
+pacman -S --needed mingw-w64-ucrt-x86_64-clang \
+                  mingw-w64-ucrt-x86_64-cmake \
+                  mingw-w64-ucrt-x86_64-ninja \
+                  mingw-w64-ucrt-x86_64-llvm-openmp \
+                  mingw-w64-ucrt-x86_64-pkg-config
+
+# PDF / OCR (DLL partagées — liées par CMake au build)
+pacman -S --needed mingw-w64-ucrt-x86_64-mupdf \
+                  mingw-w64-ucrt-x86_64-tesseract-ocr \
+                  mingw-w64-ucrt-x86_64-leptonica
+
+# Utilitaires
 pacman -S --needed git wget curl
 ```
 
-Qt6 de MSYS2 inclut automatiquement `windeployqt` (`mingw64/bin/windeployqt.exe`).
+> **Optionnel — Qt6 depuis MSYS2** (évite le Qt Online Installer séparé) :
+>
+> ```bash
+> pacman -S --needed mingw-w64-ucrt-x86_64-qt6-base \
+>                   mingw-w64-ucrt-x86_64-qt6-declarative \
+>                   mingw-w64-ucrt-x86_64-qt6-shadertools
+> ```
+>
+> Activer avec `-DHODEIA_QT_FROM_MSYS2=ON` lors du configure CMake.
 
 ### GPU (optionnel — hors MSYS2)
 
@@ -294,9 +315,13 @@ Qt6 de MSYS2 inclut automatiquement `windeployqt` (`mingw64/bin/windeployqt.exe`
 
 ### Bibliothèques à compiler
 
-Toutes les commandes s'exécutent dans **MSYS2 clang64**.
+Toutes les commandes s'exécutent dans **MSYS2 UCRT64**.
 
-#### 1. llama.cpp (CPU) → `.dll` + `.lib`
+> **MuPDF / Tesseract / Leptonica** : pas de compilation nécessaire — les DLL
+> partagées installées par `pacman` (étape Installation MSYS2) sont détectées
+> automatiquement par CMake via `find_library`.
+
+#### 1. llama.cpp (CPU) → `.dll` + `.dll.a`
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp.git
@@ -345,93 +370,7 @@ Pour Vulkan, répétez avec `-DLLAMA_VULKAN=ON` → `external/lib/windows/llamac
 ggml-vulkan.dll    ← backend GPU
 ```
 
-#### 2. MuPDF → `.a` (statique)
-
-> **Important** : `MUPDF_BUILD_THIRD_PARTY=ON` embed toutes les dépendances (libpng,
-> libjpeg, libtiff, zlib, FreeType, HarfBuzz, etc.) dans les archives statiques.
-> Avec MSYS2, `pkg-config` trouve automatiquement ces bibliothèques.
-
-```bash
-git clone https://github.com/ArtifexSoftware/mupdf.git
-cd mupdf
-git submodule update --init
-
-mkdir build && cd build
-
-cmake .. -G Ninja \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DMUPDF_BUILD_TYPE=Release \
-  -DMUPDF_BUILD_THIRD_PARTY=ON \
-  -DBUILD_SHARED_LIBS=OFF
-
-cmake --build .
-```
-
-Copier dans `external/lib/windows/` :
-
-```
-libmupdf.a
-libmupdf-third.a
-libmupdf-threads.a
-```
-
-#### 3. Leptonica → `.a` (statique)
-
-> Avec MSYS2 et MuPDF compilé avec `MUPDF_BUILD_THIRD_PARTY=ON`, les bibliothèques
-> png/jpeg/tiff/zlib sont disponibles via `pkg-config` — Leptonica les trouve
-> automatiquement.
-
-```bash
-wget https://github.com/DanBloomberg/leptonica/releases/download/1.87.0/leptonica-1.87.0.tar.gz
-tar xzf leptonica-1.87.0.tar.gz
-cd leptonica-1.87.0
-mkdir build && cd build
-
-cmake .. -G Ninja \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DBUILD_PROG=OFF \
-  -DENABLE_PNG=ON \
-  -DENABLE_JPEG=ON \
-  -DENABLE_TIFF=ON \
-  -DENABLE_ZLIB=ON \
-  -DENABLE_GIF=OFF \
-  -DENABLE_WEBP=OFF \
-  -DENABLE_OPENJPEG=OFF
-
-cmake --build .
-```
-
-Copier `build/src/libleptonica.a` → `external/lib/windows/`
-
-> **Vérification** : `nm libleptonica.a | grep " U " | grep -iE "png|jpeg|tiff|zlib"` doit retourner **rien** si les libs sont bien liées statiquement. Si des symboles persistent, passez manuellement les archives MuPDF : `-DPNG_LIBRARY=...` etc.
-
-#### 4. Tesseract → `.a` (statique)
-
-```bash
-wget https://github.com/tesseract-ocr/tesseract/releases/download/5.5.2/tesseract-5.5.2.tar.gz
-tar xzf tesseract-5.5.2.tar.gz
-cd tesseract-5.5.2
-mkdir build && cd build
-
-cmake .. -G Ninja \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DBUILD_TRAINING_TOOLS=OFF \
-  -DBUILD_TESTS=OFF \
-  -DDISABLED_LEGACY_ENGINE=ON \
-  -DGRAPHICS_DISABLED=ON \
-  -DLeptonica_DIR=/chemin/vers/leptonica-1.87.0/build
-
-cmake --build .
-```
-
-Copier `build/libtesseract.a` → `external/lib/windows/`
-
-#### 5. sqlite-vec → `.dll` + `.a`
+#### 2. sqlite-vec → `.dll`
 
 ```bash
 curl -fSL -o vec0.c "https://github.com/asg017/sqlite-vec/raw/main/dist/vec0.c"
@@ -440,7 +379,7 @@ clang -shared -o vec0.dll vec0.c
 
 Copier `vec0.dll` → `external/lib/windows/sqlitevec/`
 
-#### 6. Tesseract traineddata
+#### 3. Tesseract traineddata
 
 ```bash
 mkdir -p Resources/tessdata
@@ -457,13 +396,14 @@ cmake .. -G Ninja \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/mingw64   # Qt6 de MSYS2
+  -DHODEIA_MINGW_PREFIX=C:/msys64/ucrt64 \
+  [-DHODEIA_QT_FROM_MSYS2=ON]   # si Qt6 installé via pacman
 
 cmake --build .
 ```
 
 > Si vous utilisez Qt de l'**Online Installer** au lieu de MSYS2, remplacez
-> `CMAKE_PREFIX_PATH` par le chemin du kit Qt :
+> `-DHODEIA_QT_FROM_MSYS2=ON` par :
 > `-DCMAKE_PREFIX_PATH="C:/Qt/6.10.0/msvc2022_64"`
 
 Le CMake appelle automatiquement **`windeployqt`** en POST_BUILD. Le dossier de sortie contient :
@@ -475,7 +415,7 @@ Le CMake appelle automatiquement **`windeployqt`** en POST_BUILD. Le dossier de 
 | **GPU backend**          | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si CUDA) / `vulkan-1.dll` (si Vulkan)                                                   |
 | **Extensions**           | `vec0.dll` (sqlite-vec), `libomp.dll` (OpenMP)                                                                                                  |
 | **Ressources**           | themes/, Fonts/, tessdata/                                                                                                                      |
-| **Exécutable**           | `Hodeia.exe`                                                                                                                                  |
+| **Exécutable**           | `Hodeia.exe`                                                                                                                                    |
 
 > **Runtime C/C++ (UCRT)** : Le runtime universel Windows (`ucrtbase.dll`, `vcruntime140.dll`)
 > fait partie de Windows 10/11 et est toujours présent. Pas besoin de shipper le VC++ Redist
@@ -518,22 +458,21 @@ external/lib/
 │       └── vec0.dylib
 │
 └── windows/                        ← à remplir
-    ├── libmupdf.lib
-    ├── libmupdf-third.lib
-    ├── libmupdf-threads.lib
-    ├── libtesseract.lib
-    ├── libleptonica.lib
     ├── llamacpp/
-    │   ├── cpu/     ← .dll + .lib
-    │   ├── cuda/    ← .dll + .lib (optionnel)
-    │   └── vulkan/  ← .dll + .lib (optionnel)
+    │   ├── cpu/     ← .dll + .dll.a
+    │   ├── cuda/    ← .dll + .dll.a (optionnel)
+    │   └── vulkan/  ← .dll + .dll.a (optionnel)
     └── sqlitevec/
         └── vec0.dll
+    # MuPDF / Tesseract / Leptonica : DLL partagées depuis MSYS2 (pacman)
+    # → pas de fichiers in-tree nécessaires
 ```
 
 ---
 
 ## Ordre recommandé de compilation
+
+### Linux / macOS (compilation source)
 
 1. **Leptonica** → dépendance de Tesseract
 2. **Tesseract** → dépend de Leptonica
@@ -542,8 +481,15 @@ external/lib/
 5. **sqlite-vec** → fichier unique, compilation instantanée
 6. **Hodeia** → assemble tout
 
+### Windows (MSYS2)
+
+1. **pacman** → installe MuPDF, Tesseract, Leptonica (DLL partagées) + toolchain
+2. **llama.cpp** → indépendant (compiler une fois par backend)
+3. **sqlite-vec** → fichier unique, compilation instantanée
+4. **Hodeia** → assemble tout (CMake détecte les DLL MSYS2 automatiquement)
+
 ## Notes Clang-specific
 
 - **macOS** : Clang d'Apple (`/usr/bin/clang`) supporte C++23 et OpenMP via `libomp`. Le LLVM Homebrew est recommandé pour une version plus récente.
-- **Windows** : `clang-cl` agit comme un drop-in pour MSVC mais produit du code souvent plus performant. Il nécessite `link.exe` du Windows SDK — d'où l'installation de Visual Studio Build Tools (même avec Clang).
-- Sur les deux plateformes, `-DCMAKE_C_COMPILER` et `-DCMAKE_CXX_COMPILER` pointent vers les binaires Clang, mais le linker reste celui de la plateforme (`ld.lld` sur macOS, `link.exe` sur Windows avec `clang-cl`).
+- **Windows** : Le Clang de MSYS2 (ucrt64) utilise le linker `lld` natif. Aucune dépendance VS Build Tools requise. Les DLL de MuPDF/Tesseract/Leptonica viennent de MSYS2 et sont déployées automatiquement par CMake en POST_BUILD.
+- Sur les deux plateformes, `-DCMAKE_C_COMPILER` et `-DCMAKE_CXX_COMPILER` pointent vers les binaires Clang, mais le linker reste celui de la plateforme (`ld.lld` sur macOS et MSYS2 Windows).

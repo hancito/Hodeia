@@ -2,20 +2,23 @@
 # ─────────────────────────────────────────────────────────────────
 # Master build script — Hodeia Windows dependencies
 #
-# Builds all dependencies in the correct order, then copies
-# artefacts into external/lib/windows/.
+# Builds the in-tree dependencies (llama.cpp + sqlite-vec) and
+# verifies that the MSYS2 shared-DLL dependencies (MuPDF, Tesseract,
+# Leptonica) are installed.
+#
+# On Windows, MuPDF / Tesseract / Leptonica are NOT built from source —
+# they are consumed as shared DLLs from MSYS2 (see 00_install_packages.sh).
 #
 # Usage:
 #   ./build_all_windows.sh [SOURCE_ROOT] [backends...]
 #
-#   SOURCE_ROOT : directory containing leptonica-1.87.0, tesseract-5.5.2,
-#                 mupdf, and llamacpp subdirectories.
+#   SOURCE_ROOT : directory containing the llama.cpp source
 #                 Default: /c/Dependencies
 #
-#   backends    : space-separated list of llama.cpp backends to build.
-#                 Options: cpu cuda vulkan  (default: cpu cuda vulkan)
+#   backends    : space-separated llama.cpp backends
+#                 Options: cpu cuda vulkan  (default: cpu)
 #
-# Run inside MSYS2 CLANG-UCRT64 shell.
+# Run inside MSYS2 UCRT64 shell.
 # ─────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -27,82 +30,101 @@ shift || true
 BACKENDS="$*"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  Hodeia — Windows Dependency Build (MSYS2 clang-ucrt64)  ║"
+echo "║  Hodeia — Windows Dependency Build (MSYS2 UCRT64)           ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Hodeia root : $HODEIA"
-echo "Source root   : $SRC"
-echo "Backends      : ${BACKENDS:-cpu cuda vulkan}"
+echo "  Hodeia root : $HODEIA"
+echo "  Source root : $SRC"
+echo "  Backends    : ${BACKENDS:-cpu cuda vulkan}"
 echo ""
-echo "Build order:"
-echo "  1. Leptonica    (static)"
-echo "  2. Tesseract    (static, depends on Leptonica)"
-echo "  3. MuPDF        (static, independent)"
-echo "  4. llama.cpp    (shared DLLs, per backend)"
-echo "  5. sqlite-vec   (shared DLL)"
+echo "  Build steps:"
+echo "    1. Verify MSYS2 shared DLLs (MuPDF, Tesseract, Leptonica)"
+echo "    2. llama.cpp          (shared DLLs, per backend)"
+echo "    3. sqlite-vec         (shared DLL)"
 echo ""
-echo "Artefacts go to: $HODEIA/external/lib/windows/"
+echo "  Artefacts go to: $HODEIA/external/lib/windows/"
 echo ""
-read -rp "Continue? [y/N] " confirm
-if [[ "$confirm" != [yY] ]]; then
-  echo "Aborted."
-  exit 0
+
+# ─── Step 1: Verify MSYS2 shared libraries ───────────────────
+echo ""
+echo "═══════════════════════════════════════════════════════════════"
+echo " STEP 1/3 — Verify MSYS2 shared libraries"
+echo "═══════════════════════════════════════════════════════════════"
+
+MSYS_BIN=""
+for p in /ucrt64/bin /mingw64/bin /clang64/bin; do
+  if [[ -d "$p" ]]; then MSYS_BIN="$p"; break; fi
+done
+
+if [[ -z "$MSYS_BIN" ]]; then
+  echo "  ERROR: No MSYS2 bin directory found."
+  echo "  Run 00_install_packages.sh first."
+  exit 1
 fi
 
-# ─── Step 1: Leptonica ──────────────────────────────────────
-echo ""
-echo "═══════════════════════════════════════════════════════════════"
-echo " STEP 1/5 — Leptonica"
-echo "═══════════════════════════════════════════════════════════════"
-bash "$SCRIPT_DIR/01_build_leptonica.sh" "$SRC"
+MISSING=0
+for lib in mupdf tesseract leptonica; do
+  # MSYS2 names: libmupdf.dll, libtesseract-5.5.dll, libleptonica-6.dll
+  if ls "$MSYS_BIN/lib${lib}"*.dll 1>/dev/null 2>&1 || ls "$MSYS_BIN/${lib}"*.dll 1>/dev/null 2>&1; then
+    echo "  [OK] $lib"
+  else
+    echo "  [MISS] $lib"
+    MISSING=1
+  fi
+done
 
-# ─── Step 2: Tesseract ──────────────────────────────────────
-echo ""
-echo "═══════════════════════════════════════════════════════════════"
-echo " STEP 2/5 — Tesseract"
-echo "═══════════════════════════════════════════════════════════════"
-bash "$SCRIPT_DIR/02_build_tesseract.sh" "$SRC"
+if [[ "$MISSING" -eq 1 ]]; then
+  echo ""
+  echo "  Missing MSYS2 packages. Install with:"
+  echo "    pacman -S mingw-w64-ucrt-x86_64-mupdf \\"
+  echo "              mingw-w64-ucrt-x86_64-tesseract-ocr \\"
+  echo "              mingw-w64-ucrt-x86_64-leptonica"
+  echo "  Or run: bash $SCRIPT_DIR/00_install_packages.sh"
+  echo ""
+  read -rp "Continue without PDF/OCR support? [y/N] " confirm
+  [[ "$confirm" == [yY] ]] || exit 0
+fi
 
-# ─── Step 3: MuPDF ──────────────────────────────────────────
+# ─── Step 2: llama.cpp ──────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo " STEP 3/5 — MuPDF"
-echo "═══════════════════════════════════════════════════════════════"
-bash "$SCRIPT_DIR/03_build_mupdf.sh" "$SRC"
-
-# ─── Step 4: llama.cpp ──────────────────────────────────────
-echo ""
-echo "═══════════════════════════════════════════════════════════════"
-echo " STEP 4/5 — llama.cpp (${BACKENDS:-cpu cuda vulkan})"
+echo " STEP 2/3 — llama.cpp (${BACKENDS:-cpu})"
 echo "═══════════════════════════════════════════════════════════════"
 bash "$SCRIPT_DIR/04_build_llamacpp.sh" "$SRC" $BACKENDS
 
-# ─── Step 5: sqlite-vec ─────────────────────────────────────
+# ─── Step 3: sqlite-vec ─────────────────────────────────────
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
-echo " STEP 5/5 — sqlite-vec"
+echo " STEP 3/3 — sqlite-vec"
 echo "═══════════════════════════════════════════════════════════════"
 bash "$SCRIPT_DIR/05_build_sqlitevec.sh"
 
-# ─── Summary ────────────────────────────────────────────────
+# ─── Summary ─────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║  Build complete!                                            ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Artefacts:"
-echo ""
+echo "  In-tree artefacts:"
 find "$HODEIA/external/lib/windows" -type f | sort | while read -r f; do
-  ls -lh "$f"
+  echo "    $(ls -lh "$f" | awk '{print $5, $9}')"
 done
 echo ""
-echo "Next step: build Hodeia itself."
+echo "  MSYS2 shared DLLs (at runtime, from $MSYS_BIN):"
+for lib in mupdf tesseract leptonica; do
+  ls "$MSYS_BIN/lib${lib}"*.dll 2>/dev/null | while read -r dll; do
+    echo "    $(basename "$dll")"
+  done
+done
 echo ""
-echo "  mkdir -p $HODEIA/build && cd \$_"
-echo "  cmake .. -G Ninja \\"
-echo "    -DCMAKE_C_COMPILER=clang \\"
-echo "    -DCMAKE_CXX_COMPILER=clang++ \\"
-echo "    -DCMAKE_BUILD_TYPE=Release \\"
-echo "    -DCMAKE_PREFIX_PATH=<path-to-Qt6>"
-echo "  cmake --build ."
+echo "  Next step — build Hodeia:"
+echo ""
+echo "    mkdir -p $HODEIA/build && cd \$_"
+echo "    cmake .. -G Ninja \\"
+echo "      -DCMAKE_C_COMPILER=clang \\"
+echo "      -DCMAKE_CXX_COMPILER=clang++ \\"
+echo "      -DCMAKE_BUILD_TYPE=Release \\"
+echo "      -DHODEIA_MINGW_PREFIX=C:/msys64/ucrt64 \\"
+echo "      [-DHODEIA_QT_FROM_MSYS2=ON]"
+echo "    cmake --build ."
 echo ""

@@ -2,8 +2,8 @@
 # ─────────────────────────────────────────────────────────────────
 # Build llama.cpp as shared libraries (.dll) for Windows/MSYS2
 #
-# Builds 3 backend variants: CPU, CUDA, Vulkan.
-# Each variant produces a set of .dll + .dll.a import libs.
+# Builds one or more backend variants (CPU, CUDA, Vulkan).
+# Each variant produces .dll + .dll.a import libs.
 #
 # Output (per backend):
 #   external/lib/windows/llamacpp/<backend>/
@@ -13,37 +13,40 @@
 #     ggml.dll, ggml.dll.a
 #     ggml-base.dll, ggml-base.dll.a
 #     ggml-cpu.dll, ggml-cpu.dll.a
-#     ggml-<backend>.dll  (only for cuda/vulkan)
+#     ggml-cuda.dll (+ .dll.a)    ← only for cuda
+#     ggml-vulkan.dll (+ .dll.a)  ← only for vulkan
 #
 # Usage:
 #   ./04_build_llamacpp.sh [SOURCE_ROOT] [backends...]
 #
-#   backends: cpu | cuda | vulkan  (default: all three)
-#   CPU is always built; cuda/vulkan are skipped if the backend flag is OFF.
+#   SOURCE_ROOT: directory containing the llama.cpp source
+#   backends:    cpu | cuda | vulkan  (default: cpu)
 #
-# Run inside MSYS2 CLANG-UCRT64 shell.
+# Run inside MSYS2 UCRT64 shell.
 # ─────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HODEIA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
-# Source location (auto-detect, or override via $1)
 SRC="${1:-/c/Dependencies}"
-LLAMA_SRC="$SRC/llamacpp"
+LLAMA_SRC="$SRC/llama.cpp"
+if [ ! -d "$LLAMA_SRC" ]; then
+  # Try the older directory name
+  LLAMA_SRC="$SRC/llamacpp"
+fi
 
-# Backend selection: pass "cpu cuda" or "cpu vulkan" etc. (default: all)
-BACKENDS="${@:2:}"
+BACKENDS="${*:2}"
 if [ -z "$BACKENDS" ]; then
-  BACKENDS="cpu cuda vulkan"
+  BACKENDS="cpu"
 fi
 
 EXT_LIB="$HODEIA/external/lib/windows"
 EXT_INC="$HODEIA/external/include"
 
-JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+JOBS="$(nproc 2>/dev/null || echo 4)"
 
-# Shared DLLs to copy from each backend build
+# Shared DLLs + import libs to copy from each backend build
 SHARED_FILES=(
   llama.dll llama.dll.a
   llama-common.dll llama-common.dll.a
@@ -53,21 +56,24 @@ SHARED_FILES=(
   ggml-cpu.dll ggml-cpu.dll.a
 )
 
-# Backend-specific DLLs
 declare -A BACKEND_FILES
 BACKEND_FILES[cuda]="ggml-cuda.dll ggml-cuda.dll.a"
 BACKEND_FILES[vulkan]="ggml-vulkan.dll ggml-vulkan.dll.a"
 
-echo "=== Hodeia root : $HODEIA"
-echo "=== llama.cpp src : $LLAMA_SRC"
-echo "=== Backends      : $BACKENDS"
-echo "=== Jobs          : $JOBS"
+echo "══════════════════════════════════════════════════════════════"
+echo "  llama.cpp — MSYS2 UCRT64"
+echo "══════════════════════════════════════════════════════════════"
+echo "  Source   : $LLAMA_SRC"
+echo "  Backends : $BACKENDS"
+echo "  Jobs     : $JOBS"
+echo "  Output   : $EXT_LIB/llamacpp/"
 echo ""
 
 # ─── Verify source ───────────────────────────────────────────
 if [ ! -d "$LLAMA_SRC" ]; then
   echo "ERROR: llama.cpp source not found at $LLAMA_SRC"
-  echo "  Hint: pass the source root as \$1"
+  echo "  Hint: pass the source root as \$1, e.g.:"
+  echo "    bash 04_build_llamacpp.sh /c/Dependencies cpu"
   exit 1
 fi
 
@@ -102,13 +108,10 @@ build_backend() {
 
   mkdir -p "$build_dir"
   cd "$build_dir"
-
   rm -f CMakeCache.txt
 
-  # Start with common flags
   local cmake_cmd=(cmake .. "${COMMON_CMAKE_FLAGS[@]}")
 
-  # Add backend-specific flags
   case "$backend" in
     cpu)
       cmake_cmd+=(-DLLAMA_CUDA=OFF -DLLAMA_VULKAN=OFF)
@@ -121,37 +124,30 @@ build_backend() {
       ;;
   esac
 
-  # Run CMake
   "${cmake_cmd[@]}"
-
   cmake --build . -- -j"$JOBS"
 
   echo "  ✓ Build done."
 
-  # ─── Copy DLLs ───────────────────────────────────────────
+  # ─── Copy DLLs + import libs ─────────────────────────────
   mkdir -p "$install_dir"
 
-  # Find the build output directory (llama.cpp puts DLLs in the build root)
+  # llama.cpp puts DLLs in the build root or bin/
   local out_dir="$build_dir/bin"
-  if [ ! -d "$out_dir" ]; then
-    # Fallback: DLLs may be at build root
-    out_dir="$build_dir"
-  fi
+  [ -d "$out_dir" ] || out_dir="$build_dir"
 
-  # Copy shared (common) DLLs
   local copied=0
-  for dll in "${SHARED_FILES[@]}"; do
-    if [ -f "$out_dir/$dll" ]; then
-      cp "$out_dir/$dll" "$install_dir/$dll"
+  for f in "${SHARED_FILES[@]}"; do
+    if [ -f "$out_dir/$f" ]; then
+      cp "$out_dir/$f" "$install_dir/$f"
       ((copied++))
     fi
   done
 
-  # Copy backend-specific DLLs
   if [ -n "${BACKEND_FILES[$backend]:-}" ]; then
-    for dll in ${BACKEND_FILES[$backend]}; do
-      if [ -f "$out_dir/$dll" ]; then
-        cp "$out_dir/$dll" "$install_dir/$dll"
+    for f in ${BACKEND_FILES[$backend]}; do
+      if [ -f "$out_dir/$f" ]; then
+        cp "$out_dir/$f" "$install_dir/$f"
         ((copied++))
       fi
     done
@@ -159,7 +155,6 @@ build_backend() {
 
   echo "  ✓ Copied $copied files → $install_dir/"
   ls -lh "$install_dir/"
-
   echo ""
 }
 
@@ -192,14 +187,16 @@ for backend in $BACKENDS; do
 done
 
 # ─── Summary ─────────────────────────────────────────────────
-echo ""
-echo "━━━ Summary ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "══════════════════════════════════════════════════════════════"
+echo "  Summary"
+echo "══════════════════════════════════════════════════════════════"
 for backend in $BACKENDS; do
   dir="$EXT_LIB/llamacpp/${backend}"
   if [ -d "$dir" ]; then
-    count=$(ls -1 "$dir"/*.dll 2>/dev/null | wc -l)
-    echo "  ${backend}: $count DLLs in $dir"
+    dll_count=$(ls "$dir"/*.dll 2>/dev/null | wc -l)
+    lib_count=$(ls "$dir"/*.dll.a 2>/dev/null | wc -l)
+    echo "  ${backend}: ${dll_count} DLLs, ${lib_count} import libs"
   fi
 done
 echo ""
-echo "Done."
+echo "Done. Next: bash 05_build_sqlitevec.sh"
