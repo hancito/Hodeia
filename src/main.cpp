@@ -62,7 +62,9 @@ static void registerApplicationFonts(const QString &fontsDir) {
 // Main app section. The entry point
 int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
-  app.setWindowIcon(QIcon(":/Resources/paperize.png"));
+  app.setApplicationName("Hodeia");
+  app.setApplicationDisplayName("Hodeia");
+  app.setWindowIcon(QIcon(":/Resources/hodeia.png"));
 
   // Force Fusion style to avoid platform-dependent styles (e.g. Breeze on KDE)
   // that conflict with our manual palette theming.
@@ -119,7 +121,7 @@ int main(int argc, char *argv[]) {
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
-  engine.loadFromModule("PaperizeCPP", "Main");
+  engine.loadFromModule("HodeiaCPP", "Main");
 
   return QGuiApplication::exec();
 }

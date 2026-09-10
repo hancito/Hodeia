@@ -4,7 +4,7 @@
 #
 # Uses USE_SYSTEM_LIBS=yes to link thirdparty deps from MSYS2 system
 # packages (no submodule compilation). Tesseract and Leptonica are
-# explicitly excluded (Paperize provides its own copies).
+# explicitly excluded (Hodeia provides its own copies).
 #
 # MuPDF with USE_SYSTEM_LIBS=yes does NOT produce libmupdf-third.a
 # (because THIRD_SRC is empty). We reconstruct it by bundling the
@@ -21,18 +21,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PAPERIZE="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+HODEIA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Source location (auto-detect, or override via $1)
 SRC="${1:-/c/Dependencies}"
 MUPDF_SRC="$SRC/mupdf-1.28.0"
 
-EXT_LIB="$PAPERIZE/external/lib/windows"
-EXT_INC="$PAPERIZE/external/include"
+EXT_LIB="$HODEIA/external/lib/windows"
+EXT_INC="$HODEIA/external/include"
 
 JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
-echo "=== Paperize root : $PAPERIZE"
+echo "=== Hodeia root : $HODEIA"
 echo "=== MuPDF src     : $MUPDF_SRC"
 echo "=== Jobs          : $JOBS"
 echo ""

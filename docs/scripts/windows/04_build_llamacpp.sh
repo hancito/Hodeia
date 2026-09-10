@@ -26,7 +26,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PAPERIZE="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+HODEIA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Source location (auto-detect, or override via $1)
 SRC="${1:-/c/Dependencies}"
@@ -38,8 +38,8 @@ if [ -z "$BACKENDS" ]; then
   BACKENDS="cpu cuda vulkan"
 fi
 
-EXT_LIB="$PAPERIZE/external/lib/windows"
-EXT_INC="$PAPERIZE/external/include"
+EXT_LIB="$HODEIA/external/lib/windows"
+EXT_INC="$HODEIA/external/include"
 
 JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
@@ -58,7 +58,7 @@ declare -A BACKEND_FILES
 BACKEND_FILES[cuda]="ggml-cuda.dll ggml-cuda.dll.a"
 BACKEND_FILES[vulkan]="ggml-vulkan.dll ggml-vulkan.dll.a"
 
-echo "=== Paperize root : $PAPERIZE"
+echo "=== Hodeia root : $HODEIA"
 echo "=== llama.cpp src : $LLAMA_SRC"
 echo "=== Backends      : $BACKENDS"
 echo "=== Jobs          : $JOBS"
@@ -171,7 +171,7 @@ mkdir -p "$EXT_INC/llamacpp"
 if [ -d "$LLAMA_SRC/include" ]; then
   cp -r "$LLAMA_SRC/include/"* "$EXT_INC/llamacpp/"
 fi
-# common headers (used by Paperize)
+# common headers (used by Hodeia)
 if [ -d "$LLAMA_SRC/common/include" ]; then
   mkdir -p "$EXT_INC/llamacpp/common"
   cp -r "$LLAMA_SRC/common/include/"* "$EXT_INC/llamacpp/common/"

@@ -4,10 +4,10 @@
 // see: https://zed.dev/docs/debugger
 [
   {
-    "label": "Debug Paperize (GDB)",
+    "label": "Debug Hodeia (GDB)",
     "process": "lldb",
     "adapter": "CodeLLDB",
-    "process_args": ["./build/Paperize", "--args"],
+    "process_args": ["./build/Hodeia", "--args"],
     "cwd": ".",
 
     "setup": [

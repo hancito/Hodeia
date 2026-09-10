@@ -1,8 +1,8 @@
-# Paperize
+# Hodeia
 
 **Your personal research assistant — powered by local AI, running entirely on your machine.**
 
-Paperize helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated summaries, and ask questions across your entire library — all without sending your data to the cloud.
+Hodeia helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated summaries, and ask questions across your entire library — all without sending your data to the cloud.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 
@@ -18,7 +18,7 @@ Paperize helps you manage, summarize, and search through your collection of acad
 ## Quick Start
 
 1. **Install** — [Build from source](docs/TECHNICAL.md) (Linux)
-2. **Load a model** — Place a GGUF model (e.g. Llama 3, Mistral) in `~/.local/share/Paperize/Models/Summarizers/`
+2. **Load a model** — Place a GGUF model (e.g. Llama 3, Mistral) in `~/.local/share/Hodeia/Models/Summarizers/`
 3. **Create a project** — File → New Project
 4. **Import papers** — Use the toolbar to add PDFs or folders
 5. **Summarize & query** — Select papers to summarize, or open the RAG window to ask questions across your library

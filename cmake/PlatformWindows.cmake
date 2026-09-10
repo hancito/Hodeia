@@ -9,14 +9,14 @@
 #     by MSYS2 (mingw64), discovered with find_library (+ pkg-config hints).
 #     No in-tree static .a on Windows.
 #   * Qt6: optionally taken from MSYS2 too (mingw-w64-qt6-base +
-#     mingw-w64-qt6-declarative).  When PAPERIZE_QT_FROM_MSYS2=ON, find_package
+#     mingw-w64-qt6-declarative).  When HODEIA_QT_FROM_MSYS2=ON, find_package
 #     resolves Qt6 from the MSYS2 prefix and the Qt runtime DLLs are shipped
 #     from MSYS2 as well (windeployqt becomes a fallback only).
 #
 # Configure MSYS2 location (optional — auto-detected first):
-#     cmake -DPAPERIZE_MINGW_PREFIX=C:/msys64/mingw64 ...
+#     cmake -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 ...
 # Use MSYS2's Qt6 instead of a separate Qt installer:
-#     cmake -DPAPERIZE_QT_FROM_MSYS2=ON ...
+#     cmake -DHODEIA_QT_FROM_MSYS2=ON ...
 #
 # Expected MSYS2 packages (mingw64):
 #     # in the ucrt64 shell:
@@ -28,14 +28,14 @@
 #     pacman -S mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative \
 #               mingw-w64-ucrt-x86_64-qt6-shadertools
 #
-# Included by the top-level CMakeLists.txt AFTER PAPERIZE_PLATFORM_WIN=ON.
+# Included by the top-level CMakeLists.txt AFTER HODEIA_PLATFORM_WIN=ON.
 #
-# NOTE: PAPERIZE_MINGW_PREFIX is resolved HERE (and exported to
-# PAPERIZE_MSYS_PREFIX so the top-level can point find_package(Qt6) at it),
+# NOTE: HODEIA_MINGW_PREFIX is resolved HERE (and exported to
+# HODEIA_MSYS_PREFIX so the top-level can point find_package(Qt6) at it),
 # because this file is included before the Qt6 lookup in the top level.
 # ---------------------------------------------------------------------------
 
-set(PAPERIZE_PLATFORM_WIN ON)
+set(HODEIA_PLATFORM_WIN ON)
 
 # ===========================================================================
 # A. Shared-library name mapping
@@ -60,16 +60,16 @@ set(_SQLITEVEC_LIB     "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/sqlitevec/${_V
 # ===========================================================================
 # B. MSYS2 prefix discovery
 # ===========================================================================
-option(PAPERIZE_QT_FROM_MSYS2 "Link Qt6 from the MSYS2 prefix (mingw-w64-qt6-*) instead of a separate Qt install" OFF)
+option(HODEIA_QT_FROM_MSYS2 "Link Qt6 from the MSYS2 prefix (mingw-w64-qt6-*) instead of a separate Qt install" OFF)
 
 # Search order (ucrt64 first — the target ABI; override with
-# PAPERIZE_MINGW_PREFIX or MINGW_PREFIX to use mingw64/clang64):
-#   1. PAPERIZE_MINGW_PREFIX (cache var, e.g. C:/msys64/ucrt64)
+# HODEIA_MINGW_PREFIX or MINGW_PREFIX to use mingw64/clang64):
+#   1. HODEIA_MINGW_PREFIX (cache var, e.g. C:/msys64/ucrt64)
 #   2. MINGW_PREFIX environment variable
 #   3. Common install locations (C:/msys64/{ucrt64,mingw64,clang64})
 set(_MSYS_PREFIXES "")
-if(DEFINED PAPERIZE_MINGW_PREFIX)
-  list(APPEND _MSYS_PREFIXES "${PAPERIZE_MINGW_PREFIX}")
+if(DEFINED HODEIA_MINGW_PREFIX)
+  list(APPEND _MSYS_PREFIXES "${HODEIA_MINGW_PREFIX}")
 endif()
 if(DEFINED ENV{MINGW_PREFIX})
   list(APPEND _MSYS_PREFIXES "$ENV{MINGW_PREFIX}")
@@ -79,23 +79,23 @@ foreach(_arch ucrt64 mingw64 clang64)
 endforeach()
 
 # Export the resolved prefix so the top-level can point find_package(Qt6) at
-# it when PAPERIZE_QT_FROM_MSYS2=ON.  Only the first valid (existing) prefix
+# it when HODEIA_QT_FROM_MSYS2=ON.  Only the first valid (existing) prefix
 # is used; the rest remain as search candidates for the libs above.
-set(PAPERIZE_MSYS_PREFIX "")
+set(HODEIA_MSYS_PREFIX "")
 foreach(_p IN LISTS _MSYS_PREFIXES)
   if(EXISTS "${_p}/lib")
-    set(PAPERIZE_MSYS_PREFIX "${_p}")
+    set(HODEIA_MSYS_PREFIX "${_p}")
     break()
   endif()
 endforeach()
-if(PAPERIZE_QT_FROM_MSYS2)
-  if(PAPERIZE_MSYS_PREFIX)
+if(HODEIA_QT_FROM_MSYS2)
+  if(HODEIA_MSYS_PREFIX)
     # Prepend the MSYS2 prefix (and its lib/cmake for the Qt config files).
-    list(PREPEND CMAKE_PREFIX_PATH "${PAPERIZE_MSYS_PREFIX}" "${PAPERIZE_MSYS_PREFIX}/lib/cmake")
-    message(STATUS "Qt6 will be resolved from MSYS2: ${PAPERIZE_MSYS_PREFIX}")
+    list(PREPEND CMAKE_PREFIX_PATH "${HODEIA_MSYS_PREFIX}" "${HODEIA_MSYS_PREFIX}/lib/cmake")
+    message(STATUS "Qt6 will be resolved from MSYS2: ${HODEIA_MSYS_PREFIX}")
   else()
-    message(WARNING "PAPERIZE_QT_FROM_MSYS2=ON but no MSYS2 prefix found.\n"
-                    "Set -DPAPERIZE_MINGW_PREFIX=C:/msys64/mingw64 and install\n"
+    message(WARNING "HODEIA_QT_FROM_MSYS2=ON but no MSYS2 prefix found.\n"
+                    "Set -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 and install\n"
                     "  pacman -S mingw-w64-qt6-base mingw-w64-qt6-declarative mingw-w64-qt6-shadertools")
   endif()
 endif()
@@ -203,12 +203,12 @@ foreach(_var ${WIN_MUPDF_LIB} ${WIN_MUPDF_THIRD_LIB} ${WIN_MUPDF_THREADS_LIB}
     message(WARNING
       "MSYS2 library '${_var}' not found. PDF/OCR may be unavailable at runtime.\n"
       "  → Install it via:  pacman -S mingw-w64-mupdf mingw-w64-tesseract-ocr mingw-w64-leptonica\n"
-      "  → Or set the MSYS2 prefix:  cmake -DPAPERIZE_MINGW_PREFIX=C:/msys64/mingw64 ...")
+      "  → Or set the MSYS2 prefix:  cmake -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 ...")
   endif()
 endforeach()
 
 # Public include dirs for the MSYS2 headers (mupdf/fitz.h, tesseract/baseapi.h).
-set(PAPERIZE_MSYS_INCLUDES "${_MSYS_INC_DIRS}")
+set(HODEIA_MSYS_INCLUDES "${_MSYS_INC_DIRS}")
 
 # ===========================================================================
 # D. GPU backend discovery (CUDA > Vulkan > CPU)
@@ -261,7 +261,7 @@ else()
 endif()
 
 string(TOUPPER "${LLAMA_BACKEND}" _upper)
-add_compile_definitions("PAPERIZE_BACKEND_${_upper}")
+add_compile_definitions("HODEIA_BACKEND_${_upper}")
 
 if(LLAMA_BACKEND STREQUAL "cuda")
   set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/cuda")
@@ -276,7 +276,7 @@ endif()
 # ===========================================================================
 # On Windows the image codecs (png/jpeg/tiff/zlib) come from the MSYS2
 # MuPDF-third shared DLL; no pthread/dl needed.  Link `m` for math.
-set(PAPERIZE_SYSTEM_LIBS m)
+set(HODEIA_SYSTEM_LIBS m)
 
 # OpenMP (ggml-cpu) — libomp.dll must be shipped alongside the executable.
 find_package(OpenMP QUIET)
@@ -325,10 +325,10 @@ if(_BACKEND_SHARED_LIBS)
 endif()
 
 # ===========================================================================
-# G. POST_BUILD — deployment (requires the Paperize target to exist)
+# G. POST_BUILD — deployment (requires the Hodeia target to exist)
 #    Called from src/CMakeLists.txt after the target is created.
 # ===========================================================================
-function(paperize_windows_deploy TARGET)
+function(hodeia_windows_deploy TARGET)
   # --- Themes & fonts ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -431,14 +431,14 @@ function(paperize_windows_deploy TARGET)
 
   # =========================================================================
   # Qt runtime deployment.
-  #   * If Qt came from MSYS2 (PAPERIZE_QT_FROM_MSYS2=ON), the Qt DLLs live in
+  #   * If Qt came from MSYS2 (HODEIA_QT_FROM_MSYS2=ON), the Qt DLLs live in
   #     the MSYS2 bin dir and are copied in the "MSYS2 runtime DLLs" step above
   #     (windeployqt is only used as a fallback for any it misses).
   #   * If Qt came from a separate installer, windeployqt ships the full set.
   # =========================================================================
-  if(PAPERIZE_QT_FROM_MSYS2 AND PAPERIZE_MSYS_PREFIX AND EXISTS "${PAPERIZE_MSYS_PREFIX}/bin")
+  if(HODEIA_QT_FROM_MSYS2 AND HODEIA_MSYS_PREFIX AND EXISTS "${HODEIA_MSYS_PREFIX}/bin")
     # Copy the Qt6 DLLs from the MSYS2 bin dir alongside the executable.
-    file(GLOB _QT6_DLLS "${PAPERIZE_MSYS_PREFIX}/bin/Qt6*.dll")
+    file(GLOB _QT6_DLLS "${HODEIA_MSYS_PREFIX}/bin/Qt6*.dll")
     if(_QT6_DLLS)
       add_custom_command(TARGET ${TARGET} POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E copy_if_different

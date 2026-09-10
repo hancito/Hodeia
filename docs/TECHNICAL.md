@@ -51,7 +51,7 @@
 ## Project Structure
 
 ```
-Paperize_CPP/
+Hodeia_CPP/
 ├── CMakeLists.txt                  # Slim build entry: project, Qt, platform routing
 ├── cmake/                          # Modular CMake scripts
 │   ├── CompilerFlags.cmake         # C++23, warnings, optimisation, LTO (opt-in)
@@ -68,7 +68,7 @@ Paperize_CPP/
 │   └── <thememanager.h, database.h, localbackend.h, ...>
 │
 ├── src/                            # C++ source files + target definitions
-│   ├── CMakeLists.txt              # add_library(PaperizeEngine) + qt_add_executable(Paperize)
+│   ├── CMakeLists.txt              # add_library(HodeiaEngine) + qt_add_executable(Hodeia)
 │   ├── main.cpp                    # Entry point: QML engine + C++ object registration
 │   ├── configmanager.cpp           # JSON config, project CRUD, hardware detection
 │   ├── database.cpp                # SQLite DB init, table/schema creation, project switch
@@ -189,13 +189,13 @@ pacman -S mingw-w64-ucrt-x86_64-qt6-base \
 ```bash
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja \
-  -DPAPERIZE_MINGW_PREFIX=C:/msys64/ucrt64 \
-  [-DPAPERIZE_QT_FROM_MSYS2=ON]
+  -DHODEIA_MINGW_PREFIX=C:/msys64/ucrt64 \
+  [-DHODEIA_QT_FROM_MSYS2=ON]
 cmake --build .
 ```
 
-`PAPERIZE_MINGW_PREFIX` (or the `MINGW_PREFIX` env var) points CMake at the
-MSYS2 prefix; `PAPERIZE_QT_FROM_MSYS2=ON` makes `find_package(Qt6)` resolve
+`HODEIA_MINGW_PREFIX` (or the `MINGW_PREFIX` env var) points CMake at the
+MSYS2 prefix; `HODEIA_QT_FROM_MSYS2=ON` makes `find_package(Qt6)` resolve
 from MSYS2 and ships the Qt6 DLLs from there instead of via a Qt installer.
 
 ### GPU Backend Selection
@@ -295,7 +295,7 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
 
 ## Configuration
 
-### `config.json` (`~/.local/share/Paperize/config.json`)
+### `config.json` (`~/.local/share/Hodeia/config.json`)
 
 ```json
 {
@@ -318,7 +318,7 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
 ### Directory Layout
 
 ```
-~/.local/share/Paperize/
+~/.local/share/Hodeia/
 ├── config.json
 ├── hardware.json                    # Cached hardware detection results
 ├── Projects/

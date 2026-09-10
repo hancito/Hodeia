@@ -4,10 +4,10 @@
 # GPU backend discovery (CUDA > Vulkan > CPU), llama.cpp shared-lib mapping,
 # and the POST_BUILD deployment (copy/symlink/patchelf/vec0).
 #
-# Included by the top-level CMakeLists.txt AFTER PAPERIZE_PLATFORM_LINUX=ON.
+# Included by the top-level CMakeLists.txt AFTER HODEIA_PLATFORM_LINUX=ON.
 # ---------------------------------------------------------------------------
 
-set(PAPERIZE_PLATFORM_LINUX ON)
+set(HODEIA_PLATFORM_LINUX ON)
 
 # ===========================================================================
 # A. Shared-library name mapping + static library paths
@@ -81,7 +81,7 @@ else()
 endif()
 
 string(TOUPPER "${LLAMA_BACKEND}" _upper)
-add_compile_definitions("PAPERIZE_BACKEND_${_upper}")
+add_compile_definitions("HODEIA_BACKEND_${_upper}")
 
 if(LLAMA_BACKEND STREQUAL "cuda")
   set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/cuda")
@@ -128,7 +128,7 @@ endif()
 # On Linux the app links the in-tree static third-party libs and a set of
 # system shared libs (image codecs, pthread, dl, z).  Set here; linked in
 # src/CMakeLists.txt so the target definitions stay in one place.
-set(PAPERIZE_SYSTEM_LIBS pthread dl m z png jpeg tiff)
+set(HODEIA_SYSTEM_LIBS pthread dl m z png jpeg tiff)
 
 # OpenMP (ggml-cpu)
 find_package(OpenMP QUIET)
@@ -139,10 +139,10 @@ else()
 endif()
 
 # ===========================================================================
-# E. POST_BUILD — deployment (requires the Paperize target to exist)
+# E. POST_BUILD — deployment (requires the Hodeia target to exist)
 #    Called from src/CMakeLists.txt after the target is created.
 # ===========================================================================
-function(paperize_linux_deploy TARGET)
+function(hodeia_linux_deploy TARGET)
   # --- Themes & fonts ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory

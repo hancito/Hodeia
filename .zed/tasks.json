@@ -20,7 +20,7 @@
   },
   {
     "label": "Build & Run",
-    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build && ./build/src/Paperize",
+    "command": "cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build && ./build/src/Hodeia",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
@@ -56,8 +56,8 @@
     "show_command": true,
   },
   {
-    "label": "Run: Paperize",
-    "command": "./build/src/Paperize",
+    "label": "Run: Hodeia",
+    "command": "./build/src/Hodeia",
     "cwd": ".",
     "use_new_terminal": true,
     "reveal": "always",

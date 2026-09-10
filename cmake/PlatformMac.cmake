@@ -4,10 +4,10 @@
 # (the only GPU backend on macOS), and the POST_BUILD deployment
 # (@executable_path install names, dylib copy, vec0.dylib, libomp, macdeployqt).
 #
-# Included by the top-level CMakeLists.txt AFTER PAPERIZE_PLATFORM_MAC=ON.
+# Included by the top-level CMakeLists.txt AFTER HODEIA_PLATFORM_MAC=ON.
 # ---------------------------------------------------------------------------
 
-set(PAPERIZE_PLATFORM_MAC ON)
+set(HODEIA_PLATFORM_MAC ON)
 
 # ===========================================================================
 # A. Shared-library name mapping + library paths
@@ -47,7 +47,7 @@ if(METAL_FRAMEWORK)
 endif()
 
 string(TOUPPER "${LLAMA_BACKEND}" _upper)
-add_compile_definitions("PAPERIZE_BACKEND_${_upper}")
+add_compile_definitions("HODEIA_BACKEND_${_upper}")
 
 set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/metal")
 
@@ -56,7 +56,7 @@ set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/metal")
 # ===========================================================================
 # MuPDF is built with MUPDF_BUILD_THIRD_PARTY=ON (embeds png/jpeg/tiff/zlib/
 # freetype/harfbuzz/openjpeg), so only the Metal framework + m are linked.
-set(PAPERIZE_SYSTEM_LIBS ${METAL_FRAMEWORK} m)
+set(HODEIA_SYSTEM_LIBS ${METAL_FRAMEWORK} m)
 
 # OpenMP (ggml-cpu) — the shared runtime must be shipped alongside the app.
 find_package(OpenMP QUIET)
@@ -99,10 +99,10 @@ if(_BACKEND_SHARED_LIBS)
 endif()
 
 # ===========================================================================
-# E. POST_BUILD — deployment (requires the Paperize target to exist)
+# E. POST_BUILD — deployment (requires the Hodeia target to exist)
 #    Called from src/CMakeLists.txt after the target is created.
 # ===========================================================================
-function(paperize_mac_deploy TARGET)
+function(hodeia_mac_deploy TARGET)
   # The executable lives in <app>.app/Contents/MacOS/; assets go next to it.
 
   # --- Themes & fonts ---

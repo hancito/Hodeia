@@ -256,7 +256,7 @@ cmake --build .
 
 Le CMake appelle automatiquement **`macdeployqt`** en POST_BUILD — cela copie tous les Frameworks Qt, les plugins (ICU, image formats, platform plugins), `libomp.dylib`, les `.dylib` llama.cpp, `vec0.dylib`, les themes et les fonts **dans le `.app` bundle**.
 
-Résultat : `Paperize.app` (~300 Mo) — standalone, drag & drop vers `/Applications`. Aucune dépendance externe requise pour l'utilisateur.
+Résultat : `Hodeia.app` (~300 Mo) — standalone, drag & drop vers `/Applications`. Aucune dépendance externe requise pour l'utilisateur.
 
 ---
 
@@ -475,14 +475,14 @@ Le CMake appelle automatiquement **`windeployqt`** en POST_BUILD. Le dossier de 
 | **GPU backend**          | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si CUDA) / `vulkan-1.dll` (si Vulkan)                                                   |
 | **Extensions**           | `vec0.dll` (sqlite-vec), `libomp.dll` (OpenMP)                                                                                                  |
 | **Ressources**           | themes/, Fonts/, tessdata/                                                                                                                      |
-| **Exécutable**           | `Paperize.exe`                                                                                                                                  |
+| **Exécutable**           | `Hodeia.exe`                                                                                                                                  |
 
 > **Runtime C/C++ (UCRT)** : Le runtime universel Windows (`ucrtbase.dll`, `vcruntime140.dll`)
 > fait partie de Windows 10/11 et est toujours présent. Pas besoin de shipper le VC++ Redist
 > tant que votre cible est Windows 10+. `windeployqt` les copie quand même s'il trouve
 > les Visual Studio Build Tools.
 
-Résultat : un dossier autonome (~250-400 Mo selon le backend GPU). L'utilisateur lance `Paperize.exe` — zéro installation requise, zéro dépendance MSYS2.
+Résultat : un dossier autonome (~250-400 Mo selon le backend GPU). L'utilisateur lance `Hodeia.exe` — zéro installation requise, zéro dépendance MSYS2.
 
 Pour créer un installateur, empaquete le dossier avec [Inno Setup](https://jrsoftware.org/isinfo.php) ou [NSIS](https://nsis.sourceforge.io/).
 
@@ -540,7 +540,7 @@ external/lib/
 3. **MuPDF** → indépendant
 4. **llama.cpp** → indépendant (compiler une fois par backend)
 5. **sqlite-vec** → fichier unique, compilation instantanée
-6. **Paperize** → assemble tout
+6. **Hodeia** → assemble tout
 
 ## Notes Clang-specific
 

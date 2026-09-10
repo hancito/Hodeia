@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(Paperize VERSION 0.1 LANGUAGES CXX C)
+project(Hodeia VERSION 0.1 LANGUAGES CXX C)
 
 # ---------------------------------------------------------------------------
 # 1. Parallel build — use all cores by default (override: -DCMAKE_BUILD_PARALLEL_LEVEL=4)
@@ -23,11 +23,11 @@ include(cmake/CompilerFlags.cmake)
 # 3. Platform detection + per-platform routing
 #    Each cmake/Platform<OS>.cmake file sets its own link variables
 #    (_MUPDF_LIB*, _TESS_LIB, _LEPTO_LIB, _SQLITEVEC_LIB, MUPDF_LIB_TARGETS,
-#     PAPERIZE_SYSTEM_LIBS, LLAMA_LINK_LIBS, _LLAMA_LINK_DIR, etc.).
+#     HODEIA_SYSTEM_LIBS, LLAMA_LINK_LIBS, _LLAMA_LINK_DIR, etc.).
 # ---------------------------------------------------------------------------
-set(PAPERIZE_PLATFORM_LINUX OFF)
-set(PAPERIZE_PLATFORM_WIN   OFF)
-set(PAPERIZE_PLATFORM_MAC   OFF)
+set(HODEIA_PLATFORM_LINUX OFF)
+set(HODEIA_PLATFORM_WIN   OFF)
+set(HODEIA_PLATFORM_MAC   OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   include(cmake/PlatformLinux.cmake)
@@ -41,7 +41,7 @@ endif()
 
 # ---------------------------------------------------------------------------
 # 4. Qt6 — project setup
-#    (On Windows with PAPERIZE_QT_FROM_MSYS2=ON, the MSYS2 prefix has already
+#    (On Windows with HODEIA_QT_FROM_MSYS2=ON, the MSYS2 prefix has already
 #     been prepended to CMAKE_PREFIX_PATH by cmake/PlatformWindows.cmake.)
 # ---------------------------------------------------------------------------
 find_package(Qt6 REQUIRED COMPONENTS Concurrent Network Quick QuickControls2)
@@ -57,14 +57,14 @@ set(MUPDF_INC     ${EXTERNAL}/include/mupdf)
 set(TESS_INC      ${EXTERNAL}/include/tesseract)
 
 # ---------------------------------------------------------------------------
-# 6. Core targets (PaperizeEngine static lib + Paperize executable)
+# 6. Core targets (HodeiaEngine static lib + Hodeia executable)
 # ---------------------------------------------------------------------------
 add_subdirectory(src)
 
 # ---------------------------------------------------------------------------
 # 7. Install
 # ---------------------------------------------------------------------------
-install(TARGETS Paperize
+install(TARGETS Hodeia
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

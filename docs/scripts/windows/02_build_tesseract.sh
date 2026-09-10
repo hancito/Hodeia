@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PAPERIZE="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+HODEIA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Source location (auto-detect, or override via $1)
 SRC="${1:-/c/Dependencies}"
@@ -20,12 +20,12 @@ TESS_BUILD="$TESS_SRC/build"
 LEPTO_SRC="${2:-$SRC/leptonica-1.87.0}"
 LEPTO_BUILD="$LEPTO_SRC/build"
 
-EXT_LIB="$PAPERIZE/external/lib/windows"
-EXT_INC="$PAPERIZE/external/include"
+EXT_LIB="$HODEIA/external/lib/windows"
+EXT_INC="$HODEIA/external/include"
 
 JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
-echo "=== Paperize root  : $PAPERIZE"
+echo "=== Hodeia root  : $HODEIA"
 echo "=== Tesseract src  : $TESS_SRC"
 echo "=== Leptonica build: $LEPTO_BUILD"
 echo "=== Jobs           : $JOBS"

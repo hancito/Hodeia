@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
-# Master build script — Paperize Windows dependencies
+# Master build script — Hodeia Windows dependencies
 #
 # Builds all dependencies in the correct order, then copies
 # artefacts into external/lib/windows/.
@@ -20,17 +20,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PAPERIZE="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+HODEIA="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 SRC="${1:-/c/Dependencies}"
 shift || true
 BACKENDS="$*"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║  Paperize — Windows Dependency Build (MSYS2 clang-ucrt64)  ║"
+echo "║  Hodeia — Windows Dependency Build (MSYS2 clang-ucrt64)  ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "Paperize root : $PAPERIZE"
+echo "Hodeia root : $HODEIA"
 echo "Source root   : $SRC"
 echo "Backends      : ${BACKENDS:-cpu cuda vulkan}"
 echo ""
@@ -41,7 +41,7 @@ echo "  3. MuPDF        (static, independent)"
 echo "  4. llama.cpp    (shared DLLs, per backend)"
 echo "  5. sqlite-vec   (shared DLL)"
 echo ""
-echo "Artefacts go to: $PAPERIZE/external/lib/windows/"
+echo "Artefacts go to: $HODEIA/external/lib/windows/"
 echo ""
 read -rp "Continue? [y/N] " confirm
 if [[ "$confirm" != [yY] ]]; then
@@ -92,13 +92,13 @@ echo "╚═══════════════════════�
 echo ""
 echo "Artefacts:"
 echo ""
-find "$PAPERIZE/external/lib/windows" -type f | sort | while read -r f; do
+find "$HODEIA/external/lib/windows" -type f | sort | while read -r f; do
   ls -lh "$f"
 done
 echo ""
-echo "Next step: build Paperize itself."
+echo "Next step: build Hodeia itself."
 echo ""
-echo "  mkdir -p $PAPERIZE/build && cd \$_"
+echo "  mkdir -p $HODEIA/build && cd \$_"
 echo "  cmake .. -G Ninja \\"
 echo "    -DCMAKE_C_COMPILER=clang \\"
 echo "    -DCMAKE_CXX_COMPILER=clang++ \\"

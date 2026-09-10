@@ -9,10 +9,10 @@ ApplicationWindow {
     id: ragwindow
     width: 1200
     height: 800
-    title: qsTr("Paperize")
+    title: qsTr("Hodeia")
     visible: true
     font.family: Fonts.ui
-    //icon.source: "qrc:/Resources/paperize.png"
+    //icon.source: "qrc:/Resources/hodeia.png"
     // Signal to notify the main app that this window is closing
     readonly property var activeTheme: themeManager.activeTheme || {}
     signal closed

@@ -140,7 +140,7 @@ void OpenAlexClient::fetchAndSave(const QString &paperHash,
   url.setQuery(query);
 
   QNetworkRequest req(url);
-  req.setHeader(QNetworkRequest::UserAgentHeader, "Paperize/0.1");
+  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
 
   qInfo() << "[OpenAlex] ── SEARCH ──"
           << "paper:" << paperHash.left(12) << "| title:" << searchTitle
@@ -245,7 +245,7 @@ void OpenAlexClient::fetchWorkList(const QString &paperHash, RefKind kind,
   url.setQuery(query);
 
   QNetworkRequest req(url);
-  req.setHeader(QNetworkRequest::UserAgentHeader, "Paperize/0.1");
+  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
 
   qInfo() << "[OpenAlex] ──" << label << "──"
           << "paper:" << paperHash.left(12) << "| page: 1"
@@ -329,7 +329,7 @@ void OpenAlexClient::handleListReply(QNetworkReply *reply,
     url.setQuery(query);
 
     QNetworkRequest req(url);
-    req.setHeader(QNetworkRequest::UserAgentHeader, "Paperize/0.1");
+    req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
 
     m_pending = m_nam->get(req);
     connect(m_pending, &QNetworkReply::finished, this,

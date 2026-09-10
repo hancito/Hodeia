@@ -11,7 +11,7 @@ ApplicationWindow {
 
     visible: true
     font.family: Fonts.ui
-    //icon.source: "qrc:/Resources/paperize.png"
+    //icon.source: "qrc:/Resources/hodeia.png"
     property var secondaryWindow: null
     property var windowComponent: null
     property var selectedProjects: []
@@ -19,7 +19,7 @@ ApplicationWindow {
 
     readonly property var activeTheme: themeManager.activeTheme || {}
     readonly property var activeProject: configManager.lastProject || {}
-    title: qsTr("Paperize - " + activeProject)
+    title: qsTr("Hodeia - " + activeProject)
     // Derived colors (mirrors _theme.py update_palette logic)
     readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
 

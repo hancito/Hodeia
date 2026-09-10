@@ -36,7 +36,7 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
 ConfigManager::~ConfigManager() { saveConfig(); }
 
 QString ConfigManager::getFilePath() const {
-  // Finds location like: AppData/Roaming/Paperize/ or ~/.local/share/Paperize/
+  // Finds location like: AppData/Roaming/Hodeia/ or ~/.local/share/Hodeia/
   QString dirPath =
       QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
   QDir().mkpath(dirPath); // Creates directory if it doesn't exist yet

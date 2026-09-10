@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────
 # Build Leptonica + Tesseract as static libraries, then install
-# artefacts into Paperize_CPP/external/ and Resources/tessdata/.
+# artefacts into Hodeia_CPP/external/ and Resources/tessdata/.
 #
 # Usage:  ./build_ocr.sh                          # auto-detect paths
 #   or:   ./build_ocr.sh /path/to/src_root
@@ -9,12 +9,12 @@
 # The script expects:
 #   $SRC/leptonica-1.87.0/
 #   $SRC/tesseract-5.5.2/
-#   $PAPERIZE/   ← this script's parent directory
+#   $HODEIA/   ← this script's parent directory
 # ─────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PAPERIZE="${SCRIPT_DIR}"
+HODEIA="${SCRIPT_DIR}"
 SRC="${1:-/home/hancitog/Developpement}"
 JOBS="$(nproc)"
 
@@ -24,10 +24,10 @@ TESS_SRC="$SRC/tesseract-5.5.2"
 LEPTO_BUILD="$LEPTO_SRC/build"
 TESS_BUILD="$TESS_SRC/build"
 
-EXT_LIB="$PAPERIZE/external/lib"
-EXT_INC="$PAPERIZE/external/include"
+EXT_LIB="$HODEIA/external/lib"
+EXT_INC="$HODEIA/external/include"
 
-echo "=== Paperize root : $PAPERIZE"
+echo "=== Hodeia root : $HODEIA"
 echo "=== Source root   : $SRC"
 echo "=== Jobs          : $JOBS"
 echo ""
@@ -120,7 +120,7 @@ cmake --build . -- -j"$JOBS"
 echo ""
 echo "  Tesseract build done."
 
-# ─── 3. Copy libraries & headers into Paperize/external/ ──────────
+# ─── 3. Copy libraries & headers into Hodeia/external/ ──────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Step 3/4 : Installing artefacts into external/"
@@ -152,7 +152,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  Step 4/4 : Installing tessdata (eng.traineddata)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-TESSDATA_DIR="$PAPERIZE/Resources/tessdata"
+TESSDATA_DIR="$HODEIA/Resources/tessdata"
 mkdir -p "$TESSDATA_DIR"
 
 ENG="$TESSDATA_DIR/eng.traineddata"

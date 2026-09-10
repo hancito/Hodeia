@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # src/CMakeLists.txt
-# Target definitions: PaperizeEngine (static lib for all C++ business logic)
-# and Paperize (the Qt6 Quick executable + QML module).
+# Target definitions: HodeiaEngine (static lib for all C++ business logic)
+# and Hodeia (the Qt6 Quick executable + QML module).
 #
 # Platform-specific variables (library paths, system libs, backend shared
 # libs, include dirs) are set by the active cmake/Platform<OS>.cmake file
@@ -9,9 +9,9 @@
 # ---------------------------------------------------------------------------
 
 # ===========================================================================
-# PaperizeEngine — static library for all C++ business logic
+# HodeiaEngine — static library for all C++ business logic
 # ===========================================================================
-add_library(PaperizeEngine STATIC
+add_library(HodeiaEngine STATIC
     # --- headers (public) ---
     ../include/thememanager.h
     ../include/configmanager.h
@@ -65,7 +65,7 @@ set_source_files_properties(${EXTERNAL}/sqlite3/sqlite3.c PROPERTIES LANGUAGE C)
 #   ${CMAKE_SOURCE_DIR}         → also gives direct access to include/ (flat).
 #   ${CMAKE_SOURCE_DIR}/include → PUBLIC staging area, isolated from external/.
 #   external include dirs       → third-party (llama.cpp, MuPDF, tesseract, sqlite3).
-target_include_directories(PaperizeEngine
+target_include_directories(HodeiaEngine
     PUBLIC
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
@@ -80,38 +80,38 @@ target_include_directories(PaperizeEngine
 )
 
 # Windows: MSYS2-provided header dirs (mupdf/fitz.h, tesseract/baseapi.h).
-if(PAPERIZE_PLATFORM_WIN AND PAPERIZE_MSYS_INCLUDES)
-  target_include_directories(PaperizeEngine PRIVATE ${PAPERIZE_MSYS_INCLUDES})
+if(HODEIA_PLATFORM_WIN AND HODEIA_MSYS_INCLUDES)
+  target_include_directories(HodeiaEngine PRIVATE ${HODEIA_MSYS_INCLUDES})
 endif()
 
 # --- Link: Qt core modules + third-party libs + system libs + llama.cpp ---
-#   * PaperizeEngine links Qt6::Concurrent (used across the workers).
-#   * Paperize (the exe) links Qt6::Gui via Qt6::Quick's Qt6::Gui dependency,
-#     so PaperizeEngine does not need to link it directly.
-target_link_libraries(PaperizeEngine
+#   * HodeiaEngine links Qt6::Concurrent (used across the workers).
+#   * Hodeia (the exe) links Qt6::Gui via Qt6::Quick's Qt6::Gui dependency,
+#     so HodeiaEngine does not need to link it directly.
+target_link_libraries(HodeiaEngine
     PRIVATE
         Qt6::Concurrent
         Qt6::Gui
         Qt6::Network
         ${MUPDF_LIB_TARGETS}
-        ${PAPERIZE_SYSTEM_LIBS}
+        ${HODEIA_SYSTEM_LIBS}
         ${LLAMA_LINK_LIBS}
 )
 
 # OpenMP (ggml-cpu parallelism)
 if(OpenMP_CXX_FOUND)
-  target_link_libraries(PaperizeEngine PRIVATE OpenMP::OpenMP_C)
+  target_link_libraries(HodeiaEngine PRIVATE OpenMP::OpenMP_C)
 endif()
 
 # LTO (opt-in)
-if(PAPERIZE_ENABLE_LTO)
-  set_target_properties(PaperizeEngine PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+if(HODEIA_ENABLE_LTO)
+  set_target_properties(HodeiaEngine PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 
 # ===========================================================================
-# Paperize — main executable + QML module
+# Hodeia — main executable + QML module
 # ===========================================================================
-qt_add_executable(Paperize main.cpp)
+qt_add_executable(Hodeia main.cpp)
 
 set_source_files_properties(../ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(../ui/Fonts.qml  PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -129,8 +129,8 @@ foreach(_f ${_QML_FILES})
       PROPERTIES QT_RESOURCE_ALIAS "${_f}")
 endforeach()
 
-qt_add_qml_module(Paperize
-    URI "PaperizeCPP"
+qt_add_qml_module(Hodeia
+    URI "HodeiaCPP"
     QML_FILES
         ${CMAKE_SOURCE_DIR}/ui/Colors.qml
         ${CMAKE_SOURCE_DIR}/ui/Fonts.qml
@@ -148,7 +148,7 @@ qt_add_qml_module(Paperize
 # Resources
 set(_RES_FILES
     ai-svgrepo-com.svg align-justify.svg arrow-right-to-file.svg edit.svg
-    file-export.svg folder-open.svg gear.svg list.svg paperize.ico paperize.png
+    file-export.svg folder-open.svg gear.svg list.svg hodeia.ico hodeia.png
     refresh.svg save.svg share-square.svg trash-can.svg circle-check.svg
     circle-xmark.svg arrow-circle-left.svg arrow-circle-right.svg
     magnifying-glass-plus.svg magnifying-glass-minus.svg arrow-rotate-back.svg)
@@ -157,7 +157,7 @@ foreach(_f ${_RES_FILES})
       PROPERTIES QT_RESOURCE_ALIAS "Resources/${_f}")
 endforeach()
 
-qt_add_resources(Paperize "resources"
+qt_add_resources(Hodeia "resources"
     PREFIX "/"
     FILES
         ${CMAKE_SOURCE_DIR}/Resources/ai-svgrepo-com.svg
@@ -168,8 +168,8 @@ qt_add_resources(Paperize "resources"
         ${CMAKE_SOURCE_DIR}/Resources/folder-open.svg
         ${CMAKE_SOURCE_DIR}/Resources/gear.svg
         ${CMAKE_SOURCE_DIR}/Resources/list.svg
-        ${CMAKE_SOURCE_DIR}/Resources/paperize.ico
-        ${CMAKE_SOURCE_DIR}/Resources/paperize.png
+        ${CMAKE_SOURCE_DIR}/Resources/hodeia.ico
+        ${CMAKE_SOURCE_DIR}/Resources/hodeia.png
         ${CMAKE_SOURCE_DIR}/Resources/refresh.svg
         ${CMAKE_SOURCE_DIR}/Resources/save.svg
         ${CMAKE_SOURCE_DIR}/Resources/share-square.svg
@@ -183,15 +183,15 @@ qt_add_resources(Paperize "resources"
         ${CMAKE_SOURCE_DIR}/Resources/arrow-rotate-back.svg
 )
 
-# Link PaperizeEngine + Qt GUI components
-target_link_libraries(Paperize
+# Link HodeiaEngine + Qt GUI components
+target_link_libraries(Hodeia
     PRIVATE
-        PaperizeEngine
+        HodeiaEngine
         Qt6::Quick
         Qt6::QuickControls2
 )
 
-target_include_directories(Paperize
+target_include_directories(Hodeia
     PRIVATE
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
@@ -202,7 +202,7 @@ target_include_directories(Paperize
 # ===========================================================================
 # Target properties
 # ===========================================================================
-set_target_properties(Paperize PROPERTIES
+set_target_properties(Hodeia PROPERTIES
     MACOSX_BUNDLE                 TRUE
     MACOSX_BUNDLE_BUNDLE_VERSION  ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
@@ -212,25 +212,25 @@ set_target_properties(Paperize PROPERTIES
 )
 
 # On macOS, point the install_name at the executable dir.
-if(PAPERIZE_PLATFORM_MAC)
-  set_target_properties(Paperize PROPERTIES
+if(HODEIA_PLATFORM_MAC)
+  set_target_properties(Hodeia PROPERTIES
     BUILD_RPATH   "@executable_path"
     INSTALL_RPATH "@executable_path"
   )
 endif()
 
 # LTO (opt-in)
-if(PAPERIZE_ENABLE_LTO)
-  set_target_properties(Paperize PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+if(HODEIA_ENABLE_LTO)
+  set_target_properties(Hodeia PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
 
 # ===========================================================================
 # POST_BUILD deployment — delegates to the active platform
 # ===========================================================================
-if(PAPERIZE_PLATFORM_LINUX)
-  paperize_linux_deploy(Paperize)
-elseif(PAPERIZE_PLATFORM_MAC)
-  paperize_mac_deploy(Paperize)
-elseif(PAPERIZE_PLATFORM_WIN)
-  paperize_windows_deploy(Paperize)
+if(HODEIA_PLATFORM_LINUX)
+  hodeia_linux_deploy(Hodeia)
+elseif(HODEIA_PLATFORM_MAC)
+  hodeia_mac_deploy(Hodeia)
+elseif(HODEIA_PLATFORM_WIN)
+  hodeia_windows_deploy(Hodeia)
 endif()
