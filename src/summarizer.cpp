@@ -79,13 +79,6 @@ Summarizer::~Summarizer() = default;
 
 /* ── Public API ─────────────────────────────────────────────────── */
 
-struct BackendInfo {
-  bool isLocal;
-  QString modelName;
-  QString modelPath;
-  QVariantMap config;
-};
-
 void Summarizer::summarizePapers(const QStringList &hashes) {
   emit started();
   if (hashes.isEmpty())

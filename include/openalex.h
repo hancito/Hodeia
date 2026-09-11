@@ -30,6 +30,14 @@ public:
                           QObject *parent = nullptr);
   ~OpenAlexClient() override;
 
+  // Local metadata used to disambiguate OpenAlex candidates.
+  struct PaperMeta {
+    QStringList authors;
+    int year = 0;
+    QString journal;
+    QString cleanTitle;
+  };
+
   /// Scan the Citations table for rows missing citation data and fetch it
   /// from OpenAlex.  Safe to call from any thread (queued).
   Q_INVOKABLE void checkEmptyReferences();
@@ -43,13 +51,28 @@ private:
   enum class RefKind { Cites, CitedBy };
 
   void fetchAndSave(const QString &paperHash, const QString &title);
-  void handleSearchReply(QNetworkReply *reply, const QString &paperHash);
+  void searchForWork(const QString &paperHash, const QString &title,
+                     const PaperMeta &meta);
+  void handleSearchReply(QNetworkReply *reply, const QString &paperHash,
+                         const PaperMeta &meta);
+  // Score each candidate (0..3) against the local metadata and return the
+  // index of the best match, or -1 if none is a confident match.  Ranked by
+  // title, then authors, then year, then journal.
+  int bestCandidate(const QJsonArray &results, const PaperMeta &meta) const;
+  // Read title / authors / year / journal for @p paperHash from the
+  // Summaries table.  Must be called on the main thread
+  // (SQLite is owned by the main thread).
+  PaperMeta loadPaperMeta(const QString &paperHash) const;
   void fetchWorkList(const QString &paperHash, RefKind kind,
                      const QString &workId);
+
   void handleListReply(QNetworkReply *reply, const QString &paperHash,
                        RefKind kind, const QString &workId, int page);
+  // Persist a citation list plus its true OpenAlex total (@p total), which is
+  // stored in cites_count / cited_by_count so the UI can show it even though
+  // the array itself is capped.
   void saveWorkList(const QString &paperHash, RefKind kind,
-                    const QString &itemsJson);
+                    const QString &itemsJson, int total);
   void appendPage(QUrlQuery &query, int page) const;
   void appendAuthQuery(QUrlQuery &query) const;
 

@@ -80,7 +80,9 @@ void DatabaseManager::createTables() {
                       "clean_title TEXT NOT NULL, "
                       "work_id TEXT NOT NULL DEFAULT '', "
                       "cites TEXT NOT NULL DEFAULT '', "
-                      "cited_by TEXT NOT NULL DEFAULT '')");
+                      "cited_by TEXT NOT NULL DEFAULT '', "
+                      "cites_count INTEGER NOT NULL DEFAULT 0, "
+                      "cited_by_count INTEGER NOT NULL DEFAULT 0)");
   if (!r3)
     qCritical() << "[Database] Citations table failed:" << r3.error();
   else
@@ -190,8 +192,9 @@ QString DatabaseManager::getReferencesForHash(const QString &paperHash) {
   if (paperHash.isEmpty())
     return {};
 
-  SqliteStatement stmt = m_db.prepare("SELECT cites, cited_by FROM Citations "
-                                      "WHERE paper_hash = ?");
+  SqliteStatement stmt =
+      m_db.prepare("SELECT cites, cited_by, cites_count, cited_by_count "
+                   "FROM Citations WHERE paper_hash = ?");
   if (!stmt.isValid())
     return {};
 
@@ -202,10 +205,16 @@ QString DatabaseManager::getReferencesForHash(const QString &paperHash) {
 
   QString cites = stmt.columnText(0);
   QString citedBy = stmt.columnText(1);
+  int citesCount = stmt.columnInt(2);
+  int citedByCount = stmt.columnInt(3);
 
-  // Return a JSON object: {"cites": [...], "cited_by": [...]}
+  // Return a JSON object:
+  // {"cites": [...], "cited_by": [...], "cites_count": N, "cited_by_count": N}
+  // The *_count values are the true OpenAlex totals; the arrays are capped.
   QJsonObject obj;
   obj["cites"] = QJsonDocument::fromJson(cites.toUtf8()).array();
   obj["cited_by"] = QJsonDocument::fromJson(citedBy.toUtf8()).array();
+  obj["cites_count"] = citesCount;
+  obj["cited_by_count"] = citedByCount;
   return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
