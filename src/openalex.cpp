@@ -37,16 +37,22 @@ static const char *kSelectFields =
 OpenAlexClient::OpenAlexClient(ConfigManager *config, DatabaseManager *database,
                                QObject *parent)
     : QObject(parent), m_config(config), m_database(database) {
+  // m_thread is parented to this; destroying the client (parent) will delete
+  // it.  No self-deleteLater here: a deleteLater queued on `this` during
+  // destruction races with the stack object in main() being torn down and
+  // causes a double free on close.
   m_thread = new QThread(this);
   moveToThread(m_thread);
-  connect(m_thread, &QThread::finished, this, &QObject::deleteLater);
   m_thread->start();
 }
 
 OpenAlexClient::~OpenAlexClient() {
+  // Stop the worker thread while this object is still alive.  m_thread is a
+  // child of this, so QObject's parent handling deletes it right after this
+  // destructor returns — no manual delete needed here.
   if (m_thread && m_thread->isRunning()) {
     m_thread->quit();
-    m_thread->wait(3000);
+    m_thread->wait();
   }
 }
 
@@ -119,7 +125,7 @@ void OpenAlexClient::checkEmptyReferences() {
       Qt::QueuedConnection);
 }
 
-/* ── Step 1: semantic search for the work ID ────────────────── */
+/* ── Step 1: find the work ID (semantic → title → author) ───── */
 
 void OpenAlexClient::fetchAndSave(const QString &paperHash,
                                   const QString &title) {
@@ -140,7 +146,7 @@ void OpenAlexClient::fetchAndSave(const QString &paperHash,
       this,
       [this, paperHash, title]() {
         PaperMeta meta = loadPaperMeta(paperHash);
-        searchForWork(paperHash, title, meta);
+        semanticSearch(paperHash, meta);
       },
       Qt::QueuedConnection);
 }
@@ -168,20 +174,20 @@ OpenAlexClient::loadPaperMeta(const QString &paperHash) const {
   return meta;
 }
 
-void OpenAlexClient::searchForWork(const QString &paperHash,
-                                   const QString &title,
-                                   const PaperMeta &meta) {
+void OpenAlexClient::semanticSearch(const QString &paperHash,
+                                    const PaperMeta &meta) {
   if (!m_nam)
     m_nam = new QNetworkAccessManager(this);
+
+  const QString searchTitle = meta.cleanTitle.trimmed();
+  if (searchTitle.isEmpty()) {
+    qWarning() << "[OpenAlex] Empty title — skipping" << paperHash.left(12);
+    return;
+  }
 
   // The search text goes directly into "search.semantic" (no separate
   // "search" param).  Keep apostrophes and hyphens — semantic search embeds
   // the query, so it tolerates punctuation.
-  QString searchTitle = title.trimmed();
-
-  // Pull the top 20 candidates; we disambiguate with title/authors/year/
-  // journal (see bestCandidate) because the #1 hit is not always the right
-  // work.
   QUrl url("https://api.openalex.org/works");
   QUrlQuery query;
   query.addQueryItem("search.semantic", searchTitle);
@@ -196,7 +202,7 @@ void OpenAlexClient::searchForWork(const QString &paperHash,
   QNetworkRequest req(url);
   req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
 
-  qInfo() << "[OpenAlex] ── SEARCH ──"
+  qInfo() << "[OpenAlex] ── SEMANTIC ──"
           << "paper:" << paperHash.left(12) << "| title:" << searchTitle
           << "| URL:" << url.toString(QUrl::FullyEncoded);
 
@@ -205,8 +211,104 @@ void OpenAlexClient::searchForWork(const QString &paperHash,
           [this, reply = m_pending, paperHash, meta]() {
             if (m_pending == reply)
               m_pending = nullptr;
-            handleSearchReply(reply, paperHash, meta);
+            if (!scoreAndFetch(reply, paperHash, meta, "SEMANTIC"))
+              searchByTitle(paperHash, meta); // no confident match — tier 2
           });
+}
+
+void OpenAlexClient::searchByTitle(const QString &paperHash,
+                                   const PaperMeta &meta) {
+  if (!m_nam)
+    m_nam = new QNetworkAccessManager(this);
+
+  const QString searchTitle = meta.cleanTitle.trimmed();
+  if (searchTitle.isEmpty()) {
+    qWarning() << "[OpenAlex] Empty title — skipping title search"
+               << paperHash.left(12);
+    return;
+  }
+
+  // "search.title" (what the OpenAlex website uses) ranks the matching work
+  // high even when embedding-based "search.semantic" buries it.
+  QUrl url("https://api.openalex.org/works");
+  QUrlQuery query;
+  query.addQueryItem("search.title", searchTitle);
+  query.addQueryItem("sort", "relevance_score:desc");
+  query.addQueryItem("per-page", "20");
+  query.addQueryItem(
+      "select",
+      "id,display_name,authorships,publication_year,primary_location");
+  appendAuthQuery(query);
+  url.setQuery(query);
+
+  QNetworkRequest req(url);
+  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
+
+  qInfo() << "[OpenAlex] ── TITLE ──"
+          << "paper:" << paperHash.left(12) << "| title:" << searchTitle
+          << "| URL:" << url.toString(QUrl::FullyEncoded);
+
+  m_pending = m_nam->get(req);
+  connect(m_pending, &QNetworkReply::finished, this,
+          [this, reply = m_pending, paperHash, meta]() {
+            if (m_pending == reply)
+              m_pending = nullptr;
+            if (!scoreAndFetch(reply, paperHash, meta, "TITLE"))
+              searchByAuthor(paperHash, meta); // no confident match — tier 3
+          });
+}
+
+void OpenAlexClient::searchByAuthor(const QString &paperHash,
+                                    const PaperMeta &meta) {
+  if (!m_nam)
+    m_nam = new QNetworkAccessManager(this);
+
+  // Last resort: search by the first author's name.  bestCandidate then
+  // disambiguates on title > authors > year > journal.
+  QString author = meta.authors.isEmpty() ? QString() : meta.authors.first();
+  author = author.trimmed();
+  if (author.isEmpty()) {
+    qWarning() << "[OpenAlex] No authors for author search"
+               << paperHash.left(12);
+    return;
+  }
+
+  QUrl url("https://api.openalex.org/works");
+  QUrlQuery query;
+  // raw_author_name.search is the only author-name filter on /works
+  // (author.display_name.search is not a valid field).  It matches the
+  // first author's name; bestCandidate then disambiguates.
+  query.addQueryItem("filter",
+                     QString("raw_author_name.search:%1").arg(author));
+  query.addQueryItem("sort", "publication_year:desc");
+  query.addQueryItem("per-page", "50");
+  query.addQueryItem(
+      "select",
+      "id,display_name,authorships,publication_year,primary_location");
+  appendAuthQuery(query);
+  url.setQuery(query);
+
+  QNetworkRequest req(url);
+  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
+
+  qInfo() << "[OpenAlex] ── AUTHOR ──"
+          << "paper:" << paperHash.left(12) << "| author:" << author
+          << "| URL:" << url.toString(QUrl::FullyEncoded);
+
+  m_pending = m_nam->get(req);
+  connect(
+      m_pending, &QNetworkReply::finished, this,
+      [this, reply = m_pending, paperHash, meta]() {
+        if (m_pending == reply)
+          m_pending = nullptr;
+        if (!scoreAndFetch(reply, paperHash, meta, "AUTHOR")) {
+          // All three tiers failed — leave the columns empty so the scan
+          // can retry later (the paper may simply be missing from OpenAlex).
+          qWarning() << "[OpenAlex] ── NO MATCH ──"
+                     << "paper:" << paperHash.left(12)
+                     << "| no confident match across semantic, title, author";
+        }
+      });
 }
 
 /* ── Candidate disambiguation ────────────────────────────────── */
@@ -308,23 +410,24 @@ int OpenAlexClient::bestCandidate(const QJsonArray &results,
   return bestIdx;
 }
 
-/* ── Step 1 response: pick the work ID, then fetch both lists ── */
+/* ── Disambiguation: pick the work ID, then fetch both lists ── */
 
-void OpenAlexClient::handleSearchReply(QNetworkReply *reply,
-                                       const QString &paperHash,
-                                       const PaperMeta &meta) {
+bool OpenAlexClient::scoreAndFetch(QNetworkReply *reply,
+                                   const QString &paperHash,
+                                   const PaperMeta &meta,
+                                   const QString &label) {
   if (!reply)
-    return;
+    return false;
 
   if (reply->error() != QNetworkReply::NoError) {
     qWarning()
-        << "[OpenAlex] ── SEARCH ──"
+        << "[OpenAlex] ──" << label << "──"
         << "paper:" << paperHash.left(12) << "| ERROR:" << reply->errorString()
         << "| HTTP:"
         << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     reply->deleteLater();
     // Transient failure — leave the columns empty so the scan retries.
-    return;
+    return false;
   }
 
   QByteArray raw = reply->readAll();
@@ -333,41 +436,33 @@ void OpenAlexClient::handleSearchReply(QNetworkReply *reply,
   QJsonParseError err;
   QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
   if (err.error != QJsonParseError::NoError) {
-    qWarning() << "[OpenAlex] Search JSON parse error:" << err.errorString();
-    return;
+    qWarning() << "[OpenAlex] ──" << label << "──"
+               << "paper:" << paperHash.left(12)
+               << "| JSON parse error:" << err.errorString();
+    return false;
   }
 
   QJsonArray results = doc.object().value("results").toArray();
   if (results.isEmpty()) {
-    qWarning() << "[OpenAlex] ── SEARCH ──"
-               << "paper:" << paperHash.left(12) << "| No work found for title";
-    QMetaObject::invokeMethod(
-        this,
-        [this, paperHash]() {
-          saveWorkList(paperHash, RefKind::Cites, kNoReferencesMsg, 0);
-          saveWorkList(paperHash, RefKind::CitedBy, kNoReferencesMsg, 0);
-        },
-        Qt::QueuedConnection);
-    return;
+    qWarning() << "[OpenAlex] ──" << label << "──"
+               << "paper:" << paperHash.left(12) << "| No works returned";
+    return false;
   }
 
   // Disambiguate: pick the candidate that best matches the local metadata.
   const int best = bestCandidate(results, meta);
   if (best < 0) {
-    qWarning() << "[OpenAlex] ── SEARCH ──"
+    qWarning() << "[OpenAlex] ──" << label << "──"
                << "paper:" << paperHash.left(12) << "| No confident match among"
-               << results.size()
-               << "candidates — "
-                  "leaving empty so the scan can retry";
-    // No marker: a confident mismatch means we simply haven't found it yet.
-    return;
+               << results.size() << "candidates — falling through";
+    return false;
   }
 
   const QJsonObject bestWork = results.at(best).toObject();
   // workId is a URL like "https://openalex.org/W1234567890"
   const QString workId = bestWork.value("id").toString();
   const QString workIdShort = workId.section('/', -1);
-  qInfo() << "[OpenAlex] ── SEARCH ──"
+  qInfo() << "[OpenAlex] ──" << label << "──"
           << "paper:" << paperHash.left(12) << "| candidates:" << results.size()
           << "| chosen idx:" << best << "| workId:" << workIdShort;
 
@@ -392,6 +487,7 @@ void OpenAlexClient::handleSearchReply(QNetworkReply *reply,
   // self-contained paginated fetch; the last one to finish emits the signal.
   fetchWorkList(paperHash, RefKind::Cites, workIdShort);
   fetchWorkList(paperHash, RefKind::CitedBy, workIdShort);
+  return true;
 }
 
 /* ── Step 2/3: paginated fetch of a citation list ───────────── */
@@ -560,6 +656,8 @@ void OpenAlexClient::handleListReply(QNetworkReply *reply,
       this,
       [this, paperHash, kind, itemsJson, total = totalCount]() {
         saveWorkList(paperHash, kind, itemsJson, total);
+        // Fire only after the last list (cited_by) so the UI refreshes once
+        // per paper instead of once per list.
         if (kind == RefKind::CitedBy)
           emit referencesSaved(paperHash);
       },

@@ -66,6 +66,11 @@ void CitationsModel::loadAll() {
   }
 
   endResetModel();
+
+  // Notify QML bindings that read a computed display string (which do not
+  // track the model's dataChanged/layoutChanged) that the data has changed.
+  ++m_version;
+  emit versionChanged();
 }
 
 const CitationRow *CitationsModel::findByHash(const QString &paperHash) const {

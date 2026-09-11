@@ -38,6 +38,13 @@ public:
                 int role = Qt::DisplayRole) const override;
   QHash<int, QByteArray> roleNames() const override;
 
+  // Bumped by loadAll().  A QML binding that reads a computed display string
+  // via the invokable referencesDisplayForHash() has no trackable dependency
+  // on the model data, so it depends on this property to re-evaluate after a
+  // reload.
+  Q_PROPERTY(int version READ version NOTIFY versionChanged)
+  int version() const { return m_version; }
+
   /// Reload all rows (joined to Summaries so only summarized papers appear).
   Q_INVOKABLE void loadAll();
 
@@ -47,6 +54,9 @@ public:
   /// sections are produced here, with the true OpenAlex totals in the headers.
   Q_INVOKABLE QString referencesDisplayForHash(const QString &paperHash) const;
 
+signals:
+  void versionChanged();
+
 private:
   const CitationRow *findByHash(const QString &paperHash) const;
   QString formatSection(const QString &header, const QString &itemsJson,
@@ -54,4 +64,5 @@ private:
 
   SqliteDb *m_db = nullptr;
   QVector<CitationRow> m_rows;
+  int m_version = 0;
 };

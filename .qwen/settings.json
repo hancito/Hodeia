@@ -19,7 +19,9 @@
       "WebFetch(packages.msys2.org)",
       "Bash(which *)",
       "Bash(pkg-config *)",
-      "Bash(cmake *)"
+      "Bash(cmake *)",
+      "Bash(curl *)",
+      "Bash(python3 *)"
     ]
   },
   "$version": 4

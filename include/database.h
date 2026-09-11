@@ -10,6 +10,7 @@
 #include <expected>
 
 class ConfigManager;
+class OpenAlexClient;
 
 class DatabaseManager : public QObject {
   Q_OBJECT
@@ -38,6 +39,9 @@ public:
   Q_INVOKABLE std::expected<void, QString>
   switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
+  // Wire up the OpenAlex client so a finished citation save refreshes all
+  // models.  Called once from main() after the client is constructed.
+  void setOpenAlexClient(OpenAlexClient *client);
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
   Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
 
@@ -54,4 +58,5 @@ private:
   SummaryProxyModel *m_summaryProxyModel = nullptr;
   QueryProxyModel *m_queryProxyModel = nullptr;
   SqliteVecManager m_vecManager;
+  OpenAlexClient *m_openAlexClient = nullptr;
 };

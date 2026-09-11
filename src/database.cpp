@@ -1,5 +1,6 @@
 #include "database.h"
 #include "configmanager.h"
+#include "openalex.h"
 #include "sqlitevec.h"
 #include <QDir>
 #include <QJsonArray>
@@ -126,6 +127,14 @@ void DatabaseManager::reloadModels() {
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
   m_citationsModel->loadAll();
+}
+
+void DatabaseManager::setOpenAlexClient(OpenAlexClient *client) {
+  m_openAlexClient = client;
+  // referencesSaved fires on the main thread after each citation list is
+  // persisted — refresh all models so the UI picks up the new data.
+  connect(client, &OpenAlexClient::referencesSaved, this,
+          &DatabaseManager::reloadModels);
 }
 
 void DatabaseManager::removeByHashes(const QStringList &hashes) {

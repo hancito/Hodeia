@@ -15,7 +15,8 @@ class QUrlQuery;
 /// OpenAlex API and stores it in the Citations table.
 ///
 /// For each paper it:
-///   1. Finds the OpenAlex work by semantic title search (stores work_id).
+///   1. Finds the OpenAlex work by a 3-tier search — semantic, then title,
+///      then author — disambiguated against the local metadata (work_id).
 ///   2. Fetches the works it cites (its references)  -> Citations.cites
 ///   3. Fetches the works that cite it (citing papers) -> Citations.cited_by
 ///
@@ -51,10 +52,22 @@ private:
   enum class RefKind { Cites, CitedBy };
 
   void fetchAndSave(const QString &paperHash, const QString &title);
-  void searchForWork(const QString &paperHash, const QString &title,
-                     const PaperMeta &meta);
-  void handleSearchReply(QNetworkReply *reply, const QString &paperHash,
-                         const PaperMeta &meta);
+  // Tier 1: embedding-based semantic search.  On reply, disambiguates and, if
+  // no confident match, falls through to searchByTitle.
+  void semanticSearch(const QString &paperHash, const PaperMeta &meta);
+  // Tier 2: exact-title search, used when the semantic search yields no
+  // confident match (the right work can rank below the top-20 semantic
+  // results, as with some journal papers).  Falls through to searchByAuthor.
+  void searchByTitle(const QString &paperHash, const PaperMeta &meta);
+  // Tier 3: author search, the last resort when neither semantic nor title
+  // search produces a confident match.  Searches by the first author's name.
+  void searchByAuthor(const QString &paperHash, const PaperMeta &meta);
+  // Disambiguate @p results and, on a confident match, persist the work id
+  // and fetch both citation lists.  Returns true on a match, false otherwise
+  // (the caller then falls through to the next search tier).  @p reply is
+  // deleted here.
+  bool scoreAndFetch(QNetworkReply *reply, const QString &paperHash,
+                     const PaperMeta &meta, const QString &label);
   // Score each candidate (0..3) against the local metadata and return the
   // index of the best match, or -1 if none is a confident match.  Ranked by
   // title, then authors, then year, then journal.

@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
 
   // Create the OpenAlex reference service (independent background thread)
   OpenAlexClient openAlexClient(&configManager, &databaseManager);
+  databaseManager.setOpenAlexClient(&openAlexClient);
   QObject::connect(&summaryController, &SummaryController::summaryFinished,
                    &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 

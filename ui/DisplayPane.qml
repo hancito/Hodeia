@@ -217,8 +217,13 @@ Rectangle {
                             placeholderText: "Select a paper to see its references"
                             // APA formatting + section/total logic now lives in
                             // CitationsModel::referencesDisplayForHash (C++).
+                            // Reading model.version makes the binding re-evaluate
+                            // after loadAll() (the invokable call is not a
+                            // trackable dependency on its own).
                             text: {
-                                var s = databaseManager.citationsModel.referencesDisplayForHash(displayPane.activePaperHash);
+                                var model = databaseManager.citationsModel;
+                                var v = model.version;
+                                var s = model.referencesDisplayForHash(displayPane.activePaperHash);
                                 return s ? s : "No references found for this paper";
                             }
                         }
