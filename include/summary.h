@@ -38,6 +38,9 @@ struct SummaryRow {
   QString llmodel;
   QVariant summaryJson;
   QDateTime date;
+  // Number of works that cite this paper (from Citations.cites_count, 0 if
+  // the paper has no citation data yet).
+  int citesCount = 0;
 };
 
 struct ExtractionResult {
@@ -64,7 +67,8 @@ public:
     LlmModelRole,
     SummaryJsonRole,
     DateRole,
-    FormattedDateRole
+    FormattedDateRole,
+    CitesCountRole
   };
 
   explicit SummaryModel(QObject *parent = nullptr);

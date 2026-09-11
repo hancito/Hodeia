@@ -1,4 +1,5 @@
 #pragma once
+#include "citationsmodel.h"
 #include "query.h"
 #include "queryproxymodel.h"
 #include "sqlitedb.h"
@@ -15,6 +16,7 @@ class DatabaseManager : public QObject {
 
   Q_PROPERTY(SummaryModel *summaryModel READ summaryModel CONSTANT)
   Q_PROPERTY(QueryModel *queryModel READ queryModel CONSTANT)
+  Q_PROPERTY(CitationsModel *citationsModel READ citationsModel CONSTANT)
   Q_PROPERTY(
       SummaryProxyModel *summaryProxyModel READ summaryProxyModel CONSTANT)
   Q_PROPERTY(QueryProxyModel *queryProxyModel READ queryProxyModel CONSTANT)
@@ -25,6 +27,7 @@ public:
 
   SummaryModel *summaryModel() const { return m_summaryModel; }
   QueryModel *queryModel() const { return m_queryModel; }
+  CitationsModel *citationsModel() const { return m_citationsModel; }
   SummaryProxyModel *summaryProxyModel() const { return m_summaryProxyModel; }
   QueryProxyModel *queryProxyModel() const { return m_queryProxyModel; }
   SqliteDb &db() { return m_db; }
@@ -37,7 +40,6 @@ public:
   Q_INVOKABLE void reloadModels();
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
   Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
-  Q_INVOKABLE QString getReferencesForHash(const QString &paperHash);
 
 private:
   bool initDatabase();
@@ -48,6 +50,7 @@ private:
   ConfigManager *m_config = nullptr;
   SummaryModel *m_summaryModel = nullptr;
   QueryModel *m_queryModel = nullptr;
+  CitationsModel *m_citationsModel = nullptr;
   SummaryProxyModel *m_summaryProxyModel = nullptr;
   QueryProxyModel *m_queryProxyModel = nullptr;
   SqliteVecManager m_vecManager;

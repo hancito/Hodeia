@@ -268,10 +268,11 @@ Rectangle {
 
             ComboBox {
                 id: sortComboBox
-                model: ["Title", "Date", "Pages", "Model"]
+                model: ["Title", "Date", "Pages", "Model", "Citations"]
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
-                    // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265
+                    // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265,
+                    // CitesCountRole=269
                     var roleMap = {
                         0: 259  // Title
                         ,
@@ -280,6 +281,8 @@ Rectangle {
                         2: 261  // PagesNum
                         ,
                         3: 265   // LlmModel
+                        ,
+                        4: 269   // CitesCount (papers that cite this paper)
                     };
                     databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 259;
                 }
@@ -310,6 +313,7 @@ Rectangle {
                 required property string llmodel
                 required property string formattedDate
                 required property string paperHash
+                required property int citesCount
                 width: paperListView.width
                 height: 120
                 border.width: summaryDbPane.activePaperHash === paperHash ? 4 : 5
@@ -363,6 +367,14 @@ Rectangle {
                             font.pixelSize: 12
                             text: pagesNum
                             font.family: Fonts.mono
+                        }
+                        Label {
+                            font.pixelSize: 12
+                            // "cited by N" only makes sense once OpenAlex has
+                            // populated cites_count (0 = not fetched yet).
+                            text: citesCount > 0 ? "· cited by " + citesCount : ""
+                            font.family: Fonts.mono
+                            opacity: citesCount > 0 ? 0.8 : 0
                         }
                         Item {
                             Layout.fillWidth: true

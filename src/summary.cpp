@@ -40,6 +40,8 @@ QVariant SummaryModel::data(const QModelIndex &index, int role) const {
     return row.date;
   case FormattedDateRole:
     return formatDate(row.date);
+  case CitesCountRole:
+    return row.citesCount;
   default:
     return {};
   }
@@ -59,6 +61,7 @@ QHash<int, QByteArray> SummaryModel::roleNames() const {
   roles[SummaryJsonRole] = "summaryJson";
   roles[DateRole] = "date";
   roles[FormattedDateRole] = "formattedDate";
+  roles[CitesCountRole] = "citesCount";
   return roles;
 }
 
@@ -76,10 +79,13 @@ void SummaryModel::loadAll() {
   beginResetModel();
   m_rows.clear();
 
+  // LEFT JOIN so papers without citation data still appear (cites_count 0).
   SqliteStatement stmt = m_db->prepare(
-      "SELECT id, paper_hash, title, authors, pages_num, journal, "
-      "year, topics, llmodel, summary_json, date FROM Summaries "
-      "ORDER BY id");
+      "SELECT s.id, s.paper_hash, s.title, s.authors, s.pages_num, s.journal, "
+      "s.year, s.topics, s.llmodel, s.summary_json, s.date, "
+      "COALESCE(c.cites_count, 0) "
+      "FROM Summaries s LEFT JOIN Citations c ON c.paper_hash = s.paper_hash "
+      "ORDER BY s.id");
 
   while (true) {
     auto stepResult = stmt.step();
@@ -97,6 +103,7 @@ void SummaryModel::loadAll() {
     row.llmodel = stmt.columnText(8);
     row.summaryJson = stmt.columnBlob(9);
     row.date = stmt.columnDateTime(10);
+    row.citesCount = stmt.columnInt(11);
     m_rows.append(row);
   }
 

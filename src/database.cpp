@@ -10,12 +10,14 @@
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
       m_queryModel(new QueryModel(this)),
+      m_citationsModel(new CitationsModel(this)),
       m_summaryProxyModel(new SummaryProxyModel(this)),
       m_queryProxyModel(new QueryProxyModel(this)), m_vecManager(config) {
   m_summaryProxyModel->setSourceModel(m_summaryModel);
   m_queryProxyModel->setSourceModel(m_queryModel);
   m_summaryModel->setDatabase(m_db);
   m_queryModel->setDatabase(m_db);
+  m_citationsModel->setDatabase(m_db);
   initDatabase();
 }
 
@@ -43,6 +45,7 @@ bool DatabaseManager::initDatabase() {
 
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
+  m_citationsModel->loadAll();
 
   return true;
 }
@@ -122,6 +125,7 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
 void DatabaseManager::reloadModels() {
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
+  m_citationsModel->loadAll();
 }
 
 void DatabaseManager::removeByHashes(const QStringList &hashes) {
@@ -186,35 +190,4 @@ void DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
   }
 
   m_queryModel->loadAll();
-}
-
-QString DatabaseManager::getReferencesForHash(const QString &paperHash) {
-  if (paperHash.isEmpty())
-    return {};
-
-  SqliteStatement stmt =
-      m_db.prepare("SELECT cites, cited_by, cites_count, cited_by_count "
-                   "FROM Citations WHERE paper_hash = ?");
-  if (!stmt.isValid())
-    return {};
-
-  (void)stmt.bind(1, paperHash);
-  auto stepResult = stmt.step();
-  if (!stepResult || !stepResult.value())
-    return {};
-
-  QString cites = stmt.columnText(0);
-  QString citedBy = stmt.columnText(1);
-  int citesCount = stmt.columnInt(2);
-  int citedByCount = stmt.columnInt(3);
-
-  // Return a JSON object:
-  // {"cites": [...], "cited_by": [...], "cites_count": N, "cited_by_count": N}
-  // The *_count values are the true OpenAlex totals; the arrays are capped.
-  QJsonObject obj;
-  obj["cites"] = QJsonDocument::fromJson(cites.toUtf8()).array();
-  obj["cited_by"] = QJsonDocument::fromJson(citedBy.toUtf8()).array();
-  obj["cites_count"] = citesCount;
-  obj["cited_by_count"] = citedByCount;
-  return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }

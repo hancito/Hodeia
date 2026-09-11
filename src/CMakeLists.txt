@@ -20,6 +20,7 @@ add_library(HodeiaEngine STATIC
     ../include/query.h
     ../include/summaryproxymodel.h
     ../include/queryproxymodel.h
+    ../include/citationsmodel.h
     ../include/ingestionengine.h
     ../include/enginemanager.h
     ../include/sqlitedb.h
@@ -42,6 +43,7 @@ add_library(HodeiaEngine STATIC
     query.cpp
     summaryproxymodel.cpp
     queryproxymodel.cpp
+    citationsmodel.cpp
     ingestionengine.cpp
     enginemanager.cpp
     sqlitedb.cpp

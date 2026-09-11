@@ -28,9 +28,9 @@ static const int kMaxWorks = 100;
 // Fields requested for each cited/citing work.  primary_location is selected
 // whole (nested paths are not valid in select); the journal is read from
 // primary_location.source.display_name.  authorships is requested so the
-// stored list carries each work's author names for a richer citation display.
+// stored list carries each work's author names; id is the OpenAlex work id.
 static const char *kSelectFields =
-    "display_name,publication_year,doi,primary_location,authorships";
+    "id,display_name,publication_year,doi,primary_location,authorships";
 
 /* ── Construction / destruction ─────────────────────────────── */
 
@@ -477,13 +477,17 @@ void OpenAlexClient::handleListReply(QNetworkReply *reply,
           << "paper:" << paperHash.left(12) << "| page:" << page
           << "| results:" << results.size() << "| total:" << totalCount;
 
-  // Reduce each result to the fields we store (title, authors, year, doi,
+  // Reduce each result to the fields we store (id, title, authors, year, doi,
   // journal).
   for (const QJsonValue &v : results) {
     const QJsonObject w = v.toObject();
     const QJsonObject loc =
         w.value("primary_location").toObject().value("source").toObject();
     QJsonObject item;
+    // id is a URL like "https://openalex.org/W123" — store the short "W123"
+    // form (same convention as Citations.work_id).
+    const QString workId = w.value("id").toString();
+    item["id"] = workId.section('/', -1);
     item["display_name"] = w.value("display_name");
     item["publication_year"] = w.value("publication_year");
     item["doi"] = w.value("doi");

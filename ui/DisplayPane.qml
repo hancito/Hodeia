@@ -215,69 +215,11 @@ Rectangle {
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
                             placeholderText: "Select a paper to see its references"
+                            // APA formatting + section/total logic now lives in
+                            // CitationsModel::referencesDisplayForHash (C++).
                             text: {
-                                var json = databaseManager.getReferencesForHash(displayPane.activePaperHash);
-                                if (!json)
-                                    return "No references found for this paper";
-                                var data;
-                                try {
-                                    data = JSON.parse(json);
-                                } catch (e) {
-                                    return json;
-                                }
-                                var lines = [];
-                                function formatSection(header, arr, total) {
-                                    // Show the true OpenAlex total in the header;
-                                    // note when the list is capped.
-                                    var shown = (Array.isArray(arr)) ? arr.length : 0;
-                                    var suffix = "";
-                                    if (total > 0) {
-                                        suffix = " (" + total.toLocaleString() + (shown < total ? ", showing top " + shown + ")" : ")");
-                                    }
-                                    lines.push("## " + header + suffix, "");
-                                    if (!Array.isArray(arr) || arr.length === 0) {
-                                        lines.push("None found on OpenAlex.", "");
-                                        return;
-                                    }
-                                    // APA-style: "Authors (Year). Title. Journal. https://doi.org/DOI"
-                                    // Authors are joined with \u001F (unit separator) in the
-                                    // stored string because each name itself contains a comma
-                                    // ("Family, Given").
-                                    function apaAuthors(raw) {
-                                        if (!raw)
-                                            return "";
-                                        var parts = raw.split("\u001F").map(function (s) {
-                                            return s.trim();
-                                        }).filter(function (s) {
-                                            return s.length > 0;
-                                        });
-                                        if (parts.length === 0)
-                                            return "";
-                                        if (parts.length === 1)
-                                            return parts[0];
-                                        var head = parts.slice(0, -1).join(", ");
-                                        return head + " & " + parts[parts.length - 1];
-                                    }
-                                    for (var i = 0; i < arr.length; i++) {
-                                        var r = arr[i];
-                                        var authors = apaAuthors(r.authors);
-                                        var line = "- ";
-                                        if (authors)
-                                            line += authors + " ";
-                                        if (r.publication_year)
-                                            line += "(" + r.publication_year + "). ";
-                                        line += (r.display_name || "Unknown") + ".";
-                                        if (r.journal)
-                                            line += " " + r.journal + ".";
-                                        if (r.doi)
-                                            line += " " + r.doi;
-                                        lines.push(line);
-                                    }
-                                }
-                                formatSection("References", data.cited_by, data.cited_by_count);
-                                formatSection("Cited by", data.cites, data.cites_count);
-
-                                return lines.join("\n");
+                                var s = databaseManager.citationsModel.referencesDisplayForHash(displayPane.activePaperHash);
+                                return s ? s : "No references found for this paper";
                             }
                         }
                     }
