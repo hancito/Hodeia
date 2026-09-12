@@ -221,19 +221,17 @@ ToolBar {
         }
         ComboBox {
             id: visualModeCombo
-            model: ["Text only", "Reduced (figures/tables)", "Full (all pages)"]
             Layout.preferredWidth: 220
-            Component.onCompleted: currentIndex = configManager.visualMode
-            onCurrentIndexChanged: {
-                if (currentIndex !== configManager.visualMode) {
-                    configManager.visualMode = currentIndex;
-                }
+            Component.onCompleted: {
+                var saved = configManager.visualMode;
+                model = configManager.visualModeList();
+                currentIndex = model.indexOf(saved);
+                configManager.visualMode = saved;
             }
-        }
-        Connections {
-            target: configManager
-            function onVisualModeChanged() {
-                visualModeCombo.currentIndex = configManager.visualMode;
+            onCurrentTextChanged: {
+                if (currentText !== "") {
+                    configManager.visualMode = currentText;
+                }
             }
         }
 

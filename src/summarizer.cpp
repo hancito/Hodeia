@@ -442,7 +442,7 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     return payload;
   }
 
-  VisualMode mode = static_cast<VisualMode>(m_config->visualMode());
+  VisualMode mode = m_config->visualModeEnum();
 
   // ── Merge chunks per page (0-based page → text) ──
   QMap<int, QString> pageTextMap;

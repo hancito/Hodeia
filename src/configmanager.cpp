@@ -56,14 +56,22 @@ void ConfigManager::loadConfig() {
     m_activeBackend = obj.value("activeBackend").toString("");
     m_activeModel = obj.value("activeModel").toString("");
     m_openAlexApiKey = obj.value("openAlexApiKey").toString("");
-    m_modelTemperature = obj.value("modelTemperature").toDouble(0.1);
-    // Support both old "useVisualContext" bool and new "visualMode" int.
+    // Support string "visualMode", old int "visualMode", and legacy
+    // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
-      int mode = obj.value("visualMode").toInt(1);
-      m_visualMode = static_cast<VisualMode>(mode);
-    } else {
-      bool useVisual = obj.value("useVisualContext").toBool(true);
-      m_visualMode = useVisual ? VisualMode::Reduced : VisualMode::TextOnly;
+      QJsonValue v = obj.value("visualMode");
+      if (v.isString()) {
+        m_visualMode = v.toString();
+      } else {
+        int mode = v.toInt(1);
+        m_visualMode = mode == 0   ? "Text only"
+                       : mode == 2 ? "Full (all pages)"
+                                   : "Reduced (figures/tables)";
+      }
+    } else if (obj.contains("useVisualContext")) {
+      m_visualMode = obj.value("useVisualContext").toBool(true)
+                         ? "Reduced (figures/tables)"
+                         : "Text only";
     }
 
     // Load backend list from JSON array
@@ -89,8 +97,7 @@ void ConfigManager::saveConfig() {
   obj["activeBackend"] = m_activeBackend;
   obj["activeModel"] = m_activeModel;
   obj["openAlexApiKey"] = m_openAlexApiKey;
-  obj["modelTemperature"] = m_modelTemperature;
-  obj["visualMode"] = static_cast<int>(m_visualMode);
+  obj["visualMode"] = m_visualMode;
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;
@@ -149,12 +156,32 @@ void ConfigManager::setOpenAlexApiKey(const QString &key) {
   }
 }
 
-void ConfigManager::setModelTemperature(double temperature) {
-  if (m_modelTemperature != temperature) {
-    m_modelTemperature = temperature;
-    emit modelTemperatureChanged();
+QString ConfigManager::visualMode() const { return m_visualMode; }
+
+QStringList ConfigManager::visualModeList() const {
+  return {QStringLiteral("Text only"),
+          QStringLiteral("Reduced (figures/tables)"),
+          QStringLiteral("Full (all pages)")};
+}
+
+void ConfigManager::setVisualMode(const QString &mode) {
+  if (m_visualMode != mode) {
+    m_visualMode = mode;
+    emit visualModeChanged();
     saveConfig();
   }
+}
+
+VisualMode ConfigManager::visualModeEnum() const {
+  if (m_visualMode == "Text only")
+    return VisualMode::TextOnly;
+  if (m_visualMode == "Full (all pages)")
+    return VisualMode::Full;
+  return VisualMode::Reduced;
+}
+
+bool ConfigManager::useVisualContext() const {
+  return visualModeEnum() != VisualMode::TextOnly;
 }
 
 void ConfigManager::setBackendList(const QVariantList &backends) {

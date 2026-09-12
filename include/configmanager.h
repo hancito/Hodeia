@@ -20,8 +20,6 @@ class ConfigManager : public QObject {
                  lastProjectChanged)
   Q_PROPERTY(QString activeBackend READ activeBackend WRITE setActiveBackend
                  NOTIFY activeBackendChanged)
-  Q_PROPERTY(double modelTemperature READ modelTemperature WRITE
-                 setModelTemperature NOTIFY modelTemperatureChanged)
   Q_PROPERTY(QVariantList backendList READ backendList WRITE setBackendList
                  NOTIFY backendListChanged)
   Q_PROPERTY(QString activeModel READ activeModel WRITE setActiveModel NOTIFY
@@ -29,7 +27,7 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QString openAlexApiKey READ openAlexApiKey WRITE setOpenAlexApiKey
                  NOTIFY openAlexApiKeyChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
-  Q_PROPERTY(int visualMode READ visualMode WRITE setVisualMode NOTIFY
+  Q_PROPERTY(QString visualMode READ visualMode WRITE setVisualMode NOTIFY
                  visualModeChanged)
 
 public:
@@ -40,12 +38,11 @@ public:
   unsigned short activeThemeIndex() const { return m_activeThemeIndex; }
   QString lastProject() const { return m_lastProject; }
   QString activeBackend() const { return m_activeBackend; }
-  float modelTemperature() const { return m_modelTemperature; }
   QVariantList backendList() const { return m_backendList; }
   QString activeModel() const { return m_activeModel; }
   QString openAlexApiKey() const { return m_openAlexApiKey; }
   QStringList projectList() const { return m_projectList; }
-  int visualMode() const { return static_cast<int>(m_visualMode); }
+  QString visualMode() const;
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -59,24 +56,10 @@ public:
   Q_INVOKABLE void setActiveBackend(const QString &backend);
   Q_INVOKABLE void setActiveModel(const QString &model);
   void setOpenAlexApiKey(const QString &key);
-  void setModelTemperature(double temperature);
-  void setVisualMode(int mode) {
-    VisualMode m = static_cast<VisualMode>(mode);
-    if (m_visualMode != m) {
-      m_visualMode = m;
-      emit visualModeChanged();
-      saveConfig();
-    }
-  }
-
-  /// Backward compat: treats true → Reduced, false → TextOnly.
-  inline void setUseVisualContext(bool use) {
-    setVisualMode(
-        static_cast<int>(use ? VisualMode::Full : VisualMode::TextOnly));
-  }
-  inline bool useVisualContext() const {
-    return m_visualMode != VisualMode::TextOnly;
-  }
+  void setVisualMode(const QString &mode);
+  Q_INVOKABLE QStringList visualModeList() const;
+  VisualMode visualModeEnum() const;
+  bool useVisualContext() const;
 
   /// Replace the entire backend list.
   /// Each entry is a QVariantMap with keys: "name", "url", "api_key".
@@ -128,7 +111,6 @@ signals:
   void activeBackendChanged();
   void activeModelChanged();
   void openAlexApiKeyChanged();
-  void modelTemperatureChanged();
   void backendListChanged();
 
   /// Progress for model file copy (0–100).
@@ -156,11 +138,9 @@ private:
   QString m_activeBackend = "";
   QString m_activeModel = "";
   QString m_openAlexApiKey = "";
-  double m_modelTemperature = 0.1;
 
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
   QVariantList m_backendList;
   QStringList m_projectList;
-
-  VisualMode m_visualMode = VisualMode::Reduced;
+  QString m_visualMode = "Reduced (figures/tables)";
 };
