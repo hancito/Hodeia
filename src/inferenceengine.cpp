@@ -2,11 +2,12 @@
 
 #include "common/common.h"
 #include "common/sampling.h"
-#include "localbackend.h"
 #include "llama.h"
+#include "localbackend.h"
 #include "mtmd-helper.h"
 #include "mtmd.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <algorithm>
 #include <vector>
@@ -168,7 +169,21 @@ QString InferenceEngine::generate() {
     }
   }
 
+  // Poll for a queued stop() every kPollTokens generated tokens. The
+  // generation loop is synchronous and blocks the worker's event loop, so a
+  // queued stop() slot cannot run until we pump events; this is what makes
+  // cooperative cancellation actually interrupt a long local generation.
+  const int kPollTokens = 32;
+
   while (true) {
+    // Cooperative cancellation: if the caller set the flag (via stop()),
+    // stop at this token boundary and return the partial output.
+    if (m_cancelFlag && *m_cancelFlag) {
+      qInfo() << "[InferenceEngine] Generation cancelled after" << i
+              << "tokens";
+      break;
+    }
+
     llama_token tokenId = common_sampler_sample(m_sampler.get(), m_ctx, -1);
     common_sampler_accept(m_sampler.get(), tokenId, true);
 
@@ -200,6 +215,11 @@ QString InferenceEngine::generate() {
       }
     }
     ++i;
+
+    // Pump the event loop periodically so a queued stop() can run and set
+    // m_cancelFlag (checked at the top of the next iteration).
+    if (m_cancelFlag && (i % kPollTokens == 0))
+      QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 0);
   }
 
   return output;

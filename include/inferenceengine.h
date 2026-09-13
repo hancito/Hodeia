@@ -53,6 +53,12 @@ public:
   /// string.
   void setStopSequence(const QString &seq) { m_stopSequence = seq; }
 
+  /// Optional cooperative-cancellation flag. When the pointed-to value is
+  /// true, generation stops at the next token boundary and the partial
+  /// output is returned. The flag is owned and cleared by the caller
+  /// (e.g. the worker's m_cancelled); this engine only reads it.
+  void setCancelFlag(bool *flag) { m_cancelFlag = flag; }
+
 signals:
   /// Emitted for every generated token piece (for future streaming).
   void tokenGenerated(const QString &piece);
@@ -74,6 +80,7 @@ private:
   const struct llama_vocab *m_vocab = nullptr;
   int32_t m_n_batch = 0;
   QString m_stopSequence;
+  bool *m_cancelFlag = nullptr;
 
   /// common_sampler wraps the full sampling chain (sampling.h).
   std::unique_ptr<common_sampler, void (*)(common_sampler *)> m_sampler;

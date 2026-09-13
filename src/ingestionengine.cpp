@@ -723,6 +723,11 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       // 1. Build structured text with layout-aware options + image detection
       // ------------------------------------------------------------------
       page = fz_load_page(ctx, doc, i);
+      if (!page) {
+        qWarning() << "[PdfWorker] fz_load_page failed for page" << i + 1
+                   << "— skipping";
+        break;
+      }
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
 
       fz_stext_options opts = {};

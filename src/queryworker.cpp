@@ -11,6 +11,7 @@
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QImage>
+#include <QTimer>
 
 /* ── Prompts ───────────────────────────────────────────────────── */
 
@@ -40,10 +41,18 @@ QueryWorker::~QueryWorker() = default;
 
 void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   emit started();
+  // A stop() from a previous, abandoned run may have set the cancel flag;
+  // clear it so this fresh query is not cancelled immediately.
+  m_cancelled = false;
   if (queryText.trimmed().isEmpty()) {
     emit queryFinished(QString(), false, "Empty query");
     return;
   }
+
+  // Mark a DB operation as in flight so DatabaseManager::switchDatabase()
+  // refuses to close the shared connection while we are using it.
+  if (m_database)
+    m_database->beginDbOperation();
 
   qDebug() << "[QueryWorker] Starting query:" << queryText.left(60)
            << "| maxPages:" << maxPages;
@@ -56,6 +65,8 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   if (pages.isEmpty()) {
     emit queryFinished(QString(), false,
                        "No relevant information found in the library.");
+    if (m_database)
+      m_database->endDbOperation();
     return;
   }
 
@@ -82,7 +93,12 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   else
     result = queryRemote(payload, backend);
 
-  if (result.isEmpty()) {
+  if (m_cancelled) {
+    // The user stopped the query mid-inference. Do NOT persist a partial
+    // response — the run was abandoned, not completed.
+    emit queryFinished(QString(), false, "Query cancelled");
+    qDebug() << "[QueryWorker] ✗ Query cancelled by user — no DB write";
+  } else if (result.isEmpty()) {
     QString msg = "Empty response from model";
     emit queryFinished(QString(), false, msg);
     qDebug() << "[QueryWorker] ✗ Query failed:" << msg;
@@ -98,6 +114,8 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   }
 
   cleanupGpu(backend.isLocal, wasEmbeddingReady);
+  if (m_database)
+    m_database->endDbOperation();
 }
 
 /* ── Backend resolution ─────────────────────────────────────────── */
@@ -171,10 +189,13 @@ QString QueryWorker::queryLocal(const PromptPayload &payload,
 
   QElapsedTimer genTimer;
   genTimer.start();
-  QString result = m_chatBackend->summarize(payload);
+  // Pass the cancel flag so a queued stop() can interrupt a long local
+  // generation at the next token boundary (see InferenceEngine::generate).
+  QString result = m_chatBackend->summarize(payload, &m_cancelled);
   qDebug() << "[QueryWorker] Generation completed in" << genTimer.elapsed()
            << "ms"
-           << "(" << result.length() << "chars)";
+           << "(" << result.length() << "chars)"
+           << (m_cancelled ? "— CANCELLED" : "");
   return result;
 }
 
@@ -197,6 +218,7 @@ QString QueryWorker::queryRemote(const PromptPayload &payload,
   genTimer.start();
 
   QString result, error;
+  bool timedOut = false;
   QEventLoop loop;
   QObject::connect(
       m_remoteBackend, &RemoteBackend::finished, this,
@@ -206,6 +228,20 @@ QString QueryWorker::queryRemote(const PromptPayload &payload,
         loop.quit();
       },
       Qt::SingleShotConnection);
+
+  // Watchdog: if the endpoint hangs (no response, server stall) the reply
+  // never finishes and this loop would block the worker thread forever,
+  // wedging the controller. Abort after the budget and surface an error.
+  // Generous — a large multimodal prompt can take minutes to process.
+  const int kRemoteTimeoutMs = 10 * 60 * 1000; // 10 minutes
+  QTimer timeout;
+  timeout.setSingleShot(true);
+  QObject::connect(&timeout, &QTimer::timeout, this, [&loop, &timedOut]() {
+    timedOut = true;
+    if (loop.isRunning())
+      loop.quit();
+  });
+  timeout.start(kRemoteTimeoutMs);
 
   if (!payload.pageBlocks.empty()) {
     m_remoteBackend->generateInterleaved(payload.systemPrompt, payload,
@@ -222,11 +258,21 @@ QString QueryWorker::queryRemote(const PromptPayload &payload,
   }
 
   loop.exec(QEventLoop::ExcludeUserInputEvents);
+  timeout.stop();
 
   qDebug() << "[QueryWorker] Remote generation completed in"
            << genTimer.elapsed() << "ms"
-           << "(" << result.length() << "chars)";
+           << "(" << result.length() << "chars)"
+           << (timedOut ? "— TIMED OUT" : "");
 
+  if (timedOut) {
+    // The reply never finished; cancel the still-in-flight request so it
+    // doesn't fire later into a dead loop, and report the failure.
+    m_remoteBackend->cancel();
+    qWarning() << "[QueryWorker] Remote request timed out after"
+               << kRemoteTimeoutMs / 1000 << "s";
+    return QString();
+  }
   if (!error.isEmpty())
     return QString();
   return result;
@@ -407,8 +453,15 @@ const QString &QueryWorker::systemPrompt() { return s_systemPrompt; }
 
 void QueryWorker::stop() {
   m_stopping = true;
+  // Signal cooperative cancellation to the in-flight local generation.
+  // InferenceEngine::generate() polls this flag (and pumps the event loop
+  // every 32 tokens so this slot can run) and stops at the next token
+  // boundary. executeQuery() sees m_cancelled and skips the DB write.
+  m_cancelled = true;
+  // Cancel the in-flight remote request so its QEventLoop exits.
   m_remoteBackend->cancel();
-  m_chatBackend->unloadModel();
+  // Do NOT unload the chat model here: it may be held mid-llama_decode.
+  // cleanupGpu() unloads it exactly once on the normal exit path.
   emit stopped();
   qDebug() << "[QueryWorker] Stop requested";
 }

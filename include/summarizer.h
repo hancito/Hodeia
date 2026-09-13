@@ -69,6 +69,9 @@ private:
   bool isStopping() const { return m_stopping; }
 
   bool m_stopping = false;
+  // Set by stop() to cooperatively cancel the in-flight local generation
+  // (polled by InferenceEngine::generate()). A cancelled paper is not saved.
+  bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
   LocalBackend *m_chatBackend = nullptr;

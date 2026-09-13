@@ -964,7 +964,8 @@ bool LocalBackend::isReady() const { return m_ready; }
 /// Main public entry point. Computes how much prompt space is available
 /// (leaving room for generation), truncates the text context accordingly,
 /// and dispatches to text-only or multimodal inference.
-QString LocalBackend::summarize(const PromptPayload &payload) {
+QString LocalBackend::summarize(const PromptPayload &payload,
+                                bool *cancelFlag) {
   if (!m_ready) {
     qWarning() << "[LocalBackend] Model not loaded";
     return QString();
@@ -1008,9 +1009,9 @@ QString LocalBackend::summarize(const PromptPayload &payload) {
   // loaded yet we fall through to text-only.  The caller can retry after
   // an explicit loadMmproj() call if needed.
   if (m_hasVision && m_mtmdCtx && !images.empty()) {
-    return runMultimodalInference(promptText, images);
+    return runMultimodalInference(promptText, images, cancelFlag);
   }
-  return runTextInference(promptText);
+  return runTextInference(promptText, cancelFlag);
 }
 
 QString LocalBackend::generate(const QString &systemPrompt,
@@ -1035,8 +1036,11 @@ common_params_sampling LocalBackend::makeSamplingParams() const {
   return params;
 }
 
-QString LocalBackend::runTextInference(const QString &formattedText) {
+QString LocalBackend::runTextInference(const QString &formattedText,
+                                       bool *cancelFlag) {
   InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
+  if (cancelFlag)
+    engine.setCancelFlag(cancelFlag);
   QString result = engine.inferText(formattedText);
 
   if (result.isEmpty()) {
@@ -1052,7 +1056,8 @@ QString LocalBackend::runTextInference(const QString &formattedText) {
 /// text-only and multimodal workloads.
 QString
 LocalBackend::runMultimodalInference(const QString &formattedText,
-                                     const std::vector<PageImage> &images) {
+                                     const std::vector<PageImage> &images,
+                                     bool *cancelFlag) {
   if (!m_hasVision) {
     qWarning() << "[LocalBackend] Multimodal inference requested but "
                   "vision not available";
@@ -1070,6 +1075,8 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
            << "images";
 
   InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
+  if (cancelFlag)
+    engine.setCancelFlag(cancelFlag);
   QString result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
 
   // Keep mmproj loaded — unloading and reloading it for every inference

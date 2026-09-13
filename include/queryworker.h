@@ -81,7 +81,12 @@ private:
 
   bool isStopping() const { return m_stopping; }
 
+  // Called at the start of each executeQuery so a cancellation from a
+  // previous, abandoned run cannot bleed into the next one.
+  void resetCancellation() { m_cancelled = false; }
+
   bool m_stopping = false;
+  bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
   LocalBackend *m_chatBackend = nullptr;

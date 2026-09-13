@@ -84,6 +84,14 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
   if (hashes.isEmpty())
     return;
 
+  // Clear any cancellation left over from a previous, abandoned run.
+  m_cancelled = false;
+
+  // Mark a DB operation as in flight so DatabaseManager::switchDatabase()
+  // refuses to close the shared connection while we are using it.
+  if (m_database)
+    m_database->beginDbOperation();
+
   qDebug() << "[Summarizer] Starting summarization for" << hashes.size()
            << "paper(s)";
 
@@ -118,6 +126,14 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
     else
       result = summarizeRemote(payload, backend);
 
+    if (m_cancelled) {
+      // stop() fired mid-inference. Do NOT persist a partial summary and stop
+      // processing further papers.
+      emit paperFinished(hash, false, "Cancelled");
+      qDebug() << "[Summarizer] ✗ Paper" << hash << "cancelled — no DB write";
+      break;
+    }
+
     if (result.isEmpty()) {
       QString msg = "Empty response";
       emit paperFinished(hash, false, msg);
@@ -140,6 +156,8 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
            << "succeeded in" << totalTimer.elapsed() << "ms";
 
   cleanupGpu(backend.isLocal, wasEmbeddingReady);
+  if (m_database)
+    m_database->endDbOperation();
 }
 
 /* ── Backend resolution ─────────────────────────────────────────── */
@@ -222,10 +240,13 @@ QString Summarizer::summarizeLocal(const PromptPayload &payload,
 
   QElapsedTimer genTimer;
   genTimer.start();
-  QString result = m_chatBackend->summarize(payload);
+  // Pass the cancel flag so a queued stop() can interrupt a long local
+  // generation at the next token boundary (see InferenceEngine::generate).
+  QString result = m_chatBackend->summarize(payload, &m_cancelled);
   qDebug() << "[Summarizer] Generation completed in" << genTimer.elapsed()
            << "ms"
-           << "(" << result.length() << "chars)";
+           << "(" << result.length() << "chars)"
+           << (m_cancelled ? "— CANCELLED" : "");
   return result;
 }
 
@@ -537,22 +558,20 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
 
 void Summarizer::stop() {
   m_stopping = true;
-
-  // Cancel in-flight remote request
+  // Signal cooperative cancellation to the in-flight local generation.
+  // InferenceEngine::generate() polls this flag (and pumps the event loop
+  // every 32 tokens so this slot can run) and stops at the next token
+  // boundary. summarizePapers() sees m_cancelled, skips the DB write for the
+  // current paper, and stops processing further papers.
+  m_cancelled = true;
+  // Cancel the in-flight remote request so its QEventLoop exits.
   m_remoteBackend->cancel();
-
-  // Unload local model
-  m_chatBackend->unloadModel();
-
-  // Restore embedding model if it was unloaded
-  if (m_database) {
-    SqliteVecManager &vecMgr = m_database->vecManager();
-    if (!vecMgr.isReady()) {
-      vecMgr.initialize();
-      qDebug() << "[Summarizer] Embedding model reloaded after stop";
-    }
-  }
-
+  // Do NOT unload/reload models here:
+  //  - the chat model may be held mid-llama_decode; unloading now would free
+  //    it under a live inference (use-after-free).
+  //  - the embedding model restore is already handled on the normal exit
+  //    path by cleanupGpu(), which runs unconditionally at the end of
+  //    summarizePapers() (whether all papers finished or we broke early).
   emit stopped();
   qDebug() << "[Summarizer] Stop requested";
 }

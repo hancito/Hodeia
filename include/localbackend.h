@@ -107,7 +107,10 @@ public:
 
   /// High-level entry point: assemble a chat prompt from the payload and
   /// run either text-only or multimodal inference.
-  QString summarize(const PromptPayload &payload);
+  /// \param cancelFlag  optional pointer to a bool the caller sets to request
+  ///                    cooperative cancellation; generation stops at the next
+  ///                    token boundary and returns the partial output.
+  QString summarize(const PromptPayload &payload, bool *cancelFlag = nullptr);
 
   /// Convenience wrapper around summarize() for simple text-only calls.
   QString generate(const QString &systemPrompt, const QString &userPrompt);
@@ -118,8 +121,9 @@ signals:
 
 private:
   QString runMultimodalInference(const QString &formattedText,
-                                 const std::vector<PageImage> &images);
-  QString runTextInference(const QString &formattedText);
+                                 const std::vector<PageImage> &images,
+                                 bool *cancelFlag);
+  QString runTextInference(const QString &formattedText, bool *cancelFlag);
 
   /// Assemble the user/system prompt with visual markers + text context,
   /// then wrap it in the model's chat template.

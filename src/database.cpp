@@ -107,6 +107,17 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
     return std::unexpected("Empty database path");
   }
 
+  // Refuse to close the connection while a worker thread is mid-statement on
+  // it — that would run the worker's in-flight prepare/step/finalize on a
+  // closed handle (use-after-close). The caller should retry once the
+  // current operation finishes.
+  if (m_opsInFlight.loadRelaxed() > 0) {
+    qWarning() << "[Database] switchDatabase refused — a worker operation "
+                  "is in flight. Retry when it completes.";
+    return std::unexpected(
+        "Cannot switch project while an operation is in progress.");
+  }
+
   m_db.close();
 
   auto openResult = m_db.open(dbPath);
@@ -128,6 +139,12 @@ void DatabaseManager::reloadModels() {
   m_queryModel->loadAll();
   m_citationsModel->loadAll();
 }
+
+void DatabaseManager::beginDbOperation() {
+  m_opsInFlight.fetchAndAddOrdered(1);
+}
+
+void DatabaseManager::endDbOperation() { m_opsInFlight.fetchAndAddOrdered(-1); }
 
 void DatabaseManager::setOpenAlexClient(OpenAlexClient *client) {
   m_openAlexClient = client;

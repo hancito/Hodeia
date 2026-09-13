@@ -6,6 +6,7 @@
 #include "sqlitevec.h"
 #include "summary.h"
 #include "summaryproxymodel.h"
+#include <QAtomicInt>
 #include <QObject>
 #include <expected>
 
@@ -45,6 +46,13 @@ public:
   Q_INVOKABLE void removeByHashes(const QStringList &hashes);
   Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
 
+  // Begin/end a worker operation that uses the shared SQLite connection.
+  // switchDatabase() refuses to close the connection while any operation is
+  // in flight, so a worker's in-flight statement cannot run on a closed
+  // handle (use-after-close).
+  void beginDbOperation();
+  void endDbOperation();
+
 private:
   bool initDatabase();
   void createTables();
@@ -59,4 +67,5 @@ private:
   QueryProxyModel *m_queryProxyModel = nullptr;
   SqliteVecManager m_vecManager;
   OpenAlexClient *m_openAlexClient = nullptr;
+  QAtomicInt m_opsInFlight{0};
 };
