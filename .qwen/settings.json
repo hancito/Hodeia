@@ -21,7 +21,8 @@
       "Bash(pkg-config *)",
       "Bash(cmake *)",
       "Bash(curl *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(ninja)"
     ]
   },
   "$version": 4

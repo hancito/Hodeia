@@ -212,8 +212,14 @@ std::expected<void, QString> SqliteDb::open(const QString &path) {
   if (m_db)
     close();
 
+  // FULLMUTEX: serialize all access to this connection. The connection is
+  // shared across the main, ingestion, summarizer and OpenAlex threads, so
+  // without fullmutex interleaved prepare/step/finalize is undefined
+  // behaviour (SQLITE_MISUSE, torn statements, silent write loss).
   int rc = sqlite3_open_v2(path.toUtf8().constData(), &m_db,
-                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
+                               SQLITE_OPEN_FULLMUTEX,
+                           nullptr);
   if (rc != SQLITE_OK) {
     QString err = QString::fromUtf8(sqlite3_errmsg(m_db));
     sqlite3_close_v2(m_db);
@@ -223,6 +229,11 @@ std::expected<void, QString> SqliteDb::open(const QString &path) {
 
   // Enable WAL mode for better concurrent read/write
   sqlite3_exec(m_db, "PRAGMA journal_mode=WAL", nullptr, nullptr, nullptr);
+
+  // Without a busy timeout any cross-connection contention (e.g. a second
+  // app instance) fails instantly with SQLITE_BUSY; a 5s window lets writers
+  // queue briefly instead of dropping writes.
+  sqlite3_exec(m_db, "PRAGMA busy_timeout=5000", nullptr, nullptr, nullptr);
 
   // Enable loading of extensions
   sqlite3_enable_load_extension(m_db, 1);

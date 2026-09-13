@@ -357,11 +357,7 @@ Summarizer::retrieveVisualContext(const QString &paperHash) const {
       qWarning() << "[Summarizer] Failed to load image:" << path;
       continue;
     }
-    QImage rgb = img.convertToFormat(QImage::Format_RGB888);
-    PageImage pi{rgb.width(),
-                 rgb.height(),
-                 {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
-    result.push_back(std::move(pi));
+    result.push_back(PageImage::fromQImage(img));
   }
 
   qDebug() << "[Summarizer] loaded" << result.size()
@@ -413,11 +409,7 @@ Summarizer::retrieveReducedVisualContext(const QString &paperHash) const {
     if (img.isNull()) {
       continue;
     }
-    QImage rgb = img.convertToFormat(QImage::Format_RGB888);
-    PageImage pi{rgb.width(),
-                 rgb.height(),
-                 {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
-    result.push_back(std::move(pi));
+    result.push_back(PageImage::fromQImage(img));
   }
 
   qDebug() << "[Summarizer] reduced visual:" << result.size()
@@ -500,12 +492,8 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     pb.pageNumber = page0 + 1;
     pb.text = pageTextMap[page0];
     auto it = pageImages.find(page0);
-    if (it != pageImages.end()) {
-      const QImage &rgb = it.value();
-      pb.visualContext = {rgb.width(),
-                          rgb.height(),
-                          {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
-    }
+    if (it != pageImages.end())
+      pb.visualContext = PageImage::fromQImage(it.value());
     payload.pageBlocks.push_back(std::move(pb));
   }
 

@@ -376,12 +376,8 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
 
     if (m_config->useVisualContext() && !pc.imageFile.isEmpty()) {
       QImage img(pc.imageFile);
-      if (!img.isNull()) {
-        QImage rgb = img.convertToFormat(QImage::Format_RGB888);
-        pb.visualContext = {rgb.width(),
-                            rgb.height(),
-                            {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
-      }
+      if (!img.isNull())
+        pb.visualContext = PageImage::fromQImage(img);
     }
     payload.pageBlocks.push_back(std::move(pb));
   }
@@ -398,11 +394,7 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
       QImage img(pc.imageFile);
       if (img.isNull())
         continue;
-      QImage rgb = img.convertToFormat(QImage::Format_RGB888);
-      PageImage pi{rgb.width(),
-                   rgb.height(),
-                   {rgb.bits(), rgb.bits() + rgb.sizeInBytes()}};
-      payload.visualContext.push_back(std::move(pi));
+      payload.visualContext.push_back(PageImage::fromQImage(img));
     }
     qDebug() << "[QueryWorker] Visual context —" << payload.visualContext.size()
              << "image(s) loaded";

@@ -14,6 +14,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QThread>
 #include <algorithm>
 #include <cstring>
@@ -1262,4 +1263,21 @@ QString LocalBackend::resolveMmprojPath(const QString &modelPath) const {
 
   qDebug() << "[LocalBackend] No mmproj found for model:" << modelPath;
   return QString();
+}
+
+PageImage PageImage::fromQImage(const QImage &img) {
+  PageImage pi;
+  const QImage rgb = img.format() == QImage::Format_RGB888
+                         ? img
+                         : img.convertToFormat(QImage::Format_RGB888);
+  pi.width = rgb.width();
+  pi.height = rgb.height();
+  // Copy the pixels while `rgb` (and any temporary from convertToFormat) is
+  // still alive. `rgb.constBits()` stays valid for the duration of the copy;
+  // the resulting vector is self-contained, so the PageImage can outlive the
+  // source image safely.
+  const int bytes = rgb.sizeInBytes();
+  pi.data.assign(static_cast<const unsigned char *>(rgb.constBits()),
+                 static_cast<const unsigned char *>(rgb.constBits()) + bytes);
+  return pi;
 }

@@ -28,6 +28,11 @@ struct PageImage {
   int width;
   int height;
   std::vector<unsigned char> data; ///< RGB888, width*height*3 bytes
+
+  /// Build a PageImage by COPYING the pixels out of a QImage so the result
+  /// is self-contained and does not alias the (possibly temporary) source
+  /// image's buffer.
+  static PageImage fromQImage(const QImage &img);
 };
 
 /// One page: OCR text paired with an optional rendered page image.
