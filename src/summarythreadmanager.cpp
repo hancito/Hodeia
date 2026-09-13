@@ -30,41 +30,51 @@ void SummaryController::startSummarize(const QStringList &hashes) {
   m_worker = new Summarizer(m_config, m_database);
   m_worker->moveToThread(m_thread);
 
-  // Trigger work
-  connect(m_thread, &QThread::started, m_worker,
-          [this]() { m_worker->summarizePapers(m_hashes); });
+  // Capture the specific thread/worker for this run. The finished handler is
+  // queued on the main thread, so if a new run starts before it fires, the
+  // captured pointers let us delete *this* run's objects and avoid clobbering
+  // the new run's members.
+  QThread *const thread = m_thread;
+  Summarizer *const worker = m_worker;
 
-  // When done: quit thread, then delete objects in the main thread's event loop
-  connect(m_worker, &Summarizer::allFinished, m_thread, &QThread::quit);
-  connect(m_thread, &QThread::finished, this, [this]() {
-    m_worker->deleteLater();
-    m_thread->deleteLater();
-    m_worker = nullptr;
-    m_thread = nullptr;
+  // Trigger work. Capture hashes by value so a re-entrant startSummarize
+  // cannot swap m_hashes out from under an about-to-start thread.
+  connect(thread, &QThread::started, worker,
+          [worker, hashes]() { worker->summarizePapers(hashes); });
+
+  // When done: quit the thread.
+  connect(worker, &Summarizer::allFinished, thread, &QThread::quit);
+
+  // Cleanup runs in the main thread's event loop after the worker thread has
+  // fully finished. Capture thread/worker by value so a stale handler from a
+  // previous run cannot delete the new run's objects.
+  connect(thread, &QThread::finished, this, [this, thread, worker]() {
+    worker->deleteLater();
+    thread->deleteLater();
+    if (m_thread == thread)
+      m_thread = nullptr;
+    if (m_worker == worker)
+      m_worker = nullptr;
   });
 
   // Forward signals to QML
-  connect(m_worker, &Summarizer::started, this,
+  connect(worker, &Summarizer::started, this,
           &SummaryController::summaryStarted);
 
-  connect(m_worker, &Summarizer::allFinished, this,
+  connect(worker, &Summarizer::allFinished, this,
           &SummaryController::summaryFinished);
 
-  connect(m_worker, &Summarizer::stopped, this,
+  connect(worker, &Summarizer::stopped, this,
           &SummaryController::summaryStopped);
 
-  // When the worker signals stopped, ask its thread to quit.
-  connect(m_worker, &Summarizer::stopped, m_thread, &QThread::quit,
-          Qt::QueuedConnection);
-
-  connect(m_worker, &Summarizer::paperFinished, this,
+  connect(worker, &Summarizer::paperFinished, this,
           &SummaryController::paperFinished);
 
-  connect(m_worker, &Summarizer::allFinished, this,
+  connect(worker, &Summarizer::allFinished, this,
           &SummaryController::allFinished);
 
-  qInfo() << "[EngineController] Starting worker thread";
-  m_thread->start();
+  qInfo() << "[SummaryController] Starting worker thread";
+  thread->start();
 }
 
 void SummaryController::stopSummarize() {

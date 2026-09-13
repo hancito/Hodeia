@@ -75,8 +75,12 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
             thisThread->deleteLater();
             // Clear the controller's raw pointers to prevent use-after-free
             // if stopEngine() is called again (e.g. from the destructor).
-            m_worker = nullptr;
-            m_thread = nullptr;
+            // Only if they still point at this run — a stale handler from a
+            // previous run must not clobber a newer run's thread/worker.
+            if (m_thread == thisThread)
+              m_thread = nullptr;
+            if (m_worker == thisWorker)
+              m_worker = nullptr;
           });
 
   // Forward signals to QML (auto-disconnected when worker is deleted)

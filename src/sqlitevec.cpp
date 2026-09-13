@@ -7,6 +7,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFile>
+#include <QMutexLocker>
 #include <expected>
 #include <mutex>
 
@@ -60,13 +61,17 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
   emit statusUpdated(QString("Loading embedding model: %1").arg(resolvedPath));
 
-  // Init llama backends (idempotent, safe to call from any thread).
-  common_init();
+  // All llama runtime + model/context setup is guarded by m_lock so that
+  // concurrent initialize()/embed()/shutdown() calls from worker threads
+  // cannot interleave on the same context.
+  const QMutexLocker locker(&m_lock);
 
-  // Load GGML backend plugins (e.g. Vulkan, CPU) — required before any
-  // llama context or batch allocation.  Idempotent; safe to call repeatedly.
+  // Init llama backends (idempotent, safe to call from any thread). Move
+  // common_init() inside call_once so it is not invoked concurrently with
+  // the backend init.
   static std::once_flag s_initFlag;
   std::call_once(s_initFlag, []() {
+    common_init();
     ggml_backend_load_all();
     llama_backend_init();
   });
@@ -143,6 +148,10 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     return {};
   if (!m_ready)
     return {};
+
+  // Serialize on the llama context. initialize() has already released the
+  // lock, so it is safe to re-lock here (QMutex is non-recursive but not held).
+  const QMutexLocker locker(&m_lock);
 
   auto *ctx = m_llamaCtx;
   auto *vocab = llama_model_get_vocab(m_llamaModel);
@@ -436,6 +445,7 @@ int SqliteVecManager::embeddingDim() const { return m_dim; }
 bool SqliteVecManager::isReady() const { return m_ready; }
 
 void SqliteVecManager::shutdown() {
+  const QMutexLocker locker(&m_lock);
   if (m_llamaCtx) {
     llama_free(m_llamaCtx);
     m_llamaCtx = nullptr;

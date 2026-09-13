@@ -27,37 +27,45 @@ void QueryController::startQuery(const QString &queryText, int maxPages) {
   m_worker = new QueryWorker(m_config, m_database);
   m_worker->moveToThread(m_thread);
 
+  // Capture the specific thread/worker for this run. The finished handler is
+  // queued on the main thread, so if a new run starts before it fires, the
+  // captured pointers let us delete *this* run's objects and avoid clobbering
+  // the new run's members.
+  QThread *const thread = m_thread;
+  QueryWorker *const worker = m_worker;
+
   // Trigger work
-  connect(m_thread, &QThread::started, m_worker, [this, queryText, maxPages]() {
-    m_worker->executeQuery(queryText, maxPages);
+  connect(thread, &QThread::started, worker, [worker, queryText, maxPages]() {
+    worker->executeQuery(queryText, maxPages);
   });
 
-  // When done: quit thread, then delete objects in the main thread's event loop
-  connect(m_worker, &QueryWorker::queryFinished, m_thread, &QThread::quit);
-  connect(m_worker, &QueryWorker::stopped, m_thread, &QThread::quit);
-  connect(m_thread, &QThread::finished, this, [this]() {
-    m_worker->deleteLater();
-    m_thread->deleteLater();
-    m_worker = nullptr;
-    m_thread = nullptr;
+  // When done: quit the thread.
+  connect(worker, &QueryWorker::queryFinished, thread, &QThread::quit);
+  connect(worker, &QueryWorker::stopped, thread, &QThread::quit);
+
+  // Cleanup runs in the main thread's event loop after the worker thread has
+  // fully finished (no pending events, worker idle). Capture thread/worker by
+  // value so a stale handler from a previous run cannot delete the new run's
+  // objects.
+  connect(thread, &QThread::finished, this, [this, thread, worker]() {
+    worker->deleteLater();
+    thread->deleteLater();
+    if (m_thread == thread)
+      m_thread = nullptr;
+    if (m_worker == worker)
+      m_worker = nullptr;
   });
 
   // Forward signals to QML
-  connect(m_worker, &QueryWorker::started, this,
-          &QueryController::queryStarted);
+  connect(worker, &QueryWorker::started, this, &QueryController::queryStarted);
 
-  connect(m_worker, &QueryWorker::queryFinished, this,
+  connect(worker, &QueryWorker::queryFinished, this,
           &QueryController::queryFinished);
 
-  connect(m_worker, &QueryWorker::stopped, this,
-          &QueryController::queryStopped);
-
-  // When the worker signals stopped, ask its thread to quit.
-  connect(m_worker, &QueryWorker::stopped, m_thread, &QThread::quit,
-          Qt::QueuedConnection);
+  connect(worker, &QueryWorker::stopped, this, &QueryController::queryStopped);
 
   qInfo() << "[QueryController] Starting worker thread";
-  m_thread->start();
+  thread->start();
 }
 
 void QueryController::stopQuery() {

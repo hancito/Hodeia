@@ -3,6 +3,7 @@
 #include "llama.h"
 #include "summary.h"
 #include <QList>
+#include <QMutex>
 #include <QString>
 #include <QVector>
 #include <expected>
@@ -74,4 +75,11 @@ private:
   int m_dim = 0;
   int m_maxTokens = 0;
   ConfigManager *m_config = nullptr;
+
+  // Serializes all access to the llama context/model. embed() is called
+  // concurrently from the ingestion and query worker threads, and
+  // prepareGpu/cleanupGpu call initialize()/shutdown() from workers; without
+  // this, concurrent llama_encode on one context corrupts the KV cache and
+  // llama_free under a live encode is a segfault.
+  QMutex m_lock;
 };
