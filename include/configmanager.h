@@ -114,10 +114,10 @@ signals:
   void backendListChanged();
 
   /// Progress for model file copy (0–100).
-  /// Emitted by ModelHelper but forwarded here for QML convenience.
+  /// Emitted by Helpers but forwarded here for QML convenience.
   void modelCopyProgress(int percentage, const QString &fileName);
 
-  /// Model file copy finished (emitted by ModelHelper, forwarded here).
+  /// Model file copy finished (emitted by Helpers, forwarded here).
   void modelCopyFinished(bool success, const QString &destPath,
                          const QString &error);
 

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 Rectangle {
@@ -14,6 +15,7 @@ Rectangle {
     property int elapsedTime: 0
     property bool summarizing: false
     property bool ingesting: false
+    property var reportJsons: []
 
     function addSelectedPaper(hash) {
         if (!selectedPapers.includes(hash) && hash !== "") {
@@ -144,6 +146,7 @@ Rectangle {
                 icon.source: "qrc:/Resources/refresh.svg"
                 onClicked: {
                     databaseManager.summaryModel.loadAll();
+                    databaseManager.citationsModel.loadAll();
                 }
             }
 
@@ -154,7 +157,21 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/list.svg"
-                onClicked: console.log("Generate Report from", summaryDbPane.selectedPapers.length, "selected papers")
+                onClicked: {
+                    if (summaryDbPane.selectedPapers.length === 0) {
+                        console.log("No papers selected");
+                        return;
+                    }
+                    var jsons = [];
+                    for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
+                        var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
+                        if (summaryDbPane.selectedPapers.includes(hash)) {
+                            jsons.push(databaseManager.summaryProxyModel.get(i, "summaryJson"));
+                        }
+                    }
+                    summaryDbPane.reportJsons = jsons;
+                    reportSaveDialog.open();
+                }
             }
 
             Button {
@@ -420,6 +437,20 @@ Rectangle {
                     }
                 }
             }
+        }
+    }
+
+    FileDialog {
+        id: reportSaveDialog
+        title: qsTr("Save Report as PDF")
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PDF Files (*.pdf)"]
+        onAccepted: {
+            var result = helpers.generateReport(summaryDbPane.reportJsons, selectedFile.toString());
+            if (result)
+                console.log("Report saved to:", result);
+            else
+                console.warn("Report export failed");
         }
     }
 }

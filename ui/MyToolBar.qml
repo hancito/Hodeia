@@ -13,7 +13,7 @@ ToolBar {
     property bool busy: false
 
     // Load models for the active backend when this component is ready.
-    Component.onCompleted: modelHelper.loadActiveBackendModels()
+    Component.onCompleted: helpers.loadActiveBackendModels()
 
     // ── File dialog for selecting PDFs ──
     FileDialog {
@@ -91,9 +91,9 @@ ToolBar {
         }
     }
 
-    // ── React to modelHelper modelsChecked to populate the model combobox ──
+    // ── React to helpers modelsChecked to populate the model combobox ──
     Connections {
-        target: modelHelper
+        target: helpers
         function onModelsChecked(success, models, error) {
             // Read activeModel BEFORE assigning the model to avoid the
             // ComboBox resetting to index 0 and overwriting it via

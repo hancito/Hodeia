@@ -11,82 +11,94 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPdfWriter>
 #include <QStandardPaths>
+#include <QTextDocument>
 #include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 
+/* ── Constructor / Destructor ────────────────────────────────── */
+
+Helpers::Helpers(ConfigManager *config, QObject *parent)
+    : QObject(parent), m_config(config) {
+  m_networkManager = new QNetworkAccessManager(this);
+
+  QObject::connect(m_config, &ConfigManager::activeBackendChanged, this,
+                   &Helpers::loadActiveBackendModels);
+  QObject::connect(m_config, &ConfigManager::modelCopied, this,
+                   &Helpers::loadActiveBackendModels);
+
+  QObject::connect(this, &Helpers::modelCopyProgress, m_config,
+                   &ConfigManager::modelCopyProgress);
+  QObject::connect(this, &Helpers::modelCopyFinished, m_config,
+                   &ConfigManager::modelCopyFinished);
+  QObject::connect(this, &Helpers::modelCopied, m_config,
+                   &ConfigManager::modelCopied);
+  QObject::connect(this, &Helpers::modelCopied, this,
+                   &Helpers::refreshLocalModelList, Qt::QueuedConnection);
+
+  refreshLocalModelList();
+  loadActiveBackendModels();
+}
+
+Helpers::~Helpers() = default;
+
 /* ── Summary parsing ─────────────────────────────────────────── */
 
-namespace SummaryHelpers {
-
-PaperSummary parseSummaryJson(const QString &raw) {
+PaperSummary Helpers::parseSummaryJson(const QString &raw) {
   PaperSummary summary;
-
   QString text = raw;
 
-  // 1. Strip markdown code fences FIRST ( ```json ... ```  or  ``` ... ``` )
+  // Strip markdown code fences (```json ... ``` or ``` ... ```)
   {
     int firstFence = text.indexOf("```");
     if (firstFence >= 0) {
       text = text.mid(firstFence + 3);
-      // Skip the language tag line (e.g. "json\n")
       int nl = text.indexOf('\n');
-      if (nl >= 0 && nl < 10) {
+      if (nl >= 0 && nl < 10)
         text = text.mid(nl + 1);
-      }
-      // Remove the closing fence and anything after
       int lastFence = text.lastIndexOf("```");
-      if (lastFence > 0) {
+      if (lastFence > 0)
         text = text.mid(0, lastFence);
-      }
     }
   }
 
-  // 2. Strip reasoning/thinking prefix — jump straight to the first '{'
+  // Strip reasoning prefix — jump to first '{'
   {
     int bracePos = text.indexOf('{');
-    if (bracePos > 0) {
+    if (bracePos > 0)
       text = text.mid(bracePos);
-    }
-    // Also ensure the closing '}' is the last meaningful char
     int endBrace = text.lastIndexOf('}');
-    if (endBrace > 0) {
+    if (endBrace > 0)
       text = text.mid(0, endBrace + 1);
-    }
   }
 
   text = text.trimmed();
 
-  // Quick sanity before parsing.
   if (!text.startsWith("{") && !text.startsWith("```")) {
     int bracePos = text.indexOf('{');
     if (bracePos < 0) {
-      qWarning() << "[SummaryHelpers] No JSON object found in output (length:"
-                 << raw.length() << ")";
-      qWarning() << "[SummaryHelpers] start:" << raw;
+      qWarning() << "[Helpers] No JSON object found (length:" << raw.length()
+                 << ")";
       return summary;
     }
-    // If the JSON starts very late, the response was likely truncated.
-    if (bracePos > raw.length() * 0.5) {
-      qWarning() << "[SummaryHelpers] JSON brace at position" << bracePos
-                 << "of" << raw.length() << "— response likely truncated";
-    }
+    if (bracePos > raw.length() * 0.5)
+      qWarning() << "[Helpers] JSON brace at" << bracePos << "of"
+                 << raw.length() << "— likely truncated";
   }
 
   QJsonParseError err;
   QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8(), &err);
   if (err.error != QJsonParseError::NoError) {
-    qWarning() << "[SummaryHelpers] JSON parse error:" << err.errorString();
-    qWarning() << "[SummaryHelpers] offset:" << err.offset << "| context:"
+    qWarning() << "[Helpers] JSON parse error:" << err.errorString();
+    qWarning() << "[Helpers] offset:" << err.offset << "| context:"
                << text.mid(qMax(0, err.offset - 30), 60).replace('\n', " ");
-    qWarning() << "[SummaryHelpers] raw length:" << raw.length()
-               << "| cleaned length:" << text.length();
-    if (text.length() < 200) {
-      qWarning() << "[SummaryHelpers] full cleaned text:" << text;
-    }
+    if (text.length() < 200)
+      qWarning() << "[Helpers] full cleaned text:" << text;
     return summary;
   }
+
   QJsonObject obj = doc.object();
   summary.title = obj.value("title").toString();
   summary.journal = obj.value("journal").toString();
@@ -105,17 +117,14 @@ PaperSummary parseSummaryJson(const QString &raw) {
   return summary;
 }
 
-} // namespace SummaryHelpers
+/* ── Markdown / LaTeX formatting ─────────────────────────────── */
 
-/* ── Markdown / LaTeX export ───────────────────────────────────── */
-
-namespace SummaryHelpers {
-
-QString toMarkdown(const PaperSummary &s) {
+QString Helpers::toMarkdown(const PaperSummary &s) {
   QString authors = s.authors.join(", ");
   QString title = s.title;
   if (!title.isEmpty())
     title[0] = title[0].toUpper();
+
   QStringList parts;
   parts.append(
       QString("## %1, (%2): %3").arg(authors, QString::number(s.year), title));
@@ -139,16 +148,18 @@ QString toMarkdown(const PaperSummary &s) {
   return parts.join("\n");
 }
 
-QString toLatex(const PaperSummary &s) {
+QString Helpers::toLatex(const PaperSummary &s) {
   QString authors = s.authors.join(", ");
   QString title = s.title;
   if (!title.isEmpty())
     title[0] = title[0].toUpper();
+
   QString findings, limitations;
   for (const QString &f : s.coreFindingsAndSignificance)
     findings += QString("\n    \\item %1").arg(f);
   for (const QString &l : s.criticalLimitations)
     limitations += QString("\n    \\item %1").arg(l);
+
   QStringList parts;
   parts.append(QString("\\section{%1, (%2): %3}")
                    .arg(authors, QString::number(s.year), title));
@@ -169,14 +180,10 @@ QString toLatex(const PaperSummary &s) {
   return parts.join("\n");
 }
 
-} // namespace SummaryHelpers
+/* ── File copy helper (static, used by thread-pool tasks) ────── */
 
-/* ── File copy helper ──────────────────────────────────────────── */
-
-/// Copy a single file into @p destDir. Emits modelCopyProgress on @p helper.
-/// Runs in a thread-pool worker; signals are auto-queued to the main thread.
 static bool copyFileToDir(const QString &sourcePath, const QString &destDir,
-                          ModelHelper *helper) {
+                          Helpers *helper) {
   QString srcPath = sourcePath;
   if (srcPath.startsWith("file://"))
     srcPath = QUrl(srcPath).toLocalFile();
@@ -230,44 +237,102 @@ static bool copyFileToDir(const QString &sourcePath, const QString &destDir,
   return true;
 }
 
-/* ── ModelHelper ───────────────────────────────────────────────── */
+/* ── Summary QML wrappers ────────────────────────────────────── */
 
-ModelHelper::ModelHelper(ConfigManager *config, QObject *parent)
-    : QObject(parent), m_config(config) {
-  m_networkManager = new QNetworkAccessManager(this);
+QString Helpers::summaryToMarkdown(const QString &json) const {
+  return toMarkdown(parseSummaryJson(json));
+}
 
-  QObject::connect(m_config, &ConfigManager::activeBackendChanged, this,
-                   &ModelHelper::loadActiveBackendModels);
-  QObject::connect(m_config, &ConfigManager::modelCopied, this,
-                   &ModelHelper::loadActiveBackendModels);
+QString Helpers::summaryToLatex(const QString &json) const {
+  return toLatex(parseSummaryJson(json));
+}
 
-  if (m_config) {
-    QObject::connect(this, &ModelHelper::modelCopyProgress, m_config,
-                     &ConfigManager::modelCopyProgress);
-    QObject::connect(this, &ModelHelper::modelCopyFinished, m_config,
-                     &ConfigManager::modelCopyFinished);
-    QObject::connect(this, &ModelHelper::modelCopied, m_config,
-                     &ConfigManager::modelCopied);
-    QObject::connect(this, &ModelHelper::modelCopied, this,
-                     &ModelHelper::refreshLocalModelList, Qt::QueuedConnection);
+/* ── PDF export ──────────────────────────────────────────────── */
+
+static const QString kDefaultPdfStyle =
+    "body { font-family: 'EB Garamond'; font-size: 11pt; }"
+    "h1 { font-family: 'EB Garamond'; font-size: 22pt; font-weight: bold; }"
+    "h2 { font-family: 'EB Garamond'; font-size: 16pt; font-weight: bold; }"
+    "h3 { font-family: 'EB Garamond'; font-size: 13pt; font-weight: bold; }"
+    "code { font-family: 'EB Garamond'; font-size: 10pt; }";
+
+static QString writeMarkdownToPdf(const QString &markdown,
+                                  const QString &destPath,
+                                  const QString &extraStyle = QString()) {
+  QString path = destPath;
+  if (path.startsWith("file://"))
+    path = QUrl(path).toLocalFile();
+
+  QPdfWriter writer(path);
+  writer.setPageSize(QPageSize(QPageSize::A4));
+  writer.setResolution(300);
+  writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+
+  QTextDocument doc;
+  doc.setDefaultFont(QFont("EB Garamond", 11));
+  QString style = kDefaultPdfStyle;
+  if (!extraStyle.isEmpty())
+    style += extraStyle;
+  doc.setDefaultStyleSheet(style);
+  doc.setMarkdown(markdown);
+
+  doc.print(&writer);
+
+  return QFile::exists(path) ? path : QString();
+}
+
+static QString writeHtmlToPdf(const QString &html, const QString &destPath) {
+  QString path = destPath;
+  if (path.startsWith("file://"))
+    path = QUrl(path).toLocalFile();
+
+  QPdfWriter writer(path);
+  writer.setPageSize(QPageSize(QPageSize::A4));
+  writer.setResolution(300);
+  writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+
+  QTextDocument doc;
+  doc.setDefaultFont(QFont("EB Garamond", 11));
+  doc.setDefaultStyleSheet(kDefaultPdfStyle);
+  doc.setHtml(html);
+
+  doc.print(&writer);
+
+  return QFile::exists(path) ? path : QString();
+}
+
+QString Helpers::exportSummaryToPdf(const QString &json,
+                                    const QString &destPath) const {
+  if (json.isEmpty())
+    return QString();
+  return writeMarkdownToPdf(toMarkdown(parseSummaryJson(json)), destPath);
+}
+
+QString Helpers::generateReport(const QStringList &jsonList,
+                                const QString &destPath) const {
+  if (jsonList.isEmpty())
+    return QString();
+
+  QStringList sections;
+  for (const QString &json : jsonList) {
+    if (json.isEmpty())
+      continue;
+    QTextDocument tmp;
+    tmp.setMarkdown(toMarkdown(parseSummaryJson(json)));
+    sections.append(tmp.toHtml());
   }
+  if (sections.isEmpty())
+    return QString();
 
-  refreshLocalModelList();
-  loadActiveBackendModels();
+  QString html = "<h1 style=\"text-align:center\">Research Summary Report</h1>"
+                 "<hr>" +
+                 sections.join("<hr>");
+  return writeHtmlToPdf(html, destPath);
 }
 
-ModelHelper::~ModelHelper() = default;
+/* ── Local model listing ─────────────────────────────────────── */
 
-QString ModelHelper::summaryToMarkdown(const QString &json) const {
-  return SummaryHelpers::toMarkdown(SummaryHelpers::parseSummaryJson(json));
-}
-QString ModelHelper::summaryToLatex(const QString &json) const {
-  return SummaryHelpers::toLatex(SummaryHelpers::parseSummaryJson(json));
-}
-
-/* ── Local model listing ───────────────────────────────────────── */
-
-void ModelHelper::refreshLocalModelList() {
+void Helpers::refreshLocalModelList() {
   if (!m_config)
     return;
   QDir d(m_config->summarizersPath());
@@ -283,9 +348,9 @@ void ModelHelper::refreshLocalModelList() {
   }
 }
 
-QStringList ModelHelper::localModelList() { return m_localModelList; }
+QStringList Helpers::localModelList() { return m_localModelList; }
 
-void ModelHelper::deleteLocalModels(const QStringList &folderNames) {
+void Helpers::deleteLocalModels(const QStringList &folderNames) {
   if (!m_config)
     return;
   for (const QString &name : folderNames) {
@@ -302,14 +367,14 @@ void ModelHelper::deleteLocalModels(const QStringList &folderNames) {
           QFile::remove(entry.absoluteFilePath());
       }
       dir.rmdir(folder);
-      qDebug() << "[ModelHelper] Local model removed:" << folder;
+      qDebug() << "[Helpers] Local model removed:" << folder;
     }
   }
   refreshLocalModelList();
   loadActiveBackendModels();
 }
 
-QStringList ModelHelper::listLocalModels() {
+QStringList Helpers::listLocalModels() {
   if (!m_config)
     return {};
   QString dir = m_config->summarizersPath();
@@ -331,8 +396,8 @@ QStringList ModelHelper::listLocalModels() {
   return models;
 }
 
-QStringList ModelHelper::getImagesForHash(const QString &paperHash,
-                                          const QString &imgPath) const {
+QStringList Helpers::getImagesForHash(const QString &paperHash,
+                                      const QString &imgPath) const {
   QDir imgDir(imgPath);
   if (!imgDir.exists())
     return {};
@@ -344,16 +409,16 @@ QStringList ModelHelper::getImagesForHash(const QString &paperHash,
   return paths;
 }
 
-/* ── Remote backend ────────────────────────────────────────────── */
+/* ── Remote backend ──────────────────────────────────────────── */
 
-void ModelHelper::checkRemoteModels(const QString &name, const QString &apiUrl,
-                                    const QString &apiKey) {
+void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
+                                const QString &apiKey) {
   if (apiUrl.isEmpty()) {
     emit modelsChecked(false, {}, "Invalid parameters");
     return;
   }
   QObject::connect(
-      this, &ModelHelper::modelsChecked, this,
+      this, &Helpers::modelsChecked, this,
       [this, name, apiUrl, apiKey](bool ok, const QStringList &,
                                    const QString &) {
         if (ok && m_config) {
@@ -366,8 +431,7 @@ void ModelHelper::checkRemoteModels(const QString &name, const QString &apiUrl,
   fetchRemoteModels(apiUrl, apiKey);
 }
 
-void ModelHelper::fetchRemoteModels(const QString &apiUrl,
-                                    const QString &apiKey) {
+void Helpers::fetchRemoteModels(const QString &apiUrl, const QString &apiKey) {
   if (apiUrl.isEmpty()) {
     emit modelsChecked(false, {}, "URL is empty");
     return;
@@ -391,7 +455,7 @@ void ModelHelper::fetchRemoteModels(const QString &apiUrl,
                    });
 }
 
-void ModelHelper::handleModelsReply(QNetworkReply *reply) {
+void Helpers::handleModelsReply(QNetworkReply *reply) {
   if (!reply)
     return;
   if (reply->error() != QNetworkReply::NoError) {
@@ -409,12 +473,11 @@ void ModelHelper::handleModelsReply(QNetworkReply *reply) {
     if (!id.isEmpty())
       models.append(id);
   }
-  qDebug() << "[ModelHelper] Received" << models.size()
-           << "model(s) from server";
+  qDebug() << "[Helpers] Received" << models.size() << "model(s) from server";
   emit modelsChecked(true, models, QString());
 }
 
-void ModelHelper::loadActiveBackendModels() {
+void Helpers::loadActiveBackendModels() {
   if (!m_config)
     return;
   QVariantMap cfg = m_config->backendConfig(m_config->activeBackend());
@@ -428,14 +491,14 @@ void ModelHelper::loadActiveBackendModels() {
   }
 }
 
-/* ── Model copy (parallel, non-blocking) ───────────────────── */
+/* ── Model copy (parallel, non-blocking) ─────────────────────── */
 
-void ModelHelper::addLocalSummarizer(const QString &sourcePath) {
+void Helpers::addLocalSummarizer(const QString &sourcePath) {
   addLocalSummarizerWithMmproj(sourcePath, QString());
 }
 
-void ModelHelper::addLocalSummarizerWithMmproj(const QString &modelPath,
-                                               const QString &mmprojPath) {
+void Helpers::addLocalSummarizerWithMmproj(const QString &modelPath,
+                                           const QString &mmprojPath) {
   if (!m_config)
     return;
 
@@ -465,37 +528,26 @@ void ModelHelper::addLocalSummarizerWithMmproj(const QString &modelPath,
   QString modelFolder = m_config->summarizersPath() + "/" + modelName;
   QDir().mkpath(modelFolder);
 
-  // Shared atomic: each copy task decrements; the one that reaches 0 emits
-  // the final signal.
   auto *done = new QAtomicInt(!mmprojSrc.isEmpty() ? 2 : 1);
   QAtomicInt *modelOk = new QAtomicInt{0};
-  QAtomicInt *mmprojOk = new QAtomicInt{1}; // 1 = ok by default
+  QAtomicInt *mmprojOk = new QAtomicInt{1};
 
-  ModelHelper *self = this;
+  Helpers *self = this;
 
-  // Model copy
   QThreadPool::globalInstance()->start(
       [self, src = modelSrc, folder = modelFolder, done, modelOk]() {
         *modelOk = copyFileToDir(src, folder, self) ? 1 : 0;
-        int remaining = done->fetchAndAddRelaxed(-1);
-        if (remaining == 1) {
-          // This task finished last.
-        }
+        done->fetchAndAddRelaxed(-1);
       });
 
-  // MMProj copy (optional)
   if (!mmprojSrc.isEmpty()) {
     QThreadPool::globalInstance()->start(
         [self, src = mmprojSrc, folder = modelFolder, done, mmprojOk]() {
           *mmprojOk = copyFileToDir(src, folder, self) ? 1 : 0;
-          int remaining = done->fetchAndAddRelaxed(-1);
-          if (remaining == 1) {
-            // This task finished last.
-          }
+          done->fetchAndAddRelaxed(-1);
         });
   }
 
-  // Poll the atomic counter via a QTimer to avoid blocking the main thread.
   auto *timer = new QTimer(this);
   timer->setInterval(50);
   QObject::connect(

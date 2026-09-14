@@ -97,8 +97,9 @@ int main(int argc, char *argv[]) {
   // Create the Query controller (RAG over the paper library)
   QueryController queryController(&configManager, &databaseManager);
 
-  // Create the ModelHelper (manages model discovery for QML)
-  ModelHelper modelHelper(&configManager);
+  // Create the Helpers (manages model discovery, summary formatting, PDF
+  // export)
+  Helpers helpers(&configManager);
 
   // Create the OpenAlex reference service (independent background thread)
   OpenAlexClient openAlexClient(&configManager, &databaseManager);
@@ -118,7 +119,7 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("summaryController",
                                            &summaryController);
   engine.rootContext()->setContextProperty("queryController", &queryController);
-  engine.rootContext()->setContextProperty("modelHelper", &modelHelper);
+  engine.rootContext()->setContextProperty("helpers", &helpers);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

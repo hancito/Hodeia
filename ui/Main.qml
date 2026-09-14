@@ -327,7 +327,7 @@ ApplicationWindow {
             }
         }
         onAccepted: {
-            modelHelper.deleteLocalModels(root.selectedModels);
+            helpers.deleteLocalModels(root.selectedModels);
             root.selectedModels = [];
         }
         onRejected: {
@@ -436,7 +436,7 @@ ApplicationWindow {
             if (modelPath === "") {
                 return;
             }
-            modelHelper.addLocalSummarizerWithMmproj(modelPath, mmprojPath);
+            helpers.addLocalSummarizerWithMmproj(modelPath, mmprojPath);
         }
         onClosed: {
             modelPathField.clear();

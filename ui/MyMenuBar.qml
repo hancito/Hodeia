@@ -133,7 +133,7 @@ MenuBar {
             title: "Delete Local Model..."
             width: 280
             Repeater {
-                model: modelHelper.localModelList
+                model: helpers.localModelList
                 delegate: Item {
                     required property var modelData
                     width: contentItem.implicitWidth

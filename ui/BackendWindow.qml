@@ -26,7 +26,7 @@ Dialog {
 
     // React to checkRemoteModels result
     Connections {
-        target: modelHelper
+        target: helpers
         function onModelsChecked(success, models, error) {
             if (success) {
                 modelCheckLabel.text = "Connected — " + models.length + " model(s) available";
@@ -157,7 +157,7 @@ Dialog {
                             modelCheckLabel.visible = true;
                             return;
                         }
-                        modelHelper.checkRemoteModels(n, u, k);
+                        helpers.checkRemoteModels(n, u, k);
                     }
                 }
 

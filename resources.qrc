@@ -15,5 +15,7 @@
         <file>Resources/save.svg</file>
         <file>Resources/share-square.svg</file>
         <file>Resources/trash-can.svg</file>
+        <file>Resources/file-pdf-solid-full.svg</file>
+        <file>Resources/file-pdf-regular-full.svg</file>
     </qresource>
 </RCC>

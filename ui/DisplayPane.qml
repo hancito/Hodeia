@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Dialogs
 import QtQuick.Layouts
 
 Rectangle {
@@ -37,7 +38,7 @@ Rectangle {
         if (activePaperHash === "")
             return [];
         let imgPath = configManager.projectImgPath(configManager.lastProject);
-        return modelHelper.getImagesForHash(activePaperHash, imgPath);
+        return helpers.getImagesForHash(activePaperHash, imgPath);
     }
 
     ColumnLayout {
@@ -166,7 +167,7 @@ Rectangle {
                             textFormat: TextEdit.MarkdownText
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-                            text: displayPane.activeSummaryJson ? modelHelper.summaryToMarkdown(displayPane.activeSummaryJson) : "Please make a summary of this paper"
+                            text: displayPane.activeSummaryJson ? helpers.summaryToMarkdown(displayPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
 
@@ -180,19 +181,17 @@ Rectangle {
                         }
 
                         Button {
-                            text: qsTr("Save")
+                            text: qsTr("PDF")
                             icon.width: 24
                             icon.height: 24
-                            icon.source: "qrc:/Resources/save.svg"
-                            onClicked: console.log(displayPane.activeSummaryJson)
-                        }
-
-                        Button {
-                            text: qsTr("Edit")
-                            icon.width: 24
-                            icon.height: 24
-                            icon.source: "qrc:/Resources/edit.svg"
-                            onClicked: textEditor.readOnly = !textEditor.readOnly
+                            icon.source: "qrc:/Resources/file-pdf-solid-full.svg"
+                            onClicked: {
+                                if (!displayPane.activeSummaryJson) {
+                                    console.warn("No summary to export");
+                                    return;
+                                }
+                                pdfSaveDialog.open();
+                            }
                         }
                     }
                 }
@@ -326,6 +325,20 @@ Rectangle {
                     horizontalAlignment: Text.AlignHCenter
                 }
             }
+        }
+    }
+
+    FileDialog {
+        id: pdfSaveDialog
+        title: qsTr("Save Summary as PDF")
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["PDF Files (*.pdf)"]
+        onAccepted: {
+            var result = helpers.exportSummaryToPdf(displayPane.activeSummaryJson, selectedFile.toString());
+            if (result)
+                console.log("PDF saved to:", result);
+            else
+                console.warn("PDF export failed");
         }
     }
 }
