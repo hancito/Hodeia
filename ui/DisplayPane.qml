@@ -8,7 +8,6 @@ Rectangle {
     property var activeTheme: ({})
     property string activePaperHash: ""
     color: Colors.surface0
-    opacity: 1
     border.width: 1
     radius: 5
 
@@ -199,94 +198,64 @@ Rectangle {
                 }
             }
 
-            Item {
-                id: refTab
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.rightMargin: 5
-                    anchors.leftMargin: 5
-                    spacing: 10
-                    ScrollView {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                        TextArea {
-                            id: refEditor
-                            readOnly: true
-                            textFormat: TextEdit.MarkdownText
-                            hoverEnabled: true
-                            selectByMouse: true
-                            font.pointSize: 12
-                            wrapMode: TextEdit.WordWrap
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
-                                acceptedButtons: Qt.NoButton // Allows underlying TextArea to handle clicks and text selection
-                            }
-
-                            // Open a clicked link in the default browser.
-                            onLinkActivated: function (link) {
-                                Qt.openUrlExternally(link);
-                            }
-                            // APA formatting + section/total logic now lives in
-                            // CitationsModel::referencesDisplayForHash (C++).
-                            // Reading model.version makes the binding re-evaluate
-                            // after loadAll() (the invokable call is not a
-                            // trackable dependency on its own).
-                            text: {
-                                var model = databaseManager.citationsModel;
-                                var v = model.version;
-                                var s = model.citesDisplayForHash(displayPane.activePaperHash);
-                                return s ? s : "No references found for this paper";
+            // Shared markup for the "References (Cited)" and "Cited by" tabs.
+            // The only difference between the two is which model method feeds
+            // the TextArea, so it is parameterised by the `displayMethod`
+            // property. APA formatting lives in CitationsModel (C++); reading
+            // model.version makes the binding re-evaluate after loadAll().
+            Component {
+                id: referenceTabComponent
+                Item {
+                    // Set by the Loader that instantiates this component.
+                    property string displayMethod: "cites"
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.rightMargin: 5
+                        anchors.leftMargin: 5
+                        spacing: 10
+                        ScrollView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                            TextArea {
+                                readOnly: true
+                                textFormat: TextEdit.MarkdownText
+                                hoverEnabled: true
+                                selectByMouse: true
+                                font.pointSize: 12
+                                wrapMode: TextEdit.WordWrap
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
+                                    acceptedButtons: Qt.NoButton // Let the TextArea handle clicks and text selection
+                                }
+                                onLinkActivated: function (link) {
+                                    Qt.openUrlExternally(link);
+                                }
+                                text: {
+                                    var model = databaseManager.citationsModel;
+                                    var v = model.version; // invalidate after loadAll()
+                                    var s = displayMethod === "citedBy" ? model.citedByDisplayForHash(displayPane.activePaperHash) : model.citesDisplayForHash(displayPane.activePaperHash);
+                                    return s ? s : "No references found for this paper";
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Item {
-                id: refTab2
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.rightMargin: 5
-                    anchors.leftMargin: 5
-                    spacing: 10
-                    ScrollView {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                        TextArea {
-                            id: refCitedBy
-                            readOnly: true
-                            textFormat: TextEdit.MarkdownText
-                            hoverEnabled: true
-                            selectByMouse: true
-                            font.pointSize: 12
-                            wrapMode: TextEdit.WordWrap
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
-                                acceptedButtons: Qt.NoButton // Allows underlying TextArea to handle clicks and text selection
-                            }
+            Loader {
+                id: refTab
+                active: true
+                sourceComponent: referenceTabComponent
+                onLoaded: item.displayMethod = "cites"
+            }
 
-                            // Open a clicked link in the default browser.
-                            onLinkActivated: function (link) {
-                                Qt.openUrlExternally(link);
-                            }
-                            // APA formatting + section/total logic now lives in
-                            // CitationsModel::referencesDisplayForHash (C++).
-                            // Reading model.version makes the binding re-evaluate
-                            // after loadAll() (the invokable call is not a
-                            // trackable dependency on its own).
-                            text: {
-                                var model = databaseManager.citationsModel;
-                                var v = model.version;
-                                var s = model.citedByDisplayForHash(displayPane.activePaperHash);
-                                return s ? s : "No references found for this paper";
-                            }
-                        }
-                    }
-                }
+            Loader {
+                id: refTab2
+                active: true
+                sourceComponent: referenceTabComponent
+                onLoaded: item.displayMethod = "citedBy"
             }
             // ── PDF tab ─────────────────────────────────────
             Item {
@@ -294,24 +263,51 @@ Rectangle {
                 property real pdfZoomLevel: 1
                 clip: true
 
+                // fitW/fitH: the image's size after PreserveAspectFit into the
+                // viewport (zoom 1). Derived from nativeWidth/Height (not the
+                // bound width/height, which would be circular). Falls back to
+                // the viewport size before the image loads, because
+                // nativeWidth is undefined (not 0) and undefined <= 0 is false
+                // in JS, which would otherwise produce NaN.
+                readonly property real fitW: {
+                    if (!pdfImageItem.nativeWidth || !pdfImageItem.nativeHeight)
+                        return pdfTab.width;
+                    return pdfImageItem.nativeWidth * Math.min(pdfTab.width / pdfImageItem.nativeWidth, pdfTab.height / pdfImageItem.nativeHeight);
+                }
+                readonly property real fitH: {
+                    if (!pdfImageItem.nativeWidth || !pdfImageItem.nativeHeight)
+                        return pdfTab.height;
+                    return pdfImageItem.nativeHeight * Math.min(pdfTab.width / pdfImageItem.nativeWidth, pdfTab.height / pdfImageItem.nativeHeight);
+                }
+                readonly property real zoomedWidth: pdfTab.fitW * pdfTab.pdfZoomLevel
+                readonly property real zoomedHeight: pdfTab.fitH * pdfTab.pdfZoomLevel
+                // Content must never shrink below the viewport, otherwise a
+                // portrait page (fit < viewport) or the pre-load state collapses
+                // the Flickable content and clips the image away.
+                readonly property real effContentW: Math.max(pdfTab.zoomedWidth, pdfFlickable.width)
+                readonly property real effContentH: Math.max(pdfTab.zoomedHeight, pdfFlickable.height)
+
                 Flickable {
                     id: pdfFlickable
                     anchors.fill: parent
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    contentWidth: pdfImageItem.width * pdfImageItem.scale
-                    contentHeight: pdfImageItem.height * pdfImageItem.scale
+                    contentWidth: pdfTab.effContentW
+                    contentHeight: pdfTab.effContentH
 
                     ScrollBar.vertical: ScrollBar {}
                     ScrollBar.horizontal: ScrollBar {}
 
                     Image {
                         id: pdfImageItem
-                        width: pdfTab.width
-                        height: pdfTab.height
+                        // Center the zoomed box within the (viewport-or-larger)
+                        // content area so the page is always visible.
+                        x: (pdfFlickable.contentWidth - pdfTab.zoomedWidth) / 2
+                        y: (pdfFlickable.contentHeight - pdfTab.zoomedHeight) / 2
+                        width: pdfTab.zoomedWidth
+                        height: pdfTab.zoomedHeight
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
-                        scale: pdfTab.pdfZoomLevel
                         source: {
                             if (displayPane.pageImages.length > 0)
                                 "file://" + displayPane.pageImages[Math.max(pageSpinner.value - 1, 0)];
