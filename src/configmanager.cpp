@@ -30,6 +30,7 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
     (void)createProject("Default");
   }
   ensureModelsDirectory();
+  seedDefaultEmbedder();
   refreshProjectList();
 }
 
@@ -419,6 +420,43 @@ void ConfigManager::ensureModelsDirectory() {
     modelsDir.mkpath("Embedders");
     modelsDir.mkpath("Summarizers");
   }
+}
+
+void ConfigManager::seedDefaultEmbedder() {
+  static const QString kModelName =
+      QStringLiteral("multilingual-e5-small-q8_0.gguf");
+
+  const QString destDir = embeddersPath();
+  const QString destPath = destDir + "/" + kModelName;
+
+  // Nothing to do if the model is already in place.
+  if (QFile::exists(destPath))
+    return;
+
+  // The default model ships in the Resources/Embedders/ folder.  At runtime
+  // that folder lives next to the executable in a normal install.
+  const QString appDir = QCoreApplication::applicationDirPath();
+  const QStringList candidates = {
+      appDir + "/Resources/Embedders/" + kModelName,
+      appDir + "/Embedders/" + kModelName,
+      appDir + "/" + kModelName,
+  };
+
+  for (const QString &src : candidates) {
+    if (!QFile::exists(src))
+      continue;
+
+    if (QFile::copy(src, destPath)) {
+      qInfo() << "[Config] Seeded default embedder model:" << destPath;
+      return;
+    }
+
+    qWarning() << "[Config] Failed to copy embedder model from" << src << "to"
+               << destPath;
+  }
+
+  qWarning() << "[Config] No bundled embedder model found; looked in"
+             << candidates;
 }
 
 QString ConfigManager::modelsRoot() const {

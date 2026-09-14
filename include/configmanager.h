@@ -129,6 +129,9 @@ signals:
 private:
   void refreshProjectList();
   void ensureModelsDirectory();
+  /// Copy the default embedding model into the data dir if it is missing.
+  /// Runs once at startup so SqliteVecManager can find it on a fresh install.
+  void seedDefaultEmbedder();
   QString getFilePath() const;
   QString projectsRoot() const;
   QString modelsRoot() const;

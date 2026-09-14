@@ -345,6 +345,13 @@ function(hodeia_windows_deploy TARGET)
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
+  # --- Default embedding model (seeded into the data dir on first run) ---
+  add_custom_command(TARGET ${TARGET} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/Resources/Embedders
+          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
+      COMMENT "Copying default embedding model")
+
   # --- Base .dll ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
