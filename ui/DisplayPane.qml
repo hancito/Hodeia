@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import QtQuick.Pdf
 
 Rectangle {
     id: displayPane
@@ -57,7 +56,10 @@ Rectangle {
                 text: qsTr("Text")
             }
             TabButton {
-                text: qsTr("References")
+                text: qsTr("References (Cited)")
+            }
+            TabButton {
+                text: qsTr("Cited by")
             }
             TabButton {
                 text: qsTr("PDF")
@@ -66,7 +68,7 @@ Rectangle {
 
         // Page navigation row (visible only on PDF tab)
         RowLayout {
-            visible: tabBar.currentIndex === 2
+            visible: tabBar.currentIndex === 3
             Layout.fillWidth: true
             spacing: 8
             opacity: displayPane.pageImages.length > 0 ? 1 : 0
@@ -212,9 +214,20 @@ Rectangle {
                             id: refEditor
                             readOnly: true
                             textFormat: TextEdit.MarkdownText
+                            hoverEnabled: true
+                            selectByMouse: true
                             font.pointSize: 12
                             wrapMode: TextEdit.WordWrap
-                            placeholderText: "Select a paper to see its references"
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
+                                acceptedButtons: Qt.NoButton // Allows underlying TextArea to handle clicks and text selection
+                            }
+
+                            // Open a clicked link in the default browser.
+                            onLinkActivated: function (link) {
+                                Qt.openUrlExternally(link);
+                            }
                             // APA formatting + section/total logic now lives in
                             // CitationsModel::referencesDisplayForHash (C++).
                             // Reading model.version makes the binding re-evaluate
@@ -223,7 +236,52 @@ Rectangle {
                             text: {
                                 var model = databaseManager.citationsModel;
                                 var v = model.version;
-                                var s = model.referencesDisplayForHash(displayPane.activePaperHash);
+                                var s = model.citesDisplayForHash(displayPane.activePaperHash);
+                                return s ? s : "No references found for this paper";
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item {
+                id: refTab2
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.rightMargin: 5
+                    anchors.leftMargin: 5
+                    spacing: 10
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                        TextArea {
+                            id: refCitedBy
+                            readOnly: true
+                            textFormat: TextEdit.MarkdownText
+                            hoverEnabled: true
+                            selectByMouse: true
+                            font.pointSize: 12
+                            wrapMode: TextEdit.WordWrap
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.IBeamCursor
+                                acceptedButtons: Qt.NoButton // Allows underlying TextArea to handle clicks and text selection
+                            }
+
+                            // Open a clicked link in the default browser.
+                            onLinkActivated: function (link) {
+                                Qt.openUrlExternally(link);
+                            }
+                            // APA formatting + section/total logic now lives in
+                            // CitationsModel::referencesDisplayForHash (C++).
+                            // Reading model.version makes the binding re-evaluate
+                            // after loadAll() (the invokable call is not a
+                            // trackable dependency on its own).
+                            text: {
+                                var model = databaseManager.citationsModel;
+                                var v = model.version;
+                                var s = model.citedByDisplayForHash(displayPane.activePaperHash);
                                 return s ? s : "No references found for this paper";
                             }
                         }

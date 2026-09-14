@@ -52,7 +52,9 @@ public:
   /// Returns an empty string if the paper has no citation row.  Both the
   /// "References" (works this paper cited) and "Cited by" (works that cite it)
   /// sections are produced here, with the true OpenAlex totals in the headers.
-  Q_INVOKABLE QString referencesDisplayForHash(const QString &paperHash) const;
+
+  Q_INVOKABLE QString citesDisplayForHash(const QString &paperHash) const;
+  Q_INVOKABLE QString citedByDisplayForHash(const QString &paperHash) const;
 
 signals:
   void versionChanged();

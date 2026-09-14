@@ -80,8 +80,19 @@ const CitationRow *CitationsModel::findByHash(const QString &paperHash) const {
   return nullptr;
 }
 
-QString
-CitationsModel::referencesDisplayForHash(const QString &paperHash) const {
+QString CitationsModel::citedByDisplayForHash(const QString &paperHash) const {
+  const CitationRow *row = findByHash(paperHash);
+  if (!row)
+    return {};
+
+  // "References" = works this paper cited (citedBy column).
+  // "Cited by"   = works that cite it (cites column).
+  QString out;
+  out += formatSection("Cited by", row->cites, row->citesCount);
+  return out;
+}
+
+QString CitationsModel::citesDisplayForHash(const QString &paperHash) const {
   const CitationRow *row = findByHash(paperHash);
   if (!row)
     return {};
@@ -90,7 +101,6 @@ CitationsModel::referencesDisplayForHash(const QString &paperHash) const {
   // "Cited by"   = works that cite it (cites column).
   QString out;
   out += formatSection("References", row->citedBy, row->citedByCount);
-  out += formatSection("Cited by", row->cites, row->citesCount);
   return out;
 }
 
@@ -120,20 +130,19 @@ QString CitationsModel::formatSection(const QString &header,
                                       int total) const {
   QString out;
   out += "## ";
+  out += header + " ( ";
 
   // Show the true OpenAlex total in the header; note when the list is capped.
   QJsonArray arr = QJsonDocument::fromJson(itemsJson.toUtf8()).array();
   const int shown = arr.size();
   if (total > 0) {
-    out += QString::number(total);
+    out += QString::number(total) + " ) " + "\n\n";
     if (shown < total)
-      out += ", showing top " + QString::number(shown);
-    out += " ";
+      out += " ( Showing top " + QString::number(shown) + " ) " + "\n\n";
   }
-  out += header + "\n\n";
 
   if (arr.isEmpty()) {
-    out += "None found on OpenAlex.\n\n";
+    out += "None found on OpenAlex ) \n\n";
     return out;
   }
 
@@ -153,8 +162,17 @@ QString CitationsModel::formatSection(const QString &header,
     if (!journal.isEmpty())
       line += " " + journal + ".";
     const QString doi = r.value("doi").toString();
-    if (!doi.isEmpty())
-      line += " " + doi;
+    if (!doi.isEmpty()) {
+      // Render as a Markdown link so the references tab shows a clickable
+      // DOI.  OpenAlex returns a full URL; if a bare DOI is stored instead,
+      // prefix the canonical resolver so it still resolves.
+      const QString url =
+          doi.startsWith("http://", Qt::CaseInsensitive) ||
+                  doi.startsWith("https://", Qt::CaseInsensitive)
+              ? doi
+              : QStringLiteral("https://doi.org/") + doi;
+      line += " [" + doi + "](" + url + ")";
+    }
     out += line + "\n";
   }
   return out;
