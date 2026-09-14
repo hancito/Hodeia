@@ -53,7 +53,7 @@ struct ExtractionResult {
 
 class SummaryModel : public QAbstractListModel {
   Q_OBJECT
-
+  // Qt::UserRole is 256 so IdRole is 257 and so on
 public:
   enum Roles {
     IdRole = Qt::UserRole + 1,

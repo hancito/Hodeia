@@ -268,7 +268,7 @@ Rectangle {
 
             ComboBox {
                 id: sortComboBox
-                model: ["Title", "Date", "Pages", "Model", "Citations"]
+                model: ["Title", "Date", "Pages", "Model", "Year", "Citations"]
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
                     // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265,
@@ -282,7 +282,9 @@ Rectangle {
                         ,
                         3: 265   // LlmModel
                         ,
-                        4: 269   // CitesCount (papers that cite this paper)
+                        4: 263 // Year
+                        ,
+                        5: 269   // CitesCount (papers that cite this paper)
                     };
                     databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 259;
                 }
@@ -314,6 +316,7 @@ Rectangle {
                 required property string formattedDate
                 required property string paperHash
                 required property int citesCount
+                required property string year
                 width: paperListView.width
                 height: 120
                 border.width: summaryDbPane.activePaperHash === paperHash ? 4 : 5
@@ -365,7 +368,7 @@ Rectangle {
                         Layout.fillWidth: true
                         Label {
                             font.pixelSize: 12
-                            text: pagesNum
+                            text: "Year: " + year + " · " + pagesNum + " pages "
                             font.family: Fonts.mono
                         }
                         Label {
