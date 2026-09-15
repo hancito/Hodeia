@@ -11,6 +11,7 @@
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QVector>
 
 // Marker stored in cites/cited_by when OpenAlex has no data for a paper.
 // Non-empty so the startup scan doesn't retry it, but distinct from a JSON
@@ -96,27 +97,25 @@ void OpenAlexClient::checkEmptyReferences() {
           return;
         }
 
-        int count = 0;
-        QStringList toFetch;
+        QVector<QPair<QString, QString>> toFetch;
         while (true) {
           auto stepResult = stmt.step();
           if (!stepResult || !*stepResult)
             break;
-          toFetch << stmt.columnText(0) + "|" + stmt.columnText(1);
-          count++;
+          toFetch.append(qMakePair(stmt.columnText(0), stmt.columnText(1)));
         }
 
-        if (count == 0) {
+        if (toFetch.isEmpty()) {
           qInfo() << "[OpenAlex] Scan: no empty citations to fetch";
           return;
         }
 
-        qInfo() << "[OpenAlex] Scan:" << count << "empty citation(s) to fetch";
+        qInfo() << "[OpenAlex] Scan:" << toFetch.size()
+                << "empty citation(s) to fetch";
 
         for (const auto &entry : toFetch) {
-          int sep = entry.indexOf('|');
-          QString hash = entry.left(sep);
-          QString title = entry.mid(sep + 1);
+          const QString hash = entry.first;
+          const QString title = entry.second;
           QMetaObject::invokeMethod(
               this, [this, hash, title]() { fetchAndSave(hash, title); },
               Qt::QueuedConnection);
@@ -146,7 +145,7 @@ void OpenAlexClient::fetchAndSave(const QString &paperHash,
       this,
       [this, paperHash, title]() {
         PaperMeta meta = loadPaperMeta(paperHash);
-        semanticSearch(paperHash, meta);
+        searchByTitle(paperHash, meta); // exact-title first (most precise)
       },
       Qt::QueuedConnection);
 }
@@ -174,154 +173,120 @@ OpenAlexClient::loadPaperMeta(const QString &paperHash) const {
   return meta;
 }
 
-void OpenAlexClient::semanticSearch(const QString &paperHash,
-                                    const PaperMeta &meta) {
+// Fields requested for each search-tier candidate.
+static const char *kSearchSelect =
+    "id,display_name,authorships,publication_year,primary_location";
+
+void OpenAlexClient::runSearchTier(
+    const QString &paperHash, const PaperMeta &meta, const QUrlQuery &query,
+    const QString &label,
+    std::function<void(const QString &, const PaperMeta &)> fallthrough) {
   if (!m_nam)
     m_nam = new QNetworkAccessManager(this);
 
-  const QString searchTitle = meta.cleanTitle.trimmed();
-  if (searchTitle.isEmpty()) {
-    qWarning() << "[OpenAlex] Empty title — skipping" << paperHash.left(12);
-    return;
-  }
-
-  // The search text goes directly into "search.semantic" (no separate
-  // "search" param).  Keep apostrophes and hyphens — semantic search embeds
-  // the query, so it tolerates punctuation.
   QUrl url("https://api.openalex.org/works");
-  QUrlQuery query;
-  query.addQueryItem("search.semantic", searchTitle);
-  query.addQueryItem("sort", "relevance_score:desc");
-  query.addQueryItem("per-page", "20");
-  query.addQueryItem(
-      "select",
-      "id,display_name,authorships,publication_year,primary_location");
-  appendAuthQuery(query);
   url.setQuery(query);
 
   QNetworkRequest req(url);
   req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
 
-  qInfo() << "[OpenAlex] ── SEMANTIC ──"
-          << "paper:" << paperHash.left(12) << "| title:" << searchTitle
+  qInfo() << "[OpenAlex] ──" << label << "──"
+          << "paper:" << paperHash.left(12)
           << "| URL:" << url.toString(QUrl::FullyEncoded);
 
   m_pending = m_nam->get(req);
-  connect(m_pending, &QNetworkReply::finished, this,
-          [this, reply = m_pending, paperHash, meta]() {
-            if (m_pending == reply)
-              m_pending = nullptr;
-            if (!scoreAndFetch(reply, paperHash, meta, "SEMANTIC"))
-              searchByTitle(paperHash, meta); // no confident match — tier 2
-          });
+  connect(
+      m_pending, &QNetworkReply::finished, this,
+      [this, reply = m_pending, paperHash, meta, label,
+       fallthrough = std::move(fallthrough)]() {
+        if (m_pending == reply)
+          m_pending = nullptr;
+        if (scoreAndFetch(reply, paperHash, meta, label))
+          return;
+        // No confident match — run the next tier, or give up (all tiers
+        // failed; leave the columns empty so the scan can retry later,
+        // the paper may simply be missing from OpenAlex).
+        if (fallthrough)
+          fallthrough(paperHash, meta);
+        else
+          qWarning() << "[OpenAlex] ── NO MATCH ──"
+                     << "paper:" << paperHash.left(12)
+                     << "| no confident match across semantic, title, author";
+      });
+}
+
+void OpenAlexClient::semanticSearch(const QString &paperHash,
+                                    const PaperMeta &meta) {
+  // Tier 2: embedding-based semantic search, used when exact-title search
+  // finds no confident match (the right work can be missing from the
+  // title-indexed results).  The search text goes directly into
+  // "search.semantic" (no separate "search" param); keep apostrophes and
+  // hyphens — semantic search embeds the query, so it tolerates punctuation.
+  const QString searchTitle = meta.cleanTitle.trimmed();
+  if (searchTitle.isEmpty()) {
+    qWarning() << "[OpenAlex] Empty title — skipping" << paperHash.left(12);
+    return;
+  }
+  QUrlQuery query;
+  query.addQueryItem("search.semantic", searchTitle);
+  query.addQueryItem("sort", "relevance_score:desc");
+  query.addQueryItem("per-page", "20");
+  query.addQueryItem("select", kSearchSelect);
+  appendAuthQuery(query);
+  runSearchTier(paperHash, meta, query, "SEMANTIC",
+                [this](const QString &h, const PaperMeta &m) {
+                  searchByAuthor(h, m); // no confident match — tier 3
+                });
 }
 
 void OpenAlexClient::searchByTitle(const QString &paperHash,
                                    const PaperMeta &meta) {
-  if (!m_nam)
-    m_nam = new QNetworkAccessManager(this);
-
+  // Tier 1: exact-title search (what the OpenAlex website uses) — the most
+  // precise signal, so it runs first.  Ranks the matching work high; the
+  // author gate then disambiguates duplicates.
   const QString searchTitle = meta.cleanTitle.trimmed();
   if (searchTitle.isEmpty()) {
     qWarning() << "[OpenAlex] Empty title — skipping title search"
                << paperHash.left(12);
     return;
   }
-
-  // "search.title" (what the OpenAlex website uses) ranks the matching work
-  // high even when embedding-based "search.semantic" buries it.
-  QUrl url("https://api.openalex.org/works");
   QUrlQuery query;
   query.addQueryItem("search.title", searchTitle);
   query.addQueryItem("sort", "relevance_score:desc");
   query.addQueryItem("per-page", "20");
-  query.addQueryItem(
-      "select",
-      "id,display_name,authorships,publication_year,primary_location");
+  query.addQueryItem("select", kSearchSelect);
   appendAuthQuery(query);
-  url.setQuery(query);
-
-  QNetworkRequest req(url);
-  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
-
-  qInfo() << "[OpenAlex] ── TITLE ──"
-          << "paper:" << paperHash.left(12) << "| title:" << searchTitle
-          << "| URL:" << url.toString(QUrl::FullyEncoded);
-
-  m_pending = m_nam->get(req);
-  connect(m_pending, &QNetworkReply::finished, this,
-          [this, reply = m_pending, paperHash, meta]() {
-            if (m_pending == reply)
-              m_pending = nullptr;
-            if (!scoreAndFetch(reply, paperHash, meta, "TITLE"))
-              searchByAuthor(paperHash, meta); // no confident match — tier 3
-          });
+  runSearchTier(paperHash, meta, query, "TITLE",
+                [this](const QString &h, const PaperMeta &m) {
+                  semanticSearch(h, m); // no confident match — tier 2
+                });
 }
 
 void OpenAlexClient::searchByAuthor(const QString &paperHash,
                                     const PaperMeta &meta) {
-  if (!m_nam)
-    m_nam = new QNetworkAccessManager(this);
-
-  // Last resort: search by the first author's name.  bestCandidate then
-  // disambiguates on title > authors > year > journal.
-  QString author = meta.authors.isEmpty() ? QString() : meta.authors.first();
-  author = author.trimmed();
+  // Tier 3 (last resort): search by the first author's name.
+  // raw_author_name.search is the only author-name filter on /works
+  // (author.display_name.search is not a valid field).  bestCandidate then
+  // disambiguates.
+  const QString author =
+      meta.authors.isEmpty() ? QString() : meta.authors.first().trimmed();
   if (author.isEmpty()) {
     qWarning() << "[OpenAlex] No authors for author search"
                << paperHash.left(12);
     return;
   }
-
-  QUrl url("https://api.openalex.org/works");
   QUrlQuery query;
-  // raw_author_name.search is the only author-name filter on /works
-  // (author.display_name.search is not a valid field).  It matches the
-  // first author's name; bestCandidate then disambiguates.
   query.addQueryItem("filter",
                      QString("raw_author_name.search:%1").arg(author));
   query.addQueryItem("sort", "publication_year:desc");
   query.addQueryItem("per-page", "50");
-  query.addQueryItem(
-      "select",
-      "id,display_name,authorships,publication_year,primary_location");
+  query.addQueryItem("select", kSearchSelect);
   appendAuthQuery(query);
-  url.setQuery(query);
-
-  QNetworkRequest req(url);
-  req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
-
-  qInfo() << "[OpenAlex] ── AUTHOR ──"
-          << "paper:" << paperHash.left(12) << "| author:" << author
-          << "| URL:" << url.toString(QUrl::FullyEncoded);
-
-  m_pending = m_nam->get(req);
-  connect(
-      m_pending, &QNetworkReply::finished, this,
-      [this, reply = m_pending, paperHash, meta]() {
-        if (m_pending == reply)
-          m_pending = nullptr;
-        if (!scoreAndFetch(reply, paperHash, meta, "AUTHOR")) {
-          // All three tiers failed — leave the columns empty so the scan
-          // can retry later (the paper may simply be missing from OpenAlex).
-          qWarning() << "[OpenAlex] ── NO MATCH ──"
-                     << "paper:" << paperHash.left(12)
-                     << "| no confident match across semantic, title, author";
-        }
-      });
+  runSearchTier(paperHash, meta, query, "AUTHOR",
+                {}); // last tier — no fallback
 }
 
 /* ── Candidate disambiguation ────────────────────────────────── */
-
-// Normalise a title for comparison: lowercase, drop non-alphanumerics.
-static QString normalizeTitle(const QString &s) {
-  QString out;
-  out.reserve(s.size());
-  for (const QChar &c : s.toLower())
-    if (c.isLetterOrNumber())
-      out.append(c);
-  return out;
-}
 
 // Case-insensitive containment of a substring (needle) in haystack.
 static bool containsCI(const QString &haystack, const QString &needle) {
@@ -331,26 +296,111 @@ static bool containsCI(const QString &haystack, const QString &needle) {
   return haystack.toLower().contains(n.toLower());
 }
 
+// Levenshtein edit-distance thresholds (percent of the shorter string's
+// length) for the fuzzy fields in bestCandidate.  Authors are matched
+// most loosely (middle initials, transliterations, diacritics), title and
+// journal more strictly.
+static constexpr int kAuthorFuzzyPct = 40;
+static constexpr int kTitleFuzzyPct = 30;
+static constexpr int kJournalFuzzyPct = 30;
+
+// Normalise a string for fuzzy comparison: lowercase, keep letters and
+// digits only (drops punctuation, whitespace, symbols).  Diacritics and
+// special Unicode chars (ß, ü, é, …) are kept as-is — the Levenshtein
+// threshold in fuzzyMatch absorbs the small edit distance they add
+// (e.g. "cornelissen" vs "cornelißen" = 2 edits).
+static QString normalizeName(const QString &s) {
+  QString out;
+  out.reserve(s.size());
+  for (const QChar &c : s.toLower())
+    if (c.isLetterOrNumber())
+      out.append(c);
+  return out;
+}
+
+// Levenshtein edit distance (iterative, O(n·m)).
+static int levenshtein(const QString &a, const QString &b) {
+  const int n = a.size(), m = b.size();
+  if (n == 0)
+    return m;
+  if (m == 0)
+    return n;
+  QVector<int> prev(m + 1), cur(m + 1);
+  for (int j = 0; j <= m; ++j)
+    prev[j] = j;
+  for (int i = 1; i <= n; ++i) {
+    cur[0] = i;
+    for (int j = 1; j <= m; ++j) {
+      const int cost = (a[i - 1] == b[j - 1]) ? 0 : 1;
+      cur[j] = qMin(qMin(prev[j] + 1, cur[j - 1] + 1), prev[j - 1] + cost);
+    }
+    std::swap(prev, cur);
+  }
+  return prev[m];
+}
+
+// Fuzzy match: normalise both strings, then accept if one contains the
+// other or the Levenshtein distance is within @p pct percent of the
+// shorter string's length.  pct=30 means "allow up to 30% edits."
+static bool fuzzyMatch(const QString &a, const QString &b, int pct) {
+  const QString na = normalizeName(a);
+  const QString nb = normalizeName(b);
+  if (na.isEmpty() || nb.isEmpty())
+    return false;
+  if (na == nb || na.contains(nb) || nb.contains(na))
+    return true;
+  const int dist = levenshtein(na, nb);
+  const int len = qMin(na.size(), nb.size());
+  return dist * 100 <= len * pct;
+}
+
+// OpenAlex stores duplicate records for the same paper (e.g. the
+// journal-version of record plus a repository/working-copy version).
+// The journal version is the canonical one and the one that carries
+// the real citation graph, so we prefer it when disambiguating.
+static bool preferWork(const QJsonObject &a, const QJsonObject &b) {
+  const auto locName = [](const QJsonObject &w) {
+    return w.value("primary_location")
+        .toObject()
+        .value("source")
+        .toObject()
+        .value("display_name")
+        .toString()
+        .trimmed();
+  };
+  const QString la = locName(a);
+  const QString lb = locName(b);
+  const bool ea = la.isEmpty() || la == "N/A";
+  const bool eb = lb.isEmpty() || lb == "N/A";
+  if (ea != eb)
+    return !ea; // a has a real venue
+  if (ea && eb)
+    return false;
+  return la < lb; // deterministic tiebreak
+}
+
 int OpenAlexClient::bestCandidate(const QJsonArray &results,
                                   const PaperMeta &meta) const {
-  const QString nt = normalizeTitle(meta.cleanTitle);
   int bestIdx = -1;
   int bestScore = 0;
 
   for (int i = 0; i < results.size(); ++i) {
     const QJsonObject w = results.at(i).toObject();
     int score = 0;
+    bool authorMatch = false;
 
-    // 1. Title (strongest signal).
+    // 1. Title (strongest signal) — fuzzy, kTitleFuzzyPct threshold.
     const QString candTitle = w.value("display_name").toString();
-    if (!nt.isEmpty() && normalizeTitle(candTitle) == nt)
+    if (!meta.cleanTitle.isEmpty() &&
+        fuzzyMatch(meta.cleanTitle, candTitle, kTitleFuzzyPct))
       score += 3;
     else if (containsCI(candTitle, meta.cleanTitle) ||
              containsCI(meta.cleanTitle, candTitle))
       score += 2;
 
-    // 2. Authors — a candidate matches if its authorships mention every one
-    //    of our authors (we may have fewer than OpenAlex records).
+    // 2. Authors — each local author must fuzzy-match (40% threshold) at
+    //    least one candidate author.  We may have fewer authors than
+    //    OpenAlex records, so it's enough that all of ours appear.
     if (!meta.authors.isEmpty()) {
       QStringList candAuthors;
       for (const QJsonValue &av : w.value("authorships").toArray())
@@ -365,25 +415,32 @@ int OpenAlexClient::bestCandidate(const QJsonArray &results,
                              .toObject()
                              .value("display_name")
                              .toString();
-      const QString candAuthorsAll = candAuthors.join(" | ").toLower();
-      bool allFound = !candAuthorsAll.isEmpty();
-      for (const QString &a : meta.authors)
-        if (!containsCI(candAuthorsAll, a)) {
-          allFound = false;
+      authorMatch = !candAuthors.isEmpty();
+      for (const QString &a : meta.authors) {
+        bool found = false;
+        for (const QString &ca : candAuthors)
+          if (fuzzyMatch(a, ca, kAuthorFuzzyPct)) {
+            found = true;
+            break;
+          }
+        if (!found) {
+          authorMatch = false;
           break;
         }
-      if (allFound)
+      }
+      if (authorMatch)
         score += 2;
     }
 
-    // 3. Year.
+    // 3. Year — allow ±1 to tolerate online-first vs. issue-date mismatches
+    //    (e.g. local says 2004, OpenAlex says 2003 for the same paper).
     if (meta.year > 0) {
       const int candYear = w.value("publication_year").toInt();
-      if (candYear == meta.year)
+      if (qAbs(candYear - meta.year) <= 1)
         score += 1;
     }
 
-    // 4. Journal — from primary_location.source.display_name.
+    // 4. Journal — fuzzy, kJournalFuzzyPct threshold.
     if (!meta.journal.isEmpty()) {
       const QString candJournal = w.value("primary_location")
                                       .toObject()
@@ -391,13 +448,25 @@ int OpenAlexClient::bestCandidate(const QJsonArray &results,
                                       .toObject()
                                       .value("display_name")
                                       .toString();
-      if (containsCI(candJournal, meta.journal) ||
-          containsCI(meta.journal, candJournal))
+      if (fuzzyMatch(meta.journal, candJournal, kJournalFuzzyPct))
         score += 1;
     }
 
+    // If we have author metadata, a candidate whose authors don't match is
+    // likely a *different* paper with a similar title (OpenAlex has many
+    // works sharing the same or near-same title by different authors).
+    // Reject it outright so we fall through to the next search tier.
+    if (!meta.authors.isEmpty() && !authorMatch)
+      continue;
+
+    // Prefer the first candidate strictly better than any seen so far.
     if (score > bestScore) {
       bestScore = score;
+      bestIdx = i;
+    } else if (score == bestScore && bestIdx >= 0 &&
+               preferWork(w, results.at(bestIdx).toObject())) {
+      // Same score — break ties toward the journal version of record
+      // (see preferWork).
       bestIdx = i;
     }
   }
@@ -483,14 +552,31 @@ bool OpenAlexClient::scoreAndFetch(QNetworkReply *reply,
       },
       Qt::QueuedConnection);
 
-  // Fetch the two lists in sequence (cites, then cited_by).  Each is a
-  // self-contained paginated fetch; the last one to finish emits the signal.
+  // Start the first list (cites).  The two lists must NOT run in parallel —
+  // they share m_listBuffer and m_pending, which a single in-flight request
+  // at a time guarantees.  handleListReply chains to cited_by once cites is
+  // fully saved.
   fetchWorkList(paperHash, RefKind::Cites, workIdShort);
-  fetchWorkList(paperHash, RefKind::CitedBy, workIdShort);
   return true;
 }
 
 /* ── Step 2/3: paginated fetch of a citation list ───────────── */
+
+// Build the URL for one page of a citation list for @p workId.  @p
+// filterField is "cites" (works citing W) or "cited_by" (works W cited).
+// Sorted most-cited first so the first kMaxWorks kept are the most important.
+QUrl OpenAlexClient::buildListUrl(const QString &filterField,
+                                  const QString &workId, int page) const {
+  QUrl url("https://api.openalex.org/works");
+  QUrlQuery query;
+  query.addQueryItem("filter", QString("%1:%2").arg(filterField, workId));
+  query.addQueryItem("select", kSelectFields);
+  query.addQueryItem("sort", "cited_by_count:desc");
+  appendPage(query, page);
+  appendAuthQuery(query);
+  url.setQuery(query);
+  return url;
+}
 
 void OpenAlexClient::fetchWorkList(const QString &paperHash, RefKind kind,
                                    const QString &workId) {
@@ -506,15 +592,7 @@ void OpenAlexClient::fetchWorkList(const QString &paperHash, RefKind kind,
   const char *filterField = (kind == RefKind::Cites) ? "cites" : "cited_by";
   const char *label = (kind == RefKind::Cites) ? "CITES" : "CITED-BY";
 
-  QUrl url("https://api.openalex.org/works");
-  QUrlQuery query;
-  query.addQueryItem("filter", QString("%1:%2").arg(filterField, workId));
-  query.addQueryItem("select", kSelectFields);
-  // Most-cited first, so the first kMaxWorks we keep are the most important.
-  query.addQueryItem("sort", "cited_by_count:desc");
-  appendPage(query, 1);
-  appendAuthQuery(query);
-  url.setQuery(query);
+  const QUrl url = buildListUrl(filterField, workId, 1);
 
   QNetworkRequest req(url);
   req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
@@ -523,8 +601,8 @@ void OpenAlexClient::fetchWorkList(const QString &paperHash, RefKind kind,
           << "paper:" << paperHash.left(12) << "| page: 1"
           << "| URL:" << url.toString(QUrl::FullyEncoded);
 
-  // This list is fresh — clear the buffer.  (The two fetches run back-to-back
-  // from the same call site, so reset before each.)
+  // This list is fresh — clear the buffer.  Only one list is ever in flight
+  // (scoreAndFetch chains cites → cited_by), so a single buffer is safe.
   m_listBuffer = QJsonArray();
 
   m_pending = m_nam->get(req);
@@ -606,29 +684,26 @@ void OpenAlexClient::handleListReply(QNetworkReply *reply,
     m_listBuffer.append(item);
   }
 
-  const bool hasMore = static_cast<int>(m_listBuffer.size()) < totalCount;
-  if (hasMore && static_cast<int>(m_listBuffer.size()) >= kMaxWorks) {
-    // Reached the cap — keep only the first kMaxWorks and stop paginating.
+  int buffered = static_cast<int>(m_listBuffer.size());
+  bool hasMore = buffered < totalCount;
+  if (hasMore && buffered >= kMaxWorks) {
+    // Reached the cap — keep only the first kMaxWorks (the most-cited, per
+    // the sort) and stop paginating.
     qInfo() << "[OpenAlex] ──" << label << "──"
             << "paper:" << paperHash.left(12) << "| capping at" << kMaxWorks
             << "of" << totalCount;
-    while (m_listBuffer.size() > kMaxWorks)
-      m_listBuffer.removeLast();
-  } else if (hasMore) {
+    QJsonArray capped;
+    for (int i = 0; i < kMaxWorks; ++i)
+      capped.append(m_listBuffer.at(i));
+    m_listBuffer = std::move(capped);
+    hasMore = false; // we have enough — fall through to save
+  }
+
+  if (hasMore) {
     // More pages remain and the cap is not yet reached — fetch the next one.
-    // Filter direction must match fetchWorkList: cites:{W} = citers,
-    // cited_by:{W} = references.
     const int nextPage = page + 1;
     const char *filterField = (kind == RefKind::Cites) ? "cites" : "cited_by";
-
-    QUrl url("https://api.openalex.org/works");
-    QUrlQuery query;
-    query.addQueryItem("filter", QString("%1:%2").arg(filterField, workId));
-    query.addQueryItem("select", kSelectFields);
-    query.addQueryItem("sort", "cited_by_count:desc");
-    appendPage(query, nextPage);
-    appendAuthQuery(query);
-    url.setQuery(query);
+    const QUrl url = buildListUrl(filterField, workId, nextPage);
 
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::UserAgentHeader, "Hodeia/0.1");
@@ -643,25 +718,30 @@ void OpenAlexClient::handleListReply(QNetworkReply *reply,
     return;
   }
 
-  // Done — save the accumulated list (main thread) and, for cited_by, fire
-  // the completion signal.
+  // Done with this list — save it (main thread).  Then, on the worker thread,
+  // start the next list (cites → cited_by) or fire the completion signal.
+  // Chaining the *start* (not the save) keeps the worker event loop busy
+  // during the whole fetch, so the queued saves are strictly ordered.
+  const bool isCites = (kind == RefKind::Cites);
   QString itemsJson =
       m_listBuffer.isEmpty()
           ? QString::fromLatin1(kNoReferencesMsg)
           : QString::fromUtf8(
                 QJsonDocument(m_listBuffer).toJson(QJsonDocument::Compact));
   m_listBuffer = QJsonArray();
+  const int total = totalCount;
 
   QMetaObject::invokeMethod(
       this,
-      [this, paperHash, kind, itemsJson, total = totalCount]() {
+      [this, paperHash, kind, itemsJson, total]() {
         saveWorkList(paperHash, kind, itemsJson, total);
-        // Fire only after the last list (cited_by) so the UI refreshes once
-        // per paper instead of once per list.
-        if (kind == RefKind::CitedBy)
-          emit referencesSaved(paperHash);
       },
       Qt::QueuedConnection);
+
+  if (isCites)
+    fetchWorkList(paperHash, RefKind::CitedBy, workId);
+  else
+    emit referencesSaved(paperHash);
 }
 
 /* ── DB save (main thread) ──────────────────────────────────── */
@@ -687,5 +767,5 @@ void OpenAlexClient::saveWorkList(const QString &paperHash, RefKind kind,
   auto execResult = stmt.exec();
   if (execResult)
     qInfo() << "[OpenAlex] Saved" << itemsJson.size() << "bytes of" << col
-            << "(total" << total << ")for" << paperHash.left(12);
+            << "(total" << total << ") for" << paperHash.left(12);
 }

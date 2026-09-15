@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QThread>
+#include <functional>
 
 class ConfigManager;
 class DatabaseManager;
@@ -15,8 +16,9 @@ class QUrlQuery;
 /// OpenAlex API and stores it in the Citations table.
 ///
 /// For each paper it:
-///   1. Finds the OpenAlex work by a 3-tier search — semantic, then title,
-///      then author — disambiguated against the local metadata (work_id).
+///   1. Finds the OpenAlex work by a 3-tier search — exact title, then
+///      semantic, then author — disambiguated against the local metadata
+///      (work_id).
 ///   2. Fetches the works it cites (its references)  -> Citations.cites
 ///   3. Fetches the works that cite it (citing papers) -> Citations.cited_by
 ///
@@ -52,35 +54,53 @@ private:
   enum class RefKind { Cites, CitedBy };
 
   void fetchAndSave(const QString &paperHash, const QString &title);
-  // Tier 1: embedding-based semantic search.  On reply, disambiguates and, if
-  // no confident match, falls through to searchByTitle.
-  void semanticSearch(const QString &paperHash, const PaperMeta &meta);
-  // Tier 2: exact-title search, used when the semantic search yields no
-  // confident match (the right work can rank below the top-20 semantic
-  // results, as with some journal papers).  Falls through to searchByAuthor.
+
+  // Shared body for the three search tiers: fire @p query, and on reply
+  // disambiguate; if no confident match, run @p fallthrough (or log a NO
+  // MATCH if it's empty).  The callback receives the paper hash + meta so
+  // the next tier can be launched.
+  void runSearchTier(
+      const QString &paperHash, const PaperMeta &meta, const QUrlQuery &query,
+      const QString &label,
+      std::function<void(const QString &, const PaperMeta &)> fallthrough);
+
+  // Tier 1: exact-title search (what the OpenAlex website uses) — the most
+  // precise signal, so it runs first.  A miss falls through to the semantic
+  // tier.
   void searchByTitle(const QString &paperHash, const PaperMeta &meta);
-  // Tier 3: author search, the last resort when neither semantic nor title
-  // search produces a confident match.  Searches by the first author's name.
+  // Tier 2: embedding-based semantic search, used when exact-title search
+  // finds no confident match (the right work can be missing from the
+  // title-indexed results).  A miss falls through to the author tier.
+  void semanticSearch(const QString &paperHash, const PaperMeta &meta);
+  // Tier 3: author search, the last resort.  Searches by the first author's
+  // name; bestCandidate then disambiguates.
   void searchByAuthor(const QString &paperHash, const PaperMeta &meta);
+
   // Disambiguate @p results and, on a confident match, persist the work id
-  // and fetch both citation lists.  Returns true on a match, false otherwise
-  // (the caller then falls through to the next search tier).  @p reply is
-  // deleted here.
+  // and start the first citation list.  Returns true on a match, false
+  // otherwise (the caller then falls through to the next search tier).
+  // @p reply is deleted here.
   bool scoreAndFetch(QNetworkReply *reply, const QString &paperHash,
                      const PaperMeta &meta, const QString &label);
-  // Score each candidate (0..3) against the local metadata and return the
-  // index of the best match, or -1 if none is a confident match.  Ranked by
-  // title, then authors, then year, then journal.
+  // Score each candidate against the local metadata and return the index of
+  // the best match, or -1 if none is a confident match.  Ranked by title,
+  // then authors, then year, then journal.
   int bestCandidate(const QJsonArray &results, const PaperMeta &meta) const;
   // Read title / authors / year / journal for @p paperHash from the
   // Summaries table.  Must be called on the main thread
   // (SQLite is owned by the main thread).
   PaperMeta loadPaperMeta(const QString &paperHash) const;
+
+  // Start fetching one citation list (page 1).  The two lists run strictly
+  // one after the other (see scoreAndFetch / handleListReply) so a single
+  // m_listBuffer is safe.
   void fetchWorkList(const QString &paperHash, RefKind kind,
                      const QString &workId);
-
   void handleListReply(QNetworkReply *reply, const QString &paperHash,
                        RefKind kind, const QString &workId, int page);
+  // Build the URL for one page of a citation list.
+  QUrl buildListUrl(const QString &filterField, const QString &workId,
+                    int page) const;
   // Persist a citation list plus its true OpenAlex total (@p total), which is
   // stored in cites_count / cited_by_count so the UI can show it even though
   // the array itself is capped.
