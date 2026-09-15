@@ -36,7 +36,12 @@ static const QString s_systemPromptVisual = []() {
   "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
 }
-Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
+For mathematics, do NOT use LaTeX or markdown. Write formulas as plain
+Unicode text so they render directly: use Greek letters (α β γ θ μ σ π),
+superscripts/subscripts (x², xᵢ, aⱼ), and symbols (√, ², ³, ±, ×, ÷, ≤, ≥,
+≈, ∑, ∫, →, ∞, Δ). Prefer a flat, readable form (e.g. "x² + y² = r²",
+"μ = 5.2, σ = 1.3") over stacked fractions — write fractions as "a/b".
+Don't use markdown formatting. Return only valid JSON.)";
 }();
 
 static const QString s_systemPromptText = []() {
@@ -56,7 +61,12 @@ static const QString s_systemPromptText = []() {
   "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
   "citableSummary": "A two-sentence summary suitable for a literature review"
 }
-Use latex format for mathematics. Don't use markdown formating. Return only valid JSON.)";
+For mathematics, do NOT use LaTeX or markdown. Write formulas as plain
+Unicode text so they render directly: use Greek letters (α β γ θ μ σ π),
+superscripts/subscripts (x², xᵢ, aⱼ), and symbols (√, ², ³, ±, ×, ÷, ≤, ≥,
+≈, ∑, ∫, →, ∞, Δ). Prefer a flat, readable form (e.g. "x² + y² = r²",
+"μ = 5.2, σ = 1.3") over stacked fractions — write fractions as "a/b".
+Don't use markdown formatting. Return only valid JSON.)";
 }();
 
 static const QString s_userPrompt = []() {

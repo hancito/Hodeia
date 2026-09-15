@@ -6,4 +6,5 @@ QtObject {
     readonly property string ui: "Google Sans"
     readonly property string mono: "Google Sans Code"
     readonly property string display: "Outfit"
+    readonly property string text: "Lato"
 }

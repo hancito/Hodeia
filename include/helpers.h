@@ -39,16 +39,16 @@ public:
   /// Parse a raw LLM JSON response into a PaperSummary.
   static PaperSummary parseSummaryJson(const QString &json);
 
-  /// Convert a PaperSummary to a readable Markdown string.
-  static QString toMarkdown(const PaperSummary &summary);
+  /// Convert a PaperSummary to HTML (used for both the QML display and PDF).
+  static QString toHtml(const PaperSummary &summary);
 
   /// Convert a PaperSummary to a LaTeX snippet.
   static QString toLatex(const PaperSummary &summary);
 
   // ── QML-invokable ──────────────────────────────────────────────
 
-  /// Convert a JSON summary string to Markdown.
-  Q_INVOKABLE QString summaryToMarkdown(const QString &json) const;
+  /// Convert a JSON summary string to HTML (same source used for PDF export).
+  Q_INVOKABLE QString summaryToHtml(const QString &json) const;
 
   /// Convert a JSON summary string to LaTeX.
   Q_INVOKABLE QString summaryToLatex(const QString &json) const;
@@ -81,7 +81,7 @@ public:
 
   /// Load available models for the currently active backend (local or remote).
   /// Emits modelsChecked() with the result.
-  void loadActiveBackendModels();
+  Q_INVOKABLE void loadActiveBackendModels();
 
   /// Copy a GGUF model file to the Summarizers folder in a background
   /// thread. Emits modelCopyProgress() and modelCopyFinished().

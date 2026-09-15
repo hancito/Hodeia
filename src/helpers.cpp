@@ -117,35 +117,59 @@ PaperSummary Helpers::parseSummaryJson(const QString &raw) {
   return summary;
 }
 
-/* ── Markdown / LaTeX formatting ─────────────────────────────── */
+/* ── HTML / LaTeX formatting ─────────────────────────────────── */
 
-QString Helpers::toMarkdown(const PaperSummary &s) {
-  QString authors = s.authors.join(", ");
+// Escape a text field so LLM free-text (which may contain <, >, &) is treated
+// as literal content, not markup, when building the summary HTML.
+static QString escapeHtml(const QString &text) {
+  QString out = text;
+  out.replace(QStringLiteral("&"), QStringLiteral("&amp;"));
+  out.replace(QStringLiteral("<"), QStringLiteral("&lt;"));
+  out.replace(QStringLiteral(">"), QStringLiteral("&gt;"));
+  out.replace(QStringLiteral("\""), QStringLiteral("&quot;"));
+  return out;
+}
+
+// Build a <ul> of escaped items; empty list yields an empty string.
+static QString toHtmlList(const QStringList &items) {
+  if (items.isEmpty())
+    return QString();
+  QStringList li;
+  for (const QString &item : items)
+    li.append(QStringLiteral("<li>%1</li>").arg(escapeHtml(item)));
+  return QStringLiteral("<ul>%1</ul>").arg(li.join(QString()));
+}
+
+QString Helpers::toHtml(const PaperSummary &s) {
+  QString authors = s.authors.join(QStringLiteral(", "));
   QString title = s.title;
   if (!title.isEmpty())
     title[0] = title[0].toUpper();
+  QString topics = s.topics.join(QStringLiteral(", "));
 
-  QStringList parts;
-  parts.append(
-      QString("## %1, (%2): %3").arg(authors, QString::number(s.year), title));
-  parts.append("");
-  parts.append(QString("### Journal:  %1").arg(s.journal));
-  parts.append("");
-  parts.append("## Research objective");
-  parts.append(s.researchObjective);
-  parts.append("");
-  parts.append("## Methodology");
-  parts.append(s.methodology);
-  parts.append("");
-  parts.append("## Core findings and significance");
-  parts.append(QString("- %1").arg(s.coreFindingsAndSignificance.join("\n- ")));
-  parts.append("");
-  parts.append("## Critical Limitations");
-  parts.append(QString("- %1").arg(s.criticalLimitations.join("\n- ")));
-  parts.append("");
-  parts.append("## Citable summary");
-  parts.append(s.citableSummary);
-  return parts.join("\n");
+  // Font family is intentionally NOT set here: the same HTML is rendered both
+  // in QML (Google Sans via Fonts.ui) and in the PDF (EB Garamond via
+  // kDefaultPdfStyle / default font). Each renderer supplies its own font.
+  QString html;
+  html += QStringLiteral("<h2>%1</h2>").arg(escapeHtml(title));
+  html += QStringLiteral("<h4>%1 (%2)</h4>")
+              .arg(escapeHtml(authors), QString::number(s.year));
+  html += QStringLiteral("<h4><em>Journal: %1</em></h4>")
+              .arg(escapeHtml(s.journal));
+  if (!topics.isEmpty())
+    html +=
+        QStringLiteral("<h4><em>Topics: %1</em></h4>").arg(escapeHtml(topics));
+  html += QStringLiteral("<h3>Research objective</h3>");
+  html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.researchObjective));
+  html += QStringLiteral("<h3>Methodology</h3>");
+  html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.methodology));
+  html += QStringLiteral("<h3>Core findings and significance</h3>");
+  html += toHtmlList(s.coreFindingsAndSignificance);
+  html += QStringLiteral("<h3>Critical Limitations</h3>");
+  html += toHtmlList(s.criticalLimitations);
+  html += QStringLiteral("<h3>Citable summary</h3>");
+  html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.citableSummary));
+  return html;
 }
 
 QString Helpers::toLatex(const PaperSummary &s) {
@@ -239,8 +263,8 @@ static bool copyFileToDir(const QString &sourcePath, const QString &destDir,
 
 /* ── Summary QML wrappers ────────────────────────────────────── */
 
-QString Helpers::summaryToMarkdown(const QString &json) const {
-  return toMarkdown(parseSummaryJson(json));
+QString Helpers::summaryToHtml(const QString &json) const {
+  return toHtml(parseSummaryJson(json));
 }
 
 QString Helpers::summaryToLatex(const QString &json) const {
@@ -256,45 +280,36 @@ static const QString kDefaultPdfStyle =
     "h3 { font-family: 'EB Garamond'; font-size: 13pt; font-weight: bold; }"
     "code { font-family: 'EB Garamond'; font-size: 10pt; }";
 
-static QString writeMarkdownToPdf(const QString &markdown,
-                                  const QString &destPath,
-                                  const QString &extraStyle = QString()) {
+// Footer appended as the last block of the document: a thin rule above the
+// centered, muted attribution line.
+static const QString kPdfFooterHtml =
+    "<hr><p style=\"text-align:center; font-family:'EB Garamond'; "
+    "font-size:8pt; color:#888;\">Generated with Hodeia</p>";
+
+// Single PDF backend: all output is rendered as HTML. Markdown is only a
+// convenience source that gets converted to HTML before reaching this.
+static QString writeHtmlToPdf(const QString &html, const QString &destPath,
+                              const QString &extraStyle = QString()) {
   QString path = destPath;
   if (path.startsWith("file://"))
     path = QUrl(path).toLocalFile();
 
   QPdfWriter writer(path);
+  writer.setCreator("Hodeia 1.0");
   writer.setPageSize(QPageSize(QPageSize::A4));
   writer.setResolution(300);
-  writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+  writer.setPageMargins(QMarginsF(10, 10, 10, 10), QPageLayout::Millimeter);
+  // left, top, right, bottom
 
-  QTextDocument doc;
-  doc.setDefaultFont(QFont("EB Garamond", 11));
   QString style = kDefaultPdfStyle;
   if (!extraStyle.isEmpty())
     style += extraStyle;
-  doc.setDefaultStyleSheet(style);
-  doc.setMarkdown(markdown);
-
-  doc.print(&writer);
-
-  return QFile::exists(path) ? path : QString();
-}
-
-static QString writeHtmlToPdf(const QString &html, const QString &destPath) {
-  QString path = destPath;
-  if (path.startsWith("file://"))
-    path = QUrl(path).toLocalFile();
-
-  QPdfWriter writer(path);
-  writer.setPageSize(QPageSize(QPageSize::A4));
-  writer.setResolution(300);
-  writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
 
   QTextDocument doc;
   doc.setDefaultFont(QFont("EB Garamond", 11));
-  doc.setDefaultStyleSheet(kDefaultPdfStyle);
-  doc.setHtml(html);
+  doc.setDefaultStyleSheet(style);
+  // Append the footer as the last block of the document.
+  doc.setHtml(html + kPdfFooterHtml);
 
   doc.print(&writer);
 
@@ -305,7 +320,7 @@ QString Helpers::exportSummaryToPdf(const QString &json,
                                     const QString &destPath) const {
   if (json.isEmpty())
     return QString();
-  return writeMarkdownToPdf(toMarkdown(parseSummaryJson(json)), destPath);
+  return writeHtmlToPdf(toHtml(parseSummaryJson(json)), destPath);
 }
 
 QString Helpers::generateReport(const QStringList &jsonList,
@@ -317,16 +332,17 @@ QString Helpers::generateReport(const QStringList &jsonList,
   for (const QString &json : jsonList) {
     if (json.isEmpty())
       continue;
-    QTextDocument tmp;
-    tmp.setMarkdown(toMarkdown(parseSummaryJson(json)));
-    sections.append(tmp.toHtml());
+    sections.append(toHtml(parseSummaryJson(json)));
   }
   if (sections.isEmpty())
     return QString();
 
-  QString html = "<h1 style=\"text-align:center\">Research Summary Report</h1>"
-                 "<hr>" +
-                 sections.join("<hr>");
+  QString html =
+      "<h1 style=\"text-align:center\">Research Summary Report</h1>"
+      "<h5 style=\"text-align:center; font-size:8pt; font-style:italic; "
+      "color:#888;\">Made with Hodeia</h5>"
+      "<hr>" +
+      sections.join("<hr>");
   return writeHtmlToPdf(html, destPath);
 }
 

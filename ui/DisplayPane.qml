@@ -53,7 +53,7 @@ Rectangle {
             id: tabBar
             Layout.fillWidth: true
             TabButton {
-                text: qsTr("Text")
+                text: qsTr("Summary")
             }
             TabButton {
                 text: qsTr("References (Cited)")
@@ -158,19 +158,25 @@ Rectangle {
                     anchors.leftMargin: 5
                     spacing: 10
                     ScrollView {
+                        id: scrollView
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        clip: true
+                        ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                         ScrollBar.vertical.policy: ScrollBar.AsNeeded
-                        TextArea {
+
+                        TextEdit {
                             id: textEditor
-                            readOnly: true
-                            textFormat: TextEdit.MarkdownText
+                            width: scrollView.availableWidth
+                            textFormat: TextEdit.RichText
+                            color: Colors.text
+                            font.family: Fonts.ui
                             font.pointSize: 12
-                            wrapMode: TextEdit.WordWrap
-                            text: displayPane.activeSummaryJson ? helpers.summaryToMarkdown(displayPane.activeSummaryJson) : "Please make a summary of this paper"
+                            wrapMode: TextEdit.Wrap
+                            selectByMouse: true
+                            text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : "Please make a summary of this paper"
                         }
                     }
-
                     RowLayout {
                         id: buttonRow
                         spacing: 10
