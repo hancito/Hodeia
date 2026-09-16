@@ -430,7 +430,7 @@ QStringList Helpers::getImagesForHash(const QString &paperHash,
 void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
                                 const QString &apiKey) {
   if (apiUrl.isEmpty()) {
-    emit modelsChecked(false, {}, "Invalid parameters");
+    emit modelsChecked(false, {}, tr("Invalid parameters"));
     return;
   }
   QObject::connect(
@@ -449,7 +449,7 @@ void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
 
 void Helpers::fetchRemoteModels(const QString &apiUrl, const QString &apiKey) {
   if (apiUrl.isEmpty()) {
-    emit modelsChecked(false, {}, "URL is empty");
+    emit modelsChecked(false, {}, tr("URL is empty"));
     return;
   }
   if (m_currentReply) {
@@ -480,7 +480,7 @@ void Helpers::handleModelsReply(QNetworkReply *reply) {
   }
   auto doc = QJsonDocument::fromJson(reply->readAll());
   if (!doc.isObject()) {
-    emit modelsChecked(false, {}, "Invalid JSON");
+    emit modelsChecked(false, {}, tr("Invalid JSON"));
     return;
   }
   QStringList models;
@@ -531,12 +531,12 @@ void Helpers::addLocalSummarizerWithMmproj(const QString &modelPath,
 
   if (!QFile::exists(modelSrc)) {
     emit modelCopyFinished(false, QString(),
-                           "Model file does not exist: " + modelSrc);
+                           tr("Model file does not exist: %1").arg(modelSrc));
     return;
   }
   if (!mmprojSrc.isEmpty() && !QFile::exists(mmprojSrc)) {
     emit modelCopyFinished(false, QString(),
-                           "MMProj file does not exist: " + mmprojSrc);
+                           tr("MMProj file does not exist: %1").arg(mmprojSrc));
     return;
   }
 

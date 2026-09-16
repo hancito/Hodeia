@@ -61,7 +61,7 @@ LocalBackend::loadModel(const QString &modelPath,
     return std::unexpected{"Model file not found: " + path};
   }
 
-  emit statusUpdated("Loading model: " + path);
+  emit statusUpdated(tr("Loading model: %1").arg(path));
 
   // ── Detect mmproj (lazy-loaded on first multimodal use) ──────────
   m_mmprojPath = resolveMmprojPath(path);
@@ -110,7 +110,7 @@ LocalBackend::loadModel(const QString &modelPath,
            << "| batch:" << llama_n_batch(m_llamaCtx)
            << "| ubatch:" << llama_n_ubatch(m_llamaCtx)
            << "| vision:" << m_hasVision;
-  emit statusUpdated("Model loaded: " + path);
+  emit statusUpdated(tr("Model loaded: %1").arg(path));
   return {};
 }
 
@@ -1097,7 +1097,7 @@ std::expected<void, QString> LocalBackend::loadMmproj() {
   if (m_mmprojPath.isEmpty())
     return std::unexpected{"No mmproj path configured"};
 
-  emit statusUpdated("Loading multimodal projector: " + m_mmprojPath);
+  emit statusUpdated(tr("Loading multimodal projector: %1").arg(m_mmprojPath));
 
   auto mtmdParams = mtmd_context_params_default();
   // On iGPU, keep mmproj on CPU only if the model itself is on the GPU.
@@ -1111,7 +1111,7 @@ std::expected<void, QString> LocalBackend::loadMmproj() {
                                   m_llamaModel, mtmdParams);
   if (!m_mtmdCtx) {
     qWarning() << "[LocalBackend] Failed to load mmproj:" << m_mmprojPath;
-    return std::unexpected{"Failed to load mmproj: " + m_mmprojPath};
+    return std::unexpected{tr("Failed to load mmproj: %1").arg(m_mmprojPath)};
   }
 
   qDebug() << "[LocalBackend] mmproj loaded on GPU";

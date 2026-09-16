@@ -268,15 +268,15 @@ QString ConfigManager::projectsRoot() const {
 std::expected<void, QString>
 ConfigManager::createProject(const QString &projectName) {
   if (projectName.trimmed().isEmpty())
-    return std::unexpected{QStringLiteral("Project name is empty")};
+    return std::unexpected{tr("Project name is empty")};
 
   QString projectDir = projectsRoot() + "/" + projectName.trimmed();
 
   // Check if project already exists
   if (QDir(projectDir).exists()) {
     qWarning() << "Project already exists:" << projectDir;
-    return std::unexpected{QStringLiteral("Project already exists: ") +
-                           projectName.trimmed()};
+    return std::unexpected{
+        tr("Project already exists: %1").arg(projectName.trimmed())};
   }
 
   QDir rootDir;
@@ -288,8 +288,8 @@ ConfigManager::createProject(const QString &projectName) {
   QFile dbFile(dbPath);
   if (!dbFile.open(QIODevice::WriteOnly)) {
     qWarning() << "Failed to create database file:" << dbPath;
-    return std::unexpected{QStringLiteral("Failed to create database file: ") +
-                           dbPath};
+    return std::unexpected{
+        tr("Failed to create database file: %1").arg(dbPath)};
   }
   dbFile.close();
 
@@ -305,13 +305,13 @@ ConfigManager::createProject(const QString &projectName) {
 std::expected<void, QString>
 ConfigManager::switchToProject(const QString &projectName) {
   if (projectName.trimmed().isEmpty())
-    return std::unexpected{QStringLiteral("Project name is empty")};
+    return std::unexpected{tr("Project name is empty")};
 
   QString projectDir = projectsRoot() + "/" + projectName.trimmed();
   if (!QDir(projectDir).exists()) {
     qWarning() << "Project does not exist:" << projectDir;
-    return std::unexpected{QStringLiteral("Project does not exist: ") +
-                           projectName.trimmed()};
+    return std::unexpected{
+        tr("Project does not exist: %1").arg(projectName.trimmed())};
   }
 
   setLastProject(projectName.trimmed());
@@ -321,7 +321,7 @@ ConfigManager::switchToProject(const QString &projectName) {
 std::expected<void, QString>
 ConfigManager::deleteProjects(const QStringList &projectNames) {
   if (projectNames.isEmpty())
-    return std::unexpected{QStringLiteral("No project names provided")};
+    return std::unexpected{tr("No project names provided")};
 
   // Check if active project is among those to delete
   bool activeWillBeDeleted = false;
@@ -375,8 +375,7 @@ ConfigManager::deleteProjects(const QStringList &projectNames) {
   }
 
   if (!anyDeleted)
-    return std::unexpected{
-        QStringLiteral("No projects were deleted (none existed)")};
+    return std::unexpected{tr("No projects were deleted (none existed)")};
 
   return {};
 }
@@ -385,7 +384,7 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
   QString name = m_lastProject.trimmed();
   if (name.isEmpty()) {
     qWarning() << "No active project to reset";
-    return std::unexpected{QStringLiteral("No active project to reset")};
+    return std::unexpected{tr("No active project to reset")};
   }
 
   QString projectDir = projectsRoot() + "/" + name;
@@ -393,8 +392,7 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
   if (!dir.exists()) {
     qWarning() << "Active project directory does not exist:" << projectDir;
     return std::unexpected{
-        QStringLiteral("Active project directory does not exist: ") +
-        projectDir};
+        tr("Active project directory does not exist: %1").arg(projectDir)};
   }
 
   // Remove all contents
@@ -417,7 +415,7 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
   if (!dbFile.open(QIODevice::WriteOnly)) {
     qWarning() << "Failed to recreate database file:" << dbPath;
     return std::unexpected{
-        QStringLiteral("Failed to recreate database file: ") + dbPath};
+        tr("Failed to recreate database file: %1").arg(dbPath)};
   }
   dbFile.close();
 

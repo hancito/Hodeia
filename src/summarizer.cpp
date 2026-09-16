@@ -139,13 +139,13 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
     if (m_cancelled) {
       // stop() fired mid-inference. Do NOT persist a partial summary and stop
       // processing further papers.
-      emit paperFinished(hash, false, "Cancelled");
+      emit paperFinished(hash, false, tr("Cancelled"));
       qDebug() << "[Summarizer] ✗ Paper" << hash << "cancelled — no DB write";
       break;
     }
 
     if (result.isEmpty()) {
-      QString msg = "Empty response";
+      QString msg = tr("Empty response");
       emit paperFinished(hash, false, msg);
       qDebug() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
     } else {
@@ -153,9 +153,9 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
       saveSummary(hash, summary, result, backend.modelName);
 
       successCount++;
-      emit paperFinished(hash, true,
-                         "Summary generated and saved (" +
-                             QString::number(result.length()) + " chars)");
+      emit paperFinished(
+          hash, true,
+          tr("Summary generated and saved (%1 chars)").arg(result.length()));
       qDebug() << "[Summarizer] ✓ Paper" << hash << "summarized and saved"
                << "(" << result.length() << "chars)";
     }

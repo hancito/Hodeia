@@ -45,7 +45,7 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   // clear it so this fresh query is not cancelled immediately.
   m_cancelled = false;
   if (queryText.trimmed().isEmpty()) {
-    emit queryFinished(QString(), false, "Empty query");
+    emit queryFinished(QString(), false, tr("Empty query"));
     return;
   }
 
@@ -64,7 +64,7 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   QList<PageContext> pages = retrieveAndGroupPages(queryText, maxPages);
   if (pages.isEmpty()) {
     emit queryFinished(QString(), false,
-                       "No relevant information found in the library.");
+                       tr("No relevant information found in the library."));
     if (m_database)
       m_database->endDbOperation();
     return;
@@ -96,16 +96,17 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
   if (m_cancelled) {
     // The user stopped the query mid-inference. Do NOT persist a partial
     // response — the run was abandoned, not completed.
-    emit queryFinished(QString(), false, "Query cancelled");
+    emit queryFinished(QString(), false, tr("Query cancelled"));
     qDebug() << "[QueryWorker] ✗ Query cancelled by user — no DB write";
   } else if (result.isEmpty()) {
-    QString msg = "Empty response from model";
+    QString msg = tr("Empty response from model");
     emit queryFinished(QString(), false, msg);
     qDebug() << "[QueryWorker] ✗ Query failed:" << msg;
   } else {
     // Append sources footer
     if (!citations.isEmpty()) {
-      result += "\n\n**Sources Consulted:**\n" + citations.join("\n");
+      result +=
+          "\n\n**" + tr("Sources Consulted") + ":**\n" + citations.join("\n");
     }
     saveQuery(queryText, result, backend.modelName);
     emit queryFinished(result, true, QString());

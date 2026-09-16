@@ -102,10 +102,28 @@ ApplicationWindow {
         id: theFooter
         height: 30
         Label {
+            id: footerLabel
             anchors.fill: parent
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
             text: qsTr("Ready")
+        }
+    }
+
+    // ── Status bar updates from query controller ──
+    Connections {
+        target: queryController
+        function onQueryStarted() {
+            footerLabel.text = qsTr("Querying...");
+        }
+        function onQueryFinished(response, success, error) {
+            if (success)
+                footerLabel.text = qsTr("Query completed");
+            else
+                footerLabel.text = qsTr("Query failed: %1").arg(error);
+        }
+        function onQueryStopped() {
+            footerLabel.text = qsTr("Query stopped");
         }
     }
 }

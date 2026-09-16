@@ -491,6 +491,7 @@ ApplicationWindow {
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
             text: qsTr("%1 -- Ready").arg(activeProject)
+            Component.onCompleted: text = qsTr("%1 -- Ready").arg(activeProject)
         }
     }
 }

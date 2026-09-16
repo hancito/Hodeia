@@ -55,11 +55,12 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
   if (!QFile::exists(resolvedPath)) {
     qCritical() << "[SqliteVec] Model file not found:" << resolvedPath;
-    emit statusUpdated("Embedding model file not found: " + resolvedPath);
+    emit statusUpdated(
+        tr("Embedding model file not found: %1").arg(resolvedPath));
     return false;
   }
 
-  emit statusUpdated(QString("Loading embedding model: %1").arg(resolvedPath));
+  emit statusUpdated(tr("Loading embedding model: %1").arg(resolvedPath));
 
   // All llama runtime + model/context setup is guarded by m_lock so that
   // concurrent initialize()/embed()/shutdown() calls from worker threads
@@ -84,7 +85,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   if (!model) {
     qCritical() << "[SqliteVec] Failed to load model:" << resolvedPath;
     emit statusUpdated(
-        QString("Failed to load embedding model: %1").arg(resolvedPath));
+        tr("Failed to load embedding model: %1").arg(resolvedPath));
     return false;
   }
 
@@ -107,7 +108,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   if (!ctx) {
     llama_model_free(model);
     qCritical() << "[SqliteVec] Failed to create context";
-    emit statusUpdated("Failed to create llama context");
+    emit statusUpdated(tr("Failed to create llama context"));
     return false;
   }
 
@@ -120,7 +121,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   qInfo() << "[SqliteVec] E5 model loaded, dim=" << m_dim
           << "| maxTokens=" << m_maxTokens;
   emit statusUpdated(
-      QString("E5 embedding model loaded (%1 dimensions)").arg(m_dim));
+      tr("E5 embedding model loaded (%1 dimensions)").arg(m_dim));
   return true;
 }
 

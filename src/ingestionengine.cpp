@@ -332,14 +332,12 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   m_stopFlag.store(false);
   emit started();
 
-  QString message =
-      "Started with " + QString::number(filePath.size()) + " files";
+  QString message = tr("Started with %1 files").arg(filePath.size());
   emit status(message);
 
   QMap<QString, QUrl> hashesToProcess = parallelHasher(filePath);
   QList<QUrl> urlsToProcess = filterExistingHashes(hashesToProcess, dbPath);
-  message = "Skipped " +
-            QString::number(filePath.size() - urlsToProcess.size()) + " papers";
+  message = tr("Skipped %1 papers").arg(filePath.size() - urlsToProcess.size());
   emit status(message);
 
   // Process in small batches to bound memory and provide incremental progress.
@@ -350,13 +348,13 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 
   for (int i = 0; i < total; i += batchSize) {
     if (m_stopFlag.load()) {
-      emit status("Ingestion cancelled");
+      emit status(tr("Ingestion cancelled"));
       break;
     }
     int end = qMin(i + batchSize, total);
     QList<QUrl> batchUrls(urlsToProcess.mid(i, end - i));
 
-    message = QString("Extracting %1-%2/%3").arg(i + 1).arg(end).arg(total);
+    message = tr("Extracting %1-%2/%3").arg(i + 1).arg(end).arg(total);
     emit status(message);
 
     QList<ExtractionResult> extractions = parallelExtract(batchUrls, imgPath);
@@ -407,8 +405,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       for (auto it = chunksByPaper.begin(); it != chunksByPaper.end(); ++it)
         qDebug() << "  " << it.key().left(12) << "→" << it.value() << "chunks";
 
-      QString statusMsg =
-          QString("Embedding %1 chunks...").arg(allChunks.size());
+      QString statusMsg = tr("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
 
       if (m_vecManager) {
@@ -416,8 +413,8 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       } else {
         qWarning() << "[PdfWorker] embedding model not loaded, skipping vector "
                       "storage";
-        emit status("Warning: embedding model not loaded, skipping vector "
-                    "storage");
+        emit status(tr("Warning: embedding model not loaded, skipping vector "
+                       "storage"));
       }
 
       allChunks.clear();
@@ -428,8 +425,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     // memory is released incrementally rather than held until process exit.
     cleanupOcrApi();
 
-    message =
-        QString("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
+    message = tr("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
     emit status(message);
   }
 

@@ -67,6 +67,10 @@ Rectangle {
     // Summarizer feedback
     Connections {
         target: summaryController
+        function onSummaryStarted() {
+            if (summaryDbPane.statusBarLabel)
+                summaryDbPane.statusBarLabel.text = qsTr("Summarizing...");
+        }
         function onPaperFinished(hash, success, message) {
             summaryDbPane.paperProgress += 1;
             if (summaryDbPane.statusBarLabel)

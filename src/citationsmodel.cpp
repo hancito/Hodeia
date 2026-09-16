@@ -88,7 +88,7 @@ QString CitationsModel::citedByDisplayForHash(const QString &paperHash) const {
   // "References" = works this paper cited (citedBy column).
   // "Cited by"   = works that cite it (cites column).
   QString out;
-  out += formatSection("Cited by", row->cites, row->citesCount);
+  out += formatSection(tr("Cited by"), row->cites, row->citesCount);
   return out;
 }
 
@@ -100,7 +100,7 @@ QString CitationsModel::citesDisplayForHash(const QString &paperHash) const {
   // "References" = works this paper cited (citedBy column).
   // "Cited by"   = works that cite it (cites column).
   QString out;
-  out += formatSection("References", row->citedBy, row->citedByCount);
+  out += formatSection(tr("References"), row->citedBy, row->citedByCount);
   return out;
 }
 
@@ -138,11 +138,11 @@ QString CitationsModel::formatSection(const QString &header,
   if (total > 0) {
     out += QString::number(total) + " ) " + "\n\n";
     if (shown < total)
-      out += " ( Showing top " + QString::number(shown) + " ) " + "\n\n";
+      out += tr(" ( Showing top %1 ) ").arg(shown) + "\n\n";
   }
 
   if (arr.isEmpty()) {
-    out += "None found on OpenAlex ) \n\n";
+    out += tr("None found on OpenAlex") + " ) \n\n";
     return out;
   }
 
@@ -156,7 +156,7 @@ QString CitationsModel::formatSection(const QString &header,
     if (year > 0)
       line += "(" + QString::number(year) + "). ";
     line += r.value("display_name").toString().isEmpty()
-                ? "Unknown."
+                ? tr("Unknown")
                 : r.value("display_name").toString() + ".";
     const QString journal = r.value("journal").toString();
     if (!journal.isEmpty())

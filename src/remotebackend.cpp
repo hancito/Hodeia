@@ -154,7 +154,8 @@ QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
 void RemoteBackend::generate(const QString &systemPrompt,
                              const QString &userPrompt) {
   if (!isReady()) {
-    emit finished(QString(), "Backend not configured (URL or model missing)");
+    emit finished(QString(),
+                  tr("Backend not configured (URL or model missing)"));
     return;
   }
   cancel();
@@ -173,7 +174,8 @@ void RemoteBackend::generate(const QString &systemPrompt,
                              const QString &userPrompt,
                              const std::vector<PageImage> &images) {
   if (!isReady()) {
-    emit finished(QString(), "Backend not configured (URL or model missing)");
+    emit finished(QString(),
+                  tr("Backend not configured (URL or model missing)"));
     return;
   }
   cancel();
@@ -195,7 +197,8 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
                                         const PromptPayload &payload,
                                         bool hasImages) {
   if (!isReady()) {
-    emit finished(QString(), "Backend not configured (URL or model missing)");
+    emit finished(QString(),
+                  tr("Backend not configured (URL or model missing)"));
     return;
   }
   cancel();
@@ -327,7 +330,7 @@ void RemoteBackend::handleReply(QNetworkReply *reply) {
   QJsonArray choices = doc.object().value("choices").toArray();
   if (choices.isEmpty()) {
     qDebug() << "[RemoteBackend] No choices in response";
-    emit finished(QString(), "Empty response from server");
+    emit finished(QString(), tr("Empty response from server"));
     return;
   }
 
@@ -346,7 +349,7 @@ void RemoteBackend::handleReply(QNetworkReply *reply) {
     auto firstChoice = choices.first().toObject();
     qDebug() << "[RemoteBackend] Empty content — finish_reason:"
              << firstChoice.value("finish_reason");
-    emit finished(QString(), "Empty content in response");
+    emit finished(QString(), tr("Empty content in response"));
     return;
   }
 

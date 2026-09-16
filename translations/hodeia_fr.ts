@@ -86,6 +86,83 @@
     </message>
 </context>
 <context>
+    <name>CitationsModel</name>
+    <message>
+        <location filename="../src/citationsmodel.cpp" line="91"/>
+        <source>Cited by</source>
+        <translation>Cité par</translation>
+    </message>
+    <message>
+        <location filename="../src/citationsmodel.cpp" line="103"/>
+        <source>References</source>
+        <translation>Références</translation>
+    </message>
+    <message>
+        <location filename="../src/citationsmodel.cpp" line="141"/>
+        <source> ( Showing top %1 ) </source>
+        <translation> ( Affichage des %1 premiers ) </translation>
+    </message>
+    <message>
+        <location filename="../src/citationsmodel.cpp" line="145"/>
+        <source>None found on OpenAlex</source>
+        <translation>Aucun trouvé sur OpenAlex</translation>
+    </message>
+    <message>
+        <location filename="../src/citationsmodel.cpp" line="159"/>
+        <source>Unknown</source>
+        <translation>Inconnu</translation>
+    </message>
+</context>
+<context>
+    <name>ConfigManager</name>
+    <message>
+        <location filename="../src/configmanager.cpp" line="271"/>
+        <location filename="../src/configmanager.cpp" line="308"/>
+        <source>Project name is empty</source>
+        <translation>Le nom du projet est vide</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="279"/>
+        <source>Project already exists: %1</source>
+        <translation>Le projet existe déjà : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="292"/>
+        <source>Failed to create database file: %1</source>
+        <translation>Échec de la création du fichier de base de données : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="314"/>
+        <source>Project does not exist: %1</source>
+        <translation>Le projet n&apos;existe pas : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="324"/>
+        <source>No project names provided</source>
+        <translation>Aucun nom de projet fourni</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="378"/>
+        <source>No projects were deleted (none existed)</source>
+        <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="387"/>
+        <source>No active project to reset</source>
+        <translation>Aucun projet actif à réinitialiser</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="395"/>
+        <source>Active project directory does not exist: %1</source>
+        <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="418"/>
+        <source>Failed to recreate database file: %1</source>
+        <translation>Échec de la recréation du fichier de base de données : %1</translation>
+    </message>
+</context>
+<context>
     <name>DisplayPane</name>
     <message>
         <location filename="../ui/DisplayPane.qml" line="56"/>
@@ -147,6 +224,57 @@
         <location filename="../ui/DisplayPane.qml" line="339"/>
         <source>Save Summary as PDF</source>
         <translation>Enregistrer le résumé en PDF</translation>
+    </message>
+</context>
+<context>
+    <name>Helpers</name>
+    <message>
+        <location filename="../src/helpers.cpp" line="433"/>
+        <source>Invalid parameters</source>
+        <translation>Paramètres invalides</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="452"/>
+        <source>URL is empty</source>
+        <translation>L&apos;URL est vide</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="483"/>
+        <source>Invalid JSON</source>
+        <translation>JSON invalide</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="534"/>
+        <source>Model file does not exist: %1</source>
+        <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="539"/>
+        <source>MMProj file does not exist: %1</source>
+        <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
+    </message>
+</context>
+<context>
+    <name>LocalBackend</name>
+    <message>
+        <location filename="../src/localbackend.cpp" line="64"/>
+        <source>Loading model: %1</source>
+        <translation>Chargement du modèle : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/localbackend.cpp" line="113"/>
+        <source>Model loaded: %1</source>
+        <translation>Modèle chargé : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/localbackend.cpp" line="1100"/>
+        <source>Loading multimodal projector: %1</source>
+        <translation>Chargement du projecteur multimodal : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/localbackend.cpp" line="1114"/>
+        <source>Failed to load mmproj: %1</source>
+        <translation>Échec du chargement du mmproj : %1</translation>
     </message>
 </context>
 <context>
@@ -294,6 +422,7 @@
     </message>
     <message>
         <location filename="../ui/Main.qml" line="493"/>
+        <location filename="../ui/Main.qml" line="494"/>
         <source>%1 -- Ready</source>
         <translation>%1 -- Prêt</translation>
     </message>
@@ -446,37 +575,109 @@
     </message>
 </context>
 <context>
+    <name>PdfWorker</name>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="335"/>
+        <source>Started with %1 files</source>
+        <translation>Démarré avec %1 fichier(s)</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="340"/>
+        <source>Skipped %1 papers</source>
+        <translation>%1 article(s) ignoré(s)</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="351"/>
+        <source>Ingestion cancelled</source>
+        <translation>Importation annulée</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="357"/>
+        <source>Extracting %1-%2/%3</source>
+        <translation>Extraction %1-%2/%3</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="408"/>
+        <source>Embedding %1 chunks...</source>
+        <translation>Embedding de %1 fragments...</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="416"/>
+        <source>Warning: embedding model not loaded, skipping vector storage</source>
+        <translation>Attention : modèle d&apos;embedding non chargé, stockage vectoriel ignoré</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="428"/>
+        <source>Saved %1/%2 papers</source>
+        <translation>%1/%2 articles enregistrés</translation>
+    </message>
+</context>
+<context>
     <name>QueryPane</name>
     <message>
-        <location filename="../ui/QueryPane.qml" line="45"/>
+        <location filename="../ui/QueryPane.qml" line="50"/>
         <source>Error: %1</source>
         <translation>Erreur : %1</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="59"/>
+        <location filename="../ui/QueryPane.qml" line="67"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="65"/>
-        <location filename="../ui/QueryPane.qml" line="66"/>
+        <location filename="../ui/QueryPane.qml" line="82"/>
+        <location filename="../ui/QueryPane.qml" line="83"/>
         <source>Query</source>
         <translation>Interroger</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="89"/>
-        <source>Ask a question about your paper library...</source>
-        <translation>Posez une question sur votre bibliothèque d'articles...</translation>
+        <location filename="../ui/QueryPane.qml" line="82"/>
+        <location filename="../ui/QueryPane.qml" line="83"/>
+        <source>Stop</source>
+        <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="98"/>
+        <location filename="../ui/QueryPane.qml" line="107"/>
+        <source>Ask a question about your paper library...</source>
+        <translation>Posez une question sur votre bibliothèque d&apos;articles...</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="116"/>
         <source>Max Pages</source>
         <translation>Pages max</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="113"/>
+        <location filename="../ui/QueryPane.qml" line="131"/>
         <source>Export</source>
         <translation>Exporter</translation>
+    </message>
+</context>
+<context>
+    <name>QueryWorker</name>
+    <message>
+        <location filename="../src/queryworker.cpp" line="48"/>
+        <source>Empty query</source>
+        <translation>Requête vide</translation>
+    </message>
+    <message>
+        <location filename="../src/queryworker.cpp" line="67"/>
+        <source>No relevant information found in the library.</source>
+        <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
+    </message>
+    <message>
+        <location filename="../src/queryworker.cpp" line="99"/>
+        <source>Query cancelled</source>
+        <translation>Requête annulée</translation>
+    </message>
+    <message>
+        <location filename="../src/queryworker.cpp" line="102"/>
+        <source>Empty response from model</source>
+        <translation>Réponse vide du modèle</translation>
+    </message>
+    <message>
+        <location filename="../src/queryworker.cpp" line="109"/>
+        <source>Sources Consulted</source>
+        <translation>Sources consultées</translation>
     </message>
 </context>
 <context>
@@ -512,7 +713,7 @@
         <translation>Requêtes : %1</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="194"/>
+        <location filename="../ui/RagDbPane.qml" line="236"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
@@ -520,7 +721,7 @@
 <context>
     <name>RagWindow</name>
     <message>
-        <location filename="../ui/RagWindow.qml" line="12"/>
+        <location filename="../ui/RagWindow.qml" line="11"/>
         <source>Hodeia</source>
         <translation>Hodeia</translation>
     </message>
@@ -528,6 +729,26 @@
         <location filename="../ui/RagWindow.qml" line="109"/>
         <source>Ready</source>
         <translation>Prêt</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="117"/>
+        <source>Querying...</source>
+        <translation>Interrogation...</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="121"/>
+        <source>Query completed</source>
+        <translation>Requête terminée</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="123"/>
+        <source>Query failed: %1</source>
+        <translation>Requête échouée : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="126"/>
+        <source>Query stopped</source>
+        <translation>Requête arrêtée</translation>
     </message>
 </context>
 <context>
@@ -543,14 +764,77 @@
         <translation>Envoi de la requête vers %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="320"/>
-        <source>JSON parse error: %1</source>
-        <translation>Erreur d'analyse JSON : %1</translation>
+        <location filename="../src/remotebackend.cpp" line="158"/>
+        <location filename="../src/remotebackend.cpp" line="178"/>
+        <location filename="../src/remotebackend.cpp" line="201"/>
+        <source>Backend not configured (URL or model missing)</source>
+        <translation>Backend non configuré (URL ou modèle manquant)</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="353"/>
+        <location filename="../src/remotebackend.cpp" line="323"/>
+        <source>JSON parse error: %1</source>
+        <translation>Erreur d&apos;analyse JSON : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/remotebackend.cpp" line="333"/>
+        <source>Empty response from server</source>
+        <translation>Réponse vide du serveur</translation>
+    </message>
+    <message>
+        <location filename="../src/remotebackend.cpp" line="352"/>
+        <source>Empty content in response</source>
+        <translation>Contenu vide dans la réponse</translation>
+    </message>
+    <message>
+        <location filename="../src/remotebackend.cpp" line="356"/>
         <source>Response received (%1 chars)</source>
         <translation>Réponse reçue (%1 caractères)</translation>
+    </message>
+</context>
+<context>
+    <name>SqliteVecManager</name>
+    <message>
+        <location filename="../src/sqlitevec.cpp" line="59"/>
+        <source>Embedding model file not found: %1</source>
+        <translation>Fichier du modèle d&apos;embedding introuvable : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/sqlitevec.cpp" line="63"/>
+        <source>Loading embedding model: %1</source>
+        <translation>Chargement du modèle d&apos;embedding : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/sqlitevec.cpp" line="88"/>
+        <source>Failed to load embedding model: %1</source>
+        <translation>Échec du chargement du modèle d&apos;embedding : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/sqlitevec.cpp" line="111"/>
+        <source>Failed to create llama context</source>
+        <translation>Échec de la création du contexte llama</translation>
+    </message>
+    <message>
+        <location filename="../src/sqlitevec.cpp" line="124"/>
+        <source>E5 embedding model loaded (%1 dimensions)</source>
+        <translation>Modèle d&apos;embedding E5 chargé (%1 dimensions)</translation>
+    </message>
+</context>
+<context>
+    <name>Summarizer</name>
+    <message>
+        <location filename="../src/summarizer.cpp" line="142"/>
+        <source>Cancelled</source>
+        <translation>Annulé</translation>
+    </message>
+    <message>
+        <location filename="../src/summarizer.cpp" line="148"/>
+        <source>Empty response</source>
+        <translation>Réponse vide</translation>
+    </message>
+    <message>
+        <location filename="../src/summarizer.cpp" line="158"/>
+        <source>Summary generated and saved (%1 chars)</source>
+        <translation>Résumé généré et enregistré (%1 caractères)</translation>
     </message>
 </context>
 <context>
@@ -558,138 +842,143 @@
     <message>
         <location filename="../ui/SummaryDbPane.qml" line="47"/>
         <location filename="../ui/SummaryDbPane.qml" line="63"/>
-        <location filename="../ui/SummaryDbPane.qml" line="82"/>
-        <location filename="../ui/SummaryDbPane.qml" line="93"/>
+        <location filename="../ui/SummaryDbPane.qml" line="86"/>
+        <location filename="../ui/SummaryDbPane.qml" line="97"/>
         <source>Paper Number: %1</source>
-        <translation>Nombre d'articles : %1</translation>
+        <translation>Nombre d&apos;articles : %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="84"/>
+        <location filename="../ui/SummaryDbPane.qml" line="72"/>
+        <source>Summarizing...</source>
+        <translation>Résumé en cours...</translation>
+    </message>
+    <message>
+        <location filename="../ui/SummaryDbPane.qml" line="88"/>
         <source>Summarize done: %1/%2</source>
         <translation>Résumés terminés : %1/%2</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="95"/>
+        <location filename="../ui/SummaryDbPane.qml" line="99"/>
         <source>Summarization stopped by user</source>
-        <translation>Résumé arrêté par l'utilisateur</translation>
+        <translation>Résumé arrêté par l&apos;utilisateur</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="110"/>
+        <location filename="../ui/SummaryDbPane.qml" line="114"/>
         <source>Search paper</source>
         <translation>Rechercher un article</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="120"/>
+        <location filename="../ui/SummaryDbPane.qml" line="124"/>
         <source>Summarize</source>
         <translation>Résumer</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="142"/>
+        <location filename="../ui/SummaryDbPane.qml" line="146"/>
         <source>Refresh</source>
         <translation>Rafraîchir</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="155"/>
+        <location filename="../ui/SummaryDbPane.qml" line="159"/>
         <source>Generate Report from selection</source>
         <translation>Générer un rapport à partir de la sélection</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="180"/>
+        <location filename="../ui/SummaryDbPane.qml" line="184"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="205"/>
+        <location filename="../ui/SummaryDbPane.qml" line="209"/>
         <source>Summarizing %1/%2 papers</source>
         <translation>Résumé en cours : %1/%2 articles</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="215"/>
+        <location filename="../ui/SummaryDbPane.qml" line="219"/>
         <source>Elapsed Time: %1h %2m</source>
         <translation>Temps écoulé : %1h %2m</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="219"/>
+        <location filename="../ui/SummaryDbPane.qml" line="223"/>
         <source>Elapsed Time: %1m %2s</source>
         <translation>Temps écoulé : %1m %2s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="221"/>
+        <location filename="../ui/SummaryDbPane.qml" line="225"/>
         <source>Elapsed Time: %1s</source>
         <translation>Temps écoulé : %1s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="229"/>
+        <location filename="../ui/SummaryDbPane.qml" line="233"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="256"/>
+        <location filename="../ui/SummaryDbPane.qml" line="260"/>
         <source>Select All</source>
         <translation>Tout sélectionner</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="275"/>
+        <location filename="../ui/SummaryDbPane.qml" line="279"/>
         <source>Documents: %1</source>
         <translation>Documents : %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="283"/>
+        <location filename="../ui/SummaryDbPane.qml" line="287"/>
         <source>Sort by</source>
         <translation>Trier par</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Title</source>
         <translation>Titre</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Pages</source>
         <translation>Pages</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Year</source>
         <translation>Année</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="288"/>
+        <location filename="../ui/SummaryDbPane.qml" line="292"/>
         <source>Citations</source>
         <translation>Citations</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="312"/>
+        <location filename="../ui/SummaryDbPane.qml" line="316"/>
         <source>Descending</source>
         <translation>Décroissant</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="378"/>
+        <location filename="../ui/SummaryDbPane.qml" line="426"/>
         <source>Please summarise for authors name</source>
         <translation>Veuillez résumer pour obtenir les noms des auteurs</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="388"/>
+        <location filename="../ui/SummaryDbPane.qml" line="436"/>
         <source>Year: %1 · %2 pages </source>
         <translation>Année : %1 · %2 pages </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="395"/>
+        <location filename="../ui/SummaryDbPane.qml" line="443"/>
         <source>· cited by %1</source>
         <translation>· cité par %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="445"/>
+        <location filename="../ui/SummaryDbPane.qml" line="493"/>
         <source>Save Report as PDF</source>
         <translation>Enregistrer le rapport en PDF</translation>
     </message>
