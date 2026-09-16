@@ -185,63 +185,63 @@
 <context>
     <name>DisplayPane</name>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="56"/>
+        <location filename="../ui/DisplayPane.qml" line="62"/>
         <source>Summary</source>
         <translation>Résumé</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="59"/>
+        <location filename="../ui/DisplayPane.qml" line="65"/>
         <source>References (Cited)</source>
         <translation>Références (citées)</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="62"/>
+        <location filename="../ui/DisplayPane.qml" line="68"/>
         <source>Cited by</source>
         <translation>Cité par</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="65"/>
-        <location filename="../ui/DisplayPane.qml" line="190"/>
+        <location filename="../ui/DisplayPane.qml" line="71"/>
+        <location filename="../ui/DisplayPane.qml" line="196"/>
         <source>PDF</source>
         <translation>PDF</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="77"/>
+        <location filename="../ui/DisplayPane.qml" line="83"/>
         <source>Page</source>
         <translation>Page</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="113"/>
+        <location filename="../ui/DisplayPane.qml" line="119"/>
         <source>Zoom</source>
         <translation>Zoom</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="143"/>
+        <location filename="../ui/DisplayPane.qml" line="149"/>
         <source>Reset zoom</source>
         <translation>Réinitialiser le zoom</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="177"/>
+        <location filename="../ui/DisplayPane.qml" line="183"/>
         <source>Please make a summary of this paper</source>
         <translation>Veuillez créer un résumé de cet article</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="244"/>
+        <location filename="../ui/DisplayPane.qml" line="250"/>
         <source>No references found for this paper</source>
         <translation>Aucune référence trouvée pour cet article</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="329"/>
+        <location filename="../ui/DisplayPane.qml" line="335"/>
         <source>Select a paper to view its pages</source>
         <translation>Sélectionnez un article pour voir ses pages</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="329"/>
+        <location filename="../ui/DisplayPane.qml" line="335"/>
         <source>No page images found</source>
         <translation>Aucune image de page trouvée</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="339"/>
+        <location filename="../ui/DisplayPane.qml" line="345"/>
         <source>Save Summary as PDF</source>
         <translation>Enregistrer le résumé en PDF</translation>
     </message>
@@ -564,32 +564,32 @@
         <translation>Ajouter un dossier</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="178"/>
+        <location filename="../ui/MyToolBar.qml" line="181"/>
         <source>Ingesting...</source>
         <translation>Importation...</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="190"/>
+        <location filename="../ui/MyToolBar.qml" line="193"/>
         <source>Elapsed Time: %1h %2m</source>
         <translation>Temps écoulé : %1h %2m</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="194"/>
+        <location filename="../ui/MyToolBar.qml" line="197"/>
         <source>Elapsed Time: %1m %2s</source>
         <translation>Temps écoulé : %1m %2s</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="196"/>
+        <location filename="../ui/MyToolBar.qml" line="199"/>
         <source>Elapsed Time: %1s</source>
         <translation>Temps écoulé : %1s</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="204"/>
+        <location filename="../ui/MyToolBar.qml" line="207"/>
         <source>Active Model</source>
         <translation>Modèle actif</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="244"/>
+        <location filename="../ui/MyToolBar.qml" line="247"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>
@@ -645,29 +645,29 @@
         <translation>Interroger votre bibliothèque</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="82"/>
         <location filename="../ui/QueryPane.qml" line="83"/>
+        <location filename="../ui/QueryPane.qml" line="84"/>
         <source>Query</source>
         <translation>Interroger</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="82"/>
         <location filename="../ui/QueryPane.qml" line="83"/>
+        <location filename="../ui/QueryPane.qml" line="84"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="107"/>
+        <location filename="../ui/QueryPane.qml" line="109"/>
         <source>Ask a question about your paper library...</source>
         <translation>Posez une question sur votre bibliothèque d&apos;articles...</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="116"/>
+        <location filename="../ui/QueryPane.qml" line="118"/>
         <source>Max Pages</source>
         <translation>Pages max</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="131"/>
+        <location filename="../ui/QueryPane.qml" line="133"/>
         <source>Export</source>
         <translation>Exporter</translation>
     </message>
@@ -703,39 +703,59 @@
 <context>
     <name>RagDbPane</name>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="51"/>
+        <location filename="../ui/RagDbPane.qml" line="53"/>
         <source>Query History</source>
         <translation>Historique des requêtes</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="66"/>
+        <location filename="../ui/RagDbPane.qml" line="68"/>
         <source>Select All</source>
         <translation>Tout sélectionner</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="84"/>
+        <location filename="../ui/RagDbPane.qml" line="86"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="84"/>
+        <location filename="../ui/RagDbPane.qml" line="86"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="99"/>
+        <location filename="../ui/RagDbPane.qml" line="101"/>
         <source>Descending</source>
         <translation>Décroissant</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="104"/>
+        <location filename="../ui/RagDbPane.qml" line="106"/>
         <source>Queries: %1</source>
         <translation>Requêtes : %1</translation>
     </message>
     <message>
-        <location filename="../ui/RagDbPane.qml" line="236"/>
+        <location filename="../ui/RagDbPane.qml" line="248"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagDbPane.qml" line="254"/>
+        <source>No queries selected</source>
+        <translation>Aucune requête sélectionnée</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagDbPane.qml" line="269"/>
+        <source>Delete Queries</source>
+        <translation>Supprimer les requêtes</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagDbPane.qml" line="273"/>
+        <source>Delete the selected query(ies)? This cannot be undone.</source>
+        <translation>Supprimer la/les requête(s) sélectionnée(s) ? Cette action est irréversible.</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagDbPane.qml" line="277"/>
+        <source>Deletion cancelled</source>
+        <translation type="unfinished">Suppression annulée</translation>
     </message>
 </context>
 <context>
@@ -908,99 +928,119 @@
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="209"/>
+        <location filename="../ui/SummaryDbPane.qml" line="192"/>
+        <source>No papers selected</source>
+        <translation>Aucun article sélectionné</translation>
+    </message>
+    <message>
+        <location filename="../ui/SummaryDbPane.qml" line="216"/>
         <source>Summarizing %1/%2 papers</source>
         <translation>Résumé en cours : %1/%2 articles</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="219"/>
+        <location filename="../ui/SummaryDbPane.qml" line="226"/>
         <source>Elapsed Time: %1h %2m</source>
         <translation>Temps écoulé : %1h %2m</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="223"/>
+        <location filename="../ui/SummaryDbPane.qml" line="230"/>
         <source>Elapsed Time: %1m %2s</source>
         <translation>Temps écoulé : %1m %2s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="225"/>
+        <location filename="../ui/SummaryDbPane.qml" line="232"/>
         <source>Elapsed Time: %1s</source>
         <translation>Temps écoulé : %1s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="233"/>
+        <location filename="../ui/SummaryDbPane.qml" line="240"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="260"/>
+        <location filename="../ui/SummaryDbPane.qml" line="267"/>
         <source>Select All</source>
         <translation>Tout sélectionner</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="279"/>
+        <location filename="../ui/SummaryDbPane.qml" line="286"/>
         <source>Documents: %1</source>
         <translation>Documents : %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="287"/>
+        <location filename="../ui/SummaryDbPane.qml" line="294"/>
         <source>Sort by</source>
         <translation>Trier par</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Title</source>
         <translation>Titre</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Pages</source>
         <translation>Pages</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Year</source>
         <translation>Année</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="292"/>
+        <location filename="../ui/SummaryDbPane.qml" line="299"/>
         <source>Citations</source>
         <translation>Citations</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="316"/>
+        <location filename="../ui/SummaryDbPane.qml" line="323"/>
         <source>Descending</source>
         <translation>Décroissant</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="426"/>
+        <location filename="../ui/SummaryDbPane.qml" line="443"/>
         <source>Please summarise for authors name</source>
         <translation>Veuillez résumer pour obtenir les noms des auteurs</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="436"/>
+        <location filename="../ui/SummaryDbPane.qml" line="453"/>
         <source>Year: %1 · %2 pages </source>
         <translation>Année : %1 · %2 pages </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="443"/>
+        <location filename="../ui/SummaryDbPane.qml" line="460"/>
         <source>· cited by %1</source>
         <translation>· cité par %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="493"/>
+        <location filename="../ui/SummaryDbPane.qml" line="510"/>
         <source>Save Report as PDF</source>
         <translation>Enregistrer le rapport en PDF</translation>
+    </message>
+    <message>
+        <location filename="../ui/SummaryDbPane.qml" line="528"/>
+        <source>Delete Papers</source>
+        <translation>Supprimer les articles</translation>
+    </message>
+    <message>
+        <location filename="../ui/SummaryDbPane.qml" line="532"/>
+        <source>Delete the selected paper(s)? This cannot be undone.</source>
+        <translation>Supprimer le(s) article(s) sélectionné(s) ? Cette action est irréversible.</translation>
+    </message>
+    <message>
+        <location filename="../ui/SummaryDbPane.qml" line="538"/>
+        <source>Deletion cancelled</source>
+        <translation>Suppression annulée</translation>
     </message>
 </context>
 </TS>

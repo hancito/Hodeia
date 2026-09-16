@@ -186,7 +186,14 @@ Rectangle {
                 icon.height: 24
                 Layout.fillWidth: true
                 icon.source: "qrc:/Resources/trash-can.svg"
-                onClicked: summaryDbPane.deleteSelected()
+                onClicked: {
+                    if (summaryDbPane.selectedPapers.length === 0) {
+                        if (summaryDbPane.statusBarLabel)
+                            summaryDbPane.statusBarLabel.text = qsTr("No papers selected");
+                        return;
+                    }
+                    deletePapersDialog.open();
+                }
             }
         }
 
@@ -509,6 +516,26 @@ Rectangle {
                 console.log("Report saved to:", result);
             else
                 console.warn("Report export failed");
+        }
+    }
+
+    // Delete papers confirmation dialog
+    Dialog {
+        id: deletePapersDialog
+        anchors.centerIn: parent
+        modal: true
+        width: 420
+        title: qsTr("Delete Papers")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            width: deletePapersDialog.width
+            text: qsTr("Delete the selected paper(s)? This cannot be undone.")
+            wrapMode: Text.WordWrap
+        }
+        onAccepted: summaryDbPane.deleteSelected()
+        onRejected: {
+            if (summaryDbPane.statusBarLabel)
+                summaryDbPane.statusBarLabel.text = qsTr("Deletion cancelled");
         }
     }
 }

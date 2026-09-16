@@ -249,8 +249,31 @@ Rectangle {
                 icon.width: 24
                 icon.height: 24
                 icon.source: "qrc:/Resources/trash-can.svg"
-                onClicked: dbPane.deleteSelected()
+                onClicked: {
+                    if (dbPane.selectedQueryIds.length === 0) {
+                        footerLabel.text = qsTr("No queries selected");
+                        return;
+                    }
+                    deleteQueriesDialog.open();
+                }
             }
         }
+    }
+
+    // Delete queries confirmation dialog
+    Dialog {
+        id: deleteQueriesDialog
+        anchors.centerIn: parent
+        modal: true
+        width: 420
+        title: qsTr("Delete Queries")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Label {
+            width: deleteQueriesDialog.width
+            text: qsTr("Delete the selected query(ies)? This cannot be undone.")
+            wrapMode: Text.WordWrap
+        }
+        onAccepted: dbPane.deleteSelected()
+        onRejected: footerLabel.text = qsTr("Deletion cancelled")
     }
 }
