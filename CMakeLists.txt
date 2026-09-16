@@ -44,7 +44,7 @@ endif()
 #    (On Windows with HODEIA_QT_FROM_MSYS2=ON, the MSYS2 prefix has already
 #     been prepended to CMAKE_PREFIX_PATH by cmake/PlatformWindows.cmake.)
 # ---------------------------------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Concurrent Network Quick QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent Network Quick QuickControls2 LinguistTools)
 qt_standard_project_setup(REQUIRES 6.10)
 
 # ---------------------------------------------------------------------------

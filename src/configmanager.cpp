@@ -57,6 +57,7 @@ void ConfigManager::loadConfig() {
     m_activeBackend = obj.value("activeBackend").toString("");
     m_activeModel = obj.value("activeModel").toString("");
     m_openAlexApiKey = obj.value("openAlexApiKey").toString("");
+    m_language = obj.value("language").toString("en");
     // Support string "visualMode", old int "visualMode", and legacy
     // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
@@ -99,6 +100,7 @@ void ConfigManager::saveConfig() {
   obj["activeModel"] = m_activeModel;
   obj["openAlexApiKey"] = m_openAlexApiKey;
   obj["visualMode"] = m_visualMode;
+  obj["language"] = m_language;
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;
@@ -169,6 +171,16 @@ void ConfigManager::setVisualMode(const QString &mode) {
   if (m_visualMode != mode) {
     m_visualMode = mode;
     emit visualModeChanged();
+    saveConfig();
+  }
+}
+
+QString ConfigManager::language() const { return m_language; }
+
+void ConfigManager::setLanguage(const QString &lang) {
+  if (m_language != lang) {
+    m_language = lang;
+    emit languageChanged();
     saveConfig();
   }
 }

@@ -63,7 +63,7 @@ Rectangle {
 
             CheckBox {
                 id: selectAllCheckbox
-                text: "Select All"
+                text: qsTr("Select All")
                 checked: false
                 onCheckedChanged: {
                     if (checked) {
@@ -81,7 +81,7 @@ Rectangle {
             }
             ComboBox {
                 id: sortComboBox
-                model: [ "Date", "Model"]
+                model: [qsTr("Date"), qsTr("Model")]
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
                     // QueryTextRole=258, DateRole=260, LlmModelRole=261
@@ -96,12 +96,12 @@ Rectangle {
 
             CheckBox {
                 id: descendingQueries
-                text: "Descending"
+                text: qsTr("Descending")
                 onCheckedChanged: databaseManager.queryProxyModel.sortDescending = checked
             }
             Label {
                 id: numberQuery
-                text: "Queries: " + dbPane.nqueries
+                text: qsTr("Queries: %1").arg(dbPane.nqueries)
             }
         }
 

@@ -42,7 +42,7 @@ Rectangle {
             if (success) {
                 queryPane.lastResponse = response;
             } else {
-                queryPane.lastResponse = "Error: " + error;
+                queryPane.lastResponse = qsTr("Error: %1").arg(error);
             }
         }
     }
@@ -56,14 +56,14 @@ Rectangle {
             TextField {
                 id: queryLlm
                 Layout.fillWidth: true
-                placeholderText: "Query your library"
+                placeholderText: qsTr("Query your library")
                 text: queryPane.activeQueryText
             }
 
             Button {
                 ToolTip.visible: hovered
-                text: "Query"
-                ToolTip.text: "Query"
+                text: qsTr("Query")
+                ToolTip.text: qsTr("Query")
                 icon.width: 24
                 icon.height: 24
                 icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
@@ -86,7 +86,7 @@ Rectangle {
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
                     // Prefer the active query response; fall back to lastResponse from a live query.
-                    text: queryPane.activeQueryResponse !== "" ? queryPane.activeQueryResponse : queryPane.lastResponse !== "" ? queryPane.lastResponse : "Ask a question about your paper library..."
+                    text: queryPane.activeQueryResponse !== "" ? queryPane.activeQueryResponse : queryPane.lastResponse !== "" ? queryPane.lastResponse : qsTr("Ask a question about your paper library...")
                 }
             }
 

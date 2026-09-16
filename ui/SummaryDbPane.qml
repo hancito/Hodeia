@@ -44,7 +44,7 @@ Rectangle {
         configManager.deleteImages(selectedPapers, imgPath);
         selectedPapers = [];
         databaseManager.summaryModel.loadAll();
-        numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+        numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
     }
 
     border.width: 1
@@ -60,7 +60,7 @@ Rectangle {
         function onIngestionFinished() {
             summaryDbPane.ingesting = false;
             databaseManager.summaryModel.loadAll();
-            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+            numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
         }
     }
 
@@ -79,9 +79,9 @@ Rectangle {
             summaryDbPane.paperProgress = 0;
             summaryDbPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
-            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+            numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = "Summarize done: " + successCount + "/" + total;
+                summaryDbPane.statusBarLabel.text = qsTr("Summarize done: %1/%2").arg(successCount).arg(total);
         }
         function onSummaryStopped() {
             summarizeTimer.stop();
@@ -90,9 +90,9 @@ Rectangle {
             summaryDbPane.paperProgress = 0;
             summaryDbPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
-            numberPaper.text = "Paper Number: " + databaseManager.summaryProxyModel.rowCount();
+            numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = "Summarization stopped by user";
+                summaryDbPane.statusBarLabel.text = qsTr("Summarization stopped by user");
         }
     }
 
@@ -107,7 +107,7 @@ Rectangle {
         TextField {
             id: paperSearch
             Layout.fillWidth: true
-            placeholderText: "Search paper"
+            placeholderText: qsTr("Search paper")
             onTextChanged: databaseManager.summaryProxyModel.filterText = text
         }
 
@@ -117,7 +117,7 @@ Rectangle {
             Button {
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 ToolTip.visible: hovered
-                ToolTip.text: "Summarize"
+                ToolTip.text: qsTr("Summarize")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -139,7 +139,7 @@ Rectangle {
 
             Button {
                 ToolTip.visible: hovered
-                ToolTip.text: "Refresh"
+                ToolTip.text: qsTr("Refresh")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -152,7 +152,7 @@ Rectangle {
 
             Button {
                 ToolTip.visible: hovered
-                ToolTip.text: "Generate Report from selection"
+                ToolTip.text: qsTr("Generate Report from selection")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -177,7 +177,7 @@ Rectangle {
             Button {
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 ToolTip.visible: hovered
-                ToolTip.text: "Delete"
+                ToolTip.text: qsTr("Delete")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -202,7 +202,7 @@ Rectangle {
 
             RowLayout {
                 Label {
-                    text: "Summarizing " + summaryDbPane.paperProgress + "/" + summaryDbPane.totalPapers + " papers"
+                    text: qsTr("Summarizing %1/%2 papers").arg(summaryDbPane.paperProgress).arg(summaryDbPane.totalPapers)
                     Layout.fillWidth: true
                 }
 
@@ -212,13 +212,13 @@ Rectangle {
                         if (totalSec >= 3600) {
                             var h = Math.floor(totalSec / 3600);
                             var m = Math.floor((totalSec % 3600) / 60);
-                            return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
+                            return qsTr("Elapsed Time: %1h %2m").arg(h).arg(m.toString().padStart(2, "0"));
                         } else if (totalSec >= 60) {
                             var m = Math.floor(totalSec / 60);
                             var s = totalSec % 60;
-                            return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
+                            return qsTr("Elapsed Time: %1m %2s").arg(m).arg(s.toString().padStart(2, "0"));
                         } else {
-                            return "Elapsed Time: " + totalSec + "s";
+                            return qsTr("Elapsed Time: %1s").arg(totalSec);
                         }
                     }
                     Layout.fillWidth: true
@@ -226,7 +226,7 @@ Rectangle {
 
                 Button {
                     id: stopSummarize
-                    text: "Stop"
+                    text: qsTr("Stop")
                     icon.source: "qrc:/Resources/circle-xmark.svg"
                     onClicked: {
                         summaryController.stopSummarize();
@@ -253,7 +253,7 @@ Rectangle {
             CheckBox {
                 id: selectAllCheckbox
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
-                text: "Select All"
+                text: qsTr("Select All")
                 checked: false
                 onCheckedChanged: {
                     if (checked) {
@@ -272,7 +272,7 @@ Rectangle {
 
             Label {
                 id: numberPaper
-                text: "Documents: " + summaryDbPane.npapers
+                text: qsTr("Documents: %1").arg(summaryDbPane.npapers)
             }
 
             Item {
@@ -280,12 +280,12 @@ Rectangle {
             }
 
             Label {
-                text: "Sort by"
+                text: qsTr("Sort by")
             }
 
             ComboBox {
                 id: sortComboBox
-                model: ["Title", "Date", "Pages", "Model", "Year", "Citations"]
+                model: [qsTr("Title"), qsTr("Date"), qsTr("Pages"), qsTr("Model"), qsTr("Year"), qsTr("Citations")]
                 Layout.fillWidth: true
                 onCurrentIndexChanged: {
                     // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265,
@@ -309,7 +309,7 @@ Rectangle {
 
             CheckBox {
                 id: descendingCheckBox
-                text: "Descending"
+                text: qsTr("Descending")
                 onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
             }
         }
@@ -321,6 +321,46 @@ Rectangle {
             clip: true
             boundsBehavior: Flickable.DragAndOvershootBounds
             Layout.minimumHeight: parent.height * 0.3
+            focus: true
+            highlight: Rectangle {
+                color: "transparent"
+            }
+
+            // Sync currentIndex with activePaperHash so arrow keys navigate
+            // through the list and highlight the focused row.
+            Connections {
+                target: summaryDbPane
+                function onActivePaperHashChanged() {
+                    for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
+                        if (databaseManager.summaryProxyModel.get(i, "paperHash") === summaryDbPane.activePaperHash) {
+                            paperListView.currentIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            onCurrentIndexChanged: {
+                if (currentIndex >= 0 && currentIndex < databaseManager.summaryProxyModel.rowCount()) {
+                    var hash = databaseManager.summaryProxyModel.get(currentIndex, "paperHash");
+                    if (hash && hash !== summaryDbPane.activePaperHash)
+                        summaryDbPane.activePaperHash = hash;
+                }
+            }
+
+            ScrollBar.vertical: ScrollBar {
+                id: paperScrollBar
+                policy: ScrollBar.AsNeeded
+                width: 10
+                contentItem: Rectangle {
+                    implicitWidth: 8
+                    color: paperScrollBar.active ? Colors.overlay2 : Colors.surface2
+                    radius: 4
+                }
+                background: Rectangle {
+                    width: 8
+                    color: "transparent"
+                }
+            }
 
             model: databaseManager.summaryProxyModel
             spacing: 5
@@ -334,18 +374,22 @@ Rectangle {
                 required property string paperHash
                 required property int citesCount
                 required property string year
-                width: paperListView.width
+                width: paperListView.width - 10
                 height: 120
                 border.width: summaryDbPane.activePaperHash === paperHash ? 4 : 5
                 border.color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
                 radius: 4
-                color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
+                color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : (mouseArea.containsMouse ? Colors.surface1 : Colors.surface0)
+                focus: summaryDbPane.activePaperHash === paperHash
 
                 MouseArea {
                     id: mouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: summaryDbPane.activePaperHash = paperHash
+                    onClicked: {
+                        summaryDbPane.activePaperHash = paperHash;
+                        paperListView.forceActiveFocus();
+                    }
                 }
 
                 ColumnLayout {
@@ -375,7 +419,7 @@ Rectangle {
                     }
 
                     Label {
-                        text: authors || "Please summarise for authors name"
+                        text: authors || qsTr("Please summarise for authors name")
                         Layout.fillWidth: true
                         elide: Text.ElideMiddle
                         opacity: 0.7
@@ -385,14 +429,14 @@ Rectangle {
                         Layout.fillWidth: true
                         Label {
                             font.pixelSize: 12
-                            text: "Year: " + year + " · " + pagesNum + " pages "
+                            text: qsTr("Year: %1 · %2 pages ").arg(year).arg(pagesNum)
                             font.family: Fonts.mono
                         }
                         Label {
                             font.pixelSize: 12
                             // "cited by N" only makes sense once OpenAlex has
                             // populated cites_count (0 = not fetched yet).
-                            text: citesCount > 0 ? "· cited by " + citesCount : ""
+                            text: citesCount > 0 ? qsTr("· cited by %1").arg(citesCount) : ""
                             font.family: Fonts.mono
                             opacity: citesCount > 0 ? 0.8 : 0
                         }

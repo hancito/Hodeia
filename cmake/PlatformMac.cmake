@@ -105,6 +105,16 @@ endif()
 function(hodeia_mac_deploy TARGET)
   # The executable lives in <app>.app/Contents/MacOS/; assets go next to it.
 
+  # --- Translations (.qm files) ---
+  foreach(_qm ${HODEIA_QM_FILES})
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET}>/i18n
+        COMMAND ${CMAKE_COMMAND} -E copy
+            ${_qm}
+            $<TARGET_FILE_DIR:${TARGET}>/i18n/
+        COMMENT "Copying translations")
+  endforeach()
+
   # --- Themes & fonts ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory

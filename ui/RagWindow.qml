@@ -106,7 +106,7 @@ ApplicationWindow {
             anchors.fill: parent
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
-            text: "Ready"
+            text: qsTr("Ready")
         }
     }
 }

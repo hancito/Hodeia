@@ -29,11 +29,11 @@ Dialog {
         target: helpers
         function onModelsChecked(success, models, error) {
             if (success) {
-                modelCheckLabel.text = "Connected — " + models.length + " model(s) available";
+                modelCheckLabel.text = qsTr("Connected — %1 model(s) available").arg(models.length);
                 modelCheckLabel.visible = true;
                 connectionVerified = true;
             } else {
-                modelCheckLabel.text = "Connection failed: " + error;
+                modelCheckLabel.text = qsTr("Connection failed: %1").arg(error);
                 modelCheckLabel.visible = true;
                 connectionVerified = false;
             }
@@ -48,7 +48,7 @@ Dialog {
         GroupBox {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            title: "Backends"
+            title: qsTr("Backends")
 
             ListView {
                 id: backendListView
@@ -68,7 +68,7 @@ Dialog {
                     }
 
                     Button {
-                        text: "Edit"
+                        text: qsTr("Edit")
                         visible: modelData.name !== "Llama.cpp"
                         onClicked: {
                             editingIndex = index;
@@ -80,7 +80,7 @@ Dialog {
                     }
 
                     Button {
-                        text: "Remove"
+                        text: qsTr("Remove")
                         visible: modelData.name !== "Llama.cpp"
                         onClicked: {
                             configManager.removeBackend(modelData.name);
@@ -97,7 +97,7 @@ Dialog {
         // --- Add / Edit form ---
         GroupBox {
             Layout.fillWidth: true
-            title: editingIndex >= 0 ? "Edit Backend" : "Add Backend"
+            title: editingIndex >= 0 ? qsTr("Edit Backend") : qsTr("Add Backend")
 
             ColumnLayout {
                 anchors.fill: parent
@@ -106,21 +106,21 @@ Dialog {
                 RowLayout {
                     Layout.fillWidth: true
                     Label {
-                        text: "Name"
+                        text: qsTr("Name")
                         Layout.preferredWidth: 80
                     }
                     TextField {
                         id: nameValue
                         Layout.fillWidth: true
                         enabled: editingIndex < 0
-                        placeholderText: "my-backend"
+                        placeholderText: qsTr("my-backend")
                     }
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     Label {
-                        text: "URL"
+                        text: qsTr("URL")
                         Layout.preferredWidth: 80
                     }
                     TextField {
@@ -133,14 +133,14 @@ Dialog {
                 RowLayout {
                     Layout.fillWidth: true
                     Label {
-                        text: "API Key"
+                        text: qsTr("API Key")
                         Layout.preferredWidth: 80
                     }
                     TextField {
                         id: keyValue
                         Layout.fillWidth: true
                         echoMode: TextField.Password
-                        placeholderText: "API Key (empty if not needed)"
+                        placeholderText: qsTr("API Key (empty if not needed)")
                     }
                 }
 
@@ -153,7 +153,7 @@ Dialog {
                         let u = urlValue.text.trim();
                         let k = keyValue.text.trim();
                         if (u === "") {
-                            modelCheckLabel.text = "Please enter a URL";
+                            modelCheckLabel.text = qsTr("Please enter a URL");
                             modelCheckLabel.visible = true;
                             return;
                         }

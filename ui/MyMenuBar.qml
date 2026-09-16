@@ -14,13 +14,13 @@ MenuBar {
     signal requestDeleteModels
     signal requestOpenAlexApiKey
     Menu {
-        title: "File"
+        title: qsTr("File")
         MenuItem {
-            text: "New Project"
+            text: qsTr("New Project")
             onTriggered: menuBar.requestNewProject()
         }
         Menu {
-            title: "Open Project..."
+            title: qsTr("Open Project...")
             Repeater {
                 model: configManager.projectList
                 delegate: MenuItem {
@@ -36,7 +36,7 @@ MenuBar {
         }
         Menu {
             id: deleteProjectMenu
-            title: "Delete Project..."
+            title: qsTr("Delete Project...")
             Repeater {
                 model: configManager.projectList
                 delegate: Item {
@@ -64,26 +64,26 @@ MenuBar {
                 }
             }
             MenuItem {
-                text: "Delete Selected"
+                text: qsTr("Delete Selected")
                 enabled: mainWin.selectedProjects.length > 0
                 onTriggered: menuBar.requestDeleteProject()
             }
         }
         MenuItem {
-            text: "Clean Project"
+            text: qsTr("Clean Project")
             onTriggered: menuBar.requestCleanProject()
         }
         MenuSeparator {}
         MenuItem {
-            text: "Exit"
+            text: qsTr("Exit")
             onTriggered: Qt.quit()
         }
     }
 
     Menu {
-        title: "Settings"
+        title: qsTr("Settings")
         Menu {
-            title: "Themes"
+            title: qsTr("Themes")
             Repeater {
                 id: themesRepeater
                 model: themeManager.themes
@@ -101,15 +101,30 @@ MenuBar {
             }
         }
         Menu {
-            title: "Backend"
+            title: qsTr("Languages")
             MenuItem {
-                text: "Add Backend..."
+                text: qsTr("English")
+                checkable: true
+                checked: configManager.language === "en"
+                onTriggered: configManager.language = "en"
+            }
+            MenuItem {
+                text: qsTr("Français")
+                checkable: true
+                checked: configManager.language === "fr"
+                onTriggered: configManager.language = "fr"
+            }
+        }
+        Menu {
+            title: qsTr("Backend")
+            MenuItem {
+                text: qsTr("Add Backend...")
                 onTriggered: backendDialog.open()
             }
 
             MenuSeparator {}
             Menu {
-                title: "Change Backend"
+                title: qsTr("Change Backend")
                 Repeater {
                     model: configManager.backendList
                     delegate: MenuItem {
@@ -125,12 +140,12 @@ MenuBar {
             }
         }
         MenuItem {
-            text: "Add Local Model"
+            text: qsTr("Add Local Model")
             onTriggered: localModelDialog.open()
         }
         Menu {
             id: deleteModelMenu
-            title: "Delete Local Model..."
+            title: qsTr("Delete Local Model...")
             width: 280
             Repeater {
                 model: helpers.localModelList
@@ -159,13 +174,13 @@ MenuBar {
                 }
             }
             MenuItem {
-                text: "Delete Selected"
+                text: qsTr("Delete Selected")
                 enabled: mainWin.selectedModels.length > 0
                 onTriggered: menuBar.requestDeleteModels()
             }
         }
         MenuItem {
-            text: "Add or Modify OpenAlex API key"
+            text: qsTr("Add or Modify OpenAlex API key")
             onTriggered: menuBar.requestOpenAlexApiKey()
         }
     }

@@ -140,7 +140,7 @@ Rectangle {
                 icon.width: 20
                 icon.height: 20
                 ToolTip.visible: hovered
-                ToolTip.text: "Reset zoom"
+                ToolTip.text: qsTr("Reset zoom")
                 onClicked: pdfTab.pdfZoomLevel = 1
             }
         }
@@ -174,7 +174,7 @@ Rectangle {
                             font.pointSize: 12
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
-                            text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : "Please make a summary of this paper"
+                            text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : qsTr("Please make a summary of this paper")
                         }
                     }
                     RowLayout {
@@ -241,7 +241,7 @@ Rectangle {
                                     var model = databaseManager.citationsModel;
                                     var v = model.version; // invalidate after loadAll()
                                     var s = displayMethod === "citedBy" ? model.citedByDisplayForHash(displayPane.activePaperHash) : model.citesDisplayForHash(displayPane.activePaperHash);
-                                    return s ? s : "No references found for this paper";
+                                    return s ? s : qsTr("No references found for this paper");
                                 }
                             }
                         }
@@ -326,7 +326,7 @@ Rectangle {
                 Label {
                     anchors.centerIn: parent
                     opacity: displayPane.pageImages.length === 0 ? 0.5 : 0
-                    text: displayPane.activePaperHash === "" ? "Select a paper to view its pages" : "No page images found"
+                    text: displayPane.activePaperHash === "" ? qsTr("Select a paper to view its pages") : qsTr("No page images found")
                     font.pixelSize: 14
                     horizontalAlignment: Text.AlignHCenter
                 }

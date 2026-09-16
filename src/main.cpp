@@ -16,7 +16,28 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QTimer>
+#include <QTranslator>
 #include <print>
+
+/// Load the translation catalog for the given language code (e.g. "en", "fr").
+/// Returns true if a .qm file was found and loaded; false for "en" or when
+/// no catalog exists (the source strings are shown as-is).
+static bool loadTranslator(QGuiApplication &app, const QString &lang) {
+  static QTranslator s_translator;
+  app.removeTranslator(&s_translator);
+
+  if (lang == "en" || lang.isEmpty())
+    return true; // English = source language, no catalog needed
+
+  const QString qmFile =
+      app.applicationDirPath() + "/i18n/hodeia_" + lang + ".qm";
+  if (s_translator.load(qmFile)) {
+    app.installTranslator(&s_translator);
+    return true;
+  }
+  qWarning() << "Translator not loaded:" << qmFile;
+  return false;
+}
 
 /// Install a global llama.cpp log callback early (before any model loads)
 /// so that embedding model init and chat backend share the same filter.
@@ -79,6 +100,10 @@ int main(int argc, char *argv[]) {
   // Create ConfigManager
   ConfigManager configManager;
 
+  // Load the translation catalog for the saved language (before QML engine
+  // so that qsTr() calls in QML pick up the right strings on first load).
+  loadTranslator(app, configManager.language());
+
   // Create ThemeManager and adjust path to the JSON themes folder (relative
   // to the executable)
   ThemeManager themeManager;
@@ -123,6 +148,16 @@ int main(int argc, char *argv[]) {
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+
+  // When the user changes the language in Settings, reload the translator
+  // and the QML engine so all qsTr() calls re-evaluate with the new catalog.
+  QObject::connect(&configManager, &ConfigManager::languageChanged,
+                   [&engine, &app, &configManager]() {
+                     loadTranslator(app, configManager.language());
+                     engine.clearComponentCache();
+                     engine.loadFromModule("HodeiaCPP", "Main");
+                   });
+
   engine.loadFromModule("HodeiaCPP", "Main");
 
   return QGuiApplication::exec();

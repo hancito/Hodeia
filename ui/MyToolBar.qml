@@ -18,7 +18,7 @@ ToolBar {
     // ── File dialog for selecting PDFs ──
     FileDialog {
         id: pdfFileDialog
-        title: "Select PDF files"
+        title: qsTr("Select PDF files")
         nameFilters: ["PDF files (*.pdf)"]
         fileMode: FileDialog.OpenFiles
         onAccepted: {
@@ -39,7 +39,7 @@ ToolBar {
     // ── Folder dialog for selecting a directory ──
     FolderDialog {
         id: pdfFolderDialog
-        title: "Select a folder containing PDFs"
+        title: qsTr("Select a folder containing PDFs")
         onAccepted: {
             spinner.visible = true;
             spinner.running = true;
@@ -133,7 +133,7 @@ ToolBar {
         Button {
             id: addfilebtn
             enabled: !toolBar.busy
-            ToolTip.text: "Add a file"
+            ToolTip.text: qsTr("Add a file")
             ToolTip.visible: hovered
             display: AbstractButton.IconOnly
             padding: 0
@@ -147,7 +147,7 @@ ToolBar {
         Button {
             id: addfolderbtn
             enabled: !toolBar.busy
-            ToolTip.text: "Add a folder"
+            ToolTip.text: qsTr("Add a folder")
             ToolTip.visible: hovered
             padding: 0
             icon.width: 40
@@ -175,7 +175,7 @@ ToolBar {
         Label {
             id: status2
             visible: spinner.visible
-            text: "Ingesting..."
+            text: qsTr("Ingesting...")
         }
 
         Text {
@@ -187,13 +187,13 @@ ToolBar {
                 if (totalSec >= 3600) {
                     var h = Math.floor(totalSec / 3600);
                     var m = Math.floor((totalSec % 3600) / 60);
-                    return "Elapsed Time: " + h + "h " + m.toString().padStart(2, "0") + "m";
+                    return qsTr("Elapsed Time: %1h %2m").arg(h).arg(m.toString().padStart(2, "0"));
                 } else if (totalSec >= 60) {
                     var m = Math.floor(totalSec / 60);
                     var s = totalSec % 60;
-                    return "Elapsed Time: " + m + "m " + s.toString().padStart(2, "0") + "s";
+                    return qsTr("Elapsed Time: %1m %2s").arg(m).arg(s.toString().padStart(2, "0"));
                 } else {
-                    return "Elapsed Time: " + totalSec + "s";
+                    return qsTr("Elapsed Time: %1s").arg(totalSec);
                 }
             }
         }
@@ -201,7 +201,7 @@ ToolBar {
         ToolSeparator {}
 
         Label {
-            text: "Active Model"
+            text: qsTr("Active Model")
         }
 
         ComboBox {

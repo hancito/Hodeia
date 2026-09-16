@@ -147,6 +147,14 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/MyToolBar.qml
 )
 
+# ---------------------------------------------------------------------------
+# Translations
+# ---------------------------------------------------------------------------
+qt_add_translations(Hodeia
+    TS_FILES ${CMAKE_SOURCE_DIR}/translations/hodeia_fr.ts
+    QM_FILES_OUTPUT_VARIABLE HODEIA_QM_FILES
+)
+
 # Resources
 set(_RES_FILES
     ai-svgrepo-com.svg align-justify.svg arrow-right-to-file.svg edit.svg

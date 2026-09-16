@@ -29,6 +29,8 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
   Q_PROPERTY(QString visualMode READ visualMode WRITE setVisualMode NOTIFY
                  visualModeChanged)
+  Q_PROPERTY(
+      QString language READ language WRITE setLanguage NOTIFY languageChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -43,6 +45,7 @@ public:
   QString openAlexApiKey() const { return m_openAlexApiKey; }
   QStringList projectList() const { return m_projectList; }
   QString visualMode() const;
+  QString language() const;
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -57,6 +60,7 @@ public:
   Q_INVOKABLE void setActiveModel(const QString &model);
   void setOpenAlexApiKey(const QString &key);
   void setVisualMode(const QString &mode);
+  void setLanguage(const QString &lang);
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
   bool useVisualContext() const;
@@ -125,6 +129,7 @@ signals:
   void modelCopied();
 
   void visualModeChanged();
+  void languageChanged();
 
 private:
   void refreshProjectList();
@@ -146,4 +151,5 @@ private:
   QVariantList m_backendList;
   QStringList m_projectList;
   QString m_visualMode = "Reduced (figures/tables)";
+  QString m_language = QStringLiteral("en");
 };

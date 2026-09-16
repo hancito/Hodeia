@@ -19,7 +19,7 @@ ApplicationWindow {
 
     readonly property var activeTheme: themeManager.activeTheme || {}
     readonly property var activeProject: configManager.lastProject || {}
-    title: qsTr("Hodeia - " + activeProject)
+    title: qsTr("Hodeia - %1").arg(activeProject)
     // Derived colors (mirrors _theme.py update_palette logic)
     readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
 
@@ -180,23 +180,23 @@ ApplicationWindow {
         id: newProjectDialog
         anchors.centerIn: parent
         modal: true
-        title: "New Project"
+        title: qsTr("New Project")
         ColumnLayout {
             anchors.fill: parent
             spacing: 10
             Label {
-                text: "Enter the Project Name"
+                text: qsTr("Enter the Project Name")
             }
             TextField {
                 id: nameField
                 Layout.fillWidth: true
-                placeholderText: "Type here..."
+                placeholderText: qsTr("Type here...")
                 focus: true
                 onAccepted: doCreateProject()
             }
             Label {
                 id: messageProjectName
-                text: "Please enter a name or cancel"
+                text: qsTr("Please enter a name or cancel")
                 visible: false
                 horizontalAlignment: Text.AlignHCenter
                 color: Colors.red
@@ -204,7 +204,7 @@ ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Button {
-                    text: "Create"
+                    text: qsTr("Create")
                     highlighted: true
                     onClicked: root.doCreateProject()
                 }
@@ -212,7 +212,7 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
                 Button {
-                    text: "Cancel"
+                    text: qsTr("Cancel")
                     onClicked: {
                         newProjectDialog.close();
                         nameField.clear();
@@ -247,11 +247,11 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         width: 420
-        title: "Clean Project"
+        title: qsTr("Clean Project")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
             width: cleanProjectDialog.width
-            text: "Clean project \"" + activeProject + "\"? All files and data will be permanently removed."
+            text: qsTr("Clean project \"%1\"? All files and data will be permanently removed.").arg(activeProject)
             wrapMode: Text.WordWrap
         }
         onAccepted: {
@@ -269,14 +269,14 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         width: 420
-        title: "Delete Projects"
+        title: qsTr("Delete Projects")
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
             anchors.fill: parent
             spacing: 5
             Label {
                 Layout.fillWidth: true
-                text: "Delete the selected project(s)? This cannot be undone."
+                text: qsTr("Delete the selected project(s)? This cannot be undone.")
                 wrapMode: Text.WordWrap
             }
             Repeater {
@@ -307,14 +307,14 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         width: 420
-        title: "Delete Models"
+        title: qsTr("Delete Models")
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
             anchors.fill: parent
             spacing: 5
             Label {
                 Layout.fillWidth: true
-                text: "Delete the selected model(s)? This cannot be undone."
+                text: qsTr("Delete the selected model(s)? This cannot be undone.")
                 wrapMode: Text.WordWrap
             }
             Repeater {
@@ -341,19 +341,19 @@ ApplicationWindow {
         anchors.centerIn: parent
         modal: true
         width: 420
-        title: "OpenAlex API Key"
+        title: qsTr("OpenAlex API Key")
         standardButtons: Dialog.Ok | Dialog.Cancel
         ColumnLayout {
             anchors.fill: parent
             spacing: 10
             Label {
-                text: "Enter your OpenAlex API key:"
+                text: qsTr("Enter your OpenAlex API key:")
                 Layout.fillWidth: true
             }
             TextField {
                 id: openAlexKeyField
                 Layout.fillWidth: true
-                placeholderText: "Paste your API key..."
+                placeholderText: qsTr("Paste your API key...")
                 text: configManager.openAlexApiKey
                 focus: true
                 onAccepted: openAlexKeyDialog.accept()
@@ -374,7 +374,7 @@ ApplicationWindow {
         id: localModelDialog
         anchors.centerIn: parent
         modal: true
-        title: "Add Local Model"
+        title: qsTr("Add Local Model")
         standardButtons: Dialog.Ok | Dialog.Cancel
         width: 520
         ColumnLayout {
@@ -386,17 +386,17 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 spacing: 6
                 Label {
-                    text: "Model:"
+                    text: qsTr("Model:")
                     Layout.minimumWidth: 60
                 }
                 TextField {
                     id: modelPathField
                     Layout.fillWidth: true
-                    placeholderText: "Select a .gguf model file..."
+                    placeholderText: qsTr("Select a .gguf model file...")
                     readOnly: true
                 }
                 Button {
-                    text: "Browse..."
+                    text: qsTr("Browse...")
                     onClicked: localModelFileDlg.open()
                 }
             }
@@ -406,23 +406,23 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 spacing: 6
                 Label {
-                    text: "MMProj:"
+                    text: qsTr("MMProj:")
                     Layout.minimumWidth: 60
                 }
                 TextField {
                     id: mmprojPathField
                     Layout.fillWidth: true
-                    placeholderText: "Optional — select a .gguf mmproj file..."
+                    placeholderText: qsTr("Optional — select a .gguf mmproj file...")
                     readOnly: true
                 }
                 Button {
-                    text: "Browse..."
+                    text: qsTr("Browse...")
                     onClicked: localMmprojFileDlg.open()
                 }
             }
 
             Label {
-                text: "The mmproj file is optional. Leave empty to skip."
+                text: qsTr("The mmproj file is optional. Leave empty to skip.")
                 font.italic: true
                 opacity: 0.6
             }
@@ -447,7 +447,7 @@ ApplicationWindow {
     // Backing file dialog — model GGUF
     FileDialog {
         id: localModelFileDlg
-        title: "Select GGUF Model File"
+        title: qsTr("Select GGUF Model File")
         fileMode: FileDialog.OpenFile
         nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
         onAccepted: {
@@ -458,7 +458,7 @@ ApplicationWindow {
     // Backing file dialog — mmproj GGUF
     FileDialog {
         id: localMmprojFileDlg
-        title: "Select MMProj GGUF File"
+        title: qsTr("Select MMProj GGUF File")
         fileMode: FileDialog.OpenFile
         nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
         onAccepted: {
@@ -470,13 +470,13 @@ ApplicationWindow {
     Connections {
         target: configManager
         function onModelCopyProgress(percentage, fileName) {
-            footerLabel.text = "Copying model: " + fileName + " — " + percentage + "%";
+            footerLabel.text = qsTr("Copying model: %1 — %2%").arg(fileName).arg(percentage);
         }
         function onModelCopyFinished(success, destPath, error) {
             if (success) {
-                footerLabel.text = "Model copied: " + destPath;
+                footerLabel.text = qsTr("Model copied: %1").arg(destPath);
             } else {
-                footerLabel.text = "Copy failed: " + error;
+                footerLabel.text = qsTr("Copy failed: %1").arg(error);
             }
         }
     }
@@ -490,7 +490,7 @@ ApplicationWindow {
             font.family: Fonts.mono
             verticalAlignment: Text.AlignLeft
             horizontalAlignment: Text.AlignLeft
-            text: qsTr(activeProject + " -- Ready")
+            text: qsTr("%1 -- Ready").arg(activeProject)
         }
     }
 }
