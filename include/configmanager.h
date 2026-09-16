@@ -150,6 +150,6 @@ private:
   /// Each entry is a QVariantMap: {"name":..., "url":..., "api_key":...}
   QVariantList m_backendList;
   QStringList m_projectList;
-  QString m_visualMode = "Reduced (figures/tables)";
+  int m_visualModeIndex = 1; // 0=TextOnly, 1=Reduced, 2=Full
   QString m_language = QStringLiteral("en");
 };

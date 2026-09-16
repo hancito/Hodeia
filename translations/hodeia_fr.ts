@@ -116,48 +116,68 @@
 <context>
     <name>ConfigManager</name>
     <message>
-        <location filename="../src/configmanager.cpp" line="271"/>
-        <location filename="../src/configmanager.cpp" line="308"/>
+        <location filename="../src/configmanager.cpp" line="167"/>
+        <location filename="../src/configmanager.cpp" line="176"/>
+        <location filename="../src/configmanager.cpp" line="182"/>
+        <source>Text only</source>
+        <translation>Texte uniquement</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="169"/>
+        <location filename="../src/configmanager.cpp" line="177"/>
+        <location filename="../src/configmanager.cpp" line="184"/>
+        <source>Full (all pages)</source>
+        <translation>Complet (toutes les pages)</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="171"/>
+        <location filename="../src/configmanager.cpp" line="176"/>
+        <source>Reduced (figures/tables)</source>
+        <translation>Reduced (figures/tables)</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="291"/>
+        <location filename="../src/configmanager.cpp" line="328"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="279"/>
+        <location filename="../src/configmanager.cpp" line="299"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="292"/>
+        <location filename="../src/configmanager.cpp" line="312"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="314"/>
+        <location filename="../src/configmanager.cpp" line="334"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="324"/>
+        <location filename="../src/configmanager.cpp" line="344"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="378"/>
+        <location filename="../src/configmanager.cpp" line="398"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="387"/>
+        <location filename="../src/configmanager.cpp" line="407"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="395"/>
+        <location filename="../src/configmanager.cpp" line="415"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="418"/>
+        <location filename="../src/configmanager.cpp" line="438"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>

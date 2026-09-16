@@ -63,17 +63,19 @@ void ConfigManager::loadConfig() {
     if (obj.contains("visualMode")) {
       QJsonValue v = obj.value("visualMode");
       if (v.isString()) {
-        m_visualMode = v.toString();
+        // Map legacy English string keys to the enum
+        const QString s = v.toString();
+        if (s == "Text only")
+          m_visualModeIndex = 0;
+        else if (s == "Full (all pages)")
+          m_visualModeIndex = 2;
+        else
+          m_visualModeIndex = 1;
       } else {
-        int mode = v.toInt(1);
-        m_visualMode = mode == 0   ? "Text only"
-                       : mode == 2 ? "Full (all pages)"
-                                   : "Reduced (figures/tables)";
+        m_visualModeIndex = v.toInt(1);
       }
     } else if (obj.contains("useVisualContext")) {
-      m_visualMode = obj.value("useVisualContext").toBool(true)
-                         ? "Reduced (figures/tables)"
-                         : "Text only";
+      m_visualModeIndex = obj.value("useVisualContext").toBool(true) ? 1 : 0;
     }
 
     // Load backend list from JSON array
@@ -99,7 +101,7 @@ void ConfigManager::saveConfig() {
   obj["activeBackend"] = m_activeBackend;
   obj["activeModel"] = m_activeModel;
   obj["openAlexApiKey"] = m_openAlexApiKey;
-  obj["visualMode"] = m_visualMode;
+  obj["visualMode"] = m_visualModeIndex;
   obj["language"] = m_language;
 
   // Save backend list as JSON array of objects
@@ -159,17 +161,32 @@ void ConfigManager::setOpenAlexApiKey(const QString &key) {
   }
 }
 
-QString ConfigManager::visualMode() const { return m_visualMode; }
+QString ConfigManager::visualMode() const {
+  switch (m_visualModeIndex) {
+  case 0:
+    return tr("Text only");
+  case 2:
+    return tr("Full (all pages)");
+  default:
+    return tr("Reduced (figures/tables)");
+  }
+}
 
 QStringList ConfigManager::visualModeList() const {
-  return {QStringLiteral("Text only"),
-          QStringLiteral("Reduced (figures/tables)"),
-          QStringLiteral("Full (all pages)")};
+  return {tr("Text only"), tr("Reduced (figures/tables)"),
+          tr("Full (all pages)")};
 }
 
 void ConfigManager::setVisualMode(const QString &mode) {
-  if (m_visualMode != mode) {
-    m_visualMode = mode;
+  int idx;
+  if (mode == tr("Text only"))
+    idx = 0;
+  else if (mode == tr("Full (all pages)"))
+    idx = 2;
+  else
+    idx = 1;
+  if (m_visualModeIndex != idx) {
+    m_visualModeIndex = idx;
     emit visualModeChanged();
     saveConfig();
   }
@@ -186,11 +203,14 @@ void ConfigManager::setLanguage(const QString &lang) {
 }
 
 VisualMode ConfigManager::visualModeEnum() const {
-  if (m_visualMode == "Text only")
+  switch (m_visualModeIndex) {
+  case 0:
     return VisualMode::TextOnly;
-  if (m_visualMode == "Full (all pages)")
+  case 2:
     return VisualMode::Full;
-  return VisualMode::Reduced;
+  default:
+    return VisualMode::Reduced;
+  }
 }
 
 bool ConfigManager::useVisualContext() const {
