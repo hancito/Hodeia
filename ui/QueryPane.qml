@@ -8,6 +8,7 @@ Rectangle {
     property var activeTheme: ({})
     property int activeQueryId: 0
     property string lastResponse: ""
+    property bool querying: false
 
     // Live lookup of the active query from the proxy model.
     readonly property string activeQueryText: {
@@ -38,12 +39,19 @@ Rectangle {
 
     Connections {
         target: queryController
+        function onQueryStarted() {
+            queryPane.querying = true;
+        }
         function onQueryFinished(response, success, error) {
+            queryPane.querying = false;
             if (success) {
                 queryPane.lastResponse = response;
             } else {
                 queryPane.lastResponse = qsTr("Error: %1").arg(error);
             }
+        }
+        function onQueryStopped() {
+            queryPane.querying = false;
         }
     }
 
@@ -58,16 +66,26 @@ Rectangle {
                 Layout.fillWidth: true
                 placeholderText: qsTr("Query your library")
                 text: queryPane.activeQueryText
+                enabled: !queryPane.querying
+                onAccepted: queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
+            }
+
+            BusyIndicator {
+                running: queryPane.querying
+                visible: queryPane.querying
+                Layout.preferredWidth: 48
+                Layout.preferredHeight: 48
             }
 
             Button {
-                ToolTip.visible: hovered
-                text: qsTr("Query")
-                ToolTip.text: qsTr("Query")
+                ToolTip.visible: hovered && !queryPane.querying
+                text: queryPane.querying ? qsTr("Stop") : qsTr("Query")
+                ToolTip.text: queryPane.querying ? qsTr("Stop") : qsTr("Query")
                 icon.width: 24
                 icon.height: 24
-                icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
-                onClicked: queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
+                icon.source: queryPane.querying ? "qrc:/Resources/circle-xmark.svg" : "qrc:/Resources/ai-svgrepo-com.svg"
+                highlighted: queryPane.querying
+                onClicked: queryPane.querying ? queryController.stopQuery() : queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
             }
         }
 

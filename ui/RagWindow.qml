@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import QtQuick.Dialogs
 
 ApplicationWindow {
     id: ragwindow
@@ -87,7 +86,7 @@ ApplicationWindow {
 
             RagDbPane {
                 id: dbPaneItem
-                SplitView.minimumWidth: 400
+                SplitView.minimumWidth: 500
             }
 
             QueryPane {

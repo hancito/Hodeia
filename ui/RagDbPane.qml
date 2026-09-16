@@ -112,6 +112,44 @@ Rectangle {
             clip: true
             boundsBehavior: Flickable.DragAndOvershootBounds
             Layout.minimumHeight: parent.height * 0.3
+            focus: true
+            highlight: Rectangle {
+                color: "transparent"
+            }
+
+            Connections {
+                target: dbPane
+                function onActiveQueryIdChanged() {
+                    for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
+                        if (databaseManager.queryProxyModel.get(i, "id") === dbPane.activeQueryId) {
+                            queryView.currentIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            onCurrentIndexChanged: {
+                if (currentIndex >= 0 && currentIndex < databaseManager.queryProxyModel.rowCount()) {
+                    var qid = databaseManager.queryProxyModel.get(currentIndex, "id");
+                    if (qid && qid !== dbPane.activeQueryId)
+                        dbPane.activeQueryId = qid;
+                }
+            }
+
+            ScrollBar.vertical: ScrollBar {
+                id: queryScrollBar
+                policy: ScrollBar.AsNeeded
+                width: 10
+                contentItem: Rectangle {
+                    implicitWidth: 8
+                    color: queryScrollBar.active ? Colors.overlay2 : Colors.surface2
+                    radius: 4
+                }
+                background: Rectangle {
+                    width: 8
+                    color: "transparent"
+                }
+            }
 
             model: databaseManager.queryProxyModel
             spacing: 5
@@ -122,18 +160,22 @@ Rectangle {
                 required property string response
                 required property string model
                 required property string formattedDate
-                width: queryView.width
+                width: queryView.width-10
                 height: 80
                 border.width: dbPane.activeQueryId === id ? 4 : 5
                 border.color: dbPane.activeQueryId === id ? Colors.primary : Colors.surface1
                 radius: 4
-                color: mouseArea.containsMouse ? Colors.primary : Colors.surface0
+                color: dbPane.activeQueryId === id ? Colors.primary : (mouseArea.containsMouse ? Colors.surface1 : Colors.surface0)
+                focus: dbPane.activeQueryId === id
 
                 MouseArea {
                     id: mouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: dbPane.activeQueryId = id
+                    onClicked: {
+                        dbPane.activeQueryId = id;
+                        queryView.forceActiveFocus();
+                    }
                 }
 
                 ColumnLayout {
