@@ -2,6 +2,7 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Effects
 
 QtObject {
     readonly property var _theme: themeManager.activeTheme || {}
@@ -30,4 +31,15 @@ QtObject {
     readonly property color base: _theme.base || "#1e1e2e"
     readonly property color mantle: _theme.mantle || "#181825"
     readonly property color crust: _theme.crust || "#11111b"
+
+    // Soft blurred halo (the glow). Instantiate over the element to highlight:
+    //   Loader { sourceComponent: Colors.glowHalo; onLoaded: item.source = target }
+    // The consumer sets `item.source` (the element to glow).
+    readonly property Component glowHalo: Component {
+        MultiEffect {
+            shadowEnabled: true
+            shadowColor: Colors.primary
+            shadowBlur: 0.01
+        }
+    }
 }

@@ -52,6 +52,12 @@ Rectangle {
         TabBar {
             id: tabBar
             Layout.fillWidth: true
+            // Soft blurred accent glow around the tab bar
+            Loader {
+                anchors.fill: parent
+                sourceComponent: Colors.glowHalo
+                onLoaded: item.source = tabBar
+            }
             TabButton {
                 text: qsTr("Summary")
             }
@@ -170,8 +176,8 @@ Rectangle {
                             width: scrollView.availableWidth
                             textFormat: TextEdit.RichText
                             color: Colors.text
-                            font.family: Fonts.ui
-                            font.pointSize: 12
+                            font.family: Fonts.text
+                            font.pointSize: 13
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
                             text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : qsTr("Please make a summary of this paper")

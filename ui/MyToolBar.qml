@@ -163,6 +163,9 @@ ToolBar {
             id: spinner
             running: false
             visible: false
+            Layout.preferredWidth: 48
+            Layout.preferredHeight: 48
+            palette.dark: Colors.primary
         }
 
         Label {

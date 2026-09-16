@@ -75,6 +75,7 @@ Rectangle {
                 visible: queryPane.querying
                 Layout.preferredWidth: 48
                 Layout.preferredHeight: 48
+                palette.dark: Colors.primary
             }
 
             Button {
@@ -100,7 +101,8 @@ Rectangle {
                 TextArea {
                     id: textEditor
                     readOnly: true
-                    font.pointSize: 12
+                    font.family: Fonts.text
+                    font.pointSize: 13
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
                     // Prefer the active query response; fall back to lastResponse from a live query.

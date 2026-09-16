@@ -202,6 +202,7 @@ target_link_libraries(Hodeia
         HodeiaEngine
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::QuickEffects
 )
 
 target_include_directories(Hodeia

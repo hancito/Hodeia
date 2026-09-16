@@ -41,6 +41,8 @@ Rectangle {
     color: Colors.surface0
     opacity: 1.0
 
+
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 5
@@ -160,13 +162,23 @@ Rectangle {
                 required property string response
                 required property string model
                 required property string formattedDate
+                id: queryCard
                 width: queryView.width-10
                 height: 80
-                border.width: dbPane.activeQueryId === id ? 4 : 5
+                border.width: dbPane.activeQueryId === id ? 2 : 1
                 border.color: dbPane.activeQueryId === id ? Colors.primary : Colors.surface1
                 radius: 4
-                color: dbPane.activeQueryId === id ? Colors.primary : (mouseArea.containsMouse ? Colors.surface1 : Colors.surface0)
+                color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
                 focus: dbPane.activeQueryId === id
+
+                // Soft blurred halo behind the active query card (the glow)
+                Loader {
+                    id: queryGlow
+                    anchors.fill: parent
+                    sourceComponent: Colors.glowHalo
+                    onLoaded: item.source = queryCard
+                    visible: dbPane.activeQueryId === id
+                }
 
                 MouseArea {
                     id: mouseArea

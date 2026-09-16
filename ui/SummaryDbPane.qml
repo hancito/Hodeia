@@ -370,6 +370,7 @@ Rectangle {
             spacing: 5
 
             delegate: Rectangle {
+                id: card
                 required property string title
                 required property string authors
                 required property int pagesNum
@@ -380,11 +381,20 @@ Rectangle {
                 required property string year
                 width: paperListView.width - 10
                 height: 120
-                border.width: summaryDbPane.activePaperHash === paperHash ? 4 : 5
+                border.width: summaryDbPane.activePaperHash === paperHash ? 2 : 1
                 border.color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
                 radius: 4
-                color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : (mouseArea.containsMouse ? Colors.surface1 : Colors.surface0)
+                color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
                 focus: summaryDbPane.activePaperHash === paperHash
+
+                // Soft blurred halo behind the active card (the glow)
+                Loader {
+                    id: cardGlow
+                    anchors.fill: parent
+                    sourceComponent: Colors.glowHalo
+                    onLoaded: item.source = card
+                    visible: summaryDbPane.activePaperHash === paperHash
+                }
 
                 MouseArea {
                     id: mouseArea
