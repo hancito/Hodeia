@@ -1,345 +1,212 @@
 # ---------------------------------------------------------------------------
 # PlatformWindows.cmake
-# Windows build rules.
+# Native Windows build with Visual Studio (MSVC).
 #
-#   * llama.cpp shared libraries: linked from the in-tree
-#     external/lib/windows/llamacpp/<backend>/ (pre-compiled .dll + import
-#     libs), exactly like Linux/macOS.
-#   * MuPDF / Tesseract / Leptonica: linked against the shared DLLs provided
-#     by MSYS2 (mingw64), discovered with find_library (+ pkg-config hints).
-#     No in-tree static .a on Windows.
-#   * Qt6: optionally taken from MSYS2 too (mingw-w64-qt6-base +
-#     mingw-w64-qt6-declarative).  When HODEIA_QT_FROM_MSYS2=ON, find_package
-#     resolves Qt6 from the MSYS2 prefix and the Qt runtime DLLs are shipped
-#     from MSYS2 as well (windeployqt becomes a fallback only).
+#   * Compiler: MSVC (cl.exe), Release, /MD (dynamic CRT) — matches the
+#     pre-built MSVC llama.cpp DLLs.
+#   * Qt6: the MSVC build from the Qt installer (found via CMAKE_PREFIX_PATH).
+#     NOT the MSYS2 / mingw-w64 build.
+#   * MuPDF / Tesseract / Leptonica / Vulkan: provided by vcpkg (x64-windows
+#     triplet).  Configure with:
+#         cmake -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+#     See vcpkg.json at the repo root for the pinned packages.
+#       - libmupdf     → static .lib on Windows (no MuPDF DLL to ship).
+#       - tesseract    → dynamic; depends on leptonica + image codecs.
+#       - vulkan-loader→ dynamic; provides vulkan-1.dll.
+#   * llama.cpp: pre-built MSVC DLLs shipped in-tree under
+#     external/lib/windows/llamacpp/ (all three backends: CPU + Vulkan + CUDA).
+#     They are linked via import libraries generated at configure time with
+#     llvm-dlltool (part of the MSVC LLVM toolset).  ggml auto-selects the CPU
+#     variant and the backend at runtime via ggml_backend_load_all().
 #
-# Configure MSYS2 location (optional — auto-detected first):
-#     cmake -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 ...
-# Use MSYS2's Qt6 instead of a separate Qt installer:
-#     cmake -DHODEIA_QT_FROM_MSYS2=ON ...
-#
-# Expected MSYS2 packages (mingw64):
-#     # in the ucrt64 shell:
-#     pacman -S mingw-w64-ucrt-x86_64-mupdf mingw-w64-ucrt-x86_64-tesseract-ocr \
-#               mingw-w64-ucrt-x86_64-leptonica
-#     (plus their transitive deps: libpng, libjpeg-turbo, libtiff, zlib,
-#      libwebp, libopenjpeg, freetype, ...)
-#     # only if building against MSYS2's Qt:
-#     pacman -S mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative \
-#               mingw-w64-ucrt-x86_64-qt6-shadertools
-#
-# Included by the top-level CMakeLists.txt AFTER HODEIA_PLATFORM_WIN=ON.
-#
-# NOTE: HODEIA_MINGW_PREFIX is resolved HERE (and exported to
-# HODEIA_MSYS_PREFIX so the top-level can point find_package(Qt6) at it),
-# because this file is included before the Qt6 lookup in the top level.
+# The top-level CMakeLists.txt includes this file AFTER HODEIA_PLATFORM_WIN=ON
+# and BEFORE find_package(Qt6), so this file must not itself call find_package
+# on Qt.
 # ---------------------------------------------------------------------------
 
 set(HODEIA_PLATFORM_WIN ON)
 
 # ===========================================================================
-# A. Shared-library name mapping
+# A. Shared-library name mapping (in-tree pre-built MSVC DLLs)
 # ===========================================================================
-set(_PLAT              "windows")
-set(_SHARED_LLAMA      "llama.dll")
-set(_SHARED_LLAMA_COMM "llama-common.dll")
-set(_SHARED_MTMD       "mtmd.dll")
-set(_SHARED_GGML       "ggml.dll")
-set(_SHARED_GGML_BASE  "ggml-base.dll")
-set(_SHARED_GGML_CPU   "ggml-cpu.dll")
-set(_SHARED_GGML_CUDA  "ggml-cuda.dll")
-set(_SHARED_GGML_VK    "ggml-vulkan.dll")
-set(_SHARED_GGML_METAL "")
-set(_VECTOREC_EXT      "vec0.dll")
-set(_STATIC_EXT        ".a")
+set(_PLAT                 "windows")
+set(_SHARED_LLAMA         "llama.dll")
+set(_SHARED_LLAMA_COMM    "llama-common.dll")
+set(_SHARED_MTMD          "mtmd.dll")
+set(_SHARED_GGML          "ggml.dll")
+set(_SHARED_GGML_BASE     "ggml-base.dll")
+set(_SHARED_GGML_CPU_X64  "ggml-cpu-x64.dll")
+set(_SHARED_GGML_CPU_SSE  "ggml-cpu-sse42.dll")   # SSE4.2 fallback baseline
+set(_SHARED_GGML_CUDA     "ggml-cuda.dll")
+set(_SHARED_GGML_VK       "ggml-vulkan.dll")
+set(_VECTOREC_EXT         "vec0.dll")
+set(_STATIC_EXT           ".a")
 
-# llama.cpp base dir (in-tree) + the MSYS2-provided sqlite-vec extension.
+# All pre-built llama.cpp DLLs are staged into a single flat dir (see
+# scripts/stage-llama.ps1).  Core DLLs + every ggml-cpu-* variant + the
+# CUDA/Vulkan backend DLLs + CUDA runtime + libomp.dll all live here.
 set(_LLAMA_BASE        "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/llamacpp")
 set(_SQLITEVEC_LIB     "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/sqlitevec/${_VECTOREC_EXT}")
 
 # ===========================================================================
-# B. MSYS2 prefix discovery
+# B. vcpkg integration
 # ===========================================================================
-option(HODEIA_QT_FROM_MSYS2 "Link Qt6 from the MSYS2 prefix (mingw-w64-qt6-*) instead of a separate Qt install" OFF)
-
-# Search order (ucrt64 first — the target ABI; override with
-# HODEIA_MINGW_PREFIX or MINGW_PREFIX to use mingw64/clang64):
-#   1. HODEIA_MINGW_PREFIX (cache var, e.g. C:/msys64/ucrt64)
-#   2. MINGW_PREFIX environment variable
-#   3. Common install locations (C:/msys64/{ucrt64,mingw64,clang64})
-set(_MSYS_PREFIXES "")
-if(DEFINED HODEIA_MINGW_PREFIX)
-  list(APPEND _MSYS_PREFIXES "${HODEIA_MINGW_PREFIX}")
+# The vcpkg toolchain file is passed on the command line:
+#   -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+# When it is active, VCPKG_ROOT is defined by the toolchain file.  We locate
+# the installed triplet root so the deploy step can ship the runtime DLLs.
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED VCPKG_ROOT)
+  set(VCPKG_ROOT "$ENV{VCPKG_ROOT}")
 endif()
-if(DEFINED ENV{MINGW_PREFIX})
-  list(APPEND _MSYS_PREFIXES "$ENV{MINGW_PREFIX}")
+set(VCPKG_TARGET_TRIPLET "x64-windows")
+set(_VCPKG_INSTALLED "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
+if(VCPKG_ROOT AND NOT EXISTS "${_VCPKG_INSTALLED}")
+  message(WARNING
+    "vcpkg toolchain not active or packages not installed.\n"
+    "  Run:  .\\vcpkg\\vcpkg install --triplet x64-windows   (from the repo root)\n"
+    "  Expected installed root: ${_VCPKG_INSTALLED}")
 endif()
-foreach(_arch ucrt64 mingw64 clang64)
-  list(APPEND _MSYS_PREFIXES "C:/msys64/${_arch}")
-endforeach()
 
-# Export the resolved prefix so the top-level can point find_package(Qt6) at
-# it when HODEIA_QT_FROM_MSYS2=ON.  Only the first valid (existing) prefix
-# is used; the rest remain as search candidates for the libs above.
-set(HODEIA_MSYS_PREFIX "")
-foreach(_p IN LISTS _MSYS_PREFIXES)
-  if(EXISTS "${_p}/lib")
-    set(HODEIA_MSYS_PREFIX "${_p}")
-    break()
+# --- MuPDF (static on Windows → no DLL to ship) -----------------------------
+find_package(unofficial-libmupdf QUIET)
+if(NOT unofficial-libmupdf_FOUND)
+  message(WARNING
+    "vcpkg package 'unofficial-libmupdf' not found.\n"
+    "  Install with:  vcpkg install libmupdf --triplet x64-windows")
+endif()
+
+# --- Tesseract + Leptonica (dynamic) ---------------------------------------
+find_package(Tesseract QUIET)
+find_package(Leptonica QUIET)
+if(NOT Tesseract_FOUND OR NOT Leptonica_FOUND)
+  message(WARNING
+    "vcpkg packages 'tesseract'/'leptonica' not found.\n"
+    "  Install with:  vcpkg install tesseract --triplet x64-windows")
+endif()
+
+# --- Vulkan loader (dynamic) -----------------------------------------------
+# Optional at link time: if the Vulkan package is missing, the build still
+# succeeds and the app runs without the Vulkan backend (ggml-vulkan.dll is
+# simply not loaded at runtime).
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+  message(STATUS "Vulkan loader found (vcpkg) → Vulkan::Vulkan")
+  # Capture the runtime vulkan-1.dll location for deployment.
+  find_file(VULKAN_LOADER_DLL vulkan-1.dll
+    PATHS "${_VCPKG_INSTALLED}/bin" NO_DEFAULT_PATH)
+else()
+  message(STATUS "Vulkan not found — building without the Vulkan backend")
+endif()
+
+# ===========================================================================
+# C. llama.cpp import libraries (MSVC link.exe needs a .lib per DLL)
+# ===========================================================================
+# The pre-built release ships DLLs but no import .lib.  Two ways to link them:
+#   1. llvm-dlltool (preferred) — generates a real import .lib at configure
+#      time.  Part of the MSVC LLVM toolset (VS "LLVM toolchain" component)
+#      or installable separately.
+#   2. Link the DLL by full path (fallback) — MSVC link.exe resolves the DLL's
+#      exports and emits an auto-import library.  Works for the llama.cpp C
+#      API (all exports are undecorated C symbols) and needs no extra tools.
+# We use (1) when llvm-dlltool is found, else (2).
+find_program(LLVM_DLLTOOL_EXECUTABLE
+  NAMES llvm-dlltool llvm-dlltool.exe
+  HINTS
+    "$ENV{VCToolsInstallDir}/llvm/bin"
+    "$ENV{VCINSTALLDIR}/Tools/LLVM/x64/bin"
+  PATHS
+    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/LLVM/x64/bin"
+    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/LLVM/x64/bin"
+    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/LLVM/x64/bin"
+    "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/LLVM/x64/bin")
+
+# DLLs that must be *linked* (resolve their C API at build time).  The
+# per-microarchitecture ggml-cpu-* variants are NOT linked — ggml loads the
+# matching one at runtime via LoadLibrary; they only need to be deployed.
+set(_LLAMA_LINK_DLLS
+    ${_LLAMA_BASE}/${_SHARED_LLAMA}
+    ${_LLAMA_BASE}/${_SHARED_LLAMA_COMM}
+    ${_LLAMA_BASE}/${_SHARED_MTMD}
+    ${_LLAMA_BASE}/${_SHARED_GGML}
+    ${_LLAMA_BASE}/${_SHARED_GGML_BASE}
+    ${_LLAMA_BASE}/${_SHARED_GGML_CPU_X64}
+    ${_LLAMA_BASE}/${_SHARED_GGML_CPU_SSE})
+if(EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
+  list(APPEND _LLAMA_LINK_DLLS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
+endif()
+if(Vulkan_FOUND AND EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_VK}")
+  list(APPEND _LLAMA_LINK_DLLS "${_LLAMA_BASE}/${_SHARED_GGML_VK}")
+endif()
+
+set(_LLAMA_LIB_DIR "${CMAKE_BINARY_DIR}/_llama_importlibs")
+file(MAKE_DIRECTORY "${_LLAMA_LIB_DIR}")
+
+set(LLAMA_LINK_LIBS "")
+foreach(_dll IN LISTS _LLAMA_LINK_DLLS)
+  if(NOT EXISTS "${_dll}")
+    message(WARNING "llama.cpp DLL missing at configure time: ${_dll}")
+    continue()
   endif()
-endforeach()
-if(HODEIA_QT_FROM_MSYS2)
-  if(HODEIA_MSYS_PREFIX)
-    # Prepend the MSYS2 prefix (and its lib/cmake for the Qt config files).
-    list(PREPEND CMAKE_PREFIX_PATH "${HODEIA_MSYS_PREFIX}" "${HODEIA_MSYS_PREFIX}/lib/cmake")
-    message(STATUS "Qt6 will be resolved from MSYS2: ${HODEIA_MSYS_PREFIX}")
+  get_filename_component(_dllname "${_dll}" NAME_WE)
+  set(_lib "${_LLAMA_LIB_DIR}/${_dllname}.lib")
+  if(LLVM_DLLTOOL_EXECUTABLE)
+    # -d: generate the import library from the DLL's export table.
+    add_custom_command(
+      OUTPUT  "${_lib}"
+      COMMAND "${LLVM_DLLTOOL_EXECUTABLE}" -d "${_dll}" -o "${_lib}"
+      DEPENDS "${_dll}"
+      COMMENT "Generating import lib ${_dllname}.lib from ${_dllname}.dll"
+      VERBATIM)
+    add_custom_target(_llama_${_dllname}_lib ALL DEPENDS "${_lib}")
+    list(APPEND LLAMA_LINK_LIBS "${_lib}")
   else()
-    message(WARNING "HODEIA_QT_FROM_MSYS2=ON but no MSYS2 prefix found.\n"
-                    "Set -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 and install\n"
-                    "  pacman -S mingw-w64-qt6-base mingw-w64-qt6-declarative mingw-w64-qt6-shadertools")
-  endif()
-endif()
-
-# Helper: resolve a shared library by its candidate base names under the
-# MSYS2 prefixes, falling back to pkg-config for a hint. Emits:
-#   <RESULT_VAR> — the resolved import-lib path (or NOTFOUND)
-#   <RESULT_INC> — the header include dir (best-effort)
-function(msys_find_lib RESULT_VAR)
-  cmake_parse_arguments(MF "" "RESULT_INC" "NAMES" ${ARGN})
-  set(${RESULT_VAR} "NOTFOUND" PARENT_SCOPE)
-
-  foreach(_base IN LISTS MF_NAMES)
-    find_library(_found_lib ${_base}
-      PATHS ${_MSYS_PREFIXES}
-      PATH_SUFFIXES lib
-      NO_DEFAULT_PATH)
-    if(_found_lib)
-      set(${RESULT_VAR} "${_found_lib}" PARENT_SCOPE)
-      get_filename_component(_libdir "${_found_lib}" DIRECTORY)
-      get_filename_component(_prefix "${_libdir}" DIRECTORY)
-      if(MF_RESULT_INC)
-        set(${MF_RESULT_INC} "${_prefix}/include" PARENT_SCOPE)
-      endif()
-      message(STATUS "  [MSYS2] ${_base} → ${_found_lib}")
-      return()
-    endif()
-  endforeach()
-
-  # pkg-config hint (if a .pc file is installed in the MSYS2 prefix)
-  foreach(_p IN LISTS _MSYS_PREFIXES)
-    if(EXISTS "${_p}/lib/pkgconfig")
-      list(APPEND CMAKE_PREFIX_PATH "${_p}" "${_p}/lib/pkgconfig")
-    endif()
-  endforeach()
-  find_package(PkgConfig QUIET)
-  foreach(_base IN LISTS MF_NAMES)
-    if(PKG_CONFIG_FOUND AND PKG_CONFIG_EXECUTABLE)
-      execute_process(
-        COMMAND ${PKG_CONFIG_EXECUTABLE} --exists ${_base}
-        RESULT_VARIABLE _pc_ok ERROR_QUIET OUTPUT_QUIET)
-      if(_pc_ok EQUAL 0)
-        execute_process(
-          COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=libdir ${_base}
-          OUTPUT_VARIABLE _pc_libdir OUTPUT_STRIP_TRAILING_WHITESPACE
-          ERROR_QUIET)
-        execute_process(
-          COMMAND ${PKG_CONFIG_EXECUTABLE} --variable=includedir ${_base}
-          OUTPUT_VARIABLE _pc_inc OUTPUT_STRIP_TRAILING_WHITESPACE
-          ERROR_QUIET)
-        if(_pc_libdir)
-          foreach(_base2 IN LISTS MF_NAMES)
-            find_library(_found_lib2 ${_base2}
-              PATHS "${_pc_libdir}" NO_DEFAULT_PATH)
-            if(_found_lib2)
-              set(${RESULT_VAR} "${_found_lib2}" PARENT_SCOPE)
-              if(MF_RESULT_INC)
-                set(${MF_RESULT_INC} "${_pc_inc}" PARENT_SCOPE)
-              endif()
-              message(STATUS "  [MSYS2] ${_base} (pkg-config) → ${_found_lib2}")
-              return()
-            endif()
-          endforeach()
-        endif()
-      endif()
-    endif()
-  endforeach()
-endfunction()
-
-# ===========================================================================
-# C. Discover the MSYS2-provided shared libraries
-# ===========================================================================
-message(STATUS "MSYS2 prefix search: ${_MSYS_PREFIXES}")
-set(_MSYS_INC_DIRS "")
-
-# MuPDF (three libraries)
-msys_find_lib(WIN_MUPDF_LIB       NAMES mupdf mupdf-x y mupdf-14)
-msys_find_lib(WIN_MUPDF_THIRD_LIB NAMES mupdf-third mupdf-third-14)
-msys_find_lib(WIN_MUPDF_THREADS_LIB NAMES mupdf-threads mupdf-threads-14)
-
-# Tesseract
-msys_find_lib(WIN_TESS_LIB        NAMES tesseract tesseract-5 libtesseract tesseract-ocr)
-
-# Leptonica
-msys_find_lib(WIN_LEPTO_LIB       NAMES lept libleptonica leptonica)
-
-# Collect include dirs (best-effort; the mingw64 include dir is the common one)
-foreach(_lib ${WIN_MUPDF_LIB} ${WIN_MUPDF_THIRD_LIB} ${WIN_MUPDF_THREADS_LIB}
-             ${WIN_TESS_LIB} ${WIN_LEPTO_LIB})
-  if(_lib AND NOT _lib STREQUAL "NOTFOUND")
-    get_filename_component(_libdir "${_lib}" DIRECTORY)
-    get_filename_component(_prefix "${_libdir}" DIRECTORY)
-    list(APPEND _MSYS_INC_DIRS "${_prefix}/include")
-  endif()
-endforeach()
-list(REMOVE_DUPLICATES _MSYS_INC_DIRS)
-
-# Warn (do not fail) on any missing library — MSYS2 may not be installed on
-# this machine (e.g. cross-configuring).  The build will still link llama.cpp;
-# PDF/OCR features will be unavailable at runtime until the DLLs are present.
-foreach(_var ${WIN_MUPDF_LIB} ${WIN_MUPDF_THIRD_LIB} ${WIN_MUPDF_THREADS_LIB}
-             ${WIN_TESS_LIB} ${WIN_LEPTO_LIB})
-  if(NOT DEFINED ${_var} OR ${_var} STREQUAL "NOTFOUND" OR ${_var} STREQUAL "")
-    string(TOUPPER "${_var}" _up)
-    message(WARNING
-      "MSYS2 library '${_var}' not found. PDF/OCR may be unavailable at runtime.\n"
-      "  → Install it via:  pacman -S mingw-w64-mupdf mingw-w64-tesseract-ocr mingw-w64-leptonica\n"
-      "  → Or set the MSYS2 prefix:  cmake -DHODEIA_MINGW_PREFIX=C:/msys64/mingw64 ...")
+    # No dlltool — link the DLL directly.  MSVC link.exe can resolve exports
+    # from a DLL path in many cases; this is a best-effort fallback.
+    message(STATUS "llvm-dlltool not found — linking ${_dllname}.dll by path")
+    list(APPEND LLAMA_LINK_LIBS "${_dll}")
   endif()
 endforeach()
 
-# Public include dirs for the MSYS2 headers (mupdf/fitz.h, tesseract/baseapi.h).
-set(HODEIA_MSYS_INCLUDES "${_MSYS_INC_DIRS}")
+# ===========================================================================
+# D. System libraries (Win32 / MSVC)
+# ===========================================================================
+# The app uses Win32/OLE APIs through Qt; these are the standard Win32 libs
+# a Qt/Win32 GUI app links against.  No pthread/dl/z on native MSVC.
+set(HODEIA_SYSTEM_LIBS
+    ole32 user32 gdi32 shell32 shlwapi ws2_32 advapi32 comctl32)
 
 # ===========================================================================
-# D. GPU backend discovery (CUDA > Vulkan > CPU)
+# E. Link variables consumed by src/CMakeLists.txt
 # ===========================================================================
-option(LLAMA_FORCE_BACKEND "" "Override backend: cpu | cuda | vulkan")
-
-set(CUDA_FOUND OFF)
-if(EXISTS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA")
-  file(GLOB _CUDA_VERSIONS LIST_DIRECTORIES ON
-    "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/*")
-  list(GET _CUDA_VERSIONS -1 _CUDA_LATEST)
-  find_library(HOST_CUDART  cudart  PATHS "${_CUDA_LATEST}/lib/x64" NO_DEFAULT_PATH)
-  find_library(HOST_CUBLAS  cublas  PATHS "${_CUDA_LATEST}/lib/x64" NO_DEFAULT_PATH)
-  if(HOST_CUDART AND HOST_CUBLAS)
-    set(CUDA_FOUND ON)
-    message(STATUS "CUDA toolkit found: ${HOST_CUDART}")
-  endif()
-endif()
-
-set(VULKAN_FOUND OFF)
-if(DEFINED ENV{VULKAN_SDK})
-  find_library(HOST_VULKAN vulkan-1 PATHS "$ENV{VULKAN_SDK}/lib" NO_DEFAULT_PATH)
-endif()
-if(HOST_VULKAN)
-  set(VULKAN_FOUND ON)
-  message(STATUS "Vulkan found: ${HOST_VULKAN}")
-endif()
-
-set(METAL_FRAMEWORK "")
-
-set(LLAMA_BACKEND "")
-if(LLAMA_FORCE_BACKEND)
-  string(TOLOWER "${LLAMA_FORCE_BACKEND}" LLAMA_BACKEND)
-  if(NOT LLAMA_BACKEND STREQUAL "cpu"
-     AND NOT LLAMA_BACKEND STREQUAL "cuda"
-     AND NOT LLAMA_BACKEND STREQUAL "vulkan"
-     AND NOT LLAMA_BACKEND STREQUAL "all")
-    message(FATAL_ERROR "LLAMA_FORCE_BACKEND must be cpu, cuda, vulkan, or all")
-  endif()
-  message(STATUS "Backend (forced): ${LLAMA_BACKEND}")
+# MuPDF is static → a single import target carrying its transitive deps.
+if(unofficial-libmupdf_FOUND)
+  set(MUPDF_LIB_TARGETS unofficial::libmupdf::libmupdf)
 else()
-  if(CUDA_FOUND)
-    set(LLAMA_BACKEND "cuda")
-  elseif(VULKAN_FOUND)
-    set(LLAMA_BACKEND "vulkan")
-  else()
-    set(LLAMA_BACKEND "cpu")
-  endif()
-  message(STATUS "Backend (auto): ${LLAMA_BACKEND}")
+  set(MUPDF_LIB_TARGETS "")
 endif()
 
-string(TOUPPER "${LLAMA_BACKEND}" _upper)
-add_compile_definitions("HODEIA_BACKEND_${_upper}")
+# Tesseract + Leptonica (dynamic) — linked in the target that uses them.
+set(TESS_LEPTO_TARGETS "")
+if(Tesseract_FOUND)
+  list(APPEND TESS_LEPTO_TARGETS Tesseract::libtesseract)
+endif()
+if(Leptonica_FOUND)
+  list(APPEND TESS_LEPTO_TARGETS leptonica)
+endif()
 
-if(LLAMA_BACKEND STREQUAL "cuda")
-  set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/cuda")
-elseif(LLAMA_BACKEND STREQUAL "vulkan")
-  set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/vulkan")
+# Vulkan (optional).
+if(Vulkan_FOUND)
+  set(VULKAN_TARGET Vulkan::Vulkan)
 else()
-  set(_LLAMA_LINK_DIR "${_LLAMA_BASE}/cpu")
+  set(VULKAN_TARGET "")
 endif()
 
 # ===========================================================================
-# E. System libraries
-# ===========================================================================
-# On Windows the image codecs (png/jpeg/tiff/zlib) come from the MSYS2
-# MuPDF-third shared DLL; no pthread/dl needed.  Link `m` for math.
-set(HODEIA_SYSTEM_LIBS m)
-
-# OpenMP (ggml-cpu) — libomp.dll must be shipped alongside the executable.
-find_package(OpenMP QUIET)
-if(OpenMP_CXX_FOUND)
-  message(STATUS "OpenMP found")
-  get_filename_component(_CLANG_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
-  set(_OMP_DLL "${_CLANG_BIN}/libomp.dll")
-else()
-  message(STATUS "OpenMP not found — ggml-cpu will run single-threaded")
-endif()
-
-# ===========================================================================
-# F. llama.cpp backend-specific shared libs
-# ===========================================================================
-set(_BACKEND_SHARED_LIBS "")
-if(LLAMA_BACKEND STREQUAL "cuda" AND _SHARED_GGML_CUDA)
-  list(APPEND _BACKEND_SHARED_LIBS "${_LLAMA_BASE}/cuda/${_SHARED_GGML_CUDA}")
-endif()
-if(LLAMA_BACKEND STREQUAL "vulkan" AND _SHARED_GGML_VK)
-  list(APPEND _BACKEND_SHARED_LIBS "${_LLAMA_BASE}/vulkan/${_SHARED_GGML_VK}")
-endif()
-
-# --- Link variables consumed by src/CMakeLists.txt ---
-# On Windows MuPDF/Tesseract/Leptonica come from MSYS2 shared DLLs.  Each
-# resolved import lib is linked by full path (or skipped with a warning if
-# MSYS2 is not installed).  The in-tree static .a are NOT used on Windows.
-set(_WIN_THIRD_PARTY_LINK "")
-foreach(_var WIN_MUPDF_LIB WIN_MUPDF_THIRD_LIB WIN_MUPDF_THREADS_LIB
-             WIN_TESS_LIB WIN_LEPTO_LIB)
-  if(DEFINED ${_var} AND NOT ${_var} STREQUAL "NOTFOUND" AND NOT ${_var} STREQUAL "")
-    list(APPEND _WIN_THIRD_PARTY_LINK "${${_var}}")
-  endif()
-endforeach()
-set(MUPDF_LIB_TARGETS ${_WIN_THIRD_PARTY_LINK})
-
-set(LLAMA_LINK_LIBS
-    ${_LLAMA_LINK_DIR}/${_SHARED_LLAMA_COMM}
-    ${_LLAMA_LINK_DIR}/${_SHARED_LLAMA}
-    ${_LLAMA_LINK_DIR}/${_SHARED_MTMD}
-    ${_LLAMA_LINK_DIR}/${_SHARED_GGML}
-    ${_LLAMA_LINK_DIR}/${_SHARED_GGML_BASE}
-    ${_LLAMA_LINK_DIR}/${_SHARED_GGML_CPU})
-
-if(_BACKEND_SHARED_LIBS)
-  list(APPEND LLAMA_LINK_LIBS ${_BACKEND_SHARED_LIBS})
-endif()
-
-# ===========================================================================
-# G. POST_BUILD — deployment (requires the Hodeia target to exist)
+# F. POST_BUILD — deployment (requires the Hodeia target to exist)
 #    Called from src/CMakeLists.txt after the target is created.
 # ===========================================================================
 function(hodeia_windows_deploy TARGET)
-  # --- Translations (.qm files) ---
-  foreach(_qm ${HODEIA_QM_FILES})
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET}>/i18n
-        COMMAND ${CMAKE_COMMAND} -E copy
-            ${_qm}
-            $<TARGET_FILE_DIR:${TARGET}>/i18n/
-        COMMENT "Copying translations")
-  endforeach()
-
-  # --- Themes & fonts ---
+  # --- Themes, fonts, tessdata (same as Linux) ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_SOURCE_DIR}/ui/themes $<TARGET_FILE_DIR:${TARGET}>/ui/themes
@@ -348,179 +215,99 @@ function(hodeia_windows_deploy TARGET)
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_SOURCE_DIR}/Fonts $<TARGET_FILE_DIR:${TARGET}>/Fonts
       COMMENT "Copying fonts")
-
-  # --- Tesseract tessdata ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
-  # --- Default embedding model (seeded into the data dir on first run) ---
-  add_custom_command(TARGET ${TARGET} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/Resources/Embedders
-          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
-      COMMENT "Copying default embedding model")
-
-  # --- Base .dll ---
+  # --- llama.cpp: every core DLL + all CPU variants + backend + libomp ---
+  # The per-microarch ggml-cpu-* DLLs must sit next to the exe so ggml can
+  # LoadLibrary the best one for the host CPU.  Copy the whole set.
+  file(GLOB _LLAMA_DEPLOY_DLLS
+    "${_LLAMA_BASE}/llama*.dll"
+    "${_LLAMA_BASE}/mtmd.dll"
+    "${_LLAMA_BASE}/ggml*.dll"
+    "${_LLAMA_BASE}/libomp.dll")
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          ${_LLAMA_LINK_DIR}/${_SHARED_LLAMA}
-          ${_LLAMA_LINK_DIR}/${_SHARED_LLAMA_COMM}
-          ${_LLAMA_LINK_DIR}/${_SHARED_MTMD}
-          ${_LLAMA_LINK_DIR}/${_SHARED_GGML}
-          ${_LLAMA_LINK_DIR}/${_SHARED_GGML_BASE}
-          ${_LLAMA_LINK_DIR}/${_SHARED_GGML_CPU}
+          ${_LLAMA_DEPLOY_DLLS}
           $<TARGET_FILE_DIR:${TARGET}>
-      COMMENT "Copying llama.cpp base .dll")
+      COMMENT "Copying llama.cpp DLLs (CPU/Vulkan/CUDA + libomp)")
 
-  # --- Backend .dll ---
-  if(_BACKEND_SHARED_LIBS)
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${_BACKEND_SHARED_LIBS}
-            $<TARGET_FILE_DIR:${TARGET}>
-        COMMENT "Copying llama.cpp backend .dll (${LLAMA_BACKEND})")
-  endif()
-
-  # --- MSYS2 runtime DLLs (MuPDF / Tesseract / Leptonica + image codecs) ---
-  # On Windows the shared libs are NOT in the in-tree external/lib dir; they
-  # live under the MSYS2 prefix.  For each resolved import lib, resolve the
-  # actual runtime DLL (lib<base>.dll or <base>.dll) and copy it next to the
-  # executable so the app is portable.  Known image-codec deps of MuPDF-third
-  # (libpng, libjpeg-turbo, libtiff, zlib, libwebp, libopenjpeg, freetype) are
-  # copied too, since the user needs them at runtime.
-  set(_MSYS_DLLS_TO_COPY "")
-  foreach(_var WIN_MUPDF_LIB WIN_MUPDF_THIRD_LIB WIN_MUPDF_THREADS_LIB
-               WIN_TESS_LIB WIN_LEPTO_LIB)
-    if(NOT DEFINED ${_var} OR ${_var} STREQUAL "NOTFOUND" OR ${_var} STREQUAL "")
-      continue()
-    endif()
-    get_filename_component(_imp_lib "${${_var}}" NAME_WE)
-    get_filename_component(_msys_libdir "${${_var}}" DIRECTORY)
-    # Strip a leading "lib" from the import-lib base name.
-    string(REGEX REPLACE "^lib" "" _base "${_imp_lib}")
-    # Try lib<base>.dll then <base>.dll in the MSYS2 lib dir.
-    foreach(_dll_name "lib${_base}.dll" "${_base}.dll")
-      if(EXISTS "${_msys_libdir}/${_dll_name}")
-        list(APPEND _MSYS_DLLS_TO_COPY "${_msys_libdir}/${_dll_name}")
-        break()
-      endif()
-    endforeach()
-  endforeach()
-  # Image-codec dependencies of MuPDF-third / Leptonica (common MSYS2 names).
-  foreach(_codec libpng16 libpng libjpeg-turbo libjpeg libtiff-6 libtiff
-                 zlib1 zlib libwebp libopenjp2-7 libfreetype-6)
-    foreach(_msys_libdir IN LISTS _MSYS_PREFIXES)
-      set(_msys_libdir "${_msys_libdir}/lib")
-      foreach(_dll_name "${_codec}.dll" "lib${_codec}.dll")
-        if(EXISTS "${_msys_libdir}/${_dll_name}")
-          list(APPEND _MSYS_DLLS_TO_COPY "${_msys_libdir}/${_dll_name}")
-          break()
-        endif()
-      endforeach()
-    endforeach()
-  endforeach()
-  list(REMOVE_DUPLICATES _MSYS_DLLS_TO_COPY)
-  if(_MSYS_DLLS_TO_COPY)
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${_MSYS_DLLS_TO_COPY}
-            $<TARGET_FILE_DIR:${TARGET}>
-        COMMAND_ERROR_IS_FATAL ANY
-        COMMENT "Copying MSYS2 runtime DLLs")
-  endif()
-
-  # --- sqlite-vec ---
-  add_custom_command(TARGET ${TARGET} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-          ${_SQLITEVEC_LIB}
-          $<TARGET_FILE_DIR:${TARGET}>/vec0.dll
-      COMMENT "Copying sqlite-vec extension")
-
-  # --- OpenMP runtime ---
-  if(OpenMP_CXX_FOUND AND EXISTS "${_OMP_DLL}")
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${_OMP_DLL}" $<TARGET_FILE_DIR:${TARGET}>/libomp.dll
-        COMMENT "Copying libomp.dll")
-  endif()
-
-  # =========================================================================
-  # Qt runtime deployment.
-  #   * If Qt came from MSYS2 (HODEIA_QT_FROM_MSYS2=ON), the Qt DLLs live in
-  #     the MSYS2 bin dir and are copied in the "MSYS2 runtime DLLs" step above
-  #     (windeployqt is only used as a fallback for any it misses).
-  #   * If Qt came from a separate installer, windeployqt ships the full set.
-  # =========================================================================
-  if(HODEIA_QT_FROM_MSYS2 AND HODEIA_MSYS_PREFIX AND EXISTS "${HODEIA_MSYS_PREFIX}/bin")
-    # Copy the Qt6 DLLs from the MSYS2 bin dir alongside the executable.
-    file(GLOB _QT6_DLLS "${HODEIA_MSYS_PREFIX}/bin/Qt6*.dll")
-    if(_QT6_DLLS)
+  # --- CUDA 12.4 runtime (only if the CUDA backend DLL was staged) ---
+  if(EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
+    file(GLOB _CUDA_RUNTIME_DLLS
+      "${_LLAMA_BASE}/cudart64_*.dll"
+      "${_LLAMA_BASE}/cublas64_*.dll"
+      "${_LLAMA_BASE}/cublasLt64_*.dll")
+    if(_CUDA_RUNTIME_DLLS)
       add_custom_command(TARGET ${TARGET} POST_BUILD
           COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              ${_QT6_DLLS}
+              ${_CUDA_RUNTIME_DLLS}
               $<TARGET_FILE_DIR:${TARGET}>
-          COMMAND_ERROR_IS_FATAL ANY
-          COMMENT "Copying MSYS2 Qt6 DLLs")
-    endif()
-  endif()
-
-  find_program(WINDEPLOYQT_EXECUTABLE windeployqt
-    HINTS "${CMAKE_PREFIX_PATH}" "${Qt6_DIR}/../../bin"
-    PATH_SUFFIXES "bin")
-
-  if(WINDEPLOYQT_EXECUTABLE)
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${WINDEPLOYQT_EXECUTABLE}
-            --dir $<TARGET_FILE_DIR:${TARGET}>
-            --no-system-dsa
-            --no-translations
-            --no-angle
-            --no-opengl-sw
-            --qmlimport $<TARGET_PROPERTY:${TARGET},QML_IMPORT_PREFIX>
-            $<TARGET_FILE:${TARGET}>
-        COMMENT "Running windeployqt (shipping Qt runtime)")
-  else()
-    message(WARNING "windeployqt not found — Qt DLLs will NOT be shipped.\n"
-                    "Set CMAKE_PREFIX_PATH to your Qt installation prefix,\n"
-                    "or manually run windeployqt on the built executable.")
-  endif()
-
-  # =========================================================================
-  # CUDA runtime (optional — only if CUDA backend is selected)
-  # =========================================================================
-  if(LLAMA_BACKEND STREQUAL "cuda" AND CUDA_FOUND)
-    if(EXISTS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA")
-      file(GLOB _CUDA_VERSIONS_LIST LIST_DIRECTORIES ON
-        "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/*")
-      list(GET _CUDA_VERSIONS_LIST -1 _CUDA_LATEST_DIR)
-      set(_CUDA_BIN "${_CUDA_LATEST_DIR}/bin")
-      add_custom_command(TARGET ${TARGET} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              ${_CUDA_BIN}/cudart64_*.dll
-              ${_CUDA_BIN}/cublas64_*.dll
-              ${_CUDA_BIN}/cublasLt64_*.dll
-              $<TARGET_FILE_DIR:${TARGET}>
-          COMMAND_ERROR_IS_FATAL ANY
           COMMENT "Copying CUDA runtime DLLs")
     endif()
   endif()
 
-  # =========================================================================
-  # Vulkan runtime (optional — only if Vulkan backend is selected)
-  # =========================================================================
-  if(LLAMA_BACKEND STREQUAL "vulkan")
-    if(DEFINED ENV{VULKAN_SDK})
-      add_custom_command(TARGET ${TARGET} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "$ENV{VULKAN_SDK}/Bin/vulkan-1.dll"
-              $<TARGET_FILE_DIR:${TARGET}>/vulkan-1.dll
-          COMMAND_ERROR_IS_FATAL ANY
-          COMMENT "Copying Vulkan runtime DLL")
-    else()
-      message(WARNING "Vulkan backend selected but VULKAN_SDK not set.\n"
-                      "vulkan-1.dll will NOT be shipped.")
-    endif()
+  # --- Vulkan loader runtime (vcpkg vulkan-1.dll) ---
+  if(VULKAN_LOADER_DLL AND EXISTS "${VULKAN_LOADER_DLL}")
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${VULKAN_LOADER_DLL}" $<TARGET_FILE_DIR:${TARGET}>/vulkan-1.dll
+        COMMENT "Copying vulkan-1.dll (vcpkg)")
+  elseif(Vulkan_FOUND)
+    message(WARNING "Vulkan found but vulkan-1.dll not located in ${_VCPKG_INSTALLED}/bin")
+  endif()
+
+  # --- Tesseract / Leptonica / image-codec runtime DLLs (vcpkg bin) ---
+  # The OCR path is dynamic: tesseract.dll, leptonica.dll and their image
+  # codec deps (libpng, libjpeg-turbo, openjpeg, giflib, zlib) must be next
+  # to the exe.  Copy a known set from the vcpkg installed bin dir.
+  set(_OCR_RUNTIME_DLLS "")
+  if(EXISTS "${_VCPKG_INSTALLED}/bin")
+    foreach(_n tesseract leptonica libpng16 libjpeg-turbo openjp2-7 gif z)
+      find_file(_f NAMES "${_n}.dll" "lib${_n}.dll"
+        PATHS "${_VCPKG_INSTALLED}/bin" NO_DEFAULT_PATH)
+      if(_f)
+        list(APPEND _OCR_RUNTIME_DLLS "${_f}")
+      endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _OCR_RUNTIME_DLLS)
+  endif()
+  if(_OCR_RUNTIME_DLLS)
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_OCR_RUNTIME_DLLS}
+            $<TARGET_FILE_DIR:${TARGET}>
+        COMMENT "Copying Tesseract/Leptonica runtime DLLs (vcpkg)")
+  else()
+    message(WARNING "No Tesseract/Leptonica runtime DLLs found in ${_VCPKG_INSTALLED}/bin — OCR may be unavailable at runtime.")
+  endif()
+
+  # --- sqlite-vec extension ---
+  if(EXISTS "${_SQLITEVEC_LIB}")
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_SQLITEVEC_LIB}
+            $<TARGET_FILE_DIR:${TARGET}>/vec0.dll
+        COMMENT "Copying sqlite-vec extension")
+  else()
+    message(WARNING "sqlite-vec ${_VECTOREC_EXT} not found at ${_SQLITEVEC_LIB} — RAG vector search will be unavailable.")
+  endif()
+
+  # --- Qt runtime (windeployqt) ---
+  find_program(WINDEPLOYQT_EXECUTABLE windeployqt
+    HINTS "${CMAKE_PREFIX_PATH}" "${Qt6_DIR}/../../bin"
+    PATH_SUFFIXES "bin")
+  if(WINDEPLOYQT_EXECUTABLE)
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${WINDEPLOYQT_EXECUTABLE}
+            --dir $<TARGET_FILE_DIR:${TARGET}>
+            --no-translations
+            $<TARGET_FILE:${TARGET}>
+        COMMENT "Running windeployqt (shipping Qt runtime)")
+  else()
+    message(WARNING "windeployqt not found — Qt DLLs will NOT be shipped.\n"
+                    "Set CMAKE_PREFIX_PATH to your MSVC Qt installation prefix.")
   endif()
 endfunction()

@@ -127,9 +127,10 @@ Hodeia is a C++/Qt application. The build is modular: a slim top-level `CMakeLis
 
 - **CMake** ≥ 3.25
 - **Qt 6** ≥ 6.10 (Quick, QuickControls2, Concurrent, Network)
-- **C++23-compatible compiler** — Clang/LLVM on all three platforms
-- **Ninja** (recommended)
-- **MuPDF**, **Tesseract**, **Leptonica**, **llama.cpp**, **sqlite-vec** — see per-platform instructions below
+- **C++23-compatible compiler** — Clang/LLVM (Linux/macOS) or MSVC (Windows)
+- **Ninja** (Linux/macOS) or **Visual Studio 2022** (Windows)
+- **vcpkg** (Windows only) — provides MuPDF, Tesseract, Leptonica, Vulkan loader
+- **llama.cpp** + **sqlite-vec** — pre-built DLLs on Windows; compiled on Linux/macOS (see per-platform instructions below)
 
 ### Linux
 
@@ -163,38 +164,42 @@ cmake --build .
 
 Requires Xcode CLT ≥ 15, CMake, Ninja, LLVM/Clang ≥ 18, Qt 6.10+, and libomp. You must compile llama.cpp (Metal), MuPDF, Tesseract, Leptonica, and sqlite-vec as `.dylib`/`.a` into `external/lib/mac/` — full step-by-step in [docs/BUILD_REQUIREMENTS.md](docs/BUILD_REQUIREMENTS.md).
 
-### Windows (MSYS2)
+### Windows (Visual Studio / MSVC)
 
-Use **MSYS2 clang64** (not mingw64). Install the toolchain, Qt6, and the image-codec libs with `pacman`, then compile llama.cpp, MuPDF, Tesseract, Leptonica, and sqlite-vec into `external/lib/windows/` — full step-by-step in [docs/BUILD_REQUIREMENTS.md](docs/BUILD_REQUIREMENTS.md).
+Native **MSVC** build (Visual Studio 2022) with **vcpkg** providing MuPDF, Tesseract, Leptonica, and the Vulkan loader. llama.cpp is used from the pre-built MSVC release DLLs, and sqlite-vec's `vec0.dll` is auto-downloaded. One entry point does it all:
+
+```powershell
+# from the repo root, in a VS Developer Prompt
+.\build_windows.ps1 -LlamaSourceDir "D:\Developpement\Windows" `
+                    -QtPrefix "C:\Qt\6.8.0\msvc2022_64"
+```
+
+The script stages the llama.cpp DLLs, fetches `vec0.dll`, runs `vcpkg install`, then configures (VS 2022, x64) + builds. All three backends (CPU + Vulkan + CUDA) are shipped; the app auto-detects the best at runtime. Full step-by-step in [docs/BUILD_REQUIREMENTS.md](docs/BUILD_REQUIREMENTS.md).
 
 ### GPU backend selection
 
-The build auto-detects CUDA and Vulkan. Override:
+At runtime the app calls `ggml_backend_load_all()` and auto-detects the best available backend (CUDA > Vulkan > CPU) from whichever DLLs are present.
 
-```bash
-cmake .. -DLLAMA_FORCE_BACKEND=cpu      # CPU only
-cmake .. -DLLAMA_FORCE_BACKEND=cuda     # Force CUDA
-cmake .. -DLLAMA_FORCE_BACKEND=vulkan   # Force Vulkan
-cmake .. -DLLAMA_FORCE_BACKEND=all      # All available
-```
+- **Linux / macOS** — CMake auto-detects CUDA and Vulkan at build time. Override with `-DLLAMA_FORCE_BACKEND=cpu` | `cuda` | `vulkan` | `all`.
+- **Windows** — all three backends (CPU + Vulkan + one CUDA version) are staged and shipped in a single binary; selection is fully runtime. Pick the CUDA version to ship with `-CudaVersion 12.4` (default) or `13.4` in `build_windows.ps1`.
 
 ### Post-build deployment
 
 Each platform's CMake module runs the relevant toolchain automatically:
 
 - **Linux** — copies themes/fonts/tessdata, deploys llama.cpp `.so` with symlinks, sets `$ORIGIN` RUNPATH via `patchelf`, copies `vec0.so`.
-- **Windows** — runs `windeployqt`, ships llama.cpp `.dll` + MSYS2 runtime + `vec0.dll` + `libomp.dll`.
+- **Windows** — runs `windeployqt`, ships all llama.cpp `.dll` (CPU variants + `ggml-cuda.dll` + `ggml-vulkan.dll`), CUDA runtime DLLs, vcpkg `vulkan-1.dll`, Tesseract/Leptonica runtime DLLs, `vec0.dll`, and `libomp.dll`.
 - **macOS** — runs `macdeployqt`, ships dylibs + `vec0.dylib` + `libomp.dylib` into the `.app` bundle.
 
 ---
 
 ## Platform Support
 
-| Platform              | Status          | Notes                                                             |
-| --------------------- | --------------- | ----------------------------------------------------------------- |
-| Linux                 | ✅ Supported    | Pre-compiled `external/lib/linux/` shipped; GPU auto-detect       |
-| macOS (Apple Silicon) | 🚧 Experimental | Metal backend; libs must be built per BUILD_REQUIREMENTS          |
-| Windows (MSYS2)       | 🚧 Experimental | CUDA / Vulkan optional; libs must be built per BUILD_REQUIREMENTS |
+| Platform              | Status          | Notes                                                                |
+| --------------------- | --------------- | -------------------------------------------------------------------- |
+| Linux                 | ✅ Supported    | Pre-compiled `external/lib/linux/` shipped; GPU auto-detect          |
+| macOS (Apple Silicon) | 🚧 Experimental | Metal backend; libs must be built per BUILD_REQUIREMENTS             |
+| Windows (MSVC)        | 🚧 Experimental | Visual Studio + vcpkg; CPU/Vulkan/CUDA backends, runtime auto-detect |
 
 ---
 

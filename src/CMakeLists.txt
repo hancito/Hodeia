@@ -81,15 +81,16 @@ target_include_directories(HodeiaEngine
         ${EXTERNAL}/sqlite3
 )
 
-# Windows: MSYS2-provided header dirs (mupdf/fitz.h, tesseract/baseapi.h).
-if(HODEIA_PLATFORM_WIN AND HODEIA_MSYS_INCLUDES)
-  target_include_directories(HodeiaEngine PRIVATE ${HODEIA_MSYS_INCLUDES})
-endif()
+# Note: on Windows (native MSVC) the MuPDF/Tesseract/Leptonica headers come
+# from ${EXTERNAL}/include (already above) and the libraries from vcpkg
+# (linked via the targets below).  No MSYS2 include dirs are needed.
 
 # --- Link: Qt core modules + third-party libs + system libs + llama.cpp ---
 #   * HodeiaEngine links Qt6::Concurrent (used across the workers).
 #   * Hodeia (the exe) links Qt6::Gui via Qt6::Quick's Qt6::Gui dependency,
 #     so HodeiaEngine does not need to link it directly.
+#   * On Windows the OCR path (Tesseract/Leptonica) and the Vulkan backend are
+#     vcpkg targets supplied by PlatformWindows.cmake (empty if not found).
 target_link_libraries(HodeiaEngine
     PRIVATE
         Qt6::Concurrent
@@ -99,6 +100,14 @@ target_link_libraries(HodeiaEngine
         ${HODEIA_SYSTEM_LIBS}
         ${LLAMA_LINK_LIBS}
 )
+
+# Windows: vcpkg-provided OCR + Vulkan targets (no-ops on Linux/macOS).
+if(HODEIA_PLATFORM_WIN)
+  target_link_libraries(HodeiaEngine PRIVATE ${TESS_LEPTO_TARGETS})
+  if(VULKAN_TARGET)
+    target_link_libraries(HodeiaEngine PRIVATE ${VULKAN_TARGET})
+  endif()
+endif()
 
 # OpenMP (ggml-cpu parallelism)
 if(OpenMP_CXX_FOUND)

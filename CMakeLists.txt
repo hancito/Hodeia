@@ -41,8 +41,9 @@ endif()
 
 # ---------------------------------------------------------------------------
 # 4. Qt6 — project setup
-#    (On Windows with HODEIA_QT_FROM_MSYS2=ON, the MSYS2 prefix has already
-#     been prepended to CMAKE_PREFIX_PATH by cmake/PlatformWindows.cmake.)
+#    On Windows this resolves the MSVC build of Qt from the Qt installer
+#    (point CMAKE_PREFIX_PATH at it, e.g. C:/Qt/6.x.x/msvc2022_64).
+#    Native MSVC + vcpkg — see cmake/PlatformWindows.cmake.
 # ---------------------------------------------------------------------------
 find_package(Qt6 REQUIRED COMPONENTS Concurrent Network Quick QuickControls2 QuickEffects LinguistTools)
 qt_standard_project_setup(REQUIRES 6.10)

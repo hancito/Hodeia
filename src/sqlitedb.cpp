@@ -238,8 +238,15 @@ std::expected<void, QString> SqliteDb::open(const QString &path) {
   // Enable loading of extensions
   sqlite3_enable_load_extension(m_db, 1);
 
-  // Load sqlite-vec extension (vec0.so) from the application directory
-  QString vec0Path = QCoreApplication::applicationDirPath() + "/vec0.so";
+  // Load the sqlite-vec extension from the application directory.  The file
+  // name is platform-specific: vec0.so on Linux/macOS, vec0.dll on Windows.
+  const QString vec0Name =
+#ifdef Q_OS_WIN
+      "vec0.dll";
+#else
+      "vec0.so";
+#endif
+  QString vec0Path = QCoreApplication::applicationDirPath() + "/" + vec0Name;
   char *load_err = nullptr;
   rc = sqlite3_load_extension(m_db, vec0Path.toUtf8().constData(), nullptr,
                               &load_err);

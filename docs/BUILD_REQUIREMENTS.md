@@ -260,169 +260,138 @@ Résultat : `Hodeia.app` (~300 Mo) — standalone, drag & drop vers `/Applicatio
 
 ---
 
-## Windows (MSYS2 + Clang/LLVM)
+## Windows (Visual Studio / MSVC + vcpkg)
 
-> **Recommandé** : Utiliser MSYS2 avec l'environnement **ucrt64**. Cela fournit un shell
-> Unix complet (bash, make, pkg-config) et un gestionnaire de paquets (`pacman`) qui résout
-> toutes les dépendances de build automatiquement. Le produit final est **identique** —
-> l'utilisateur final n'a aucune dépendance MSYS2.
+> **Approche** : build **natif MSVC** avec Visual Studio 2022. Toutes les dépendances
+> natives sont de l'ABI **MSVC** (pas de MinGW/MSYS2). llama.cpp provient des DLL de
+> release officielles compilées MSVC ; MuPDF, Tesseract, Leptonica et le loader Vulkan
+> sont fournis par **vcpkg** (triplet `x64-windows`). Un seul point d'entrée,
+> `build_windows.ps1`, orchestre tout.
 >
-> **Important** : Sur Windows, MuPDF / Tesseract / Leptonica sont consommées comme
-> **DLL partagées depuis MSYS2** — elles ne sont **pas** compilées depuis le source.
-> Seuls llama.cpp et sqlite-vec sont compilés localement.
+> **Pourquoi MSVC** : les DLL llama.cpp de la release officielle sont compilées MSVC
+> (CRT `vcruntime140`). Mélanger une app compilée MinGW avec ces DLL provoquerait des
+> incompatibilités CRT/ABI. D'où le choix d'un toolchain entièrement MSVC.
 
-### Installation MSYS2
+### Prérequis (installation unique)
 
-1. Télécharger et installer [MSYS2 x86_64](https://www.msys2.org/download/)
-2. Ouvrir **MSYS2 UCRT64** (pas mingw64, pas MSYS)
-3. Installer les paquets :
+| Composant          | Version / choix                         | Installation                                                                      |
+| ------------------ | --------------------------------------- | --------------------------------------------------------------------------------- |
+| Visual Studio 2022 | avec « Développement avec C++ »         | [Visual Studio](https://visualstudio.microsoft.com/)                              |
+| CMake              | ≥ 3.25                                  | inclus dans VS, ou `winget install Kitware.CMake`                                 |
+| Qt 6               | ≥ 6.10, build **MSVC 2019/2022 64-bit** | [Qt Online Installer](https://www.qt.io/download) (cocher `msvc2022_64`)          |
+| vcpkg              | latest                                  | `git clone https://github.com/microsoft/vcpkg <repo>\vcpkg`                       |
+| llama.cpp          | release **b11404** (ou similaire)       | téléchargé depuis GitHub — dossiers `cpu\`, `vulkan\`, `cuda\12.4\`, `cuda\13.4\` |
 
-```bash
-pacman -S --needed mingw-w64-ucrt-x86_64-clang \
-                  mingw-w64-ucrt-x86_64-cmake \
-                  mingw-w64-ucrt-x86_64-ninja \
-                  mingw-w64-ucrt-x86_64-llvm-openmp \
-                  mingw-w64-ucrt-x86_64-pkg-config
+### Paquets vcpkg
 
-# PDF / OCR (DLL partagées — liées par CMake au build)
-pacman -S --needed mingw-w64-ucrt-x86_64-mupdf \
-                  mingw-w64-ucrt-x86_64-tesseract-ocr \
-                  mingw-w64-ucrt-x86_64-leptonica
+Déclarés dans `vcpkg.json` à la racine (mode manifeste) :
 
-# Utilitaires
-pacman -S --needed git wget curl
+| Port vcpkg                         | Cible liée                       | Lienage (Win) | Rôle                                                  |
+| ---------------------------------- | -------------------------------- | ------------- | ----------------------------------------------------- |
+| `libmupdf`                         | `unofficial::libmupdf::libmupdf` | **statique**  | PDF (embed freetype, harfbuzz, jbig2dec, openjpeg, …) |
+| `tesseract`                        | `Tesseract::libtesseract`        | dynamique     | OCR                                                   |
+| `leptonica` (via tesseract)        | `leptonica`                      | dynamique     | images pour OCR                                       |
+| `vulkan-loader` + `vulkan-headers` | `Vulkan::Vulkan`                 | dynamique     | loader + `vulkan-1.dll`                               |
+
+> **Note** : le port MuPDF s'appelle **`libmupdf`** (pas `mupdf`). Sur Windows il est
+> construit **statique** (exports DLL incomplets) — il n'y a donc **aucune DLL MuPDF**
+> à distribuer ; les codecs image sont embarqués.
+
+### Étape 1 — Stager les DLL llama.cpp
+
+Les DLL de la release sont organisées par backend (`cpu\`, `vulkan\`, `cuda\12.4\`,
+`cuda\13.4\`). `scripts\stage-llama.ps1` les fusionne dans un dossier plat
+`external\lib\windows\llamacpp\` que CMake attend :
+
+```powershell
+.\scripts\stage-llama.ps1 -SourceDir "D:\Developpement\Windows" -CudaVersion 12.4
 ```
 
-> **Optionnel — Qt6 depuis MSYS2** (évite le Qt Online Installer séparé) :
->
-> ```bash
-> pacman -S --needed mingw-w64-ucrt-x86_64-qt6-base \
->                   mingw-w64-ucrt-x86_64-qt6-declarative \
->                   mingw-w64-ucrt-x86_64-qt6-shadertools
-> ```
->
-> Activer avec `-DHODEIA_QT_FROM_MSYS2=ON` lors du configure CMake.
-
-### GPU (optionnel — hors MSYS2)
-
-| Backend | Installation                                                                                                                                                             |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CUDA    | [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) — installe `cudart.lib`, `cublas.lib` dans `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\<ver>\lib\x64\` |
-| Vulkan  | [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) — définit `$env:VULKAN_SDK` automatiquement                                                                             |
-
-> Les GPU backends s'installent en dehors de MSYS2. Le SDK définit les variables
-> d'environnement visibles depuis toutes les sessions.
-
-### Bibliothèques à compiler
-
-Toutes les commandes s'exécutent dans **MSYS2 UCRT64**.
-
-> **MuPDF / Tesseract / Leptonica** : pas de compilation nécessaire — les DLL
-> partagées installées par `pacman` (étape Installation MSYS2) sont détectées
-> automatiquement par CMake via `find_library`.
-
-#### 1. llama.cpp (CPU) → `.dll` + `.dll.a`
-
-```bash
-git clone https://github.com/ggml-org/llama.cpp.git
-cd llama.cpp
-mkdir build && cd build
-
-cmake .. -G Ninja \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=ON \
-  -DLLAMA_OPENMP=ON \
-  -DLLAMA_CUDA=OFF \
-  -DLLAMA_VULKAN=OFF
-
-cmake --build .
-```
-
-Pour CUDA : `-DLLAMA_CUDA=ON` + CUDA Toolkit installé.
-Pour Vulkan : `-DLLAMA_VULKAN=ON` + Vulkan SDK installé.
-
-Fichiers à copier dans `external/lib/windows/llamacpp/cpu/` :
+Contenu résultant (tous les backends dans un seul binaire) :
 
 ```
-llama.dll          (+ llama.dll.a import lib)
-llama-common.dll   (+ .dll.a)
-mtmd.dll           (+ .dll.a)
-ggml.dll           (+ .dll.a)
-ggml-base.dll      (+ .dll.a)
-ggml-cpu.dll       (+ .dll.a)
+llama.dll, llama-common.dll, mtmd.dll
+ggml.dll, ggml-base.dll, ggml-rpc.dll
+ggml-cpu-x64.dll, ggml-cpu-sse42.dll, ggml-cpu-<arch>…   (13 variantes CPU)
+ggml-cuda.dll      ← backend CUDA
+ggml-vulkan.dll    ← backend Vulkan
+libomp.dll, cudart64_12.dll, cublas64_12.dll, cublasLt64_12.dll
 ```
 
-> Sous MSYS2, les import libs portent l'extension `.dll.a` (équivalent de `.lib`).
-> Copiez-les dans le même dossier — le linker en a besoin.
+> Le binaire unique lie **les trois backends** ; `ggml_backend_load_all()` détecte
+> au runtime le meilleur disponible (CUDA > Vulkan > CPU). `stage-llama.ps1` embarque
+> un seul niveau de CUDA — `-CudaVersion 13.4` pour cibler CUDA 13.x.
 
-Pour CUDA, répétez avec `-DLLAMA_CUDA=ON` → `external/lib/windows/llamacpp/cuda/` :
+### Étape 2 — sqlite-vec (vec0.dll)
 
-```
-llama.dll, llama-common.dll, mtmd.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll
-ggml-cuda.dll      ← backend GPU
-```
+`SqliteDb::open()` charge `vec0.dll` au runtime via `sqlite3_load_extension()`.
+Pas de port vcpkg pour sqlite-vec : `scripts\build-sqlitevec.ps1` le fournit.
 
-Pour Vulkan, répétez avec `-DLLAMA_VULKAN=ON` → `external/lib/windows/llamacpp/vulkan/` :
+```powershell
+# défaut : téléchargement du binaire officiel (version pinnée, checksum vérifié)
+.\scripts\build-sqlitevec.ps1
 
-```
-ggml-vulkan.dll    ← backend GPU
-```
-
-#### 2. sqlite-vec → `.dll`
-
-```bash
-curl -fSL -o vec0.c "https://github.com/asg017/sqlite-vec/raw/main/dist/vec0.c"
-clang -shared -o vec0.dll vec0.c
+# alternative : compilation depuis le source avec cl.exe
+.\scripts\build-sqlitevec.ps1 -Method build
 ```
 
-Copier `vec0.dll` → `external/lib/windows/sqlitevec/`
+La version est **pinnée** à `v0.1.10-alpha.4` (voir
+`external/include/SqliteVec/sqlite-vec.h`). Le script par défaut télécharge
+`sqlite-vec-0.1.10-alpha.4-loadable-windows-x86_64.tar.gz` depuis la release GitHub,
+vérifie le SHA-256, et extrait `vec0.dll` → `external\lib\windows\sqlitevec\`.
 
-#### 3. Tesseract traineddata
+### Étape 3 — Build (un seul point d'entrée)
 
-```bash
-mkdir -p Resources/tessdata
-curl -fSL -o Resources/tessdata/eng.traineddata \
-  "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
+Depuis la racine du repo, dans une **Visual Studio Developer Prompt** :
+
+```powershell
+.\build_windows.ps1 -LlamaSourceDir "D:\Developpement\Windows" `
+                    -QtPrefix "C:\Qt\6.8.0\msvc2022_64"
 ```
 
-### Build final (Windows via MSYS2)
+`build_windows.ps1` :
 
-```bash
-mkdir build && cd build
+1. localise vcpkg (par défaut `<repo>\vcpkg`) et Qt (MSVC) ;
+2. stager llama.cpp (sauf déjà présent) ;
+3. fournit `vec0.dll` (sauf déjà présent) ;
+4. `vcpkg install --triplet x64-windows` (mode manifeste) ;
+5. `cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=<vcpkg>\scripts\buildsystems\vcpkg.cmake -DCMAKE_PREFIX_PATH=<Qt>` ;
+6. `cmake --build` (Release par défaut, `-Configuration Debug` pour le debug).
 
-cmake .. -G Ninja \
-  -DCMAKE_C_COMPILER=clang \
-  -DCMAKE_CXX_COMPILER=clang++ \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DHODEIA_MINGW_PREFIX=C:/msys64/ucrt64 \
-  [-DHODEIA_QT_FROM_MSYS2=ON]   # si Qt6 installé via pacman
+Options : `-CudaVersion 13.4`, `-SqliteVecMethod build`, `-VcpkgRoot C:\src\vcpkg`.
 
-cmake --build .
-```
+### Lien des DLL llama.cpp (import libs)
 
-> Si vous utilisez Qt de l'**Online Installer** au lieu de MSYS2, remplacez
-> `-DHODEIA_QT_FROM_MSYS2=ON` par :
-> `-DCMAKE_PREFIX_PATH="C:/Qt/6.10.0/msvc2022_64"`
+Le linker MSVC (`link.exe`) a besoin d'une import lib par DLL. Les release
+officielles n'en fournissent pas. `cmake/PlatformWindows.cmake` :
 
-Le CMake appelle automatiquement **`windeployqt`** en POST_BUILD. Le dossier de sortie contient :
+- génère les `.lib` via **`llvm-dlltool`** (partie du toolchain LLVM de VS) si
+  présent ; sinon
+- lie les DLL **par chemin complet** (fallback) — `link.exe` résout les exports C
+  non décorés de l'API llama.cpp et émet une import lib automatique.
 
-| Catégorie                | Contenu                                                                                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Qt runtime** (~150 Mo) | `Qt6Core.dll`, `Qt6Gui.dll`, `Qt6Quick.dll`, `Qt6QuickControls2.dll`, `Qt6Network.dll`, ICU data, image formats, platform plugins, styles, etc. |
-| **LLaMA.cpp**            | `llama.dll`, `ggml.dll`, `ggml-cpu.dll`, `ggml-cuda.dll` (ou `ggml-vulkan.dll`), `llama-common.dll`, `mtmd.dll`                                 |
-| **GPU backend**          | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si CUDA) / `vulkan-1.dll` (si Vulkan)                                                   |
-| **Extensions**           | `vec0.dll` (sqlite-vec), `libomp.dll` (OpenMP)                                                                                                  |
-| **Ressources**           | themes/, Fonts/, tessdata/                                                                                                                      |
-| **Exécutable**           | `Hodeia.exe`                                                                                                                                    |
+### Déploiement post-build
 
-> **Runtime C/C++ (UCRT)** : Le runtime universel Windows (`ucrtbase.dll`, `vcruntime140.dll`)
-> fait partie de Windows 10/11 et est toujours présent. Pas besoin de shipper le VC++ Redist
-> tant que votre cible est Windows 10+. `windeployqt` les copie quand même s'il trouve
-> les Visual Studio Build Tools.
+`cmake/PlatformWindows.cmake` (`hodeia_windows_deploy`) copie dans le dossier de
+l'exécutable :
 
-Résultat : un dossier autonome (~250-400 Mo selon le backend GPU). L'utilisateur lance `Hodeia.exe` — zéro installation requise, zéro dépendance MSYS2.
+| Catégorie        | Contenu                                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| **llama.cpp**    | toutes les DLL `llama*.dll`, `mtmd.dll`, `ggml*.dll` (CPU variants + `ggml-cuda` + `ggml-vulkan`), `libomp.dll` |
+| **CUDA runtime** | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (si `ggml-cuda.dll` présent)                             |
+| **Vulkan**       | `vulkan-1.dll` (depuis le bin vcpkg)                                                                            |
+| **OCR (vcpkg)**  | `tesseract*.dll`, `leptonica*.dll` + codecs image (libpng, libjpeg-turbo, openjpeg, gif, zlib)                  |
+| **Extensions**   | `vec0.dll` (sqlite-vec)                                                                                         |
+| **Ressources**   | `ui/themes/`, `Fonts/`, `tessdata/`                                                                             |
+| **Qt runtime**   | via `windeployqt` (plugins, ICU, etc.)                                                                          |
+| **Exécutable**   | `Hodeia.exe`                                                                                                    |
+
+> **Runtime C/C++ (UCRT)** : `ucrtbase.dll` / `vcruntime140.dll` font partie de
+> Windows 10/11. Pas besoin de shipper le VC++ Redist si la cible est Windows 10+.
+> `windeployqt` les copie s'il détecte les VS Build Tools.
+
+Résultat : un dossier autonome (~300-500 Mo selon les backends). L'utilisateur lance
+`Hodeia.exe` — zéro installation, zéro dépendance MSYS2/MinGW.
 
 Pour créer un installateur, empaquete le dossier avec [Inno Setup](https://jrsoftware.org/isinfo.php) ou [NSIS](https://nsis.sourceforge.io/).
 
@@ -457,15 +426,18 @@ external/lib/
 │   └── sqlitevec/
 │       └── vec0.dylib
 │
-└── windows/                        ← à remplir
-    ├── llamacpp/
-    │   ├── cpu/     ← .dll + .dll.a
-    │   ├── cuda/    ← .dll + .dll.a (optionnel)
-    │   └── vulkan/  ← .dll + .dll.a (optionnel)
+└── windows/                        ← à remplir (MSVC)
+    ├── llamacpp/                   ← dossier PLAT, tous les backends mélangés
+    │   ├── llama.dll, llama-common.dll, mtmd.dll
+    │   ├── ggml.dll, ggml-base.dll, ggml-rpc.dll
+    │   ├── ggml-cpu-x64.dll, ggml-cpu-sse42.dll, ggml-cpu-<arch>…
+    │   ├── ggml-cuda.dll           ← backend CUDA (+ cudart64/cublas64/cublasLt64)
+    │   ├── ggml-vulkan.dll         ← backend Vulkan
+    │   └── libomp.dll
     └── sqlitevec/
         └── vec0.dll
-    # MuPDF / Tesseract / Leptonica : DLL partagées depuis MSYS2 (pacman)
-    # → pas de fichiers in-tree nécessaires
+    # MuPDF / Tesseract / Leptonica / Vulkan : fournis par vcpkg (x64-windows)
+    # → pas de fichiers in-tree nécessaires (MuPDF est statique, pas de DLL)
 ```
 
 ---
@@ -481,15 +453,17 @@ external/lib/
 5. **sqlite-vec** → fichier unique, compilation instantanée
 6. **Hodeia** → assemble tout
 
-### Windows (MSYS2)
+### Windows (MSVC)
 
-1. **pacman** → installe MuPDF, Tesseract, Leptonica (DLL partagées) + toolchain
-2. **llama.cpp** → indépendant (compiler une fois par backend)
-3. **sqlite-vec** → fichier unique, compilation instantanée
-4. **Hodeia** → assemble tout (CMake détecte les DLL MSYS2 automatiquement)
+Aucune compilation de dépendances natives : tout est fourni en binaire.
 
-## Notes Clang-specific
+1. **vcpkg** → `vcpkg install` (manifest) apporte MuPDF (statique), Tesseract, Leptonica, Vulkan loader
+2. **llama.cpp** → stager les DLL de release via `scripts\stage-llama.ps1` (CPU + Vulkan + CUDA)
+3. **sqlite-vec** → `scripts\build-sqlitevec.ps1` télécharge le `vec0.dll` officiel
+4. **Hodeia** → `build_windows.ps1` assemble tout (CMake détecte vcpkg + les DLL in-tree)
+
+## Notes toolchain
 
 - **macOS** : Clang d'Apple (`/usr/bin/clang`) supporte C++23 et OpenMP via `libomp`. Le LLVM Homebrew est recommandé pour une version plus récente.
-- **Windows** : Le Clang de MSYS2 (ucrt64) utilise le linker `lld` natif. Aucune dépendance VS Build Tools requise. Les DLL de MuPDF/Tesseract/Leptonica viennent de MSYS2 et sont déployées automatiquement par CMake en POST_BUILD.
-- Sur les deux plateformes, `-DCMAKE_C_COMPILER` et `-DCMAKE_CXX_COMPILER` pointent vers les binaires Clang, mais le linker reste celui de la plateforme (`ld.lld` sur macOS et MSYS2 Windows).
+- **Linux** : Clang/LLVM, linker `ld.lld`/`ld`. Les `.so` llama.cpp ont un RUNPATH `$ORIGIN` posé par `patchelf`.
+- **Windows** : MSVC (`cl.exe`) via Visual Studio 2022, linker `link.exe`. Les DLL MuPDF/Tesseract/Leptonica/Vulkan viennent de **vcpkg** et sont déployées automatiquement par CMake en POST_BUILD. Les DLL llama.cpp sont liées via import libs (générées par `llvm-dlltool` si présent, sinon par chemin complet).
