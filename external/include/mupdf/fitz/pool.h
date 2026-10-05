@@ -53,6 +53,16 @@ void *fz_pool_alloc(fz_context *ctx, fz_pool *pool, size_t size);
 char *fz_pool_strdup(fz_context *ctx, fz_pool *pool, const char *s);
 
 /**
+	strndup equivalent allocating from the pool.
+*/
+char *fz_pool_strndup(fz_context *ctx, fz_pool *pool, const char *s, size_t n);
+
+/**
+	asprintf equivalent allocating from the pool.
+*/
+char *fz_pool_asprintf(fz_context *ctx, fz_pool *pool, const char *fmt, ...);
+
+/**
 	The current size of the pool.
 
 	The number of bytes of storage currently allocated to the pool.

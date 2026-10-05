@@ -8,18 +8,18 @@
 #
 # The script expects:
 #   $SRC/leptonica-1.87.0/
-#   $SRC/tesseract-5.5.2/
+#   $SRC/tesseract-5.5.3/
 #   $HODEIA/   ← this script's parent directory
 # ─────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HODEIA="${SCRIPT_DIR}"
-SRC="${1:-/home/hancitog/Developpement}"
+SRC="${1:-/run/media/hancito/VAULT/Developpement/Dependencies}"
 JOBS="$(nproc)"
 
 LEPTO_SRC="$SRC/leptonica-1.87.0"
-TESS_SRC="$SRC/tesseract-5.5.2"
+TESS_SRC="$SRC/tesseract-5.5.3"
 
 LEPTO_BUILD="$LEPTO_SRC/build"
 TESS_BUILD="$TESS_SRC/build"
@@ -97,7 +97,6 @@ cmake .. \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TRAINING_TOOLS=OFF \
   -DBUILD_TESTS=OFF \
-  -DDISABLED_LEGACY_ENGINE=ON \
   -DDISABLE_TIFF=ON \
   -DDISABLE_ARCHIVE=ON \
   -DDISABLE_CURL=ON \
@@ -108,7 +107,6 @@ cmake .. \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TRAINING_TOOLS=OFF \
   -DBUILD_TESTS=OFF \
-  -DDISABLED_LEGACY_ENGINE=ON \
   -DDISABLE_TIFF=ON \
   -DDISABLE_ARCHIVE=ON \
   -DDISABLE_CURL=ON \

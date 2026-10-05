@@ -240,7 +240,7 @@ static probe_info lb_probe_model(const QString &modelPath,
 
   auto mparams = llama_model_default_params();
   mparams.no_alloc = true;
-  mparams.use_mmap = false; // required: mmap + no_alloc triggers GGML_ASSERT
+  mparams.load_mode = LLAMA_LOAD_MODE_NONE; // required: mmap + no_alloc triggers GGML_ASSERT
 
   auto *model =
       llama_model_load_from_file(modelPath.toUtf8().constData(), mparams);
@@ -266,7 +266,7 @@ static probe_info lb_probe_model(const QString &modelPath,
   if (!mmprojPath.isEmpty()) {
     auto mmparams = llama_model_default_params();
     mmparams.no_alloc = true;
-    mmparams.use_mmap = false;
+    mmparams.load_mode = LLAMA_LOAD_MODE_NONE;
     auto *mm =
         llama_model_load_from_file(mmprojPath.toUtf8().constData(), mmparams);
     if (mm) {

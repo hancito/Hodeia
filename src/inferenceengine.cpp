@@ -47,17 +47,25 @@ QString InferenceEngine::inferText(const QString &prompt) {
 
   qDebug() << "[InferenceEngine] Prompt tokens:" << tokens.size();
 
-  // Decode the prompt in n_batch-sized chunks using common_batch_add.
+  // Decode the prompt in n_batch-sized chunks. The last token of each chunk
+  // is the one we request logits for (the final token of the prompt).
   llama_pos pos = 0;
   while (pos < (llama_pos)tokens.size()) {
     llama_pos end =
         std::min(pos + (llama_pos)m_n_batch, (llama_pos)tokens.size());
-    bool lastChunk = (end >= (llama_pos)tokens.size());
 
-    struct llama_batch batch = llama_batch_init(m_n_batch, 0, 1);
+    // Manual batch: llama_batch_get_one always sets output on the last
+    // token of the whole sequence, but during a chunked prompt pass we want
+    // output only on the very last token of the *whole* prompt.
+    struct llama_batch batch = llama_batch_init(end - pos, 0, 1);
     for (llama_pos i = pos; i < end; ++i) {
-      common_batch_add(batch, tokens[i], i, {0},
-                       lastChunk && i == (llama_pos)tokens.size() - 1);
+      batch.n_tokens       = i - pos + 1;
+      batch.token[i - pos] = tokens[i];
+      batch.pos[i - pos]   = i;
+      batch.n_seq_id[i - pos] = 1;
+      batch.seq_id[i - pos][0] = 0;
+      batch.logits[i - pos] =
+          (i == (llama_pos)tokens.size() - 1) ? 1 : 0;
     }
 
     int32_t res = llama_decode(m_ctx, batch);
@@ -109,7 +117,8 @@ QString InferenceEngine::inferMultimodal(const QString &prompt,
   }
 
   QByteArray data = prompt.toUtf8();
-  mtmd_input_text textInput{data.constData(), true, false};
+  mtmd_input_text textInput{data.constData(),
+                           static_cast<size_t>(data.size()), true, false};
 
   mtmd_input_chunks *chunks = mtmd_input_chunks_init();
   int32_t result = mtmd_tokenize(mctx, chunks, &textInput, bitmaps.data(),
@@ -203,7 +212,12 @@ QString InferenceEngine::generate() {
     // Decode the single token.
     {
       struct llama_batch batch = llama_batch_init(1, 0, 1);
-      common_batch_add(batch, tokenId, nPast + i, {0}, true);
+      batch.n_tokens = 1;
+      batch.token[0] = tokenId;
+      batch.pos[0]   = nPast + i;
+      batch.n_seq_id[0] = 1;
+      batch.seq_id[0][0] = 0;
+      batch.logits[0] = 1;
 
       int32_t res = llama_decode(m_ctx, batch);
       llama_batch_free(batch);

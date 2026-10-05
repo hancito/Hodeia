@@ -743,7 +743,9 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       fz_paragraph_break(ctx, textPage);
 
       // Hunt for tables → creates GRID blocks.
-      fz_table_hunt(ctx, textPage);
+      fz_table_hunt_options huntOpts;
+      fz_init_table_hunt_options(ctx, &huntOpts);
+      fz_table_hunt(ctx, textPage, &huntOpts);
 
       // ------------------------------------------------------------------
       // 1b. Detect figures, vector graphics, and tables
