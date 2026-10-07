@@ -1,13 +1,16 @@
 # build-sqlitevec.ps1
 # Provides the Windows sqlite-vec loadable extension (vec0.dll) that
-# SqliteDb::open() loads at runtime.  Primary path: download the official
-# pre-built MSVC DLL from the sqlite-vec GitHub release (exact version match,
-# no build step).  Fallback: build from source with cl.exe (needs the
-# "Desktop development with C++" workload + make).
+# SqliteDb::open() loads at runtime.
 #
-# Usage (from the repo root, in PowerShell):
+# Methods:
+#   local    — compile from a local source checkout (-SourceDir)
+#   build    — clone from GitHub and compile with cl.exe
+#   download — fetch the official pre-built MSVC DLL (default)
+#
+# Usage (from the repo root, in a VS Developer PowerShell):
+#   .\scripts\build-sqlitevec.ps1 -Method local -SourceDir "D:\Developpement\Dependencies\sqlite-vec"
 #   .\scripts\build-sqlitevec.ps1                          # download (default)
-#   .\scripts\build-sqlitevec.ps1 -Method build            # compile from source
+#   .\scripts\build-sqlitevec.ps1 -Method build            # clone + compile
 #   .\scripts\build-sqlitevec.ps1 -SkipIfPresent           # no-op if vec0.dll exists
 #
 # The pinned version must match external/include/SqliteVec/sqlite-vec.h
@@ -15,8 +18,9 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet("download","build")]
+    [ValidateSet("download","build","local")]
     [string]$Method = "download",
+    [string]$SourceDir,    # required for -Method local
     [switch]$SkipIfPresent
 )
 
@@ -66,35 +70,42 @@ switch ($Method) {
         }
     }
     "build" {
-        Write-Host ">> Building sqlite-vec $vecVersion from source (cl.exe)"
+        Write-Host ">> Building sqlite-vec $vecVersion from GitHub (cl.exe)"
         $srcRoot = Join-Path ([System.IO.Path]::GetTempPath()) "sqlitevec-src-$([guid]::NewGuid().ToString('N'))"
         New-Item -ItemType Directory -Force -Path $srcRoot | Out-Null
         try {
             git clone --depth 1 --branch $vecVersion https://github.com/asg017/sqlite-vec.git $srcRoot
             if ($LASTEXITCODE -ne 0) { throw "git clone failed" }
-
-            # The Makefile compiles a single C file into the shared extension.
-            # It assumes a `vendor/` dir with sqlite3.h; we point it at the
-            # amalgamation already in this repo (external/sqlite3/sqlite3.h).
-            New-Item -ItemType Directory -Force -Path (Join-Path $srcRoot "vendor") | Out-Null
-            Copy-Item -Force (Join-Path $repoRoot "external\sqlite3\sqlite3.h") (Join-Path $srcRoot "vendor\sqlite3.h")
-
-            # The Makefile targets gcc; on MSVC we compile directly with cl.exe.
-            # /LD = shared DLL, /O2 = optimize, exports are C (undecorated).
-            $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
-            if (-not $cl) { throw "cl.exe not on PATH — run this from a VS Developer Prompt" }
-            Push-Location $srcRoot
-            try {
-                & cl.exe /nologo /LD /O2 /DSQLITE_CORE /Ivendor /I. sqlite-vec.c /Fe:$destDll /link /DLL
-                if ($LASTEXITCODE -ne 0) { throw "cl.exe build failed" }
-            }
-            finally { Pop-Location }
+            & (Join-Path $PSScriptRoot "..\scripts\build-sqlitevec-compile.ps1") -SrcDir $srcRoot -DestDll $destDll -RepoRoot $repoRoot
         }
         finally {
             Remove-Item -Recurse -Force $srcRoot -ErrorAction SilentlyContinue
         }
     }
+    "local" {
+        if (-not $SourceDir) { throw "-Method local requires -SourceDir" }
+        if (-not (Test-Path $SourceDir)) { throw "SourceDir not found: $SourceDir" }
+        Write-Host ">> Building sqlite-vec from local source: $SourceDir"
+        & (Join-Path $PSScriptRoot "..\scripts\build-sqlitevec-compile.ps1") -SrcDir $SourceDir -DestDll $destDll -RepoRoot $repoRoot
+    }
 }
 
 if (-not (Test-Path $destDll)) { throw "vec0.dll was not produced at $destDll" }
+
+# --- Copy the header to external/include/SqliteVec/ -------------------------
+$headerDir = Join-Path $repoRoot "external\include\SqliteVec"
+New-Item -ItemType Directory -Force -Path $headerDir | Out-Null
+# Locate sqlite-vec.h — check the source dir (for local/build methods)
+$srcHeader = $null
+if ($Method -eq "local" -and $SourceDir) {
+    if (Test-Path (Join-Path $SourceDir "sqlite-vec.h")) {
+        $srcHeader = Join-Path $SourceDir "sqlite-vec.h"
+    }
+}
+if (-not $srcHeader -and (Test-Path (Join-Path $destDir "..\..\include\SqliteVec\sqlite-vec.h"))) {
+    # Already present — skip
+} elseif ($srcHeader) {
+    Copy-Item -Force $srcHeader (Join-Path $headerDir "sqlite-vec.h")
+}
+
 Write-Host "Done. vec0.dll ready at $destDll"

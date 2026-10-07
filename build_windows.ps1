@@ -2,23 +2,23 @@
 # Native Windows (Visual Studio / MSVC) build entry point.
 #
 # Prerequisites (one-time, on the Windows machine):
-#   1. Visual Studio 2022 with "Desktop development with C++".
+#   1. Visual Studio 2022 with "Desktop development with C++" + "Ninja".
 #   2. Qt 6 (>= 6.10) — the MSVC 2019/2022 64-bit build, from the Qt installer.
 #   3. vcpkg — a git clone at <repo>\vcpkg (or on PATH).
-#   4. The pre-built llama.cpp DLLs (cpu\ vulkan\ cuda\12.4\ cuda\13.4\) — this
-#      script stages them into external\lib\windows\llamacpp\ (see -LlamaSourceDir).
+#   4. Local source checkouts:
+#        -LlamaSourceDir    → llama.cpp source (built from source, 3 backends)
+#        -MupdfSourceDir    → MuPDF 1.28.5 source (vcpkg overlay port)
+#        -SqliteVecSourceDir→ sqlite-vec source (compiled with cl.exe)
+#      For CUDA: CUDA toolkit installed. For Vulkan: Vulkan SDK installed.
 #
-# Auto-provisioned (no manual step needed):
-#   - sqlite-vec vec0.dll  → downloaded from the official release by default
-#     (scripts\build-sqlitevec.ps1), or built with -SqliteVecMethod build.
-#
-# Usage (from the repo root, in a developer PowerShell):
-#   .\build_windows.ps1 -LlamaSourceDir "D:\Developpement\Windows"
+# Usage (from the repo root, in a VS Developer PowerShell):
+#   .\build_windows.ps1 -LlamaSourceDir "D:\Developpement\Dependencies\llama.cpp" `
+#                       -MupdfSourceDir "D:\Developpement\Dependencies\mupdf" `
+#                       -SqliteVecMethod local -SqliteVecSourceDir "D:\Developpement\Dependencies\sqlite-vec"
 #   .\build_windows.ps1 -Configuration Debug
 #   .\build_windows.ps1 -QtPrefix "C:\Qt\6.8.0\msvc2022_64"
 #   .\build_windows.ps1 -VcpkgRoot "C:\src\vcpkg"
-#   .\build_windows.ps1 -CudaVersion 13.4                 # re-stage llama.cpp
-#   .\build_windows.ps1 -SqliteVecMethod build            # compile vec0.dll
+#   .\build_windows.ps1 -LlamaBackends cpu,vulkan         # skip CUDA
 
 [CmdletBinding()]
 param(
@@ -26,10 +26,14 @@ param(
     [string]$Configuration = "Release",
     [string]$QtPrefix,          # e.g. C:\Qt\6.8.0\msvc2022_64
     [string]$VcpkgRoot,         # default: <repo>\vcpkg
-    [string]$LlamaSourceDir,    # folder with cpu\ vulkan\ cuda\12.4\ cuda\13.4\
-    [string]$CudaVersion = "12.4",
-    [ValidateSet("download","build")]
-    [string]$SqliteVecMethod = "download"   # how to obtain vec0.dll if missing
+    [string]$LlamaSourceDir,    # local llama.cpp source checkout (e.g. D:\Developpement\Dependencies\llama.cpp)
+    [string[]]$LlamaBackends = @("cpu","vulkan","cuda"),
+    [ValidateSet("download","build","local")]
+    [string]$SqliteVecMethod = "download",   # how to obtain vec0.dll if missing
+    [string]$SqliteVecSourceDir,             # local sqlite-vec checkout (for -SqliteVecMethod local)
+    [string]$MupdfSourceDir,                 # local MuPDF 1.28.5 checkout (for the overlay port)
+    [string]$CudaToolkit,                    # optional, e.g. C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4
+    [string]$VulkanSdk                       # optional, e.g. C:\VulkanSDK\1.3.296.0
 )
 
 $ErrorActionPreference = "Stop"
@@ -58,39 +62,55 @@ if (-not $QtPrefix) {
     throw "Qt MSVC prefix not found. Pass -QtPrefix e.g. C:\Qt\6.8.0\msvc2022_64"
 }
 
-# --- Stage llama.cpp DLLs ---------------------------------------------------
-# The pre-built llama.cpp DLLs are git-ignored; stage them into the tree so
-# CMake can link/deploy them.  Skip if already present.
+# --- Build llama.cpp from source -------------------------------------------
 if (-not (Test-Path (Join-Path $repoRoot "external\lib\windows\llamacpp\llama.dll"))) {
     if (-not $LlamaSourceDir) {
-        throw "external\lib\windows\llamacpp\llama.dll missing and -LlamaSourceDir not given. Pass the folder containing cpu\ vulkan\ cuda\12.4\ cuda\13.4\"
+        throw "llama.dll missing and -LlamaSourceDir not given."
     }
-    Write-Host ">> Staging llama.cpp from $LlamaSourceDir (CUDA $CudaVersion)"
-    & (Join-Path $PSScriptRoot "scripts\stage-llama.ps1") -SourceDir $LlamaSourceDir -CudaVersion $CudaVersion
+    Write-Host ">> Building llama.cpp from $LlamaSourceDir (backends: $($LlamaBackends -join ', '))"
+    $llamaArgs = @("-SourceDir", $LlamaSourceDir, "-Backends", $LlamaBackends)
+    if ($CudaToolkit) { $llamaArgs += @("-CudaToolkit", $CudaToolkit) }
+    if ($VulkanSdk)   { $llamaArgs += @("-VulkanSdk",   $VulkanSdk)   }
+    & (Join-Path $PSScriptRoot "scripts\build-llama.ps1") @llamaArgs
 } else {
     Write-Host ">> llama.cpp DLLs already staged — skipping"
 }
 
-# --- Provide sqlite-vec (vec0.dll) -----------------------------------------
-# SqliteDb::open() loads vec0.dll from the app dir at runtime.  It is
-# git-ignored; obtain it (official prebuilt by default) if not already staged.
+# --- Build sqlite-vec from source -------------------------------------------
 if (-not (Test-Path (Join-Path $repoRoot "external\lib\windows\sqlitevec\vec0.dll"))) {
-    Write-Host ">> Providing sqlite-vec vec0.dll (method: $SqliteVecMethod)"
-    & (Join-Path $PSScriptRoot "scripts\build-sqlitevec.ps1") -Method $SqliteVecMethod
+    if ($SqliteVecMethod -eq "local") {
+        if (-not $SqliteVecSourceDir) {
+            throw "-SqliteVecMethod local requires -SqliteVecSourceDir"
+        }
+        Write-Host ">> Building sqlite-vec from $SqliteVecSourceDir"
+        & (Join-Path $PSScriptRoot "scripts\build-sqlitevec.ps1") -Method local -SourceDir $SqliteVecSourceDir
+    } else {
+        Write-Host ">> Providing sqlite-vec vec0.dll (method: $SqliteVecMethod)"
+        & (Join-Path $PSScriptRoot "scripts\build-sqlitevec.ps1") -Method $SqliteVecMethod
+    }
 } else {
     Write-Host ">> vec0.dll already present — skipping"
 }
 
 # --- vcpkg install (manifest mode, driven by vcpkg.json) -------------------
-# Manifest mode auto-detects vcpkg.json in the working dir.  We set the
-# triplet to x64-windows and let CMake's toolchain file pick up the result.
-Write-Host ">> vcpkg install (x64-windows)"
+# The overlay port vcpkg-overlay/ports/libmupdf builds MuPDF 1.28.5 from
+# $MupdfSourceDir instead of the stock vcpkg port (which pins 1.26.10).
+if (-not $MupdfSourceDir) {
+    throw "Pass -MupdfSourceDir pointing at your local MuPDF 1.28.5 checkout, e.g. D:\Developpement\Dependencies\mupdf"
+}
+
+Write-Host ">> vcpkg install (x64-windows, overlay: libmupdf from $MupdfSourceDir)"
+$env:MUPDF_LOCAL_SOURCE = $MupdfSourceDir
 Push-Location $repoRoot
 try {
-    & (Join-Path $VcpkgRoot "vcpkg.exe") install --triplet x64-windows
+    & (Join-Path $VcpkgRoot "vcpkg.exe") install --triplet x64-windows `
+        --overlay-ports (Join-Path $repoRoot "vcpkg-overlay\ports")
     if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
 }
-finally { Pop-Location }
+finally {
+    Remove-Item Env:MUPDF_LOCAL_SOURCE -ErrorAction SilentlyContinue
+    Pop-Location
+}
 
 # --- Configure + build ------------------------------------------------------
 $buildDir = Join-Path $repoRoot "build-windows"
