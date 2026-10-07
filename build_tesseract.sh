@@ -1,36 +1,16 @@
-#!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────
-# Build Leptonica + Tesseract as static libraries, then install
-# artefacts into Hodeia_CPP/external/ and Resources/tessdata/.
-#
-# Usage:  ./build_ocr.sh                          # auto-detect paths
-#   or:   ./build_ocr.sh /path/to/src_root
-#
-# The script expects:
-#   $SRC/leptonica-1.87.0/
-#   $SRC/tesseract-5.5.3/
-#   $HODEIA/   ← this script's parent directory
-# ─────────────────────────────────────────────────────────────────
-set -euo pipefail
+#!/bin/bash
+cd /run/media/hancito/VAULT/Developpement/Dependencies
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HODEIA="${SCRIPT_DIR}"
-SRC="${1:-/run/media/hancito/VAULT/Developpement/Dependencies}"
-JOBS="$(nproc)"
-
-LEPTO_SRC="$SRC/leptonica-1.87.0"
-TESS_SRC="$SRC/tesseract-5.5.3"
-
-LEPTO_BUILD="$LEPTO_SRC/build"
-TESS_BUILD="$TESS_SRC/build"
-
-EXT_LIB="$HODEIA/external/lib"
+# Configuration
+HODEIA="/home/hancito/LLM_Stuff/Hodeia"
+EXT_LIB="$HODEIA/external/lib/linux"
 EXT_INC="$HODEIA/external/include"
 
-echo "=== Hodeia root : $HODEIA"
-echo "=== Source root   : $SRC"
-echo "=== Jobs          : $JOBS"
-echo ""
+DEPS_DIR="$(pwd)"
+LEPTO_SRC="$DEPS_DIR/leptonica"
+TESS_SRC="$DEPS_DIR/tesseract"
+LEPTO_BUILD="$LEPTO_SRC/build"
+TESS_BUILD="$TESS_SRC/build"
 
 # ─── Verify sources exist ─────────────────────────────────────────
 if [ ! -d "$LEPTO_SRC" ]; then
@@ -47,6 +27,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  Step 1/4 : Building Leptonica (static)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+rm -rf "$LEPTO_BUILD"
 mkdir -p "$LEPTO_BUILD"
 cd "$LEPTO_BUILD"
 
@@ -72,7 +53,7 @@ cmake .. \
   -DENABLE_WEBP=OFF \
   -DENABLE_OPENJPEG=OFF
 
-cmake --build . -- -j"$JOBS"
+cmake --build . -- -j$(nproc)
 
 echo ""
 echo "  Leptonica build done."
@@ -81,7 +62,7 @@ echo "  Leptonica build done."
 # (the config file hardcodes CMAKE_INSTALL_PREFIX by default).
 sed -i \
   "s|set(Leptonica_INCLUDE_DIRS.*|set(Leptonica_INCLUDE_DIRS      \"${LEPTO_BUILD}/src;${LEPTO_SRC}/src\")|" \
-  "$LEPTO_BUILD/LeptonicaConfig.cmake"
+  LeptonicaConfig.cmake
 echo "  ✓ Patched LeptonicaConfig.cmake → build-tree includes"
 
 # ─── 2. Build Tesseract ───────────────────────────────────────────
@@ -90,30 +71,40 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "  Step 2/4 : Building Tesseract (static, LSTM-only)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+rm -rf "$TESS_BUILD"
 mkdir -p "$TESS_BUILD"
 cd "$TESS_BUILD"
+
+# -DDISABLED_LEGACY_ENGINE=1 must be a CXX compile definition: Tesseract's
+# CMake option only removes legacy source files but does NOT define the macro,
+# so #ifndef DISABLED_LEGACY_ENGINE guards in baseapi.cpp stay open.
+CXX_FLAGS="-DDISABLED_LEGACY_ENGINE=1"
 
 cmake .. \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TRAINING_TOOLS=OFF \
   -DBUILD_TESTS=OFF \
+  -DDISABLED_LEGACY_ENGINE=ON \
   -DDISABLE_TIFF=ON \
   -DDISABLE_ARCHIVE=ON \
   -DDISABLE_CURL=ON \
   -DGRAPHICS_DISABLED=ON \
   -DLeptonica_DIR="$LEPTO_BUILD" \
+  -DCMAKE_CXX_FLAGS="$CXX_FLAGS" \
   -G Ninja 2>/dev/null || \
 cmake .. \
   -DBUILD_SHARED_LIBS=OFF \
   -DBUILD_TRAINING_TOOLS=OFF \
   -DBUILD_TESTS=OFF \
+  -DDISABLED_LEGACY_ENGINE=ON \
   -DDISABLE_TIFF=ON \
   -DDISABLE_ARCHIVE=ON \
   -DDISABLE_CURL=ON \
   -DGRAPHICS_DISABLED=ON \
-  -DLeptonica_DIR="$LEPTO_BUILD"
+  -DLeptonica_DIR="$LEPTO_BUILD" \
+  -DCMAKE_CXX_FLAGS="$CXX_FLAGS"
 
-cmake --build . -- -j"$JOBS"
+cmake --build . -- -j$(nproc)
 
 echo ""
 echo "  Tesseract build done."
@@ -125,9 +116,11 @@ echo "  Step 3/4 : Installing artefacts into external/"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # ── Leptonica ──
+rm -f "$EXT_LIB/libleptonica.a"
 cp "$LEPTO_BUILD/src/libleptonica.a" "$EXT_LIB/libleptonica.a"
 echo "  ✓ libleptonica.a  → $EXT_LIB/"
 
+rm -rf "$EXT_INC/leptonica"
 mkdir -p "$EXT_INC/leptonica"
 cp "$LEPTO_SRC/src/"*.h "$EXT_INC/leptonica/"
 # Also copy the generated config_auto.h
@@ -137,9 +130,11 @@ fi
 echo "  ✓ leptonica headers → $EXT_INC/leptonica/"
 
 # ── Tesseract ──
+rm -f "$EXT_LIB/libtesseract.a"
 cp "$TESS_BUILD/libtesseract.a" "$EXT_LIB/libtesseract.a"
 echo "  ✓ libtesseract.a  → $EXT_LIB/"
 
+rm -rf "$EXT_INC/tesseract"
 mkdir -p "$EXT_INC/tesseract"
 cp "$TESS_SRC/include/tesseract/"*.h "$EXT_INC/tesseract/"
 echo "  ✓ tesseract headers → $EXT_INC/tesseract/"
@@ -172,7 +167,4 @@ echo ""
 ls -lh "$EXT_LIB"/lib{tesseract,leptonica}.a 2>/dev/null
 echo ""
 ls -lh "$TESSDATA_DIR"/ 2>/dev/null
-echo ""
-echo "Next: update CMakeLists.txt to link tesseract + leptonica,"
-echo "      then implement the OCR fallback in ingestionengine.cpp."
 echo ""

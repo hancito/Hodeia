@@ -13,14 +13,14 @@ set(HODEIA_PLATFORM_LINUX ON)
 # A. Shared-library name mapping + static library paths
 # ===========================================================================
 set(_PLAT              "linux")
-set(_SHARED_LLAMA      "libllama.so.0.5.0")
-set(_SHARED_LLAMA_COMM "libllama-common.so.0.5.0")
-set(_SHARED_MTMD       "libmtmd.so.0.5.0")
-set(_SHARED_GGML       "libggml.so.0.25.3")
-set(_SHARED_GGML_BASE  "libggml-base.so.0.25.3")
-set(_SHARED_GGML_CPU   "libggml-cpu.so.0.25.3")
-set(_SHARED_GGML_CUDA  "libggml-cuda.so.0.25.3")
-set(_SHARED_GGML_VK    "libggml-vulkan.so.0.25.3")
+set(_SHARED_LLAMA      "libllama.so.0")
+set(_SHARED_LLAMA_COMM "libllama-common.so.0")
+set(_SHARED_MTMD       "libmtmd.so.0")
+set(_SHARED_GGML       "libggml.so.0")
+set(_SHARED_GGML_BASE  "libggml-base.so.0")
+set(_SHARED_GGML_CPU   "libggml-cpu.so.0")
+set(_SHARED_GGML_CUDA  "libggml-cuda.so.0")
+set(_SHARED_GGML_VK    "libggml-vulkan.so.0")
 set(_SHARED_GGML_METAL "")
 set(_VECTOREC_EXT      "vec0.so")
 set(_STATIC_EXT        ".a")
@@ -197,34 +197,26 @@ function(hodeia_linux_deploy TARGET)
         COMMENT "Copying llama.cpp backend .so (${LLAMA_BACKEND})")
   endif()
 
-  # --- Base symlinks ---
+  # --- Unversioned symlinks (libX.so -> libX.so.0) ---
   add_custom_command(TARGET ${TARGET} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_LLAMA}                $<TARGET_FILE_DIR:${TARGET}>/libllama.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_LLAMA}                $<TARGET_FILE_DIR:${TARGET}>/libllama.so
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML}                 $<TARGET_FILE_DIR:${TARGET}>/libggml.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML}                 $<TARGET_FILE_DIR:${TARGET}>/libggml.so
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_BASE}            $<TARGET_FILE_DIR:${TARGET}>/libggml-base.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_BASE}            $<TARGET_FILE_DIR:${TARGET}>/libggml-base.so
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_CPU}             $<TARGET_FILE_DIR:${TARGET}>/libggml-cpu.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_CPU}             $<TARGET_FILE_DIR:${TARGET}>/libggml-cpu.so
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_MTMD}                 $<TARGET_FILE_DIR:${TARGET}>/libmtmd.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_MTMD}                 $<TARGET_FILE_DIR:${TARGET}>/libmtmd.so
-      COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_LLAMA_COMM}           $<TARGET_FILE_DIR:${TARGET}>/libllama-common.so.0
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_LLAMA_COMM}           $<TARGET_FILE_DIR:${TARGET}>/libllama-common.so
       COMMENT "llama.cpp base symlinks")
 
   # --- Backend symlinks ---
   if(LLAMA_BACKEND STREQUAL "cuda")
     add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_CUDA}          $<TARGET_FILE_DIR:${TARGET}>/libggml-cuda.so.0
         COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_CUDA}          $<TARGET_FILE_DIR:${TARGET}>/libggml-cuda.so
-        COMMENT "libggml-cuda symlinks")
+        COMMENT "libggml-cuda symlink")
   endif()
   if(LLAMA_BACKEND STREQUAL "vulkan")
     add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_VK}            $<TARGET_FILE_DIR:${TARGET}>/libggml-vulkan.so.0
         COMMAND ${CMAKE_COMMAND} -E create_symlink ${_SHARED_GGML_VK}            $<TARGET_FILE_DIR:${TARGET}>/libggml-vulkan.so
-        COMMENT "libggml-vulkan symlinks")
+        COMMENT "libggml-vulkan symlink")
   endif()
 
   # --- $ORIGIN rpath (patchelf) ---
