@@ -17,6 +17,7 @@
 #include <QImage>
 #include <QThread>
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <vector>
 
@@ -27,8 +28,52 @@ static bool s_llamaInitialized = false;
 
 LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
   if (!s_llamaInitialized) {
+    // Auto-detect CUDA, Metal, Vulkan, etc.  In a release build this runs
+    // SILENT (ggml_backend_load_all_from_path sets silent=true under NDEBUG),
+    // so a backend that fails to load produces no diagnostic at all.  To
+    // surface the real reason a GPU backend is missing we explicitly load
+    // each candidate non-silent BEFORE the bulk load: load_backend() then
+    // reports via the log callback whether the DLL failed to load (with
+    // dl_error()), scored 0 ("not supported on this system"), or failed to
+    // initialize.  A no-op for backends that are already loadable.
+    {
+      const QString appDir = QCoreApplication::applicationDirPath();
+      const QStringList candidates = {"ggml-cuda.dll", "ggml-vulkan.dll"};
+      for (const QString &c : candidates) {
+        const QString p = appDir + "/" + c;
+        if (QFile::exists(p))
+          ggml_backend_load(p.toUtf8().constData());
+      }
+    }
     ggml_backend_load_all(); // auto-detect CUDA, Metal, Vulkan, etc.
-    llama_backend_init();    // start thread pools / memory allocators
+    // Log all registered backends so we can diagnose GPU detection issues.
+    {
+      int n = (int)ggml_backend_dev_count();
+      for (int i = 0; i < n; i++) {
+        struct ggml_backend_dev_props p;
+        ggml_backend_dev_get_props(ggml_backend_dev_get(i), &p);
+        const char *typeName = "META";
+        if (p.type == GGML_BACKEND_DEVICE_TYPE_CPU)
+          typeName = "CPU";
+        else if (p.type == GGML_BACKEND_DEVICE_TYPE_GPU)
+          typeName = "GPU";
+        else if (p.type == GGML_BACKEND_DEVICE_TYPE_IGPU)
+          typeName = "IGPU";
+        else if (p.type == GGML_BACKEND_DEVICE_TYPE_ACCEL)
+          typeName = "ACCEL";
+        qDebug() << "[LocalBackend] Registered device" << i
+                 << "| type:" << typeName
+                 << "| name:" << (p.name ? p.name : "?")
+                 << "| desc:" << (p.description ? p.description : "?")
+                 << "| mem:" << (p.memory_total / (1024 * 1024)) << "MiB total,"
+                 << (p.memory_free / (1024 * 1024)) << "MiB free";
+      }
+      if (n == 0)
+        qWarning() << "[LocalBackend] No ggml backends registered — "
+                      "check that ggml-cuda.dll / ggml-vulkan.dll are next to "
+                      "the exe and the CUDA runtime DLLs are present.";
+    }
+    llama_backend_init(); // start thread pools / memory allocators
     s_llamaInitialized = true;
   }
 }
@@ -82,11 +127,22 @@ LocalBackend::loadModel(const QString &modelPath,
     devName = props.name ? props.name : "unknown";
   }
 
+  // Diagnostic: tag every loadModel call with a sequence id + thread so
+  // interleaved worker-thread output can be correlated in Hodeia.log.
+  static std::atomic<int> s_loadSeq{0};
+  const int loadSeq = ++s_loadSeq;
+  qDebug() << "[LocalBackend] DIAG loadModel BEGIN #" << loadSeq
+           << "| thread:" << QThread::currentThreadId() << "| path:" << path
+           << "| mmproj:" << m_mmprojPath;
+
   common_init_result_ptr result = loadModelWithDevices(
       path, m_mmprojPath, devices, devName, estimatedPromptTokens);
 
-  if (!result)
+  if (!result) {
+    qCritical() << "[LocalBackend] DIAG loadModel #" << loadSeq
+                << "loadModelWithDevices FAILED (returned null)";
     return std::unexpected{"Failed to load model: " + QString(path)};
+  }
 
   m_llamaModel = result->model();
 
@@ -105,6 +161,8 @@ LocalBackend::loadModel(const QString &modelPath,
 
   m_modelPath = path;
   m_ready = true;
+  qDebug() << "[LocalBackend] DIAG loadModel #" << loadSeq
+           << "DONE — model+context created, ready";
 
   qDebug() << "[LocalBackend] Model loaded | ctx:" << llama_n_ctx(m_llamaCtx)
            << "| batch:" << llama_n_batch(m_llamaCtx)
@@ -240,7 +298,8 @@ static probe_info lb_probe_model(const QString &modelPath,
 
   auto mparams = llama_model_default_params();
   mparams.no_alloc = true;
-  mparams.load_mode = LLAMA_LOAD_MODE_NONE; // required: mmap + no_alloc triggers GGML_ASSERT
+  mparams.load_mode =
+      LLAMA_LOAD_MODE_NONE; // required: mmap + no_alloc triggers GGML_ASSERT
 
   auto *model =
       llama_model_load_from_file(modelPath.toUtf8().constData(), mparams);
@@ -390,10 +449,72 @@ static common_params lb_fit_params(const probe_info &probe,
   params.n_batch = desiredCtx;
   params.n_ubatch = desiredUbatch;
 
-  // No GPU available → CPU only
+  // No GPU available → CPU only.  Must still fit in available system RAM:
+  // a large multimodal model + full-context F16 KV cache can exceed free RAM
+  // and crash the process (llama.cpp C-level allocation failure → abort).
+  // Mirror the GPU progressive-reduction strategy, but against the CPU's
+  // free memory instead of GPU VRAM.
   if (gpuDevs.empty()) {
     params.n_gpu_layers = 0;
-    qDebug() << "[LocalBackend] lb_fit: no GPU, CPU only";
+    // Available system RAM = min free across CPU devices (usually one).
+    // Fallback to a conservative default if none reported.
+    uint64_t cpuFree = 16UL * 1024 * 1024 * 1024; // 16 GiB default
+    for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+      struct ggml_backend_dev_props cp;
+      ggml_backend_dev_get_props(ggml_backend_dev_get(i), &cp);
+      if (cp.type == GGML_BACKEND_DEVICE_TYPE_CPU &&
+          (cpuFree == 0 || cp.memory_free < cpuFree))
+        cpuFree = cp.memory_free;
+    }
+    // Leave headroom for the OS, the Qt GUI, OCR, and transient compute
+    // buffers: keep 4 GiB out of play.
+    uint64_t cpuMargin = 4UL * 1024 * 1024 * 1024;
+    uint64_t cpuAvailable = cpuFree > cpuMargin ? cpuFree - cpuMargin : cpuFree;
+
+    // Persistent CPU demand = model weights + mmproj + KV cache.
+    // The mmproj (multimodal projector) is resident once loaded for a
+    // visual document, so it must be counted on the CPU path too.
+    uint64_t persistentWeights =
+        probe.model_size + (probe.has_mmproj ? probe.mmproj_size : 0);
+
+    // Try full context with F16 KV first; if it doesn't fit, shrink n_ctx
+    // and/or quantize KV (F16 → Q8_0) until it fits.  Floor n_ctx at the
+    // caller's minCtx (4096) — below that multimodal inference is useless.
+    uint32_t n_ctx = lb_pad256(desiredCtx);
+    uint32_t floor_ctx = lb_pad256(std::max(minCtx, 4096U));
+    int type_k = GGML_TYPE_F16;
+    int type_v = GGML_TYPE_F16;
+
+    uint64_t kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
+                                       probe.n_layers, n_ctx, type_k, type_v);
+    while (persistentWeights + kv > cpuAvailable) {
+      // First try quantizing KV (cheap, ~half the cache).
+      if (type_k == GGML_TYPE_F16) {
+        type_k = type_v = GGML_TYPE_Q8_0;
+        kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
+                                  probe.n_layers, n_ctx, type_k, type_v);
+        continue;
+      }
+      // Then shrink the context.
+      if (n_ctx <= floor_ctx)
+        break; // cannot fit even at the floor — accept the risk
+      n_ctx = lb_pad256(n_ctx - 1024U);
+      kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
+                                probe.n_layers, n_ctx, type_k, type_v);
+    }
+
+    params.n_ctx = n_ctx;
+    params.n_batch = n_ctx;
+    params.n_ubatch = desiredUbatch;
+    params.cache_type_k = static_cast<ggml_type>(type_k);
+    params.cache_type_v = static_cast<ggml_type>(type_v);
+
+    qDebug() << "[LocalBackend] lb_fit: no GPU, CPU only"
+             << "| n_ctx=" << n_ctx
+             << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
+             << "| est persistent=" << ((persistentWeights + kv) >> 20) << "MiB"
+             << "/ " << (cpuAvailable >> 20) << "MiB available"
+             << "| cpuFree=" << (cpuFree >> 20) << "MiB";
     return params;
   }
 
@@ -405,11 +526,14 @@ static common_params lb_fit_params(const probe_info &probe,
     }
   }
 
-  // 512 MiB safety margin for iGPUs, 1 GiB for discrete GPUs.
+  // 512 MiB safety margin for iGPUs, 2 GiB for discrete GPUs.
+  // The CUDA runtime + driver + CUDA graph reserves need significant
+  // headroom beyond our weight+KV+compute estimate.  512 MiB was too
+  // tight and caused hard GPU OOM crashes during model load.
   bool integrated = bottleneck->is_integrated;
-  uint64_t effective_margin = integrated
-                                  ? 512UL * 1024 * 1024  // 512 MiB for iGPU
-                                  : 512UL * 1024 * 1024; // 512 MiB for discrete
+  uint64_t effective_margin =
+      integrated ? 512UL * 1024 * 1024       // 512 MiB for iGPU
+                 : 2UL * 1024 * 1024 * 1024; // 2 GiB for discrete
   if (bottleneck->memory_free <= effective_margin) {
     params.n_gpu_layers = 0;
     qWarning() << "[LocalBackend] lb_fit: GPU" << bottleneck->name
@@ -559,9 +683,10 @@ static common_params lb_fit_params(const probe_info &probe,
         n_gpu_layers > 0
             // CUDA graph reserve allocates per-layer activations.
             // Calibrated: 8433 MiB measured for 48 layers, 8192 ubatch, 3840
-            // embd. Effective factor is ~6 bytes per element (not 8).
+            // embd → ~6 bytes/element.  Bumped to 8 for headroom:
+            // sliding-window models (gemma4) allocate extra SWA buffers.
             ? static_cast<uint64_t>(n_ubatch) * std::max(probe.n_embd, 1) *
-                  static_cast<uint64_t>(n_gpu_layers) * 6
+                  static_cast<uint64_t>(n_gpu_layers) * 8
             : 0;
     uint64_t gpu_total =
         (gpu_weight + mmproj_mem + kv_size + compute_buf) * 105 / 100;
@@ -846,10 +971,26 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   params.cpuparams.n_threads = QThread::idealThreadCount();
   params.cpuparams_batch.n_threads = QThread::idealThreadCount();
 
+  // Diagnostic: the runtime was loading the mmproj as the main model
+  // ("CLIP cannot be used as main model"), which the code should not do.
+  // Print exactly what common_init_from_params will be handed so the
+  // offending path is visible in Hodeia.log.
+  qDebug() << "[LocalBackend] DIAG loadModelWithDevices -> model.path:"
+           << QString::fromStdString(params.model.path)
+           << "| mmproj.path:" << QString::fromStdString(params.mmproj.path)
+           << "| n_gpu_layers:" << params.n_gpu_layers
+           << "| n_devices:" << params.devices.size()
+           << "| thread:" << QThread::currentThreadId();
+
   // Remember how many GPU layers we're actually using — needed later to
   // decide whether the mmproj can live on the GPU (when model is on CPU,
   // the iGPU is free for the mmproj).
   m_gpuLayers = params.n_gpu_layers;
+
+  // We do our own fitting via lb_fit_params — disable the internal
+  // common_fit_params which re-probes all devices and can crash when
+  // multiple backends (CUDA + Vulkan) claim the same physical GPU.
+  params.fit_params = false;
 
   if (params.n_gpu_layers != 0) {
     // GPU path: the fitter already set params.devices to {bottleneck_gpu}.
@@ -884,7 +1025,26 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
     return createInitResult(params, false);
   }
 
-  auto result = createInitResult(params, params.mmproj_use_gpu);
+  // Step marker: this is the exact call that triggers
+  // llama_model_load_from_file inside common_init_from_params.  If the mmproj
+  // is loaded as the main model (CLIP error), it happens in this call.
+  qDebug()
+      << "[LocalBackend] DIAG >> createInitResult (common_init_from_params) "
+         "starting ...";
+  common_init_result_ptr result;
+  try {
+    result = createInitResult(params, params.mmproj_use_gpu);
+  } catch (const std::exception &e) {
+    qCritical() << "[LocalBackend] DIAG C++ EXCEPTION in createInitResult:"
+                << e.what();
+    result = nullptr;
+  } catch (...) {
+    qCritical() << "[LocalBackend] DIAG UNKNOWN C++ exception in "
+                   "createInitResult";
+    result = nullptr;
+  }
+  qDebug() << "[LocalBackend] DIAG << createInitResult returned"
+           << (result ? "OK" : "NULL");
   if (!result) {
     qCritical() << "[LocalBackend] Fitted load failed, trying CPU fallback";
     params =

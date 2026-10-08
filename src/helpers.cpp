@@ -237,17 +237,25 @@ static bool copyFileToDir(const QString &sourcePath, const QString &destDir,
     return false;
   }
 
+  // Heap-allocated buffer.  This runs on a QThreadPool worker thread whose
+  // default stack is only 1 MB on Windows; a 1 MB *stack* array here overflowed
+  // the stack and crashed the process on the first copy.
   const qint64 bufSize = 1024 * 1024;
-  char buf[bufSize];
+  const QByteArray buf =
+      QByteArray(static_cast<int>(bufSize), Qt::Uninitialized);
   qint64 copied = 0;
   while (!src.atEnd()) {
-    qint64 n = src.read(buf, bufSize);
+    const qint64 n = src.read(const_cast<char *>(buf.constData()), bufSize);
     if (n <= 0)
       break;
-    copied += dest.write(buf, n);
+    copied += dest.write(buf.constData(), n);
     if (helper)
-      Q_EMIT helper->modelCopyProgress(static_cast<int>(copied * 100 / total),
-                                       fileName);
+      QMetaObject::invokeMethod(
+          helper,
+          [helper, fileName, pct = static_cast<int>(copied * 100 / total)] {
+            Q_EMIT helper->modelCopyProgress(pct, fileName);
+          },
+          Qt::QueuedConnection);
   }
   dest.close();
   src.close();
@@ -257,7 +265,10 @@ static bool copyFileToDir(const QString &sourcePath, const QString &destDir,
     return false;
   }
   if (helper)
-    Q_EMIT helper->modelCopyProgress(100, fileName);
+    QMetaObject::invokeMethod(
+        helper,
+        [helper, fileName] { Q_EMIT helper->modelCopyProgress(100, fileName); },
+        Qt::QueuedConnection);
   return true;
 }
 
@@ -425,6 +436,10 @@ QStringList Helpers::getImagesForHash(const QString &paperHash,
   return paths;
 }
 
+QString Helpers::localFileUrl(const QString &path) const {
+  return QUrl::fromLocalFile(path).toString();
+}
+
 /* ── Remote backend ──────────────────────────────────────────── */
 
 void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
@@ -513,21 +528,25 @@ void Helpers::addLocalSummarizer(const QString &sourcePath) {
   addLocalSummarizerWithMmproj(sourcePath, QString());
 }
 
+// Normalize a path that may arrive as a file: URL (from QFileDialog's
+// selectedFile) or as a raw native path (after a QML "file://" strip).
+// QUrl::fromUserInput round-trips both forms to the correct local path on
+// every platform, so the downstream copy logic always gets a clean path.
+static QString normalizeLocalPath(const QString &in) {
+  if (in.isEmpty())
+    return {};
+  if (in.startsWith(QLatin1String("file://"), Qt::CaseInsensitive))
+    return QUrl(in).toLocalFile();
+  return QUrl::fromUserInput(in).toLocalFile();
+}
+
 void Helpers::addLocalSummarizerWithMmproj(const QString &modelPath,
                                            const QString &mmprojPath) {
   if (!m_config)
     return;
 
-  QString modelSrc = modelPath;
-  if (modelSrc.startsWith("file://"))
-    modelSrc = QUrl(modelSrc).toLocalFile();
-
-  QString mmprojSrc;
-  if (!mmprojPath.isEmpty()) {
-    mmprojSrc = mmprojPath;
-    if (mmprojSrc.startsWith("file://"))
-      mmprojSrc = QUrl(mmprojSrc).toLocalFile();
-  }
+  const QString modelSrc = normalizeLocalPath(modelPath);
+  const QString mmprojSrc = normalizeLocalPath(mmprojPath);
 
   if (!QFile::exists(modelSrc)) {
     emit modelCopyFinished(false, QString(),

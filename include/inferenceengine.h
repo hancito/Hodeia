@@ -71,6 +71,11 @@ private:
   /// Clear the KV cache so each inference starts from a clean slate.
   void clearKvCache();
 
+  /// Current number of consumed positions (max position + 1) across all
+  /// sequences; used to resume generation after a prompt / multimodal pass.
+  /// (llama_pos is int32_t in llama.h.)
+  int32_t currentNpast() const;
+
   /// Detokenize a single token, stripping leading-space when the
   /// model uses space-prefix encoding.
   QString tokenToPiece(llama_token tok) const;

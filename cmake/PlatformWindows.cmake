@@ -33,13 +33,14 @@ set(_PLAT                 "windows")
 set(_VECTOREC_EXT         "vec0.dll")
 set(_STATIC_EXT           ".a")
 
-# llama.cpp DLLs + MSVC import libs are staged into per-backend
-# subdirectories: cpu/ holds core + all CPU variants + libomp,
-# vulkan/ holds the Vulkan backend, cuda/ holds the CUDA backend + cuBLAS.
+# llama.cpp is built ONCE (CPU + CUDA + Vulkan combined) and staged into a
+# SINGLE flat directory.  All DLLs (core + every CPU variant + ggml-cuda +
+# ggml-vulkan) and all import libs live side by side, sharing one ggml-base ABI
+# (required because every backend links the same ggml-base target).
 set(_LLAMA_BASE        "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/llamacpp")
-set(_LLAMA_CPU         "${_LLAMA_BASE}/cpu")
-set(_LLAMA_VULKAN      "${_LLAMA_BASE}/vulkan")
-set(_LLAMA_CUDA        "${_LLAMA_BASE}/cuda")
+set(_LLAMA_CPU         "${_LLAMA_BASE}")
+set(_LLAMA_VULKAN      "${_LLAMA_BASE}")
+set(_LLAMA_CUDA        "${_LLAMA_BASE}")
 set(_SQLITEVEC_LIB     "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/sqlitevec/${_VECTOREC_EXT}")
 
 # ===========================================================================
@@ -178,16 +179,40 @@ function(hodeia_windows_deploy TARGET)
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
+  # --- Bundled embedder model (Resources/Embedders/*.gguf) ---
+  # seedDefaultEmbedder() copies this from <exe>/Resources/Embedders/ into the
+  # user's AppData models dir on first run.  copy_if_different keeps rebuilds
+  # fast even though the .gguf is ~126 MB.
+  add_custom_command(TARGET ${TARGET} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/Resources/Embedders
+          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
+      COMMENT "Copying embedder model")
+
+  # --- Translations: qt_add_translations emits the .qm into the build tree
+  #     (CMAKE_CURRENT_BINARY_DIR); the app loads it from <exe>/i18n/. ---
+  file(GLOB _QMF "${CMAKE_CURRENT_BINARY_DIR}/*.qm")
+  if(_QMF)
+    add_custom_command(TARGET ${TARGET} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            $<TARGET_FILE_DIR:${TARGET}>/i18n
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_QMF} $<TARGET_FILE_DIR:${TARGET}>/i18n
+        COMMENT "Copying translations (.qm)")
+  endif()
+
   # --- llama.cpp: every core DLL + all CPU variants + backend + libomp ---
   # The per-microarch ggml-cpu-* DLLs must sit next to the exe so ggml can
   # LoadLibrary the best one for the host CPU.  Copy the whole set.
+  # All backends now live in the single flat ${_LLAMA_BASE} dir, so a few
+  # patterns overlap (e.g. ggml-cuda.dll is matched by both ggml*.dll and the
+  # explicit entry) — dedupe to avoid redundant copy entries.
   file(GLOB _LLAMA_DEPLOY_DLLS
-    "${_LLAMA_CPU}/llama*.dll"
-    "${_LLAMA_CPU}/mtmd.dll"
-    "${_LLAMA_CPU}/ggml*.dll"
-    "${_LLAMA_CPU}/libomp.dll"
-    "${_LLAMA_VULKAN}/ggml-vulkan.dll"
-    "${_LLAMA_CUDA}/ggml-cuda.dll")
+    "${_LLAMA_BASE}/llama*.dll"
+    "${_LLAMA_BASE}/mtmd.dll"
+    "${_LLAMA_BASE}/ggml*.dll"
+    "${_LLAMA_BASE}/libomp.dll")
+  list(REMOVE_DUPLICATES _LLAMA_DEPLOY_DLLS)
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
           ${_LLAMA_DEPLOY_DLLS}

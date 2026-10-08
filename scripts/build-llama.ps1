@@ -1,28 +1,34 @@
 ﻿# build-llama.ps1
-# Builds llama.cpp from a local source checkout (MSVC / Ninja) and stages
-# the resulting DLLs into external\lib\windows\llamacpp\{cpu,vulkan,cuda}
-# matching the Linux backend subdirectory layout.
+# Builds llama.cpp from a local source checkout (MSVC / Ninja) with CPU +
+# CUDA + Vulkan enabled in a SINGLE combined configure, then stages the
+# resulting DLLs into external\lib\windows\llamacpp\{cpu,vulkan,cuda}.
 #
-# Three backend variants are built (same as Linux):
-#   cpu    -- GGML_CUDA=OFF GGML_VULKAN=OFF
-#   vulkan -- GGML_VULKAN=ON
-#   cuda   -- GGML_CUDA=ON (needs CMake CUDA toolkit on PATH)
+# One combined build (NOT three isolated ones) is required: every ggml backend
+# links the same ggml-base target, and GGML_BACKEND_DL=ON makes each backend a
+# runtime-loadable MODULE lib exporting the generic ggml_backend_init /
+# ggml_backend_score entry points.  Three separate builds would produce three
+# divergent ggml-base DLLs and — if the GPU builds omit GGML_BACKEND_DL —
+# backends that the runtime loader silently skips (CPU fallback).
 #
-# The CPU build produces the core DLLs (llama, llama-common, mtmd, ggml,
-# ggml-base, all ggml-cpu-* variants, libomp, ggml-rpc) → cpu/.
-# The Vulkan build produces ggml-vulkan.dll → vulkan/.
-# The CUDA build produces ggml-cuda.dll + CUDA runtime → cuda/.
+#   cpu    -- core DLLs (llama, llama-common, mtmd, ggml, ggml-base, all
+#            ggml-cpu-* microarch variants, libomp, ggml-rpc) → cpu/
+#   vulkan -- ggml-vulkan.dll → vulkan/  (GGML_VULKAN=ON)
+#   cuda   -- ggml-cuda.dll + CUDA runtime (cuBLAS) → cuda/  (GGML_CUDA=ON)
+#
+# CUDA / Vulkan are optional: if a toolkit/SDK is absent the configure drops
+# that backend (with a warning) and the build still succeeds.  The app detects
+# each backend at runtime by the presence of its DLL next to the exe.
 #
 # Prerequisites:
 #   - VS 2022 "Desktop development with C++" + "CMake tools" + "Ninja"
 #   - Run from a VS Developer Prompt (or a script that calls vcvarsall.bat)
-#   - For CUDA: CUDA toolkit 12.x installed, CUDAToolkit_ROOT set or on PATH
+#   - For CUDA: CUDA toolkit installed, CUDAToolkit_ROOT / CUDA_PATH set or on PATH
 #   - For Vulkan: Vulkan SDK installed, VULKAN_SDK set or on PATH
 #
 # Usage (from the repo root, in a VS Developer PowerShell):
 #   .\scripts\build-llama.ps1 -SourceDir "D:\Developpement\Dependencies\llama.cpp"
 #   .\scripts\build-llama.ps1 -SourceDir "..." -Backends cpu,vulkan
-#   .\scripts\build-llama.ps1 -SourceDir "..." -Backends cpu,cuda -CudaToolkit "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.4"
+#   .\scripts\build-llama.ps1 -SourceDir "..." -Backends cpu,cuda -CudaToolkit "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.4"
 
 [CmdletBinding()]
 param(
@@ -38,16 +44,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+# Single flat staging dir: all backends (core + CPU variants + CUDA + Vulkan)
+# and import libs live side by side, sharing one ggml-base ABI.
 $destDir  = Join-Path $repoRoot "external\lib\windows\llamacpp"
-$cpuDest   = Join-Path $destDir "cpu"
-$vulkanDest = Join-Path $destDir "vulkan"
-$cudaDest   = Join-Path $destDir "cuda"
 
 if (-not (Test-Path $SourceDir)) {
     throw "SourceDir not found: $SourceDir"
 }
 
-if ($SkipIfPresent -and (Test-Path (Join-Path $cpuDest "llama.dll"))) {
+if ($SkipIfPresent -and (Test-Path (Join-Path $destDir "llama.dll"))) {
     Write-Host "llama.dll already staged - skipping."
     return
 }
@@ -88,9 +93,7 @@ if (-not (Get-Command $cmakeExe -ErrorAction SilentlyContinue)) {
     throw "cmake not found on PATH or at the known VS 18 location"
 }
 
-New-Item -ItemType Directory -Force -Path $cpuDest | Out-Null
-New-Item -ItemType Directory -Force -Path $vulkanDest | Out-Null
-New-Item -ItemType Directory -Force -Path $cudaDest | Out-Null
+New-Item -ItemType Directory -Force -Path $destDir | Out-Null
 $buildRoot = Join-Path ([System.IO.Path]::GetTempPath()) "llama-build-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 
@@ -98,6 +101,14 @@ New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 # The build tree is wiped every run, so without a cache everything is
 # recompiled from scratch each time.  sccache (MSVC-compatible) makes repeat
 # builds near-instant for unchanged sources.  No-op if not installed.
+#
+# We only set the C and C++ compiler launchers (never a CUDA launcher).  This
+# also keeps llama.cpp's own ccache auto-detection inert: ggml/src/CMakeLists.txt
+# only sets a GLOBAL RULE_LAUNCH_COMPILE (the thing that would wrap nvcc) when
+# GGML_CCACHE is ON AND no C/C++ launcher is set.  Because we always set the
+# C/C++ launchers, that global rule never fires and sccache never touches nvcc.
+# So no GGML_CCACHE=OFF is needed here — sccache handles nvcc fine (as it did
+# in the previous per-backend builds).
 $sccacheFlags = @()
 if (Get-Command sccache -ErrorAction SilentlyContinue) {
     $sccacheFlags = @("-DCMAKE_C_COMPILER_LAUNCHER=sccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache")
@@ -112,16 +123,29 @@ $nativeFlag = "-DGGML_NATIVE=OFF"
 
 function Invoke-CMake {
     param([string[]]$args_)
-    & $cmakeExe @args_ $sccacheFlags
-    if ($LASTEXITCODE -ne 0) { throw "cmake failed: $($args_ -join ' ')" }
+    # CMake prints banner/info lines (e.g. "CMAKE_BUILD_TYPE=Release") to
+    # stderr.  With $ErrorActionPreference=Stop a nested powershell would turn
+    # any stderr line into a terminating RemoteException and abort mid-run.
+    # Temporarily drop to Continue for the native call; we check $LASTEXITCODE
+    # explicitly below, so real failures still throw.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $cmakeExe @args_ $sccacheFlags 2>&1 | ForEach-Object { Write-Host $_ }
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { throw "cmake failed (exit $code): $($args_ -join ' ')" }
 }
 
 function Invoke-CMakeBuild {
     param([string]$dir, [string[]]$targets)
     $tArgs = @()
     foreach ($t in $targets) { $tArgs += @("--target", $t) }
-    & $cmakeExe --build $dir $tArgs --config Release -j (Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty NumberOfLogicalProcessors)
-    if ($LASTEXITCODE -ne 0) { throw "cmake build failed in $dir" }
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $cmakeExe --build $dir $tArgs --config Release -j (Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty NumberOfLogicalProcessors) 2>&1 | ForEach-Object { Write-Host $_ }
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { throw "cmake build failed (exit $code) in $dir" }
 }
 
 # --- Copy DLLs from a build dir to the per-backend dest --------------------
@@ -156,152 +180,120 @@ function Copy-ImportLibs {
     return $count
 }
 
+# ===========================================================================
+# Single COMBINED build: CPU + CUDA + Vulkan in ONE configure.
+#
+# Why one build instead of three isolated ones:
+#   * Every ggml backend links the SAME ggml-base target (see ggml/src/
+#     CMakeLists.txt: target_link_libraries(${backend} PRIVATE ggml-base)).
+#     Three separate builds therefore produce THREE different ggml-base DLLs;
+#     if they drift (different GGML_BACKEND_DL setting, ABI, or build flags)
+#     the runtime loader fails.  One build gives every backend one shared
+#     ggml-base.
+#   * GGML_BACKEND_DL=ON is REQUIRED on the combined build: it makes
+#     ggml_add_backend_library build each backend as a MODULE lib and define
+#     GGML_BACKEND_DL for it, which is what emits the generic
+#     ggml_backend_init / ggml_backend_score entry points that
+#     ggml_backend_load_all() looks up.  Without it a backend only exports its
+#     named init (ggml_backend_cuda_init / ggml_backend_vk_init) and is
+#     silently skipped at runtime → CPU fallback.
+#
+# CUDA / Vulkan are optional: if a toolkit/SDK is absent, CMake configures
+# them OFF (with a warning) and the build still succeeds with the other
+# backends.  The app detects each backend at runtime via the DLL's presence.
+# ===========================================================================
+$backends = $Backends
+$useCuda  = ($backends -contains "cuda")
+$useVk    = ($backends -contains "vulkan")
+# CPU is always built (it carries the core libs + microarch variants).
+$useCpu   = $true
+
 try {
-    # =========================================================================
-    # 1. CPU build (produces core + all ggml-cpu-* variants + libomp)
-    # =========================================================================
-    if ($Backends -contains "cpu") {
-        # Rebuild if the core DLL or its import lib is missing
-        if ((Test-Path (Join-Path $cpuDest "llama.dll")) -and (Test-Path (Join-Path $cpuDest "llama.lib"))) {
-            Write-Host ">> [cpu] llama.dll + llama.lib already present - skipping"
+    $b = $buildRoot
+    New-Item -ItemType Directory -Force -Path $b | Out-Null
+
+    # --- Assemble the configure flags --------------------------------------
+    $cfg = @(
+        "-S", $SourceDir, "-B", $b,
+        "-G", "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_SHARED_LIBS=ON",
+        "-DLLAMA_BUILD_COMMON=ON",
+        "-DLLAMA_BUILD_MTMD=ON",
+        # Runtime-loadable backends (see explanation above).
+        "-DGGML_BACKEND_DL=ON",
+        # Build every ggml-cpu-* microarch variant as a separate DLL that ggml
+        # loads at runtime (LoadLibrary + ggml_backend_score), picking the best
+        # match for the host CPU.  Without this, NO variant targets are defined
+        # at all -- only the monolithic "ggml-cpu" (built for the build host),
+        # so the app would run without AVX-512 on e.g. a Zen 5.
+        "-DGGML_CPU_ALL_VARIANTS=ON",
+        $nativeFlag
+    )
+
+    # CUDA: ON only if requested AND a toolkit is locatable.
+    if ($useCuda) {
+        $cudaToolkit = $CudaToolkit
+        if (-not $cudaToolkit -and $env:CUDA_PATH) { $cudaToolkit = $env:CUDA_PATH }
+        if ($cudaToolkit -and (Test-Path $cudaToolkit)) {
+            $cfg += "-DGGML_CUDA=ON"
+            $cfg += "-DCMAKE_CUDA_TOOLKIT_ROOT_DIR=$cudaToolkit"
+            Write-Host ">> CUDA enabled: $cudaToolkit"
         } else {
-            Write-Host ">> Building llama.cpp [cpu]"
-            $b = Join-Path $buildRoot "cpu"
-            New-Item -ItemType Directory -Force -Path $b | Out-Null
-
-            $cudaFlag = "-DGGML_CUDA=OFF"
-            $vkFlag   = "-DGGML_VULKAN=OFF"
-
-            # GGML_BACKEND_DL + GGML_CPU_ALL_VARIANTS: build every ggml-cpu-*
-            # microarch variant as a separate DLL that ggml loads at runtime
-            # (LoadLibrary + ggml_backend_score), picking the best match for
-            # the host CPU.  Without these two flags, NO variant targets are
-            # defined at all -- only the monolithic "ggml-cpu" (built for the
-            # build host), so the app would run without AVX-512 on e.g. a Zen 5.
-            Invoke-CMake @("-S", $SourceDir, "-B", $b,
-                "-G", "Ninja",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DBUILD_SHARED_LIBS=ON",
-                "-DLLAMA_BUILD_COMMON=ON",
-                "-DLLAMA_BUILD_MTMD=ON",
-                "-DGGML_BACKEND_DL=ON",
-                "-DGGML_CPU_ALL_VARIANTS=ON",
-                $nativeFlag,
-                $cudaFlag, $vkFlag)
-
-            # Build the core libs AND all microarch variants in one shot:
-            # add_dependencies(ggml, <each variant>) is set by llama.cpp's
-            # build system, so building "ggml" pulls in every ggml-cpu-*.
-            Invoke-CMakeBuild -dir $b -targets @("llama","mtmd","llama-common","ggml")
-
-            # The DLLs land in $b/bin/
-            $binDir = Join-Path $b "bin"
-            if (-not (Test-Path (Join-Path $binDir "llama.dll"))) {
-                # Ninja may put them directly in build root
-                $binDir = $b
-            }
-
-            $n = Copy-BackendDlls -binDir $binDir -outDir $cpuDest -patterns @(
-                "llama.dll","llama-common.dll","mtmd.dll",
-                "ggml.dll","ggml-base.dll","ggml-rpc.dll",
-                "ggml-cpu-*.dll","libomp.dll")
-            $m = Copy-ImportLibs -buildDir $b -outDir $cpuDest
-            Write-Host "   $n DLLs + $m import libs staged (cpu)"
+            Write-Host ">> WARNING: CUDA requested but no toolkit found; configuring with GGML_CUDA=OFF"
+            $cfg += "-DGGML_CUDA=OFF"
         }
+    } else {
+        $cfg += "-DGGML_CUDA=OFF"
     }
 
-    # =========================================================================
-    # 2. Vulkan build
-    # =========================================================================
-    if ($Backends -contains "vulkan") {
-        if (Test-Path (Join-Path $vulkanDest "ggml-vulkan.dll")) {
-            Write-Host ">> [vulkan] ggml-vulkan.dll already present - skipping"
-        } else {
-            Write-Host ">> Building llama.cpp [vulkan]"
-            $b = Join-Path $buildRoot "vulkan"
-            New-Item -ItemType Directory -Force -Path $b | Out-Null
-
-            $vkOpts = @("-DGGML_VULKAN=ON")
-            $sdkPath = $null
-            if ($VulkanSdk) { $sdkPath = $VulkanSdk }
-            elseif ($env:VULKAN_SDK) { $sdkPath = $env:VULKAN_SDK }
-            if ($sdkPath) {
-                $env:VULKAN_SDK = $sdkPath
-            }
-
-            Invoke-CMake @("-S", $SourceDir, "-B", $b,
-                "-G", "Ninja",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DBUILD_SHARED_LIBS=ON",
-                "-DLLAMA_BUILD_COMMON=ON",
-                "-DGGML_CUDA=OFF",
-                $nativeFlag,
-                $vkOpts)
-
-            Invoke-CMakeBuild -dir $b -targets @("ggml-vulkan")
-
-            $binDir = Join-Path $b "bin"
-            if (-not (Test-Path (Join-Path $binDir "ggml-vulkan.dll"))) {
-                $binDir = $b
-            }
-
-            $n = Copy-BackendDlls -binDir $binDir -outDir $vulkanDest -patterns @(
-                "llama.dll","llama-common.dll","mtmd.dll",
-                "ggml.dll","ggml-base.dll","ggml-vulkan.dll")
-            $m = Copy-ImportLibs -buildDir $b -outDir $vulkanDest
-            Write-Host "   $n DLLs + $m import libs staged (vulkan)"
-        }
+    # Vulkan: ON only if requested AND a SDK is locatable (Vulkan SDK or the
+    # loader CMake can find).  We pass GGML_VULKAN=ON and let CMake decide;
+    # if no Vulkan is available it falls back with a warning.
+    if ($useVk) {
+        if ($VulkanSdk) { $env:VULKAN_SDK = $VulkanSdk }
+        $cfg += "-DGGML_VULKAN=ON"
+        Write-Host ">> Vulkan requested (GGML_VULKAN=ON)"
+    } else {
+        $cfg += "-DGGML_VULKAN=OFF"
     }
 
-    # =========================================================================
-    # 3. CUDA build
-    # =========================================================================
-    if ($Backends -contains "cuda") {
-        if (Test-Path (Join-Path $cudaDest "ggml-cuda.dll")) {
-            Write-Host ">> [cuda] ggml-cuda.dll already present - skipping"
-        } else {
-            Write-Host ">> Building llama.cpp [cuda]"
-            $b = Join-Path $buildRoot "cuda"
-            New-Item -ItemType Directory -Force -Path $b | Out-Null
+    Write-Host ">> Configuring llama.cpp (combined: CPU + CUDA + Vulkan, GGML_BACKEND_DL=ON)"
+    Invoke-CMake @($cfg)
 
-            $cudaOpts = @("-DGGML_CUDA=ON")
-            if ($CudaToolkit) {
-                $cudaOpts += "-DCMAKE_CUDA_TOOLKIT_ROOT_DIR=$CudaToolkit"
-            }
-            elseif ($env:CUDA_PATH) {
-                $cudaOpts += "-DCMAKE_CUDA_TOOLKIT_ROOT_DIR=$env:CUDA_PATH"
-            }
+    # Build the core libs, all microarch CPU variants, and the GPU backends in
+    # one shot.  Building "ggml" pulls in every ggml-cpu-* variant (the build
+    # system sets add_dependencies(ggml, <variant>)); we add the GPU backend
+    # targets explicitly.
+    $targets = @("llama", "mtmd", "llama-common", "ggml")
+    if ($useCuda) { $targets += "ggml-cuda" }
+    if ($useVk)   { $targets += "ggml-vulkan" }
+    Invoke-CMakeBuild -dir $b -targets $targets
 
-            Invoke-CMake @("-S", $SourceDir, "-B", $b,
-                "-G", "Ninja",
-                "-DCMAKE_BUILD_TYPE=Release",
-                "-DBUILD_SHARED_LIBS=ON",
-                "-DLLAMA_BUILD_COMMON=ON",
-                "-DGGML_VULKAN=OFF",
-                $nativeFlag,
-                $cudaOpts)
-
-            Invoke-CMakeBuild -dir $b -targets @("ggml-cuda")
-
-            $binDir = Join-Path $b "bin"
-            if (-not (Test-Path (Join-Path $binDir "ggml-cuda.dll"))) {
-                $binDir = $b
-            }
-
-            $n = Copy-BackendDlls -binDir $binDir -outDir $cudaDest -patterns @(
-                "llama.dll","llama-common.dll","mtmd.dll",
-                "ggml.dll","ggml-base.dll",
-                "ggml-cuda.dll","cublas64_*.dll","cublasLt64_*.dll")
-            $m = Copy-ImportLibs -buildDir $b -outDir $cudaDest
-            Write-Host "   $n DLLs + $m import libs staged (cuda + runtime)"
-        }
+    # The DLLs land in $b/bin/ (Ninja) or the build root.
+    $binDir = Join-Path $b "bin"
+    if (-not (Test-Path (Join-Path $binDir "llama.dll"))) {
+        $binDir = $b
     }
 
+    # --- Distribute to a single flat staging dir ----------------------------
+    # ONE build => ONE set of DLLs sharing a single ggml-base / ggml ABI.  All
+    # backends (core + CPU variants + CUDA + Vulkan) and the import libs go
+    # into $destDir.  The CUDA runtime (cuBLAS) comes from the toolkit, not the
+    # build tree, so it is copied separately by the app's deploy step
+    # (cmake/PlatformWindows.cmake).
+    $n = Copy-BackendDlls -binDir $binDir -outDir $destDir -patterns @(
+        "llama.dll","llama-common.dll","mtmd.dll",
+        "ggml.dll","ggml-base.dll","ggml-rpc.dll",
+        "ggml-cpu-*.dll","ggml-cuda.dll","ggml-vulkan.dll",
+        "libomp.dll")
+    $m = Copy-ImportLibs -buildDir $b -outDir $destDir
+    Write-Host "   $n DLLs + $m import libs staged (single dir)"
 } finally {
     # Clean up the temp build root
     Remove-Item -Recurse -Force $buildRoot -ErrorAction SilentlyContinue
 }
 
-$total = (Get-ChildItem -Path $destDir -Filter "*.dll" -Recurse).Count
+$total = (Get-ChildItem -Path $destDir -Filter "*.dll").Count
 Write-Host ""
 Write-Host "Done. $total DLLs in $destDir"
