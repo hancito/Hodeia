@@ -319,11 +319,17 @@ Rectangle {
                         height: pdfTab.zoomedHeight
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
+                        // helpers.localFileUrl() uses QUrl::fromLocalFile
+                        // (C++) to build a correct file: URL for any platform —
+                        // handles Windows drive letters, native separators, and
+                        // spaces.  A bare "file://" + path breaks on Windows
+                        // (backslashes, wrong slash count).
                         source: {
-                            if (displayPane.pageImages.length > 0)
-                                "file://" + displayPane.pageImages[Math.max(pageSpinner.value - 1, 0)];
-                            else
-                                "";
+                            if (displayPane.pageImages.length === 0)
+                                return "";
+                            return helpers.localFileUrl(
+                                displayPane.pageImages[
+                                    Math.max(pageSpinner.value - 1, 0)]);
                         }
                     }
                 }

@@ -74,6 +74,11 @@ public:
   Q_INVOKABLE QStringList getImagesForHash(const QString &paperHash,
                                            const QString &imgPath) const;
 
+  /// Convert a local file path to a file: URL string (cross-platform).
+  /// Uses QUrl::fromLocalFile so Windows drive letters, forward/back slashes,
+  /// and spaces are all handled correctly.
+  Q_INVOKABLE QString localFileUrl(const QString &path) const;
+
   /// Check a remote backend and retrieve its available models.
   /// Emits modelsChecked() with the result.
   void checkRemoteModels(const QString &name, const QString &apiUrl,

@@ -25,6 +25,35 @@
 #include <windows.h>
 #endif
 
+#include <cstdio>
+
+// ── Crash / diagnostics log ────────────────────────────────────────────────
+// In a GUI-subsystem build (WIN32_EXECUTABLE) there is no console, so qDebug()
+// and llama.cpp output go to a null device and are invisible unless launched
+// from a terminal.  To diagnose hard crashes we mirror ALL app + llama output
+// to a log file (Hodeia.log) in the executable directory, and on Windows we
+// install an unhandled-exception filter so a hard crash (access violation /
+// C-level abort in ggml/llama) is captured with its exception code before the
+// process dies.  The file is overwritten each run and is always inspectable.
+static FILE *s_logFile = nullptr;
+static QString s_logPath;
+
+static void crashLogWrite(const QString &line) {
+  if (!s_logFile)
+    return;
+  fprintf(s_logFile, "%s\n", line.toUtf8().constData());
+  fflush(s_logFile);
+}
+
+static void initCrashLog() {
+  const QString appDir = QCoreApplication::applicationDirPath();
+  s_logPath = appDir + "/Hodeia.log";
+  s_logFile = fopen(s_logPath.toUtf8().constData(), "wb");
+  // Every log line is flushed (see crashLogWrite), so the file always holds
+  // the full output up to the moment of a hard crash.  That is enough to see
+  // the last thing the app / llama.cpp did before it died.
+}
+
 /// Load the translation catalog for the given language code (e.g. "en", "fr").
 /// Returns true if a .qm file was found and loaded; false for "en" or when
 /// no catalog exists (the source strings are shown as-is).
@@ -52,9 +81,9 @@ static bool loadTranslator(QGuiApplication &app, const QString &lang) {
 /// it and mirror Qt's message stream there via WriteConsoleW (bypasses C
 /// stdio buffering, so no freopen / filebuf rebinding needed).  Double-clicking
 /// the exe (no console) stays silent, so this is safe for both dev and release.
-#ifdef Q_OS_WIN
 static bool s_consoleAttached = false;
 static void consoleWrite(const QString &text) {
+#ifdef Q_OS_WIN
   if (!s_consoleAttached)
     return;
   HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -64,8 +93,23 @@ static void consoleWrite(const QString &text) {
   wide.push_back(L'\n');
   DWORD written = 0;
   WriteConsoleW(h, wide.c_str(), (DWORD)wide.size(), &written, nullptr);
-}
+#else
+  (void)text;
 #endif
+}
+
+/// Mirror a tagged line to both the attached console (if any) and the crash
+/// log file.  Used by the Qt and llama log sinks so diagnostics are captured
+/// whether or not the app was launched from a terminal.
+static void logOut(const QString &tag, const QString &msg) {
+  const QString line =
+      QString::fromLatin1("[") + tag + QString::fromLatin1("] ") + msg;
+  crashLogWrite(line);
+#ifdef Q_OS_WIN
+  if (s_consoleAttached)
+    consoleWrite(line);
+#endif
+}
 
 static void initConsoleLogging() {
 #ifdef Q_OS_WIN
@@ -74,48 +118,66 @@ static void initConsoleLogging() {
     return; // No parent console — qDebug() goes to null device as before.
   }
 #endif
-  qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &,
-                            const QString &msg) {
-    const char *tag = "DEBUG";
-    switch (type) {
-    case QtDebugMsg:
-      tag = "DEBUG";
-      break;
-    case QtInfoMsg:
-      tag = "INFO";
-      break;
-    case QtWarningMsg:
-      tag = "WARN";
-      break;
-    case QtCriticalMsg:
-      tag = "CRIT";
-      break;
-    case QtFatalMsg:
-      tag = "FATAL";
-      break;
-    }
-    const QString line = QString::fromLatin1("[") + QString::fromLatin1(tag) +
-                         QString::fromLatin1("] ") + msg;
-#ifdef Q_OS_WIN
-    if (s_consoleAttached) {
-      consoleWrite(line);
-    }
-#endif
-    if (type == QtFatalMsg) {
-      std::print("[FATAL] {}\n", msg.toUtf8().constData());
-      std::abort();
-    }
-  });
+  qInstallMessageHandler(
+      [](QtMsgType type, const QMessageLogContext &, const QString &msg) {
+        const char *tag = "DEBUG";
+        switch (type) {
+        case QtDebugMsg:
+          tag = "DEBUG";
+          break;
+        case QtInfoMsg:
+          tag = "INFO";
+          break;
+        case QtWarningMsg:
+          tag = "WARN";
+          break;
+        case QtCriticalMsg:
+          tag = "CRIT";
+          break;
+        case QtFatalMsg:
+          tag = "FATAL";
+          break;
+        }
+        logOut(tag, msg);
+        if (type == QtFatalMsg) {
+          std::abort();
+        }
+      });
 }
 
 /// Install a global llama.cpp log callback early (before any model loads)
 /// so that embedding model init and chat backend share the same filter.
+/// This callback is also the sink for ggml's own logging (ggml_log_set is
+/// forwarded by llama_log_set), which is how we surface ggml backend-load
+/// diagnostics such as "failed to load ggml-cuda.dll" or "backend ... is not
+/// supported on this system" (the latter is logged at INFO level — silently
+/// dropped if we only forward ERROR and above).
 static void initLlamaLogging() {
   llama_log_set(
       [](enum ggml_log_level level, const char *text, void *) {
-        if (level >= GGML_LOG_LEVEL_ERROR) {
-          std::print("llama.cpp: {}\n", text);
+        // ggml emits backend-load failures at ERROR and "not supported" at
+        // INFO; capture INFO and above so diagnostics are visible without
+        // the full DEBUG noise.  GGML_LOG_LEVEL_CONT continues a previous
+        // line (multi-line backtrace) — keep it so the full message shows.
+        if (level < GGML_LOG_LEVEL_INFO && level != GGML_LOG_LEVEL_CONT)
+          return;
+        const char *tag = "INFO";
+        switch (level) {
+        case GGML_LOG_LEVEL_ERROR:
+          tag = "CRIT";
+          break;
+        case GGML_LOG_LEVEL_WARN:
+          tag = "WARN";
+          break;
+        case GGML_LOG_LEVEL_INFO:
+          tag = "INFO";
+          break;
+        default:
+          tag = "DEBUG";
+          break;
         }
+        logOut(tag, QString::fromLatin1("llama.cpp: ") +
+                        QString::fromUtf8(text ? text : ""));
       },
       nullptr);
 }
@@ -159,6 +221,11 @@ int main(int argc, char *argv[]) {
   // Force Fusion style to avoid platform-dependent styles (e.g. Breeze on KDE)
   // that conflict with our manual palette theming.
   QQuickStyle::setStyle("Fusion");
+
+  // Open the crash/diagnostics log first (before any logging) so every
+  // startup line — and any hard crash — is captured in Hodeia.log even when
+  // the app is double-clicked with no console.
+  initCrashLog();
 
   // Attach to a parent console (if any) and route qDebug() there.
   // Must run before any qDebug() call so early startup messages are captured.
