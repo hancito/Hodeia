@@ -27,25 +27,19 @@
 set(HODEIA_PLATFORM_WIN ON)
 
 # ===========================================================================
-# A. Shared-library name mapping (in-tree pre-built MSVC DLLs)
+# A. External library locations (staged by scripts/build-llama.ps1)
 # ===========================================================================
 set(_PLAT                 "windows")
-set(_SHARED_LLAMA         "llama.dll")
-set(_SHARED_LLAMA_COMM    "llama-common.dll")
-set(_SHARED_MTMD          "mtmd.dll")
-set(_SHARED_GGML          "ggml.dll")
-set(_SHARED_GGML_BASE     "ggml-base.dll")
-set(_SHARED_GGML_CPU_X64  "ggml-cpu-x64.dll")
-set(_SHARED_GGML_CPU_SSE  "ggml-cpu-sse42.dll")   # SSE4.2 fallback baseline
-set(_SHARED_GGML_CUDA     "ggml-cuda.dll")
-set(_SHARED_GGML_VK       "ggml-vulkan.dll")
 set(_VECTOREC_EXT         "vec0.dll")
 set(_STATIC_EXT           ".a")
 
-# All pre-built llama.cpp DLLs are staged into a single flat dir (see
-# scripts/stage-llama.ps1).  Core DLLs + every ggml-cpu-* variant + the
-# CUDA/Vulkan backend DLLs + CUDA runtime + libomp.dll all live here.
+# llama.cpp DLLs + MSVC import libs are staged into per-backend
+# subdirectories: cpu/ holds core + all CPU variants + libomp,
+# vulkan/ holds the Vulkan backend, cuda/ holds the CUDA backend + cuBLAS.
 set(_LLAMA_BASE        "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/llamacpp")
+set(_LLAMA_CPU         "${_LLAMA_BASE}/cpu")
+set(_LLAMA_VULKAN      "${_LLAMA_BASE}/vulkan")
+set(_LLAMA_CUDA        "${_LLAMA_BASE}/cuda")
 set(_SQLITEVEC_LIB     "${CMAKE_SOURCE_DIR}/external/lib/${_PLAT}/sqlitevec/${_VECTOREC_EXT}")
 
 # ===========================================================================
@@ -59,11 +53,18 @@ if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED VCPKG_ROOT)
   set(VCPKG_ROOT "$ENV{VCPKG_ROOT}")
 endif()
 set(VCPKG_TARGET_TRIPLET "x64-windows")
+# The project uses vcpkg manifest mode which installs to a project-local
+# vcpkg_installed/ directory.  Check that first, then fall back to the
+# global $VCPKG_ROOT/installed/ path.
+set(_VCPKG_INSTALLED_LOCAL "${CMAKE_SOURCE_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
 set(_VCPKG_INSTALLED "${VCPKG_ROOT}/installed/${VCPKG_TARGET_TRIPLET}")
-if(VCPKG_ROOT AND NOT EXISTS "${_VCPKG_INSTALLED}")
+if(EXISTS "${_VCPKG_INSTALLED_LOCAL}")
+  set(_VCPKG_INSTALLED "${_VCPKG_INSTALLED_LOCAL}")
+endif()
+if(NOT EXISTS "${_VCPKG_INSTALLED}")
   message(WARNING
     "vcpkg toolchain not active or packages not installed.\n"
-    "  Run:  .\\vcpkg\\vcpkg install --triplet x64-windows   (from the repo root)\n"
+    "  Run:  vcpkg install --triplet x64-windows   (from the repo root)\n"
     "  Expected installed root: ${_VCPKG_INSTALLED}")
 endif()
 
@@ -99,73 +100,30 @@ else()
 endif()
 
 # ===========================================================================
-# C. llama.cpp import libraries (MSVC link.exe needs a .lib per DLL)
+# C. llama.cpp libraries (link against the MSVC import libs staged by
+#    scripts/build-llama.ps1 from the llama.cpp build tree)
 # ===========================================================================
-# The pre-built release ships DLLs but no import .lib.  Two ways to link them:
-#   1. llvm-dlltool (preferred) — generates a real import .lib at configure
-#      time.  Part of the MSVC LLVM toolset (VS "LLVM toolchain" component)
-#      or installable separately.
-#   2. Link the DLL by full path (fallback) — MSVC link.exe resolves the DLL's
-#      exports and emits an auto-import library.  Works for the llama.cpp C
-#      API (all exports are undecorated C symbols) and needs no extra tools.
-# We use (1) when llvm-dlltool is found, else (2).
-find_program(LLVM_DLLTOOL_EXECUTABLE
-  NAMES llvm-dlltool llvm-dlltool.exe
-  HINTS
-    "$ENV{VCToolsInstallDir}/llvm/bin"
-    "$ENV{VCINSTALLDIR}/Tools/LLVM/x64/bin"
-  PATHS
-    "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/LLVM/x64/bin"
-    "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/LLVM/x64/bin"
-    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/LLVM/x64/bin"
-    "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/LLVM/x64/bin")
-
-# DLLs that must be *linked* (resolve their C API at build time).  The
-# per-microarchitecture ggml-cpu-* variants are NOT linked — ggml loads the
-# matching one at runtime via LoadLibrary; they only need to be deployed.
-set(_LLAMA_LINK_DLLS
-    ${_LLAMA_BASE}/${_SHARED_LLAMA}
-    ${_LLAMA_BASE}/${_SHARED_LLAMA_COMM}
-    ${_LLAMA_BASE}/${_SHARED_MTMD}
-    ${_LLAMA_BASE}/${_SHARED_GGML}
-    ${_LLAMA_BASE}/${_SHARED_GGML_BASE}
-    ${_LLAMA_BASE}/${_SHARED_GGML_CPU_X64}
-    ${_LLAMA_BASE}/${_SHARED_GGML_CPU_SSE})
-if(EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
-  list(APPEND _LLAMA_LINK_DLLS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
-endif()
-if(Vulkan_FOUND AND EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_VK}")
-  list(APPEND _LLAMA_LINK_DLLS "${_LLAMA_BASE}/${_SHARED_GGML_VK}")
-endif()
-
-set(_LLAMA_LIB_DIR "${CMAKE_BINARY_DIR}/_llama_importlibs")
-file(MAKE_DIRECTORY "${_LLAMA_LIB_DIR}")
-
+# llama.cpp is built with GGML_BACKEND_DL + GGML_CPU_ALL_VARIANTS:
+#   - ggml-base links ggml-cpu-x64 (the baseline CPU kernels) -- import lib needed
+#   - each ggml-cpu-<microarch> variant is a MODULE library (it has an import
+#     lib, but nothing links it); ggml loads the best match at runtime via
+#     LoadLibrary + ggml_backend_score -- deploy only
+#   - ggml-rpc / libomp are deployed but never linked
 set(LLAMA_LINK_LIBS "")
-foreach(_dll IN LISTS _LLAMA_LINK_DLLS)
-  if(NOT EXISTS "${_dll}")
-    message(WARNING "llama.cpp DLL missing at configure time: ${_dll}")
-    continue()
-  endif()
-  get_filename_component(_dllname "${_dll}" NAME_WE)
-  set(_lib "${_LLAMA_LIB_DIR}/${_dllname}.lib")
-  if(LLVM_DLLTOOL_EXECUTABLE)
-    # -d: generate the import library from the DLL's export table.
-    add_custom_command(
-      OUTPUT  "${_lib}"
-      COMMAND "${LLVM_DLLTOOL_EXECUTABLE}" -d "${_dll}" -o "${_lib}"
-      DEPENDS "${_dll}"
-      COMMENT "Generating import lib ${_dllname}.lib from ${_dllname}.dll"
-      VERBATIM)
-    add_custom_target(_llama_${_dllname}_lib ALL DEPENDS "${_lib}")
+foreach(_name llama llama-common mtmd ggml ggml-base ggml-cpu-x64)
+  set(_lib "${_LLAMA_CPU}/${_name}.lib")
+  if(EXISTS "${_lib}")
     list(APPEND LLAMA_LINK_LIBS "${_lib}")
   else()
-    # No dlltool — link the DLL directly.  MSVC link.exe can resolve exports
-    # from a DLL path in many cases; this is a best-effort fallback.
-    message(STATUS "llvm-dlltool not found — linking ${_dllname}.dll by path")
-    list(APPEND LLAMA_LINK_LIBS "${_dll}")
+    message(WARNING "llama.cpp import lib missing: ${_lib} (run build-dependencies.ps1)")
   endif()
 endforeach()
+if(EXISTS "${_LLAMA_CUDA}/ggml-cuda.dll")
+  list(APPEND LLAMA_LINK_LIBS "${_LLAMA_CUDA}/ggml-cuda.lib")
+endif()
+if(Vulkan_FOUND AND EXISTS "${_LLAMA_VULKAN}/ggml-vulkan.dll")
+  list(APPEND LLAMA_LINK_LIBS "${_LLAMA_VULKAN}/ggml-vulkan.lib")
+endif()
 
 # ===========================================================================
 # D. System libraries (Win32 / MSVC)
@@ -224,39 +182,73 @@ function(hodeia_windows_deploy TARGET)
   # The per-microarch ggml-cpu-* DLLs must sit next to the exe so ggml can
   # LoadLibrary the best one for the host CPU.  Copy the whole set.
   file(GLOB _LLAMA_DEPLOY_DLLS
-    "${_LLAMA_BASE}/llama*.dll"
-    "${_LLAMA_BASE}/mtmd.dll"
-    "${_LLAMA_BASE}/ggml*.dll"
-    "${_LLAMA_BASE}/libomp.dll")
+    "${_LLAMA_CPU}/llama*.dll"
+    "${_LLAMA_CPU}/mtmd.dll"
+    "${_LLAMA_CPU}/ggml*.dll"
+    "${_LLAMA_CPU}/libomp.dll"
+    "${_LLAMA_VULKAN}/ggml-vulkan.dll"
+    "${_LLAMA_CUDA}/ggml-cuda.dll")
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
           ${_LLAMA_DEPLOY_DLLS}
           $<TARGET_FILE_DIR:${TARGET}>
       COMMENT "Copying llama.cpp DLLs (CPU/Vulkan/CUDA + libomp)")
 
-  # --- CUDA 12.4 runtime (only if the CUDA backend DLL was staged) ---
-  if(EXISTS "${_LLAMA_BASE}/${_SHARED_GGML_CUDA}")
-    file(GLOB _CUDA_RUNTIME_DLLS
-      "${_LLAMA_BASE}/cudart64_*.dll"
-      "${_LLAMA_BASE}/cublas64_*.dll"
-      "${_LLAMA_BASE}/cublasLt64_*.dll")
-    if(_CUDA_RUNTIME_DLLS)
-      add_custom_command(TARGET ${TARGET} POST_BUILD
-          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              ${_CUDA_RUNTIME_DLLS}
-              $<TARGET_FILE_DIR:${TARGET}>
-          COMMENT "Copying CUDA runtime DLLs")
+  # --- CUDA runtime (cudart + cublas from the CUDA toolkit) ---
+  if(EXISTS "${_LLAMA_CUDA}/ggml-cuda.dll")
+    set(_CUDA_TOOLKIT "")
+    if(DEFINED ENV{CUDA_PATH})
+      set(_CUDA_TOOLKIT "$ENV{CUDA_PATH}")
+    elseif(EXISTS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/bin/x64/cudart64_13.dll")
+      set(_CUDA_TOOLKIT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4")
+    elseif(EXISTS "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/bin/cudart64_12.dll")
+      set(_CUDA_TOOLKIT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4")
+    endif()
+    if(_CUDA_TOOLKIT)
+      # CUDA 13.x moved runtime DLLs to bin/x64/ (and bin/arm64/);
+      # CUDA <=12 keeps them in bin/.  Search both.
+      file(GLOB _CUDA_RUNTIME_DLLS
+        "${_CUDA_TOOLKIT}/bin/cudart64_*.dll"
+        "${_CUDA_TOOLKIT}/bin/x64/cudart64_*.dll"
+        "${_CUDA_TOOLKIT}/bin/x64/cublas64_*.dll"
+        "${_CUDA_TOOLKIT}/bin/x64/cublasLt64_*.dll"
+        "${_CUDA_TOOLKIT}/bin/cublas64_*.dll"
+        "${_CUDA_TOOLKIT}/bin/cublasLt64_*.dll"
+        "${_LLAMA_CUDA}/cublas64_*.dll"
+        "${_LLAMA_CUDA}/cublasLt64_*.dll")
+      list(REMOVE_DUPLICATES _CUDA_RUNTIME_DLLS)
+      if(_CUDA_RUNTIME_DLLS)
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${_CUDA_RUNTIME_DLLS}
+                $<TARGET_FILE_DIR:${TARGET}>
+            COMMENT "Copying CUDA runtime DLLs")
+      endif()
     endif()
   endif()
 
-  # --- Vulkan loader runtime (vcpkg vulkan-1.dll) ---
-  if(VULKAN_LOADER_DLL AND EXISTS "${VULKAN_LOADER_DLL}")
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${VULKAN_LOADER_DLL}" $<TARGET_FILE_DIR:${TARGET}>/vulkan-1.dll
-        COMMENT "Copying vulkan-1.dll (vcpkg)")
-  elseif(Vulkan_FOUND)
-    message(WARNING "Vulkan found but vulkan-1.dll not located in ${_VCPKG_INSTALLED}/bin")
+  # --- Vulkan loader runtime (from the Vulkan SDK) ---
+  set(_VULKAN_SDK_DIR "")
+  if(DEFINED ENV{VULKAN_SDK})
+    set(_VULKAN_SDK_DIR "$ENV{VULKAN_SDK}")
+  elseif(EXISTS "C:/VulkanSDK/1.4.363.0/Bin/vulkan-1.dll")
+    set(_VULKAN_SDK_DIR "C:/VulkanSDK/1.4.363.0")
+  endif()
+  if(Vulkan_FOUND)
+    set(_VULKAN_LOADER_DLL "${_VCPKG_INSTALLED}/bin/vulkan-1.dll")
+    if(EXISTS "${_VULKAN_SDK_DIR}/Bin/vulkan-1.dll")
+      set(_VULKAN_LOADER_DLL "${_VULKAN_SDK_DIR}/Bin/vulkan-1.dll")
+    elseif(NOT EXISTS "${_VULKAN_LOADER_DLL}")
+      set(_VULKAN_LOADER_DLL "")
+    endif()
+    if(_VULKAN_LOADER_DLL)
+      add_custom_command(TARGET ${TARGET} POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${_VULKAN_LOADER_DLL}" $<TARGET_FILE_DIR:${TARGET}>/vulkan-1.dll
+          COMMENT "Copying vulkan-1.dll")
+    else()
+      message(WARNING "vulkan-1.dll not found in SDK or vcpkg bin")
+    endif()
   endif()
 
   # --- Tesseract / Leptonica / image-codec runtime DLLs (vcpkg bin) ---

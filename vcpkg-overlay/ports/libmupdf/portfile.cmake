@@ -6,13 +6,11 @@
 #   $env:MUPDF_LOCAL_SOURCE = "D:\Developpement\Dependencies\mupdf"
 #   vcpkg install --triplet x64-windows --overlay-ports ...
 
+# Default local source path; can be overridden by MUPDF_LOCAL_SOURCE env var.
 if(DEFINED ENV{MUPDF_LOCAL_SOURCE})
   set(MUPDF_LOCAL_SOURCE "$ENV{MUPDF_LOCAL_SOURCE}")
 elseif(NOT DEFINED MUPDF_LOCAL_SOURCE)
-  message(FATAL_ERROR
-        "MUPDF_LOCAL_SOURCE is not set.\n"
-        "Set the environment variable before running vcpkg install, e.g.:\n"
-        "  $env:MUPDF_LOCAL_SOURCE = \"D:\\Developpement\\Dependencies\\mupdf\"")
+  set(MUPDF_LOCAL_SOURCE "D:/Developpement/Dependencies/mupdf")
 endif()
 get_filename_component(SOURCE_PATH "${MUPDF_LOCAL_SOURCE}" ABSOLUTE)
 

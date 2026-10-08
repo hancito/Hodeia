@@ -15,9 +15,15 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QTextStream>
 #include <QTimer>
 #include <QTranslator>
 #include <print>
+#include <string>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 /// Load the translation catalog for the given language code (e.g. "en", "fr").
 /// Returns true if a .qm file was found and loaded; false for "en" or when
@@ -37,6 +43,69 @@ static bool loadTranslator(QGuiApplication &app, const QString &lang) {
   }
   qWarning() << "Translator not loaded:" << qmFile;
   return false;
+}
+
+/// Route qDebug()/qWarning()/qCritical() to an attached console when the app
+/// was launched from a terminal.  A WIN32 (GUI-subsystem) build has no console
+/// of its own, so normally qDebug() output goes to a null device.  When a
+/// parent console exists (i.e. the user ran the exe from a shell), attach to
+/// it and mirror Qt's message stream there via WriteConsoleW (bypasses C
+/// stdio buffering, so no freopen / filebuf rebinding needed).  Double-clicking
+/// the exe (no console) stays silent, so this is safe for both dev and release.
+#ifdef Q_OS_WIN
+static bool s_consoleAttached = false;
+static void consoleWrite(const QString &text) {
+  if (!s_consoleAttached)
+    return;
+  HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+  if (h == INVALID_HANDLE_VALUE)
+    return;
+  std::wstring wide = text.toStdWString();
+  wide.push_back(L'\n');
+  DWORD written = 0;
+  WriteConsoleW(h, wide.c_str(), (DWORD)wide.size(), &written, nullptr);
+}
+#endif
+
+static void initConsoleLogging() {
+#ifdef Q_OS_WIN
+  s_consoleAttached = AttachConsole(ATTACH_PARENT_PROCESS) != 0;
+  if (!s_consoleAttached) {
+    return; // No parent console — qDebug() goes to null device as before.
+  }
+#endif
+  qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &,
+                            const QString &msg) {
+    const char *tag = "DEBUG";
+    switch (type) {
+    case QtDebugMsg:
+      tag = "DEBUG";
+      break;
+    case QtInfoMsg:
+      tag = "INFO";
+      break;
+    case QtWarningMsg:
+      tag = "WARN";
+      break;
+    case QtCriticalMsg:
+      tag = "CRIT";
+      break;
+    case QtFatalMsg:
+      tag = "FATAL";
+      break;
+    }
+    const QString line = QString::fromLatin1("[") + QString::fromLatin1(tag) +
+                         QString::fromLatin1("] ") + msg;
+#ifdef Q_OS_WIN
+    if (s_consoleAttached) {
+      consoleWrite(line);
+    }
+#endif
+    if (type == QtFatalMsg) {
+      std::print("[FATAL] {}\n", msg.toUtf8().constData());
+      std::abort();
+    }
+  });
 }
 
 /// Install a global llama.cpp log callback early (before any model loads)
@@ -90,6 +159,10 @@ int main(int argc, char *argv[]) {
   // Force Fusion style to avoid platform-dependent styles (e.g. Breeze on KDE)
   // that conflict with our manual palette theming.
   QQuickStyle::setStyle("Fusion");
+
+  // Attach to a parent console (if any) and route qDebug() there.
+  // Must run before any qDebug() call so early startup messages are captured.
+  initConsoleLogging();
 
   // Suppress llama.cpp verbosity (must run before any model is loaded)
   initLlamaLogging();

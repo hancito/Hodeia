@@ -61,6 +61,18 @@ foreach(font IN LISTS fonts)
   endif()
 endforeach()
 
+# Hyphenation dictionary (embedded binary, like fonts)
+set(HYPH_ZIP "${PROJECT_SOURCE_DIR}/resources/hyphen/hyph-all.zip")
+if (CMAKE_HOST_WIN32 AND WIN32 AND EXISTS "${HYPH_ZIP}")
+  set(hyph_object "${CMAKE_CURRENT_BINARY_DIR}/resources/hyph-all.zip.obj")
+  set_source_files_properties("${hyph_object}" PROPERTIES EXTERNAL_OBJECT 1)
+  add_custom_command(OUTPUT "${hyph_object}"
+    COMMAND "${BIN2COFF_EXECUTABLE}" "${HYPH_ZIP}" "${hyph_object}" "_binary_hyph_all_zip" ${coff_arch}
+    VERBATIM
+  )
+  list(APPEND FONT_SOURCES "${hyph_object}")
+endif()
+
 # libmupdf
 file(GLOB_RECURSE SOURCES
   "source/fitz/*.c"
@@ -72,6 +84,26 @@ file(GLOB_RECURSE SOURCES
   "source/cbz/*.c"
 )
 
+# cmark-gfm (vendored in MuPDF source tree)
+file(GLOB CMARK_SOURCES "thirdparty/cmark-gfm/src/*.c")
+list(FILTER CMARK_SOURCES EXCLUDE REGEX "main\\.c$")
+list(FILTER CMARK_SOURCES EXCLUDE REGEX "commonmark\\.c$")
+list(FILTER CMARK_SOURCES EXCLUDE REGEX "man\\.c$")
+# cmark-gfm extensions (tables, strikethrough, tasklist, etc.)
+file(GLOB CMARK_EXT_SOURCES "thirdparty/cmark-gfm/extensions/*.c")
+list(APPEND SOURCES ${CMARK_SOURCES} ${CMARK_EXT_SOURCES})
+
+# cmark-gfm generated headers absent from the tree; stub them out
+set(CMARK_EXPORT_H "${CMAKE_CURRENT_BINARY_DIR}/cmark-gfm_export.h")
+file(WRITE "${CMARK_EXPORT_H}"
+"#ifndef CMARK_GFM_EXPORT_H\n#define CMARK_GFM_EXPORT_H\n#define CMARK_GFM_EXPORT\n#define CMARK_GFM_NO_EXPORT\n#endif\n")
+set(CMARK_VERSION_H "${CMAKE_CURRENT_BINARY_DIR}/cmark-gfm_version.h")
+file(WRITE "${CMARK_VERSION_H}"
+"#ifndef CMARK_GFM_VERSION_H\n#define CMARK_GFM_VERSION_H\n#define CMARK_VERSION_MAJOR 0\n#define CMARK_VERSION_MINOR 29\n#define CMARK_VERSION_RELEASE 0\n#define CMARK_VERSION_STRING \"0.29.0\"\n#define CMARK_GFM_VERSION 0x001D0000\n#define CMARK_GFM_VERSION_STRING \"0.29.0\"\n#endif\n")
+set(CMARK_CONFIG_H "${CMAKE_CURRENT_BINARY_DIR}/config.h")
+file(WRITE "${CMARK_CONFIG_H}"
+"#ifndef CMARK_CONFIG_H\n#define CMARK_CONFIG_H\n#define HAVE_STDBOOL_H\n#include <stdbool.h>\n#define CMARK_ATTRIBUTE(list)\n#define CMARK_INLINE __inline\n#endif\n")
+
 add_library(libmupdf ${SOURCES} ${FONT_SOURCES})
 set_target_properties(libmupdf PROPERTIES PREFIX "")
 target_include_directories(libmupdf
@@ -79,6 +111,10 @@ target_include_directories(libmupdf
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
+    ${PROJECT_SOURCE_DIR}/thirdparty/cmark-gfm/src
+    ${PROJECT_SOURCE_DIR}/thirdparty/cmark-gfm/extensions
+    ${PROJECT_SOURCE_DIR}/thirdparty/cmark-gfm/include
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${JBIG2DEC_INCLUDE_DIR}
 )
 target_compile_definitions(libmupdf
@@ -91,6 +127,7 @@ target_compile_definitions(libmupdf
     MEMENTO_MUPDF_HACKS
     SHARE_JPEG
     OCR_DISABLED
+    CMARK_STATIC
 )
 target_link_libraries(libmupdf
   PRIVATE

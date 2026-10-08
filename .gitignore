@@ -73,7 +73,7 @@ CMakeLists.txt.user*
 # --------
 *.dll
 *.exe
-
+*.lib
 # Directories with generated files
 .moc/
 .obj/
@@ -83,3 +83,7 @@ CMakeLists.txt.user*
 /build*/
 /.qtcreator/
 /Models
+
+# vcpkg
+/vcpkg_installed/
+/vcpkg/
