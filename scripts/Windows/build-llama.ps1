@@ -43,7 +43,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+# This script lives in <repo>/scripts/Windows, so the repo root is two levels up.
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 # Single flat staging dir: all backends (core + CPU variants + CUDA + Vulkan)
 # and import libs live side by side, sharing one ggml-base ABI.
 $destDir  = Join-Path $repoRoot "external\lib\windows\llamacpp"

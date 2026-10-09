@@ -5,7 +5,6 @@ import QtQuick.Layouts
 
 Rectangle {
     id: dbPane
-    property var activeTheme: ({})
     property list<int> selectedQueryIds: []
     property int activeQueryId: 0
     property int nqueries: databaseManager.queryProxyModel.rowCount()

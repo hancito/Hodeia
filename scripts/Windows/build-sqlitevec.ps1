@@ -19,7 +19,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot   = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repoRoot   = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $destDir    = Join-Path $repoRoot "external\lib\windows\sqlitevec"
 $destDll    = Join-Path $destDir "vec0.dll"
 

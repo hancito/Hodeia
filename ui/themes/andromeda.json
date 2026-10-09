@@ -1,0 +1,18 @@
+{
+  "name": "Andromeda",
+  "primary":    "#2afcc3",
+
+  "red":        "#f07178",
+  "green":      "#3cd896",
+
+  "text":       "#d5ced3",
+  "overlay2":   "#726871",
+  "overlay1":   "#878c94",
+  "overlay0":   "#6e6d74",
+  "surface2":   "#3b4252",
+  "surface1":   "#323c47",
+  "surface0":   "#28303c",
+  "base":       "#22283f",
+  "mantle":     "#1c2234",
+  "crust":      "#161b2b"
+}

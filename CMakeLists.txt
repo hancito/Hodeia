@@ -34,6 +34,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   include(cmake/PlatformWindows.cmake)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  # macOS is EXPERIMENTAL — the app is not yet available for macOS, and this
+  # build path (which mirrors the Linux schema) is untested.  See
+  # cmake/PlatformMac.cmake for the warning.
   include(cmake/PlatformMac.cmake)
 else()
   message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")

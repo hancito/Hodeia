@@ -9,7 +9,8 @@
 param()
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot ".")).Path
+# This script lives in <repo>/scripts/Windows, so the repo root is two levels up.
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 $buildDir = Join-Path $repoRoot "build-windows"
 if (Test-Path $buildDir) {

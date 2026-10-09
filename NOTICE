@@ -1,0 +1,53 @@
+Hodeia
+A personal research assistant powered by local AI.
+
+Hodeia is free and open source software, licensed under the GNU Affero
+General Public License version 3.0 (AGPL-3.0). See LICENSE for the full
+text of the license.
+
+This product includes software developed at the Qt Group.
+
+
+Qt
+--
+This product uses Qt.
+
+Qt and the Qt logo are trademarks of The Qt Company Ltd. in Finland and/or
+other countries worldwide. For all licenses, including LGPL and commercial
+licensing, please refer to https://www.qt.io/licenses/ .
+
+Hodeia is built with Qt 6.12+ and uses the following Qt open-source
+components (LGPL 3.0):
+
+  - Qt Quick / QML (qtdeclarative)
+  - Qt Quick Controls 2 (qtquickcontrols2)
+  - Qt Network
+  - Qt Concurrent
+  - Qt Core (base)
+
+Because Qt Quick and Qt Quick Controls 2 are licensed under the GNU Lesser
+General Public License version 3 (LGPL 3.0), the LGPL conditions apply to
+them. In accordance with the LGPL, the source code of the Qt components used
+by Hodeia is available to any recipient who receives this product in object
+code form. You can obtain the corresponding Qt sources either from
+https://www.qt.io/lgt/ or by installing the matching Qt 6 modules from your
+platform's package manager or the official Qt online installer.
+
+Qt is distributed "AS IS", without warranty of any kind. See the Qt license
+for the full disclaimer and conditions.
+
+
+Third-Party Components
+--
+In addition to Qt, Hodeia includes the following third-party components,
+each available under its own open-source license:
+
+  - llama.cpp and ggml (https://github.com/ggml-org/llama.cpp)
+  - MuPDF (https://mupdf.com)
+  - Tesseract (https://github.com/tesseract-ocr/tesseract)
+  - Leptonica (https://github.com/DanBloomberg/leptonica)
+  - sqlite-vec (https://github.com/asg017/sqlite-vec)
+  - SQLite (https://sqlite.org)
+
+The full text of each component's license ships with that component and is
+available at the URLs listed above.

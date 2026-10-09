@@ -5,7 +5,6 @@ import QtQuick.Layouts
 
 Rectangle {
     id: queryPane
-    property var activeTheme: ({})
     property int activeQueryId: 0
     property string lastResponse: ""
     property bool querying: false

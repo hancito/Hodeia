@@ -24,7 +24,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot ".")).Path
+# This script lives in <repo>/scripts/Windows, so the repo root is two levels up.
+$scriptDir = $PSScriptRoot
+$repoRoot  = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 # --- Locate vcpkg -----------------------------------------------------------
 if (-not (Test-Path (Join-Path $VcpkgRoot "vcpkg.exe"))) {
@@ -38,7 +40,7 @@ if (-not (Test-Path (Join-Path $VcpkgRoot "vcpkg.exe"))) {
 # --- Build llama.cpp from source -------------------------------------------
 if (-not $LlamaSourceDir) { throw "-LlamaSourceDir not given." }
 Write-Host ">> llama.cpp ($($LlamaBackends -join ', '))"
-& (Join-Path $PSScriptRoot "scripts\build-llama.ps1") `
+& (Join-Path $scriptDir "build-llama.ps1") `
     -SourceDir $LlamaSourceDir `
     -Backends $LlamaBackends `
     -CudaToolkit $CudaToolkit `
@@ -47,7 +49,7 @@ Write-Host ">> llama.cpp ($($LlamaBackends -join ', '))"
 # --- Build sqlite-vec from source -------------------------------------------
 if (-not $SqliteVecSourceDir) { throw "-SqliteVecSourceDir not given." }
 Write-Host ">> sqlite-vec"
-& (Join-Path $PSScriptRoot "scripts\build-sqlitevec.ps1") -SourceDir $SqliteVecSourceDir
+& (Join-Path $scriptDir "build-sqlitevec.ps1") -SourceDir $SqliteVecSourceDir
 
 # --- vcpkg install (manifest mode, driven by vcpkg.json) -------------------
 # The overlay port vcpkg-overlay/ports/libmupdf builds MuPDF 1.28.5 from

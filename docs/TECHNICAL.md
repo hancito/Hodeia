@@ -1,6 +1,12 @@
-# Technical Documentation
+# Hodeia — Technical Documentation
+
+This document covers the architecture, code layout, core pipelines, database schema, configuration, and the full per-platform build (Linux / macOS / Windows). It is the single technical reference — build requirements are included here, not in a separate file.
+
+---
 
 ## Architecture
+
+Hodeia is a C++/Qt 6 Quick application. The layers, top to bottom:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -10,25 +16,37 @@
 │  BackendWindow │ Colors.qml │ Fonts.qml                  │
 ├─────────────────────────────────────────────────────────┤
 │              C++ Controllers (QQML-invokeable)          │
-│  EngineManager │ SummaryThreadManager │ QueryController  │
-│  ConfigManager │ ThemeManager │ HardwareDetector         │
+│  EngineController │ SummaryController │ QueryController  │
+│  ConfigManager │ ThemeManager │ Helpers                 │
+│  OpenAlexClient │ CitationsModel                          │
 ├─────────────────────────────────────────────────────────┤
 │                  Worker Threads                         │
-│  IngestionEngine │ Summarizer │ QueryWorker              │
-│  (QtConcurrent + QThreads)                              │
+│  IngestionEngine │ Summarizer │ QueryWorker             │
+│  (QtConcurrent + QThread, one worker per controller)    │
 ├─────────────────────────────────────────────────────────┤
 │                 Backend Layer                           │
-│  LocalBackend (llama.cpp libcommon)                     │
-│  RemoteBackend (QNetworkAccessManager / HTTP)           │
+│  LocalBackend (llama.cpp libcommon, llama.h)            │
+│  RemoteBackend (QNetworkAccessManager / OpenAI HTTP)    │
 ├─────────────────────────────────────────────────────────┤
 │                 Extraction Layer                        │
-│  MuPDF (text + rendering) │ Tesseract 5 (OCR fallback)  │
+│  MuPDF (structured text + page rendering)               │
+│  Tesseract + Leptonica (OCR fallback)                   │
 ├─────────────────────────────────────────────────────────┤
 │                   Data Layer                            │
-│  SQLite3 (embedded) │ sqlite-vec (vec0 vtable)          │
-│  SummaryProxyModel │ QueryProxyModel                    │
+│  SQLite3 (embedded, WAL) │ sqlite-vec (vec0 virtual     │
+│  table) │ SummaryModel │ QueryModel │ CitationsModel    │
 └─────────────────────────────────────────────────────────┘
 ```
+
+The three worker pipelines run off the GUI thread:
+
+- **Ingestion** — `EngineController` owns an `IngestionEngine` worker on a `QThread`; `QtConcurrent` parallelizes per-file hashing/extraction.
+- **Summarization** — `SummaryController` owns a `Summarizer` worker; it loads/unloads models around the LLM call.
+- **RAG query** — `QueryController` owns a `QueryWorker`; each query runs on its own thread.
+
+`main.cpp` constructs the singletons, registers them on the QML context, and loads the `HodeiaCPP` QML module. It also sets up crash/diagnostic logging, console mirroring, llama.cpp log capture, font registration, and translation loading (see [Logging & Diagnostics](#logging--diagnostics)).
+
+---
 
 ## Tech Stack
 
@@ -36,46 +54,73 @@
 | ------------------- | ------------------------------------------------------- |
 | UI Framework        | Qt 6.10+ (Qt Quick / QML, QuickControls2, Fusion style) |
 | Language            | C++23                                                   |
-| Build System        | CMake 3.25+                                             |
-| Local LLM Inference | llama.cpp (GGUF models, libcommon)                      |
+| Build System        | CMake 3.25+ (Ninja on all platforms)                    |
+| Local LLM Inference | llama.cpp (GGUF models, `llama.h` + `libcommon`)        |
 | Multimodal          | mtmd (llama.cpp) with mmproj projectors                 |
 | Remote LLM          | OpenAI-compatible REST API                              |
 | PDF Parsing         | MuPDF (layout-aware structured text + page rendering)   |
-| OCR                 | Tesseract 5.5.2 + Leptonica 1.87.0                      |
+| OCR                 | Tesseract + Leptonica (LSTM-only, legacy engine off)    |
 | Database            | SQLite3 (embedded, WAL mode)                            |
 | Vector Search       | sqlite-vec (`vec0` virtual table)                       |
-| Embedding Model     | multilingual-e5-small (~384 dims, via llama.cpp)        |
-| GPU Backends        | CUDA, Vulkan, CPU (auto-detected)                       |
+| Embedding Model     | multilingual-e5-small (384 dims, via llama.cpp)         |
+| Citations           | OpenAlex REST API (works search, `cites` / `cited_by`)  |
+| GPU Backends        | CUDA, Vulkan, CPU (auto-detected) / Metal (macOS)       |
 | Threading           | Qt Concurrent, QThread, QThreadPool                     |
+
+---
 
 ## Project Structure
 
 ```
-Hodeia_CPP/
+Hodeia/
 ├── CMakeLists.txt                  # Slim build entry: project, Qt, platform routing
-├── cmake/                          # Modular CMake scripts
-│   ├── CompilerFlags.cmake         # C++23, warnings, optimisation, LTO (opt-in)
-│   ├── PlatformLinux.cmake         # Static .a + system libs, GPU discovery, patchelf deploy
-│   ├── PlatformWindows.cmake       # Native MSVC + vcpkg (MuPDF/Tesseract/Leptonica/Vulkan), windeployqt
-│   └── PlatformMac.cmake           # .dylib map, Metal, install_name_tool, macdeployqt
+├── vcpkg.json                      # Windows dependency manifest (libmupdf, tesseract, vulkan-*)
+├── vcpkg-overlay/                  # Overlay port: libmupdf built from local source
 ├── resources.qrc                   # (legacy, unused — qt_add_resources uses explicit files)
-├── build_ocr.sh                    # Tesseract + Leptonica build script (Linux)
+├── NOTICE                          # Qt + third-party licensing notices
+├── LICENSE                         # AGPL-3.0
 ├── README.md                       # User-facing README
 ├── docs/
 │   └── TECHNICAL.md               # This file
 │
+├── cmake/                          # Modular CMake scripts
+│   ├── CompilerFlags.cmake         # C++23, warnings, optimisation, LTO (opt-in)
+│   ├── PlatformLinux.cmake         # Static .a + system libs, GPU discovery, patchelf deploy
+│   ├── PlatformWindows.cmake       # Native MSVC + vcpkg, llama import libs, windeployqt
+│   └── PlatformMac.cmake           # .dylib map, Metal, install_name_tool, macdeployqt
+│
+├── scripts/
+│   ├── Linux/                      # Dependency build scripts (see "Building from source")
+│   │   ├── get_depencies.sh        #   clone/locate sources
+│   │   ├── build_llama.sh          #   llama.cpp (CPU+CUDA+Vulkan combined, .so)
+│   │   ├── build_mupdf.sh          #   MuPDF (static .a)
+│   │   ├── build_tesseract.sh      #   Tesseract + Leptonica (static .a)
+│   │   └── build_sqlitevec.sh      #   sqlite-vec (vec0.so)
+│   └── Windows/                    # PowerShell build orchestration
+│       ├── build-dependencies.ps1  #   stage llama.cpp + sqlite-vec, vcpkg install
+│       ├── build-llama.ps1         #   build/stage llama.cpp (combined, CPU+Vulkan+CUDA)
+│       ├── build-sqlitevec.ps1     #   fetch or build vec0.dll
+│       ├── build-app.ps1           #   configure + build the app
+│       ├── clean-app.ps1           #   remove build-windows/
+│       └── clean-deps.ps1          #   remove staged deps + vcpkg cache
+│
 ├── include/                        # Public C++ headers (flat, isolated from external/)
-│   └── <thememanager.h, database.h, localbackend.h, ...>
+│   ├── thememanager.h  configmanager.h  database.h  summary.h  query.h
+│   ├── citationsmodel.h  summaryproxymodel.h  queryproxymodel.h
+│   ├── ingestionengine.h  enginemanager.h  sqlitedb.h  sqlitevec.h
+│   ├── localbackend.h  inferenceengine.h  remotebackend.h  summarizer.h
+│   ├── summarythreadmanager.h  queryworker.h  querycontroller.h
+│   └── openalex.h  helpers.h
 │
 ├── src/                            # C++ source files + target definitions
 │   ├── CMakeLists.txt              # add_library(HodeiaEngine) + qt_add_executable(Hodeia)
-│   ├── main.cpp                    # Entry point: QML engine + C++ object registration
-│   ├── configmanager.cpp           # JSON config, project CRUD, hardware detection
+│   ├── main.cpp                    # Entry point: logging, fonts, QML engine + registration
+│   ├── configmanager.cpp           # JSON config, project CRUD, model/backend selection
 │   ├── database.cpp                # SQLite DB init, table/schema creation, project switch
-│   ├── ingestionengine.cpp         # PDF extraction (MuPDF + Tesseract), chunking
-│   ├── enginemanager.cpp           # Thread controller for PDF ingestion pipeline
 │   ├── sqlitedb.cpp                # SQLite wrapper (open, exec, prepare, transactions)
 │   ├── sqlitevec.cpp               # Vector embeddings (E5 via llama.cpp), vec0 CRUD/search
+│   ├── ingestionengine.cpp         # PDF extraction (MuPDF + Tesseract), chunking
+│   ├── enginemanager.cpp           # Thread controller for the PDF ingestion pipeline
 │   ├── localbackend.cpp            # Local llama.cpp backend (model loading, GPU fitting)
 │   ├── inferenceengine.cpp         # Token-level inference (text + multimodal)
 │   ├── remotebackend.cpp           # HTTP client for OpenAI-compatible APIs
@@ -87,7 +132,8 @@ Hodeia_CPP/
 │   ├── querycontroller.cpp         # Thread controller for RAG queries
 │   ├── query.cpp                   # QueryModel (QAbstractListModel → QML)
 │   ├── queryproxymodel.cpp         # Sort/filter proxy for queries
-│   ├── hardwaredetector.cpp        # CPU/GPU/RAM/NUMA/NPU detection (cross-platform)
+│   ├── citationsmodel.cpp          # CitationsModel over the Citations table (APA format)
+│   ├── openalex.cpp                # OpenAlexClient: references / citing works
 │   ├── thememanager.cpp            # JSON-based theme loading
 │   └── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
 │
@@ -107,7 +153,7 @@ Hodeia_CPP/
 │
 ├── external/                       # Third-party libraries (pre-compiled, per-platform)
 │   ├── include/
-│   │   ├── llamacpp/               # llama.cpp headers
+│   │   ├── llamacpp/               # llama.cpp + ggml + mtmd headers
 │   │   ├── mupdf/                  # MuPDF headers
 │   │   ├── Sqlite3/                # SQLite3 headers
 │   │   ├── SqliteVec/              # sqlite-vec headers
@@ -116,155 +162,416 @@ Hodeia_CPP/
 │   ├── sqlite3/
 │   │   └── sqlite3.c               # SQLite amalgamation (compiled as C)
 │   └── lib/
-│       ├── linux/                  # static .a + llama.cpp .so (cpu/cuda/vulkan) + sqlitevec/
-│       ├── mac/                    # static .a + llama.cpp .dylib (cpu/metal) + sqlitevec/
+│       ├── linux/                  # static .a + llama.cpp .so (flat: cpu+cuda+vulkan) + sqlitevec/
+│       ├── mac/                    # static .a + llama.cpp .dylib (flat: cpu+metal, untested) + sqlitevec/
 │       └── windows/                # llama.cpp .dll (flat: cpu+cuda+vulkan) + sqlitevec/
 │                                   # (MuPDF/Tesseract/Leptonica/Vulkan come from vcpkg on Windows)
 │
-├── Resources/                      # Icons, Tesseract data
-│   └── tessdata/
-│       └── eng.traineddata
+├── Resources/                      # Icons, Tesseract data, bundled embedder model
+│   ├── tessdata/eng.traineddata
+│   └── Embedders/multilingual-e5-small-q8_0.gguf
 │
-└── Fonts/                          # Custom application fonts
-    ├── Google_Sans/
-    ├── Google_Sans_Code/
-    └── Outfit/
+├── Fonts/                          # Custom application fonts
+│   ├── Google_Sans/
+│   ├── Google_Sans_Code/
+│   └── Outfit/
+│
+└── translations/                   # Qt Linguist catalogs
+    └── hodeia_fr.ts                # French (English is the source language)
 ```
+
+> The CMake module URI is `HodeiaCPP` (the historical project name) — `engine.loadFromModule("HodeiaCPP", "Main")` in `main.cpp`.
+
+---
 
 ## Prerequisites
 
 - **CMake** ≥ 3.25
-- **Qt 6** ≥ 6.10 (Quick, QuickControls2, Concurrent, Network modules)
-- **C++23-compatible compiler** (GCC 13+, Clang 17+)
-- **Ninja** (recommended) or Make
+- **Qt 6** ≥ 6.10 (Quick, QuickControls2, QuickEffects, Concurrent, Network, LinguistTools)
+- **C++23-compatible compiler** (Clang 17+ on Linux/macOS, MSVC via Visual Studio on Windows)
+- **Ninja** (Linux / macOS / Windows)
 - **patchelf** (Linux, for RPATH manipulation)
-- **MuPDF** development libraries (`libmupdf`, `libmupdf-third`, `libmupdf-threads`)
-- **OpenMP** (optional, for ggml CPU parallelism)
+- **OpenMP** (ggml CPU parallelism — `libomp` on macOS)
+- **vcpkg** (Windows only)
 
-### OCR Dependencies (optional)
+The third-party development libraries (MuPDF, Tesseract, Leptonica, llama.cpp, sqlite-vec) are either in-tree (Linux), from vcpkg + staged DLLs (Windows), or compiled from source (macOS) — see [Building from source](#building-from-source) for each.
 
-To enable the Tesseract OCR fallback, build Leptonica and Tesseract from source:
+---
 
-```bash
-# Place leptonica-1.87.0 and tesseract-5.5.2 sources in a shared directory
-./build_ocr.sh [/path/to/source/root]
-```
+## Building from Source
 
-The script builds both as static libraries and installs artefacts into `external/`.
+The top-level `CMakeLists.txt` detects the platform and includes the matching `cmake/Platform<OS>.cmake`, which sets up third-party linking, GPU-backend discovery, and `POST_BUILD` deployment. Target definitions live in `src/CMakeLists.txt` (the `HodeiaEngine` static library + the `Hodeia` executable).
 
-## Build
+### Linux
 
-The build is modular: the top-level `CMakeLists.txt` detects the platform and
-includes the matching `cmake/Platform<OS>.cmake`, which sets up third-party
-linking, GPU-backend discovery, and POST_BUILD deployment. Target definitions
-live in `src/CMakeLists.txt`.
+The in-tree static libs under `external/lib/linux/` are pre-compiled; the llama.cpp `.so` set is built once (CPU + CUDA + Vulkan combined) into a single flat directory. Install the system packages for your distribution, then configure and build.
 
-### Standard Build (Linux)
+#### System packages
+
+**Arch / Manjaro**
 
 ```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja
-cmake --build . -j$(nproc)
+sudo pacman -S clang cmake ninja qt6-base qt6-declarative patchelf pkgconf \
+  vulkan-icd-loader libomp make git wget
 ```
 
-Linux links the in-tree **static** third-party libs (`external/lib/linux/*.a`)
-plus system image-codec/shared libs.
+**Debian / Ubuntu**
 
-### Windows Build (native MSVC + vcpkg)
+```bash
+sudo apt install -y clang cmake ninja-build patchelf pkg-config git wget \
+  libclang-rt-dev libomp-dev qt6-base-dev qt6-declarative-dev libvulkan1
+```
 
-Windows is a **native MSVC** build (Visual Studio 2022). MuPDF / Tesseract /
-Leptonica and the Vulkan loader come from **vcpkg** (triplet `x64-windows`);
-llama.cpp comes from the pre-built MSVC release DLLs in
-`external/lib/windows/llamacpp/` (staged by `scripts/stage-llama.ps1`); sqlite-vec's
-`vec0.dll` is auto-downloaded by `scripts/build-sqlitevec.ps1`.
+**Fedora**
 
-The vcpkg packages are declared in `vcpkg.json` (manifest mode):
+```bash
+sudo dnf install clang cmake ninja qt6-qtbase qt6-qtquickcontrols2 \
+  patchelf pkgconf-pkg-config libomp git wget vulkan-loader
+```
 
-| Port                               | Linked target                    | Linkage (Win)                     |
-| ---------------------------------- | -------------------------------- | --------------------------------- |
-| `libmupdf`                         | `unofficial::libmupdf::libmupdf` | **static** (no MuPDF DLL shipped) |
-| `tesseract`                        | `Tesseract::libtesseract`        | dynamic                           |
-| `leptonica` (via tesseract)        | `leptonica`                      | dynamic                           |
-| `vulkan-loader` + `vulkan-headers` | `Vulkan::Vulkan`                 | dynamic (`vulkan-1.dll`)          |
+#### Staging the third-party libraries
 
-One entry point does the staging, `vcpkg install`, configure, and build:
+The scripts under `scripts/Linux/` build and stage each dependency into `external/`:
+
+```bash
+cd scripts/Linux
+./get_depencies.sh            # clone/locate sources (llama.cpp, mupdf, tesseract, leptonica, sqlite-vec)
+./build_llama.sh              # llama.cpp → external/lib/linux/llamacpp/  (flat, all backends)
+./build_mupdf.sh              # MuPDF       → external/lib/linux/libmupdf*.a
+./build_tesseract.sh          # Tesseract + Leptonica → external/lib/linux/  (+ tessdata)
+./build_sqlitevec.sh          # sqlite-vec  → external/lib/linux/sqlitevec/vec0.so
+```
+
+If the libraries are already present in `external/` (e.g. committed), you can skip the staging scripts and go straight to the build.
+
+#### Build
+
+```bash
+mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+```
+
+> CMake auto-detects the available GPU backend (CUDA > Vulkan > CPU). Force one with
+> `-DLLAMA_FORCE_BACKEND=cpu|cuda|vulkan`. The forced value only sets the
+> `HODEIA_BACKEND_*` compile definition — the actual backend is chosen at runtime by
+> `ggml_backend_load_all()` from whichever `.so` are present.
+
+### macOS (Apple Silicon)
+
+> **⚠️ macOS is not yet available.** Support is **experimental and untested** — the app is not yet released for macOS. The CMake build below mirrors the (tested) Linux schema, but it has not been validated on a real Apple-Silicon host. Treat these steps as reference, not a supported build path.
+
+Metal is the only GPU backend. Like Linux, llama.cpp is built **once, combined** (CPU + Metal) with `GGML_BACKEND_DL` + `GGML_CPU_ALL_VARIANTS` and staged into the **single flat dir** `external/lib/mac/llamacpp/`; the app links the core libs only and selects the CPU microarch + Metal at runtime via `ggml_backend_load_all()`. You compile the five dependencies from source into `external/lib/mac/`, then build.
+
+#### System tools
+
+| Tool                     | Version                                    | Install                                                           |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------------------------- |
+| Xcode Command Line Tools | ≥ 15.0                                     | `xcode-select --install`                                          |
+| CMake                    | ≥ 3.25                                     | `brew install cmake`                                              |
+| Ninja                    | latest                                     | `brew install ninja`                                              |
+| LLVM/Clang               | ≥ 18.0                                     | `brew install llvm`                                               |
+| Qt 6.10+                 | Quick, QuickControls2, Concurrent, Network | [Qt installer](https://www.qt.io/download) or `brew install qt@6` |
+| libomp (OpenMP)          | —                                          | `brew install libomp`                                             |
+
+> `libomp.dylib` is copied into the `.app` bundle by CMake at build time — the end user installs nothing.
+
+#### 1. llama.cpp (CPU + Metal combined) → flat `.dylib` set
+
+Build once with `GGML_BACKEND_DL` + `GGML_CPU_ALL_VARIANTS` (Metal as the GPU backend), mirroring `scripts/Linux/build_llama.sh`. This produces every `ggml-cpu-<microarch>` variant + `ggml-metal` + the core libs, all sharing one `ggml-base` ABI:
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp && mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+  -DBUILD_SHARED_LIBS=ON \
+  -DLLAMA_BUILD_COMMON=ON -DLLAMA_BUILD_MTMD=ON \
+  -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_NATIVE=OFF \
+  -DGGML_METAL=ON \
+  -DLLAMA_BLAS=OFF -DLLAMA_CUDA=OFF -DLLAMA_VULKAN=OFF -DLLAMA_OPENMP=ON \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build . --target llama --target mtmd --target llama-common --target ggml --target ggml-metal --config Release
+```
+
+Copy **all** resulting `.dylib` into the **single flat dir** `external/lib/mac/llamacpp/` (core + every `ggml-cpu-<microarch>` variant + `ggml-metal` + `libomp`):
+
+```bash
+cp build/bin/*.dylib ../../external/lib/mac/llamacpp/   # run from the build dir
+```
+
+#### 2. MuPDF → static `.a`
+
+Use `MUPDF_BUILD_THIRD_PARTY=ON` (not just `MUPDF_THIRD_PARTY=ON`) so **all** image-codec/FreeType/HarfBuzz/OpenJPEG deps are compiled and linked statically — the final app has no external image-codec dependency.
+
+```bash
+git clone https://github.com/ArtifexSoftware/mupdf.git && cd mupdf
+git submodule update --init
+mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 -DMUPDF_BUILD_TYPE=Release \
+  -DMUPDF_BUILD_THIRD_PARTY=ON -DBUILD_SHARED_LIBS=OFF
+cmake --build .
+```
+
+Copy into `external/lib/mac/`: `libmupdf.a`, `libmupdf-third.a`, `libmupdf-threads.a`.
+
+#### 3. Leptonica → static `.a`
+
+Reuse the static image-codec libs produced by the MuPDF build so Leptonica stays fully static.
+
+```bash
+wget https://github.com/DanBloomberg/leptonica/releases/download/1.87.0/leptonica-1.87.0.tar.gz
+tar xzf leptonica-1.87.0.tar.gz && cd leptonica-1.87.0 && mkdir build && cd build
+MUPDF_BUILD=/path/to/mupdf/build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+  -DBUILD_SHARED_LIBS=OFF -DBUILD_PROG=OFF \
+  -DENABLE_PNG=ON -DENABLE_JPEG=ON -DENABLE_TIFF=ON -DENABLE_ZLIB=ON \
+  -DENABLE_GIF=OFF -DENABLE_WEBP=OFF -DENABLE_OPENJPEG=OFF \
+  -DPNG_LIBRARY="${MUPDF_BUILD}/_deps/libpng-build/libpng16.a" \
+  -DJPEG_LIBRARY="${MUPDF_BUILD}/_deps/libjpeg-build/libjpeg.a" \
+  -DTIFF_LIBRARY="${MUPDF_BUILD}/_deps/libtiff-build/libtiff.a" \
+  -DZ_LIBRARY="${MUPDF_BUILD}/_deps/zlib-build/libz.a"
+cmake --build .
+```
+
+Copy `build/src/libleptonica.a` → `external/lib/mac/`. Verify: `nm libleptonica.a | grep " U " | grep -iE "png|jpeg|tiff|zlib"` returns nothing.
+
+#### 4. Tesseract → static `.a`
+
+```bash
+wget https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-5.5.3.tar.gz
+tar xzf tesseract-5.5.3.tar.gz && cd tesseract-5.5.3 && mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+  -DBUILD_SHARED_LIBS=OFF -DBUILD_TRAINING_TOOLS=OFF -DBUILD_TESTS=OFF \
+  -DDISABLED_LEGACY_ENGINE=ON -DGRAPHICS_DISABLED=ON \
+  -DLeptonica_DIR=/path/to/leptonica-1.87.0/build
+cmake --build .
+```
+
+Copy `build/libtesseract.a` → `external/lib/mac/`.
+
+#### 5. sqlite-vec → `.dylib`
+
+```bash
+wget https://github.com/asg017/sqlite-vec/raw/main/dist/vec0.c
+clang -shared -fPIC -o vec0.dylib vec0.c
+```
+
+Copy `vec0.dylib` → `external/lib/mac/sqlitevec/`.
+
+#### 6. Tesseract traineddata
+
+```bash
+mkdir -p Resources/tessdata
+curl -fSL -o Resources/tessdata/eng.traineddata \
+  "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata"
+```
+
+#### Final build (macOS)
+
+```bash
+mkdir build && cd build
+cmake .. -G Ninja \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ \
+  -DCMAKE_PREFIX_PATH=/opt/homebrew/opt/llvm \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build .
+```
+
+CMake runs **`macdeployqt`** in `POST_BUILD` — it copies all Qt frameworks, plugins (ICU, image formats, platform plugins), `libomp.dylib`, the llama.cpp `.dylib` set, `vec0.dylib`, themes, and fonts **into `Hodeia.app`**. Result: a standalone `Hodeia.app` (~300 MB), drag-and-drop into `/Applications`, no external dependencies.
+
+### Windows (MSVC + Ninja + vcpkg)
+
+Native **MSVC** build — MSVC is the compiler, **Ninja** is the build generator (same as Linux/macOS). All native dependencies are MSVC-ABI (no MinGW/MSYS2). llama.cpp comes from pre-built MSVC release DLLs; MuPDF, Tesseract, Leptonica, and the Vulkan loader come from **vcpkg** (triplet `x64-windows`). `build-app.ps1` assembles the app.
+
+> **Why MSVC:** the official llama.cpp release DLLs are compiled with MSVC (CRT `vcruntime140`). Linking a MinGW-built app against them would cause CRT/ABI incompatibilities, so the compiler toolchain is MSVC. Ninja (from the VS "C++ CMake tools" component, or installed separately) drives the build.
+
+#### Prerequisites
+
+| Component     | Version / choice                                                        | Install                                                                      |
+| ------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Visual Studio | recent, with "Desktop development with C++" + "C++ CMake tools" (Ninja) | [Visual Studio](https://visualstudio.microsoft.com/)                         |
+| CMake         | ≥ 3.25                                                                  | bundled with VS, or `winget install Kitware.CMake`                           |
+| Ninja         | latest                                                                  | bundled with VS "C++ CMake tools", or `winget install Ninja-build.Ninja`     |
+| Qt 6          | ≥ 6.10, **MSVC 64-bit** build                                           | [Qt installer](https://www.qt.io/download) (pick the MSVC 64-bit kit)        |
+| vcpkg         | latest                                                                  | `git clone https://github.com/microsoft/vcpkg <repo>\vcpkg`                  |
+| llama.cpp     | pre-built MSVC release                                                  | `scripts\Windows\build-llama.ps1` builds + stages it, or stage prebuilt DLLs |
+
+#### vcpkg packages
+
+Declared in `vcpkg.json` at the repo root (manifest mode):
+
+| vcpkg port                         | Linked target                    | Linkage (Win) | Role                                                   |
+| ---------------------------------- | -------------------------------- | ------------- | ------------------------------------------------------ |
+| `libmupdf`                         | `unofficial::libmupdf::libmupdf` | **static**    | PDF (embeds freetype, harfbuzz, jbig2dec, openjpeg, …) |
+| `tesseract`                        | `Tesseract::libtesseract`        | dynamic       | OCR                                                    |
+| `leptonica` (via tesseract)        | `leptonica`                      | dynamic       | images for OCR                                         |
+| `vulkan-loader` + `vulkan-headers` | `Vulkan::Vulkan`                 | dynamic       | loader + `vulkan-1.dll`                                |
+
+> The MuPDF port is named **`libmupdf`** (not `mupdf`). On Windows it builds **static** (incomplete DLL exports), so there is **no MuPDF DLL** to ship — the image codecs are embedded. The `vcpkg-overlay/` port builds MuPDF from your local source instead of the stock port's pinned version.
+
+#### Staging the dependencies
+
+`scripts\Windows\build-dependencies.ps1` does the whole thing (from a VS Developer Prompt):
 
 ```powershell
-.\build_windows.ps1 -LlamaSourceDir "D:\Developpement\Windows" `
-                    -QtPrefix "C:\Qt\6.8.0\msvc2022_64"
+.\scripts\Windows\build-dependencies.ps1
 ```
 
-Under the hood it configures with the vcpkg toolchain file and the Qt MSVC
-prefix:
+It:
+
+1. locates vcpkg and the MSVC Qt build;
+2. builds/stages llama.cpp via `scripts\Windows\build-llama.ps1` (CPU + Vulkan + CUDA, one combined build, into the flat `external\lib\windows\llamacpp\`);
+3. provides `vec0.dll` via `scripts\Windows\build-sqlitevec.ps1` (downloads the pinned `v0.1.10-alpha.4` loadable, verifies SHA-256; or `-Method build` to compile from source with `cl.exe`);
+4. runs `vcpkg install --triplet x64-windows` (manifest mode, with the `vcpkg-overlay`).
+
+The staged llama.cpp set (all backends in one flat dir):
+
+```
+llama.dll, llama-common.dll, mtmd.dll
+ggml.dll, ggml-base.dll, ggml-rpc.dll
+ggml-cpu-x64.dll, ggml-cpu-sse42.dll, ggml-cpu-<arch>…   (every microarch variant)
+ggml-cuda.dll      ← CUDA backend
+ggml-vulkan.dll    ← Vulkan backend
+libomp.dll, cudart64_*.dll, cublas64_*.dll, cublasLt64_*.dll
+```
+
+The single binary links **all three backends**; `ggml_backend_load_all()` picks the best at runtime (CUDA > Vulkan > CPU).
+
+#### Building the app
+
+```powershell
+.\scripts\Windows\build-app.ps1            # Release (default)
+.\scripts\Windows\build-app.ps1 -Configuration Debug
+```
+
+Under the hood it configures with the **Ninja** generator, the MSVC toolchain, the vcpkg toolchain file, and the Qt MSVC prefix:
 
 ```bash
-cmake -S . -B build-windows -G "Visual Studio 17 2022" -A x64 \
+cmake -S . -B build-windows -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=<vcpkg>\scripts\buildsystems\vcpkg.cmake \
   -DCMAKE_PREFIX_PATH=<Qt MSVC prefix>
 cmake --build build-windows --config Release
 ```
 
-The llama.cpp DLLs are linked via import libraries: generated with
-`llvm-dlltool` when available, otherwise linked by full path (MSVC `link.exe`
-resolves the undecorated C exports).
+> The MSVC compiler is picked up from the **VS Developer Prompt** environment (or via `vcvarsall`); with the Ninja generator there is no `-A x64` (x64 is the default MSVC toolchain).
 
-### GPU Backend Selection
+#### Linking the llama.cpp DLLs (import libs)
 
-The app calls `ggml_backend_load_all()` at runtime and auto-detects the best
-available backend (CUDA > Vulkan > CPU) from whichever DLLs are present.
+The MSVC linker (`link.exe`) needs an import lib per DLL, but the prebuilt DLLs don't ship them. `cmake/PlatformWindows.cmake` generates the `.lib` files with **`llvm-dlltool`** (part of the VS LLVM toolset) when available; otherwise it links the DLLs **by full path** (MSVC `link.exe` resolves the undecorated C exports and emits an import lib automatically).
 
-- **Linux / macOS** — CMake auto-detects CUDA and Vulkan at build time.
-  Override with `-DLLAMA_FORCE_BACKEND=cpu` | `cuda` | `vulkan` | `all`.
-- **Windows** — all three backends are shipped in a single binary; selection is
-  fully runtime. `-CudaVersion 12.4` (default) or `13.4` chooses the CUDA level.
+---
 
-### Post-Build Deployment
+## GPU Backend Selection
 
-Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
+The app calls `ggml_backend_load_all()` at runtime and auto-detects the best available backend from whichever libraries are present next to the binary.
 
-- **Linux** — copies themes/fonts/tessdata, deploys llama.cpp `.so` with
-  symlinks, sets `$ORIGIN` RUNPATH via `patchelf`, copies `vec0.so`.
-- **Windows** — copies themes/fonts/tessdata, all llama.cpp `.dll` (CPU variants
-  - `ggml-cuda.dll` + `ggml-vulkan.dll`), CUDA runtime DLLs, vcpkg
-    `vulkan-1.dll`, Tesseract/Leptonica runtime DLLs, `vec0.dll`, `libomp.dll`,
-    and runs `windeployqt`.
-- **macOS** — copies dylibs, sets `@executable_path` install names, ships
-  `vec0.dylib` + `libomp.dylib`, and runs `macdeployqt`.
+- **Linux / macOS** — CMake auto-detects CUDA/Vulkan (or Metal on macOS) at build time. Linux supports `-DLLAMA_FORCE_BACKEND=cpu|cuda|vulkan`.
+- **Windows** — all three backends ship in a single binary; selection is fully runtime.
+- **CPU microarch** — the combined llama.cpp build compiles every `ggml-cpu-<microarch>` variant; at runtime ggml loads the one that best matches the host CPU (e.g. AVX-512 on Zen 5) via `ggml_backend_score`. This is why the CPU backend is a runtime-loadable module, not a single monolithic lib.
+
+---
+
+## Post-Build Deployment
+
+Each platform's `cmake/Platform<OS>.cmake` (`hodeia_<os>_deploy`) deploys the runtime next to the binary:
+
+| Category         | Linux                                                                                                    | Windows                                                                             | macOS                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **llama.cpp**    | all `.so` (core + every CPU variant + CUDA/Vulkan), unversioned symlinks, `$ORIGIN` RPATH via `patchelf` | all `llama*.dll`/`ggml*.dll`/`mtmd.dll`/`libomp.dll`                                | base + backend `.dylib` with `@executable_path` install names |
+| **CUDA runtime** | (system)                                                                                                 | `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` (if `ggml-cuda.dll` present) | —                                                             |
+| **Vulkan**       | (system)                                                                                                 | `vulkan-1.dll` (vcpkg bin or SDK)                                                   | —                                                             |
+| **OCR**          | in-tree static                                                                                           | `tesseract*.dll`, `leptonica*.dll` + image codecs (vcpkg bin)                       | in-tree static                                                |
+| **Extension**    | `vec0.so`                                                                                                | `vec0.dll`                                                                          | `vec0.dylib`                                                  |
+| **Resources**    | `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Embedders/`                                              | same                                                                                | same                                                          |
+| **Translations** | `i18n/*.qm`                                                                                              | `i18n/*.qm`                                                                         | `i18n/*.qm`                                                   |
+| **Qt runtime**   | system Qt                                                                                                | `windeployqt`                                                                       | `macdeployqt` (frameworks + plugins)                          |
+
+> **Windows C/C++ runtime (UCRT):** `ucrtbase.dll` / `vcruntime140.dll` are part of Windows 10/11, so no VC++ Redist is needed for Win10+ targets. `windeployqt` copies them if it detects the VS Build Tools.
+>
+> To create an installer, package the output folder with [Inno Setup](https://jrsoftware.org/isinfo.php) or [NSIS](https://nsis.sourceforge.net/).
+
+### Resulting `external/lib/` layout
+
+```
+external/lib/
+├── linux/                  # in-tree, pre-compiled ✅
+│   ├── libmupdf.a  libmupdf-third.a  libmupdf-threads.a
+│   ├── libtesseract.a  libleptonica.a
+│   ├── llamacpp/        # FLAT: every .so (core + cpu variants + cuda + vulkan)
+│   └── sqlitevec/vec0.so
+│
+├── mac/                    # compiled from source (see above) — NOT yet available / untested
+│   ├── libmupdf.a  libmupdf-third.a  libmupdf-threads.a
+│   ├── libtesseract.a  libleptonica.a
+│   ├── llamacpp/        # FLAT: every .dylib (core + cpu variants + metal)
+│   └── sqlitevec/vec0.dylib
+│
+└── windows/                # staged MSVC DLLs
+    ├── llamacpp/          # FLAT: every .dll (cpu variants + cuda + vulkan)
+    └── sqlitevec/vec0.dll
+    # MuPDF / Tesseract / Leptonica / Vulkan: from vcpkg (no in-tree files needed)
+```
+
+### Recommended build order
+
+**Linux / macOS (source):** 1) Leptonica → 2) Tesseract → 3) MuPDF → 4) llama.cpp → 5) sqlite-vec → 6) Hodeia.
+**Windows (MSVC):** no native dependency compilation — 1) `build-dependencies.ps1` (llama.cpp + sqlite-vec + vcpkg) → 2) `build-app.ps1`.
+
+---
 
 ## Core Pipelines
 
 ### PDF Ingestion Pipeline
 
-1. **File hashing** — MD5 computed per file for deduplication (parallelized via Qt Concurrent)
-2. **Text extraction** — MuPDF's structured-text engine performs DFS traversal with column segmentation, paragraph breaks, dehyphenation, and clip preservation
-3. **OCR fallback** — If a page yields < 100 characters, Tesseract 5 runs at 300 DPI grayscale. APIs are cached per-thread to minimize initialization overhead
-4. **Thumbnail generation** — 150 DPI page images rendered as PNGs
-5. **Chunking** — Full text split into ~1500-character segments with 200-character overlap; page mapping preserved
-6. **Embedding** — Batches of 64 chunks sent through the E5 model; vectors stored in the `vec0` virtual table
-7. **Batch processing** — 10 PDFs per batch with incremental progress reporting and memory cleanup
+1. **File hashing** — MD5 computed per file for deduplication (parallelized via `QtConcurrent`).
+2. **Text extraction** — MuPDF's structured-text engine performs DFS traversal with column segmentation, paragraph breaks, dehyphenation, and clip preservation.
+3. **OCR fallback** — if a page yields < 100 characters, Tesseract runs at 300 DPI grayscale. APIs are cached per-thread to minimize initialization overhead.
+4. **Thumbnail generation** — 150 DPI page images rendered as PNGs.
+5. **Chunking** — full text split into ~1500-character segments with 200-character overlap; page mapping preserved.
+6. **Embedding** — batches of 64 chunks sent through the E5 model; 384-dim vectors stored in the `chunks` (`vec0`) virtual table.
+7. **Batch processing** — 10 PDFs per batch, with incremental progress reporting and memory cleanup.
 
 ### Summarization Pipeline
 
-1. All text chunks and page images loaded for the selected paper
-2. Embedding model unloaded to free GPU memory
-3. Chat model loaded (with mmproj if multimodal)
-4. Structured prompt sent requesting a JSON response containing: title, authors, journal, year, topics, research objective, methodology, core findings, critical limitations, citable summary, references
-5. Response parsed and stored in `Summaries` table
-6. Chunk metadata updated (clean title, citation)
-7. Chat model unloaded, embedding model reloaded
+1. All text chunks (and page images, if multimodal) loaded for the selected paper.
+2. Embedding model unloaded to free GPU memory.
+3. Chat model loaded (with `mmproj` if multimodal).
+4. Structured prompt requesting a JSON response: title, authors, journal, year, topics, research objective, methodology, core findings, critical limitations, citable summary, references.
+5. Response parsed and stored in the `Summaries` table.
+6. Chunk metadata updated (clean title, citation); a `Citations` row is created.
+7. Chat model unloaded, embedding model reloaded.
+8. `OpenAlexClient::checkEmptyReferences` fires (on `summaryFinished`) to fetch references for the new paper.
 
 ### RAG Query Pipeline
 
-1. User query embedded and compared against `vec0` index (configurable top-K)
-2. Retrieved chunks grouped and deduplicated by `(paper_hash, page)`
-3. Page images loaded (if multimodal enabled)
-4. Structured prompt built with page contexts, citation markers, and user query
-5. LLM synthesizes a cross-paper response with academic-style citations
-6. Result persisted in `Queries` table
+1. User query embedded and compared against the `chunks` index (retrieves more than `maxPages`, e.g. `max(maxPages*4, 80)`, to survive dedup).
+2. Retrieved chunks grouped and deduplicated by `(paper_hash, page)`, truncated to `maxPages`.
+3. Page images loaded (if `visualMode` includes visual context).
+4. Structured prompt built with page contexts, citation markers, and the user query.
+5. LLM synthesizes a cross-paper response with academic-style citations.
+6. Result persisted in the `Queries` table.
+
+---
 
 ## Database Schema
 
-### `Summaries` table
+Each project is one SQLite file (`<project_name>.db`, WAL mode). Three tables plus the vector virtual table:
+
+### `Summaries`
 
 | Column         | Type                | Description                     |
 | -------------- | ------------------- | ------------------------------- |
@@ -277,35 +584,55 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
 | `year`         | TEXT                | Publication year                |
 | `topics`       | TEXT                | Comma-separated topics          |
 | `llmodel`      | TEXT                | Model used for summarization    |
-| `summary_json` | BLOB                | Full structured summary as JSON |
-| `date`         | TEXT                | ISO 8601 timestamp              |
+| `summary_json` | TEXT                | Full structured summary as JSON |
+| `date`         | DATETIME            | Timestamp                       |
 
-### `Queries` table
+### `Queries`
 
-| Column     | Type                | Description                      |
-| ---------- | ------------------- | -------------------------------- |
-| `id`       | INTEGER PRIMARY KEY | Auto-increment                   |
-| `query`    | TEXT                | User's natural language question |
-| `response` | TEXT                | LLM-generated answer             |
-| `date`     | TEXT                | ISO 8601 timestamp               |
-| `llmodel`  | TEXT                | Model used                       |
+| Column     | Type                | Description                                      |
+| ---------- | ------------------- | ------------------------------------------------ |
+| `id`       | INTEGER PRIMARY KEY | Auto-increment                                   |
+| `query`    | TEXT                | User's natural language question                 |
+| `response` | TEXT                | LLM-generated answer                             |
+| `date`     | DATETIME            | ISO 8601 timestamp (default `CURRENT_TIMESTAMP`) |
+| `llmodel`  | TEXT                | Model used                                       |
+
+### `Citations`
+
+| Column           | Type    | Description                                                       |
+| ---------------- | ------- | ----------------------------------------------------------------- |
+| `id`             | INTEGER | Auto-increment (primary key)                                      |
+| `paper_hash`     | TEXT    | MD5 of the PDF (unique) — joins to `Summaries`                    |
+| `clean_title`    | TEXT    | Paper title for citation formatting                               |
+| `work_id`        | TEXT    | OpenAlex work id (empty if not resolved)                          |
+| `cites`          | TEXT    | JSON array of works this paper **cited** (or a marker string)     |
+| `cited_by`       | TEXT    | JSON array of works that **cite** this paper (or a marker string) |
+| `cites_count`    | INTEGER | Total OpenAlex count for `cites`                                  |
+| `cited_by_count` | INTEGER | Total OpenAlex count for `cited_by`                               |
+
+The `CitationsModel` joins `Citations` to `Summaries` (so only summarized papers appear) and formats both sections as APA-style bibliographies for the QML display pane.
 
 ### `chunks` (sqlite-vec `vec0` virtual table)
 
-| Column        | Type     | Description                         |
-| ------------- | -------- | ----------------------------------- |
-| `rowid`       | INTEGER  | Auto-increment                      |
-| `embedding`   | float[N] | 384-dim vector (E5)                 |
-| `paper_hash`  | TEXT     | MD5 of source PDF                   |
-| `page`        | INTEGER  | 0-based page number                 |
-| `chunk_idx`   | INTEGER  | Chunk index within page             |
-| `chunk_text`  | TEXT     | Raw text segment (~1500 chars)      |
-| `citation`    | TEXT     | Generated citation string           |
-| `clean_title` | TEXT     | Paper title for citation formatting |
+| Column          | Type       | Description                         |
+| --------------- | ---------- | ----------------------------------- |
+| `rowid`         | INTEGER    | Auto-increment                      |
+| `embedding`     | float[384] | 384-dim vector (E5)                 |
+| `paper_hash`    | TEXT       | MD5 of source PDF                   |
+| `page`          | INTEGER    | 0-based page number                 |
+| `chunk_idx`     | INTEGER    | Chunk index within page             |
+| `chunk_text`    | TEXT       | Raw text segment (~1500 chars)      |
+| `citation`      | TEXT       | Generated citation string           |
+| `clean_title`   | TEXT       | Paper title for citation formatting |
+| `page_metadata` | TEXT       | Extra per-page JSON                 |
+
+---
 
 ## Configuration
 
-### `config.json` (`~/.local/share/Hodeia/config.json`)
+### `config.json`
+
+Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.json`; Windows: `%LOCALAPPDATA%\Hodeia\config.json`):
 
 ```json
 {
@@ -314,10 +641,8 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
   "activeBackend": "Llama.cpp",
   "activeModel": "qwq32b",
   "openAlexApiKey": "",
-  "modelTemperature": 0.1,
-  "useVisualContext": true,
-  "maxPages": 50,
-  "topK": 20,
+  "visualMode": 1,
+  "language": "en",
   "backendList": [
     { "name": "Llama.cpp", "url": "", "api_key": "" },
     { "name": "Ollama", "url": "http://localhost:11434/v1", "api_key": "" }
@@ -325,36 +650,57 @@ Each platform handles deployment in its `cmake/Platform<OS>.cmake`:
 }
 ```
 
-### Directory Layout
+- **`visualMode`** — `0` = Text only, `1` = some visual context, `2` = Full (all pages). (Legacy: an old `useVisualContext` boolean is still read and mapped to `0`/`1`.)
+- **`language`** — `"en"` (default) or `"fr"`. Changing it reloads the translator and re-loads the QML engine.
+- **`backendList`** — one object per backend; `Llama.cpp` is the local backend (empty `url`), the rest are remote (OpenAI-compatible) endpoints.
+- RAG tuning (`topK`, `maxPages`) and the model temperature are also persisted by the config manager.
+
+Setters save to disk automatically on every change.
+
+### Directory layout
+
+PDFs are ingested **in place** (referenced from their original location, not copied into the project); only page thumbnails are stored under the project's `IMG/`.
 
 ```
 ~/.local/share/Hodeia/
 ├── config.json
-├── hardware.json                    # Cached hardware detection results
 ├── Projects/
 │   └── <project_name>/
-│       ├── <project_name>.db        # SQLite database
-│       ├── PDF/                     # Copied PDF files
-│       └── IMG/                     # Page thumbnails
+│       ├── <project_name>.db        # SQLite database (WAL mode)
+│       └── IMG/                     # page thumbnails (PDFs referenced in place)
 └── Models/
     ├── Summarizers/
     │   └── <model_name>/
     │       ├── model.gguf
-    │       └── mmproj.gguf          # Optional: vision projector
+    │       └── mmproj.gguf          # optional: vision projector
     └── Embedders/
         └── <model_name>/
             └── model.gguf
 ```
 
+A bundled `multilingual-e5-small-q8_0.gguf` (from `Resources/Embedders/`) is seeded into the data directory on first run, so RAG works without the user providing an embedder.
+
+---
+
 ## LocalBackend Details
 
 The `LocalBackend` wraps llama.cpp's `common` library:
 
-- **Adaptive GPU fitting** — Iteratively adjusts `n_gpu_layers`, `n_ctx`, KV cache type, and `n_ubatch` to fit available VRAM
-- **Integrated GPU support** — All-or-nothing layer offload strategy to avoid Vulkan scheduler overflow
-- **Lazy mmproj loading** — Vision projectors loaded on-demand when multimodal context is needed
-- **Chat template parsing** — Jinja templates extracted from GGUF metadata
-- **Hybrid offloading** — Manual GPU + CPU layer split when VRAM is constrained
+- **Adaptive GPU fitting** — iteratively adjusts `n_gpu_layers`, `n_ctx`, KV cache type, and `n_ubatch` to fit available VRAM.
+- **Integrated GPU support** — all-or-nothing layer offload to avoid Vulkan scheduler overflow.
+- **Lazy `mmproj` loading** — vision projectors loaded on-demand when multimodal context is needed.
+- **Chat template parsing** — Jinja templates extracted from GGUF metadata.
+- **Hybrid offloading** — manual GPU + CPU layer split when VRAM is constrained.
+- **Runtime backend discovery** — `ggml_backend_load_all()` selects the best CPU microarch variant and auto-detects CUDA/Vulkan from the deployed libraries.
+
+## OpenAlex Citations
+
+`OpenAlexClient` runs on its own thread and queries the OpenAlex works API (`https://api.openalex.org/works`):
+
+- **On summarize** — connected to `SummaryController::summaryFinished`, it fetches the references (works the paper cited) and the citing works, stores them as JSON in the `Citations` table.
+- **Startup catch-up** — on launch, `checkEmptyReferences` scans for `Citations` rows that still carry the "no references found" marker and re-fetches them (covers papers summarized in a prior session before OpenAlex was reachable).
+- **Pagination** — 100 works per page (the 200-page cap is deprecated); the stored counts reflect OpenAlex's true totals.
+- **Optional API key** — `openAlexApiKey` (if set) is sent to raise rate limits; otherwise requests are anonymous.
 
 ## Theme System
 
@@ -372,28 +718,29 @@ Themes are JSON files in `ui/themes/` with a Catppuccin-style palette:
 }
 ```
 
-19 themes ship with the application. The `ThemeManager` loads the active theme into the `Colors` QML singleton.
+19 themes ship with the application. `ThemeManager` loads the active theme into the `Colors` QML singleton; the app forces the **Fusion** `QQuickStyle` so the manual palette is honored across desktop environments.
 
-## Hardware Detection
+## Logging & Diagnostics
 
-The `HardwareDetector` probes:
+`main.cpp` installs a unified logging sink before any model is loaded:
 
-- CPU model, core count, thread count
-- Total and available RAM
-- GPU(s) — vendor, model, VRAM (via `nvidia-smi`, Vulkan enumerate, or sysfs)
-- NUMA node topology
-- NPU presence (Apple Silicon)
+- **Crash log** — `Hodeia.log` in the executable directory, overwritten each run, flushed on every line. Captures the last output before a hard crash even when the app is double-clicked with no console.
+- **Console mirroring** — on Windows a `WIN32` GUI build has no console, so when launched from a shell the app attaches to the parent console (`WriteConsoleW`) and mirrors `qDebug`/`qWarning` there; on Linux/macOS the standard terminal behavior is preserved.
+- **llama.cpp log capture** — `llama_log_set` forwards ggml/llama output (INFO and above) into the same sink, so backend-load diagnostics (e.g. "failed to load ggml-cuda.dll") are visible.
+- **Translation loading** — `loadTranslator` loads `i18n/hodeia_<lang>.qm`; changing the language in Settings reloads the translator and re-loads the QML module so all `qsTr()` calls re-evaluate.
 
-Results are cached in `hardware.json` and used by the `LocalBackend` to make adaptive loading decisions.
+---
 
 ## Key Design Decisions
 
-| Decision                                     | Rationale                                                                          |
-| -------------------------------------------- | ---------------------------------------------------------------------------------- |
-| SQLite + sqlite-vec over dedicated vector DB | Minimal dependencies, single-file database, per-project isolation                  |
-| MuPDF over Poppler                           | Layout-aware structured text extraction with column segmentation                   |
-| Tesseract as fallback, not primary           | OCR is slow; most PDFs have extractable text layers                                |
-| Pre-compiled llama.cpp .so files             | Avoids building llama.cpp from source; supports multiple GPU backends side by side |
-| E5 multilingual embeddings                   | Strong cross-language retrieval without a separate embedding service               |
-| Chunking at ~1500 chars                      | Balances embedding quality with context window efficiency                          |
-| Unloading models between pipelines           | GPU VRAM is the bottleneck; never hold chat + embedding models simultaneously      |
+| Decision                                     | Rationale                                                                                             |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| SQLite + sqlite-vec over dedicated vector DB | Minimal dependencies, single-file database, per-project isolation                                     |
+| MuPDF over Poppler                           | Layout-aware structured text extraction with column segmentation                                      |
+| Tesseract as fallback, not primary           | OCR is slow; most PDFs have extractable text layers                                                   |
+| Pre-compiled llama.cpp (single flat set)     | One combined build (CPU+CUDA+Vulkan), shared ggml-base ABI; runtime backend + CPU microarch selection |
+| E5 multilingual embeddings                   | Strong cross-language retrieval without a separate embedding service                                  |
+| Chunking at ~1500 chars                      | Balances embedding quality with context window efficiency                                             |
+| Unloading models between pipelines           | GPU VRAM is the bottleneck; never hold chat + embedding models simultaneously                         |
+| OpenAlex as a side channel                   | Citations are public data; fetched async so they never block summarization/RAG                        |
+| AGPL-3.0 + Qt (LGPL)                         | The Qt citation + third-party notices are in `NOTICE`                                                 |

@@ -1,19 +1,11 @@
 {
   "name": "GruvBox Light",
   "primary":     "#b57614",
-  "secondary":   "#076678",
 
-  "magenta":    "#8f3f71",
   "red":        "#9d0006",
-  "orange":     "#af3a03",
-  "yellow":     "#b57614",
   "green":      "#79740e",
-  "cyan":       "#427b58",
-  "blue":       "#076678",
 
   "text":       "#3c3836",
-  "subtext1":   "#4f4a43",
-  "subtext0":   "#665c54",
   "overlay2":   "#7c6f64",
   "overlay1":   "#928374",
   "overlay0":   "#a89984",

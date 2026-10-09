@@ -1,19 +1,11 @@
 {
   "name": "Catppuccin Latte",
   "primary":    "#8839ef",
-  "secondary":  "#1e66f5",
 
-  "magenta":    "#8839ef",
   "red":        "#d20f39",
-  "orange":     "#fe640b",
-  "yellow":     "#df8e1d",
   "green":      "#40a02b",
-  "cyan":       "#04a5e5",
-  "blue":       "#1e66f5",
 
   "text":       "#4c4f69",
-  "subtext1":   "#5c5f77",
-  "subtext0":   "#6c6f85",
   "overlay2":   "#7c7f93",
   "overlay1":   "#8c8fa1",
   "overlay0":   "#9ca0b0",

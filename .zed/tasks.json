@@ -5,7 +5,7 @@
   // ===== Windows =====
   {
     "label": "Windows: Build (Release)",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File build-app.ps1",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -25,7 +25,7 @@
   },
   {
     "label": "Windows: Build & Run",
-    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File build-app.ps1 && cd /d build-windows && Hodeia.exe\"",
+    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 && cd /d build-windows && Hodeia.exe\"",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
@@ -35,7 +35,7 @@
   },
   {
     "label": "Windows: Build Debug",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& .\\build-app.ps1 -Configuration Debug\"",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& .\\scripts\\Windows\\build-app.ps1 -Configuration Debug\"",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -45,7 +45,7 @@
   },
   {
     "label": "Windows: Build Dependencies",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File build-dependencies.ps1",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-dependencies.ps1",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -55,7 +55,7 @@
   },
   {
     "label": "Windows: Clean App Build",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File clean-app.ps1",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/clean-app.ps1",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",
@@ -65,7 +65,7 @@
   },
   {
     "label": "Windows: Clean Dependencies",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File clean-deps.ps1",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/clean-deps.ps1",
     "use_new_terminal": false,
     "reveal": "always",
     "reveal_target": "dock",

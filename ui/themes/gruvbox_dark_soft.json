@@ -1,19 +1,11 @@
 {
   "name": "GruvBox Dark Soft",
   "primary":     "#b8bb26",
-  "secondary":   "#83a598",
 
-  "magenta":    "#d3869b",
   "red":        "#fb4934",
-  "orange":     "#fe8019",
-  "yellow":     "#fabd2f",
   "green":      "#b8bb26",
-  "cyan":       "#8ec07c",
-  "blue":       "#83a598",
 
   "text":       "#d5c4a1",
-  "subtext1":   "#bdae93",
-  "subtext0":   "#a89984",
   "overlay2":   "#928374",
   "overlay1":   "#7c6f64",
   "overlay0":   "#665c54",

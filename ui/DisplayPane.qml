@@ -6,7 +6,6 @@ import QtQuick.Layouts
 
 Rectangle {
     id: displayPane
-    property var activeTheme: ({})
     property string activePaperHash: ""
     color: Colors.surface0
     border.width: 1
@@ -327,9 +326,7 @@ Rectangle {
                         source: {
                             if (displayPane.pageImages.length === 0)
                                 return "";
-                            return helpers.localFileUrl(
-                                displayPane.pageImages[
-                                    Math.max(pageSpinner.value - 1, 0)]);
+                            return helpers.localFileUrl(displayPane.pageImages[Math.max(pageSpinner.value - 1, 0)]);
                         }
                     }
                 }
