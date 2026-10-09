@@ -106,8 +106,18 @@ static void logOut(const QString &tag, const QString &msg) {
       QString::fromLatin1("[") + tag + QString::fromLatin1("] ") + msg;
   crashLogWrite(line);
 #ifdef Q_OS_WIN
+  // Windows: a WIN32 build has no console of its own; mirror to the attached
+  // parent console (if any) via WriteConsoleW.  No stderr here (a GUI build's
+  // stderr is a null device unless a console is attached).
   if (s_consoleAttached)
     consoleWrite(line);
+#else
+  // Linux/macOS: keep the default terminal behaviour — the previous
+  // (pre-handler) Qt sink printed every qDebug/qWarning to stderr.  That
+  // default is now replaced by this handler, so we must re-emit it or the
+  // terminal goes silent (only Hodeia.log gets the output).  Writing the
+  // tagged line directly mirrors the standard Qt format.
+  fprintf(stderr, "%s\n", line.toUtf8().constData());
 #endif
 }
 

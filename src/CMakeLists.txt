@@ -101,12 +101,16 @@ target_link_libraries(HodeiaEngine
         ${LLAMA_LINK_LIBS}
 )
 
-# Windows: vcpkg-provided OCR + Vulkan targets (no-ops on Linux/macOS).
-if(HODEIA_PLATFORM_WIN)
+# OCR (Tesseract/Leptonica): Linux/macOS link the in-tree static libs (set by
+# the platform cmake); Windows links the vcpkg targets.  ingestionengine.cpp
+# uses the OCR path on all platforms, so this must not be Windows-only.
+if(TESS_LEPTO_TARGETS)
   target_link_libraries(HodeiaEngine PRIVATE ${TESS_LEPTO_TARGETS})
-  if(VULKAN_TARGET)
-    target_link_libraries(HodeiaEngine PRIVATE ${VULKAN_TARGET})
-  endif()
+endif()
+
+# Windows-only: vcpkg Vulkan target (no-op on Linux/macOS).
+if(HODEIA_PLATFORM_WIN AND VULKAN_TARGET)
+  target_link_libraries(HodeiaEngine PRIVATE ${VULKAN_TARGET})
 endif()
 
 # OpenMP (ggml-cpu parallelism)

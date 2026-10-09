@@ -38,7 +38,15 @@ LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
     // initialize.  A no-op for backends that are already loadable.
     {
       const QString appDir = QCoreApplication::applicationDirPath();
-      const QStringList candidates = {"ggml-cuda.dll", "ggml-vulkan.dll"};
+      // Unversioned names (the deploy step creates lib*.so -> lib*.so.0
+      // symlinks next to the binary).  Windows ships ggml-*.dll directly.
+      const QStringList candidates = {
+#ifdef Q_OS_WIN
+          "ggml-cuda.dll", "ggml-vulkan.dll"
+#else
+          "libggml-cuda.so", "libggml-vulkan.so"
+#endif
+      };
       for (const QString &c : candidates) {
         const QString p = appDir + "/" + c;
         if (QFile::exists(p))
