@@ -898,6 +898,22 @@ std::vector<ggml_backend_dev_t> LocalBackend::detectDevices() {
 /// re-init.  On failure returns nullptr and logs the error.
 common_init_result_ptr LocalBackend::createInitResult(common_params &params,
                                                       bool hasMmprojOnGpu) {
+  // llama_model_params.devices is a NULL-terminated C array of
+  // ggml_backend_dev_t*.  common_params.devices is a std::vector, which is
+  // NOT NULL-terminated, so common_model_params_to_llama's
+  //   mparams.devices = params.devices.data()
+  // hands llama an unbounded array.  llama_prepare_model_devices then walks
+  //   for (dev = params.devices; *dev; ++dev)
+  // reading past the vector's end until it hits a zero byte in the heap.
+  // On Windows the MSVC heap has non-zero bytes after the vector, so garbage
+  // device pointers get pushed and the load crashes in load_tensors
+  // (ggml_backend_dev_get_props on a garbage dev); on Linux the trailing heap
+  // happens to be zero so it terminates early and "works".  Append a trailing
+  // nullptr so .data() is a properly NULL-terminated array.
+  if (!params.devices.empty()) {
+    if (params.devices.back() != nullptr)
+      params.devices.push_back(nullptr);
+  }
   auto result = common_init_from_params(params);
   if (!result)
     return nullptr;
@@ -1002,8 +1018,14 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
 
   if (params.n_gpu_layers != 0) {
     // GPU path: the fitter already set params.devices to {bottleneck_gpu}.
-    // Apply global GPU settings — flash attention and auto layer split are
-    // used on all GPU backends (Vulkan, CUDA, Metal).
+    // Do NOT push the CPU device here.  params.devices is the list of
+    // compute devices the model is split across; mixing a CPU device (which
+    // carries no device_id on Windows — it reports "unknown id") into a
+    // fully GPU-offloaded model's device list crashes llama's device
+    // scheduler / arch dispatch during llama_model_load_from_file
+    // (NULL function pointer, Windows-only).  llama.cpp keeps a CPU backend
+    // available via ggml_backend_load_all() for host ops and hybrid offload
+    // on its own, so an explicit CPU entry is not needed.
     params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
     if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
       // lb_fit_params only sets mmproj if probe confirmed it exists

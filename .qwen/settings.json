@@ -22,7 +22,12 @@
       "Bash(cmake *)",
       "Bash(curl *)",
       "Bash(python3 *)",
-      "Bash(ninja)"
+      "Bash(ninja)",
+      "Read(D:\\Developpement\\Dependencies\\llama.cpp\\common\\llama-common.cpp/**)",
+      "Read(D:\\Developpement\\Dependencies\\llama.cpp\\common/**)",
+      "Bash(\"cd /d c:\\users\\garco\\documents\\developpement\\hodeia\\build-windows && findstr /n \"prepare_model_devices\\|using *)",
+      "Bash(dir *)",
+      "Bash(\"cd /d c:\\users\\garco\\documents\\developpement\\hodeia && findstr /n \"using *)"
     ]
   },
   "$version": 4
