@@ -81,8 +81,8 @@ public:
 
   /// Check a remote backend and retrieve its available models.
   /// Emits modelsChecked() with the result.
-  void checkRemoteModels(const QString &name, const QString &apiUrl,
-                         const QString &apiKey);
+  Q_INVOKABLE void checkRemoteModels(const QString &name, const QString &apiUrl,
+                                     const QString &apiKey);
 
   /// Load available models for the currently active backend (local or remote).
   /// Emits modelsChecked() with the result.
