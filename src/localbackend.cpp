@@ -104,8 +104,10 @@ LocalBackend::~LocalBackend() {
 /// prevents the projector from competing with the model for VRAM during the
 /// initial load, which is already the most memory-pressured moment.
 std::expected<void, QString>
-LocalBackend::loadModel(const QString &modelPath,
-                        uint32_t estimatedPromptTokens) {
+LocalBackend::loadModel(const QString &modelPath, const PromptPayload &payload,
+                        uint32_t responseHeadroom) {
+  // Exact-token-counting path: the probe measures the prompt tokens and sizes
+  // the KV cache as prompt_tokens + responseHeadroom, so no char heuristic.
   unloadModel();
 
   QString path = resolveModelPath(modelPath);
@@ -141,10 +143,10 @@ LocalBackend::loadModel(const QString &modelPath,
   const int loadSeq = ++s_loadSeq;
   qDebug() << "[LocalBackend] DIAG loadModel BEGIN #" << loadSeq
            << "| thread:" << QThread::currentThreadId() << "| path:" << path
-           << "| mmproj:" << m_mmprojPath;
+           << "| mmproj:" << m_mmprojPath << "| headroom:" << responseHeadroom;
 
   common_init_result_ptr result = loadModelWithDevices(
-      path, m_mmprojPath, devices, devName, estimatedPromptTokens);
+      path, m_mmprojPath, devices, devName, &payload, responseHeadroom);
 
   if (!result) {
     qCritical() << "[LocalBackend] DIAG loadModel #" << loadSeq
@@ -295,13 +297,74 @@ struct probe_info {
   uint64_t model_size = 0;
   uint64_t mmproj_size = 0;
   bool has_mmproj = false;
+  uint32_t prompt_tokens = 0;
 };
+
+/// Assemble the raw user-prompt text from a payload (no chat template, no
+/// image embeddings).  This is the single source of truth shared by prompt
+/// token-counting and the actual inference prompt, so the media marker and
+/// structure can never diverge between the two.
+///
+/// \param marker    media-placeholder string (mtmd marker, or "<__media__>"
+///                  when no projector is loaded).
+/// \param maxChars  hard cap on prompt characters.  0 means "no cap" (used
+///                  for token counting).  When set, the document body is
+///                  truncated on BOTH the pageBlocks and legacy textContext
+///                  paths so the counted prompt matches what gets fed to
+///                  inference.
+static QString lb_build_user_prompt(const PromptPayload &payload,
+                                    const QString &marker, int32_t maxChars) {
+  // Reserve room for the userMessage header + truncation suffix so the
+  // returned string never exceeds maxChars when a cap is applied.
+  int32_t budget = 0;
+  if (maxChars > 0) {
+    budget = maxChars - static_cast<int32_t>(payload.userMessage.length()) -
+             40; // "## DOCUMENT" header + "\n\n... [truncated]" suffix
+    if (budget < 256)
+      budget = 256;
+  }
+
+  QString userPrompt = payload.userMessage + "\n\n## DOCUMENT\n\n";
+
+  // ── Interleaved path (pageBlocks non-empty) ──
+  if (!payload.pageBlocks.empty()) {
+    for (const auto &pb : payload.pageBlocks) {
+      userPrompt += QString("## Page %1\n").arg(pb.pageNumber);
+      if (!pb.visualContext.data.empty())
+        userPrompt += marker + "\n";
+      userPrompt += pb.text + "\n\n";
+      if (budget > 0 && userPrompt.length() > budget) {
+        userPrompt = userPrompt.left(budget) + "\n\n... [truncated]";
+        break;
+      }
+    }
+  }
+  // ── Legacy path (textContext + visualContext) ──
+  else {
+    if (!payload.visualContext.empty()) {
+      userPrompt += "## VISUAL CONTEXT\n";
+      for (size_t i = 0; i < payload.visualContext.size(); ++i)
+        userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
+      userPrompt += "\n";
+    }
+    userPrompt += payload.userMessage + "\n\n## TEXT CONTEXT\n\n";
+    QString ctx = payload.textContext;
+    if (budget > 0 && ctx.length() > budget) {
+      ctx = ctx.left(budget) + "\n\n... [truncated]";
+    }
+    userPrompt += ctx;
+  }
+  return userPrompt;
+}
 
 /// Probe model metadata (no GPU allocation) and optionally measure mmproj.
 /// Uses no_alloc=true with mmap disabled to avoid the GGML_ASSERT in
 /// llama-model.cpp:1534 which fires when both are enabled simultaneously.
+/// When a payload is provided, the exact prompt token count is measured with
+/// the same no-alloc model load (no extra load).
 static probe_info lb_probe_model(const QString &modelPath,
-                                 const QString &mmprojPath) {
+                                 const QString &mmprojPath,
+                                 const PromptPayload *payload) {
   probe_info info{};
 
   auto mparams = llama_model_default_params();
@@ -326,6 +389,42 @@ static probe_info lb_probe_model(const QString &modelPath,
     info.n_embd_v_gqa = info.n_embd_k_gqa;
   }
   info.model_size = llama_model_size(model);
+
+  // Count the exact prompt tokens while the no-alloc model is already open.
+  if (payload) {
+    auto tmpl = common_chat_templates_init(model, "");
+    std::string formatted;
+    if (tmpl) {
+      common_chat_templates_inputs inputs;
+      inputs.use_jinja = true;
+      inputs.add_generation_prompt = true;
+      inputs.enable_thinking = false;
+      if (!payload->systemPrompt.isEmpty()) {
+        common_chat_msg sysMsg;
+        sysMsg.role = "system";
+        sysMsg.content = payload->systemPrompt.toStdString();
+        inputs.messages.push_back(std::move(sysMsg));
+      }
+      common_chat_msg usrMsg;
+      usrMsg.role = "user";
+      // No char cap (0) — counting needs the full prompt; the marker is the
+      // mtmd default since no projector is loaded at probe time.
+      usrMsg.content =
+          lb_build_user_prompt(*payload, "<__media__>", 0).toStdString();
+      inputs.messages.push_back(std::move(usrMsg));
+      formatted = common_chat_templates_apply(tmpl.get(), inputs).prompt;
+      common_chat_templates_free(tmpl.release());
+    }
+    const QString unformatted =
+        formatted.empty() ? lb_build_user_prompt(*payload, "<__media__>", 0)
+                          : QString();
+    const std::string text =
+        formatted.empty() ? unformatted.toStdString() : formatted;
+    auto *vocab = llama_model_get_vocab(model);
+    info.prompt_tokens =
+        static_cast<uint32_t>(common_tokenize(vocab, text, true, true).size());
+  }
+
   llama_model_free(model);
 
   // Measure mmproj size.  The mmproj uses a "clip" architecture which
@@ -947,11 +1046,13 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params,
 common_init_result_ptr LocalBackend::loadModelWithDevices(
     const QString &path, const QString &mmprojPath,
     const std::vector<ggml_backend_dev_t> &devices, const char *primaryName,
-    uint32_t estimatedCtxTokens) {
+    const PromptPayload *payload, uint32_t responseHeadroom) {
   (void)primaryName;
 
   // ── Phase 1: probe model metadata (no GPU allocation) ──────────
-  probe_info probe = lb_probe_model(path, mmprojPath);
+  // When a payload is given, the probe also counts the exact prompt token
+  // count during this same no-alloc load.
+  probe_info probe = lb_probe_model(path, mmprojPath, payload);
   if (!probe.n_layers) {
     qCritical() << "[LocalBackend] Model probe failed:" << path;
     return nullptr;
@@ -962,11 +1063,14 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   device_mem *cpuDev = nullptr;
   lb_discover(gpuDevs, cpuDev);
 
-  // Size the KV cache.  The caller passes estimatedCtxTokens = prompt_tokens
-  // + generation_tokens.  If not provided, use the model's trained context.
+  // Size the KV cache from the exact prompt token count (measured during the
+  // probe) plus the caller's generation headroom.
   uint32_t desiredCtx;
-  if (estimatedCtxTokens > 0) {
-    desiredCtx = estimatedCtxTokens;
+  if (payload && probe.prompt_tokens > 0) {
+    desiredCtx = probe.prompt_tokens + responseHeadroom;
+    qDebug() << "[LocalBackend] lb_fit: exact prompt tokens:"
+             << probe.prompt_tokens << "+ " << responseHeadroom
+             << " headroom → desiredCtx:" << desiredCtx;
   } else {
     desiredCtx = probe.n_ctx_train > 0 ? probe.n_ctx_train : 8192;
   }
@@ -1151,9 +1255,9 @@ bool LocalBackend::isReady() const { return m_ready; }
 
 // ── Summarize entry point ──────────────────────────────────────────
 
-/// Main public entry point. Computes how much prompt space is available
-/// (leaving room for generation), truncates the text context accordingly,
-/// and dispatches to text-only or multimodal inference.
+/// Main public entry point. Applies a conservative character budget to the
+/// prompt (so it never overflows the KV cache when the token estimate is
+/// low) and dispatches to text-only or multimodal inference.
 QString LocalBackend::summarize(const PromptPayload &payload,
                                 bool *cancelFlag) {
   if (!m_ready) {
@@ -1161,13 +1265,16 @@ QString LocalBackend::summarize(const PromptPayload &payload,
     return QString();
   }
 
-  // Calculate available prompt budget.  The caller already sized the KV cache
-  // via estimatedCtxTokens (prompt + generation room).  We don't impose an
-  // arbitrary split — the prompt gets the full context, and generation stops
-  // naturally on EOS / stop-sequence or when the KV cache is full.
+  // Character budget for the prompt.  The KV cache was already sized at load
+  // time from the *exact* prompt token count plus the caller's generation
+  // headroom (see loadModelWithDevices), so there is room to spare.  This
+  // cap is only a safety net: it guards against the fitted n_ctx being
+  // smaller than expected (e.g. the fitter scaled it down to fit VRAM).
+  // 4 chars/token is conservative (typical English prose is ~4 chars/token),
+  // so a prompt of `ctxSize` tokens is ~4*ctxSize chars — keeping the
+  // rendered prompt within the context window.
   int32_t ctxSize = llama_n_ctx(m_llamaCtx);
-  int32_t maxPromptToks = ctxSize;
-  int maxChars = maxPromptToks * 3;
+  int maxChars = ctxSize * 4;
 
   // Collect images from pageBlocks (preserving page order)
   std::vector<PageImage> images;
@@ -1327,40 +1434,12 @@ QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
                                            int32_t maxChars) {
   const char *rawMarker =
       m_mtmdCtx != nullptr ? mtmd_get_marker(m_mtmdCtx) : nullptr;
-  const char *marker = rawMarker ? rawMarker : "<__media__>";
+  const QString marker =
+      rawMarker ? QString::fromUtf8(rawMarker) : QStringLiteral("<__media__>");
 
-  QString userPrompt;
-  userPrompt += payload.userMessage + "\n\n## DOCUMENT\n\n";
-
-  // ── Interleaved path (pageBlocks non-empty) ──
-  if (!payload.pageBlocks.empty()) {
-    for (const auto &pb : payload.pageBlocks) {
-      userPrompt += QString("## Page %1\n").arg(pb.pageNumber);
-      if (!pb.visualContext.data.empty())
-        userPrompt += QString("%1\n").arg(marker);
-      userPrompt += pb.text + "\n\n";
-    }
-  }
-  // ── Legacy path (textContext + visualContext) ──
-  else {
-    if (!payload.visualContext.empty()) {
-      userPrompt += "## VISUAL CONTEXT\n";
-      for (size_t i = 0; i < payload.visualContext.size(); ++i) {
-        userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
-      }
-      userPrompt += "\n";
-    }
-    userPrompt += payload.userMessage + "\n\n## TEXT CONTEXT\n\n";
-    QString ctx = payload.textContext;
-    bool truncated = ctx.length() > maxChars;
-    if (truncated) {
-      ctx = ctx.left(maxChars) + "\n\n... [truncated]";
-      qDebug() << "[LocalBackend] buildFormattedPrompt: textContext truncated"
-               << payload.textContext.length() << "→" << ctx.length()
-               << "chars (maxChars=" << maxChars << ")";
-    }
-    userPrompt += ctx;
-  }
+  // Shared with token-counting (lb_build_user_prompt) so the prompt fed to
+  // inference is byte-for-byte what was counted when sizing the KV cache.
+  const QString userPrompt = lb_build_user_prompt(payload, marker, maxChars);
 
   // ── Debug: show prompt before chat template ──
   qDebug() << "========== PROMPT DEBUG ==========";

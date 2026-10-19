@@ -80,20 +80,17 @@ public:
   explicit LocalBackend(QObject *parent = nullptr);
   ~LocalBackend() override;
 
-  /// Load a GGUF model (and optionally an mmproj) from disk.
-  /// Returns std::expected<void, QString> — error string on failure.
-  ///
-  /// \param estimatedPromptTokens  number of tokens the upcoming prompt will
-  ///                                consume (prompt + generation).  Pass 0 to
-  ///                                use the model's trained context size.  The
-  ///                                fitter uses this to size the KV cache
-  ///                                realistically, avoiding wasted VRAM on
-  ///                                unused context slots.
+  /// Load a GGUF model (and optionally an mmproj) from disk, counting the
+  /// formatted prompt tokens with the model's own vocabulary during the
+  /// no-alloc probe and sizing the KV cache as prompt_tokens +
+  /// responseHeadroom. Returns std::expected<void, QString> — error string on
+  /// failure.
   ///
   /// Calls unloadModel() internally if a model is already loaded, so it's
   /// safe to call repeatedly.
-  std::expected<void, QString> loadModel(const QString &modelPath = QString(),
-                                         uint32_t estimatedPromptTokens = 0);
+  std::expected<void, QString> loadModel(const QString &modelPath,
+                                         const PromptPayload &payload,
+                                         uint32_t responseHeadroom = 2048);
 
   /// Returns true if a model is loaded and ready for inference.
   bool isReady() const;
@@ -153,13 +150,16 @@ private:
   std::vector<ggml_backend_dev_t> detectDevices();
 
   /// Unified model loader with hybrid GPU+CPU offloading.
-  /// \param estimatedCtxTokens  total tokens the KV cache needs to hold
-  ///                            (prompt + generation).  Pass 0 for default.
+  /// \param payload             optional prompt used to count exact prompt
+  ///                            tokens during the no-alloc probe.
+  /// \param responseHeadroom    tokens reserved for the generated response
+  ///                            when sizing the KV cache from exact prompt
+  ///                            tokens.
   common_init_result_ptr
   loadModelWithDevices(const QString &path, const QString &mmprojPath,
                        const std::vector<ggml_backend_dev_t> &devices,
-                       const char *primaryName,
-                       uint32_t estimatedCtxTokens = 0);
+                       const char *primaryName, const PromptPayload *payload,
+                       uint32_t responseHeadroom = 2048);
 
   /// libcommon init result — owns the llama_model + llama_context.
   common_init_result_ptr m_commonInit;

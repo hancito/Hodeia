@@ -265,6 +265,9 @@ QString InferenceEngine::generate() {
     common_sampler_accept(m_sampler.get(), tokenId, true);
 
     if (llama_vocab_is_eog(m_vocab, tokenId)) {
+      qDebug() << "[InferenceEngine] Generation stopped on EOS after" << i
+               << "tokens | final position:" << (nPast + i)
+               << "/ n_ctx:" << llama_n_ctx(m_ctx);
       break;
     }
 
@@ -282,7 +285,10 @@ QString InferenceEngine::generate() {
       common_batch batch(m_ctx);
       if (batch.add(tokenId, nPast + i, 0, /*output=*/true) >= 0) {
         if (llama_process(m_ctx, LLAMA_PROCESS_TYPE_DECODE, batch.get()) != 0) {
-          qCritical() << "[InferenceEngine] Decode failed at token" << i;
+          qCritical() << "[InferenceEngine] Decode failed at token" << i
+                      << "| position:" << (nPast + i)
+                      << "/ n_ctx:" << llama_n_ctx(m_ctx)
+                      << "— KV cache likely exhausted, output truncated";
           break;
         }
       }

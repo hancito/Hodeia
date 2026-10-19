@@ -170,18 +170,14 @@ void QueryWorker::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
 
 QString QueryWorker::queryLocal(const PromptPayload &payload,
                                 const BackendInfo &backend) {
-  uint64_t payloadChars = payload.textContext.length() +
-                          payload.systemPrompt.length() +
-                          payload.userMessage.length();
-  uint32_t estimatedCtxTokens = static_cast<uint32_t>(payloadChars / 3) + 4096;
-
-  qDebug() << "[QueryWorker] Loading local model:" << backend.modelPath
-           << "| estimatedCtxTokens:" << estimatedCtxTokens;
+  // The backend counts the exact prompt tokens during its no-alloc probe and
+  // sizes the KV cache as prompt_tokens + headroom, so no char heuristic here.
+  qDebug() << "[QueryWorker] Loading local model:" << backend.modelPath;
   QElapsedTimer loadTimer;
   loadTimer.start();
 
   auto loadResult =
-      m_chatBackend->loadModel(backend.modelPath, estimatedCtxTokens);
+      m_chatBackend->loadModel(backend.modelPath, payload, m_headroom);
   if (!loadResult) {
     qWarning() << "[QueryWorker] Failed to load model:" << loadResult.error();
     return QString();

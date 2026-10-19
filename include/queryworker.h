@@ -86,6 +86,11 @@ private:
   void resetCancellation() { m_cancelled = false; }
 
   bool m_stopping = false;
+  // Tokens reserved for the generated response when sizing the local model's
+  // KV cache (prompt_tokens + m_headroom). RAG answers synthesize across
+  // multiple papers with citations, so this is larger than the summary
+  // headroom.
+  uint32_t m_headroom = 4096;
   bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
