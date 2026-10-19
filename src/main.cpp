@@ -165,11 +165,10 @@ static void initConsoleLogging() {
 static void initLlamaLogging() {
   llama_log_set(
       [](enum ggml_log_level level, const char *text, void *) {
-        // ggml emits backend-load failures at ERROR and "not supported" at
-        // INFO; capture INFO and above so diagnostics are visible without
-        // the full DEBUG noise.  GGML_LOG_LEVEL_CONT continues a previous
-        // line (multi-line backtrace) — keep it so the full message shows.
-        if (level < GGML_LOG_LEVEL_INFO && level != GGML_LOG_LEVEL_CONT)
+        // Surface backend-load failures and warnings without the model
+        // loader's INFO metadata dump. GGML_LOG_LEVEL_CONT continues a
+        // previous message, so keep it for multi-line output.
+        if (level < GGML_LOG_LEVEL_WARN && level != GGML_LOG_LEVEL_CONT)
           return;
         const char *tag = "INFO";
         switch (level) {
