@@ -12,6 +12,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPdfWriter>
+#include <QStack>
 #include <QStandardPaths>
 #include <QTextDocument>
 #include <QThreadPool>
@@ -91,12 +92,142 @@ PaperSummary Helpers::parseSummaryJson(const QString &raw) {
   QJsonParseError err;
   QJsonDocument doc = QJsonDocument::fromJson(text.toUtf8(), &err);
   if (err.error != QJsonParseError::NoError) {
-    qWarning() << "[Helpers] JSON parse error:" << err.errorString();
-    qWarning() << "[Helpers] offset:" << err.offset << "| context:"
-               << text.mid(qMax(0, err.offset - 30), 60).replace('\n', " ");
-    if (text.length() < 200)
-      qWarning() << "[Helpers] full cleaned text:" << text;
-    return summary;
+    // Small LLMs produce a predictable set of malformed-JSON patterns.
+    // Apply a progressive set of repairs (each retried against the parser)
+    // so we recover as much of the summary as possible instead of returning
+    // an empty object.  Strategy order is cheapest/most-likely first.
+    const QJsonParseError::ParseError origError = err.error;
+
+    // ── Repair 1: drop trailing / duplicated commas before a closer ──
+    // (e.g. `...positions.", }` or `["a","b",]`)
+    auto dropTrailingCommas = [](const QString &in) {
+      QString out;
+      out.reserve(in.length());
+      bool inString = false;
+      for (int i = 0; i < in.length(); ++i) {
+        const QChar c = in[i];
+        if (inString) {
+          out += c;
+          if (c == '\\' && i + 1 < in.length()) {
+            ++i;
+            out += in[i];
+          } else if (c == '"') {
+            inString = false;
+          }
+          continue;
+        }
+        if (c == '"') {
+          inString = true;
+          out += c;
+          continue;
+        }
+        if (c == ',') {
+          int j = i + 1;
+          while (j < in.length() && (in[j] == ',' || in[j].isSpace()))
+            ++j;
+          if (j < in.length() && (in[j] == '}' || in[j] == ']'))
+            continue; // drop the comma run
+        }
+        out += c;
+      }
+      return out;
+    };
+
+    // ── Repair 2: close any unterminated string at the very end ──
+    // The model bailing mid-value leaves a dangling `"...` with no closing
+    // quote.  If the trailing run of non-quote chars after the last '"' is
+    // the tail of an unterminated string, close it.
+    auto closeUnterminatedString = [](const QString &in) {
+      // Count whether the number of unescaped quotes is odd; if so, the
+      // final string is unterminated.
+      int quotes = 0;
+      for (int i = 0; i < in.length(); ++i) {
+        if (in[i] == '\\') {
+          ++i;
+          continue;
+        }
+        if (in[i] == '"')
+          ++quotes;
+      }
+      if (quotes % 2 == 1)
+        return in + "\"";
+      return in;
+    };
+
+    // ── Repair 3: append missing closers so the object/array balance ──
+    // The model bailing mid-object leaves `{...` with an unclosed `{`/`[`.
+    // Walk the structure (string-aware) and append the needed `]`/`}` in
+    // the correct order, dropping a trailing comma first.
+    auto appendMissingClosers = [](const QString &in) {
+      QString s = in;
+      // Drop a trailing comma + whitespace that would precede the closers.
+      while (!s.isEmpty() && s.at(s.length() - 1).isSpace())
+        s.chop(1);
+      if (!s.isEmpty() && s.at(s.length() - 1) == ',')
+        s.chop(1);
+
+      QStack<QString> openers;
+      bool inString = false;
+      for (int i = 0; i < s.length(); ++i) {
+        const QChar c = s[i];
+        if (inString) {
+          if (c == '\\' && i + 1 < s.length())
+            ++i;
+          else if (c == '"')
+            inString = false;
+          continue;
+        }
+        if (c == '"') {
+          inString = true;
+        } else if (c == '{') {
+          openers.push(QStringLiteral("}"));
+        } else if (c == '[') {
+          openers.push(QStringLiteral("]"));
+        } else if (c == '}' || c == ']') {
+          if (!openers.isEmpty())
+            openers.pop();
+        }
+      }
+      if (inString)
+        s += QLatin1Char('"'); // close a dangling string first
+      while (!openers.isEmpty())
+        s += openers.pop();
+      return s;
+    };
+
+    QString candidate = text;
+    const char *repairName = "none";
+    doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
+
+    if (err.error != QJsonParseError::NoError) {
+      candidate = dropTrailingCommas(text);
+      repairName = "trailing-comma";
+      doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
+    }
+    if (err.error != QJsonParseError::NoError) {
+      candidate = closeUnterminatedString(dropTrailingCommas(text));
+      repairName = "unterminated-string";
+      doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
+    }
+    if (err.error != QJsonParseError::NoError) {
+      candidate = appendMissingClosers(
+          closeUnterminatedString(dropTrailingCommas(text)));
+      repairName = "missing-closers";
+      doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
+    }
+
+    if (err.error != QJsonParseError::NoError) {
+      qWarning() << "[Helpers] JSON parse error (unrecovered):"
+                 << err.errorString()
+                 << "| original error:" << static_cast<int>(origError)
+                 << "| offset:" << err.offset << "| context:"
+                 << text.mid(qMax(0, err.offset - 30), 60).replace('\n', " ");
+      if (text.length() < 200)
+        qWarning() << "[Helpers] full cleaned text:" << text;
+      return summary;
+    }
+    if (repairName != QLatin1String("none"))
+      qInfo() << "[Helpers] Repaired malformed summary JSON via" << repairName;
   }
 
   QJsonObject obj = doc.object();

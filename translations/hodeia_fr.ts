@@ -755,7 +755,7 @@
     <message>
         <location filename="../ui/RagDbPane.qml" line="277"/>
         <source>Deletion cancelled</source>
-        <translation type="unfinished">Suppression annulée</translation>
+        <translation>Suppression annulée</translation>
     </message>
 </context>
 <context>
