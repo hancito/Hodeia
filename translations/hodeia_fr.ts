@@ -527,18 +527,18 @@
     </message>
     <message>
         <location filename="../ui/MyMenuBar.qml" line="143"/>
-        <source>Add Local Model</source>
-        <translation>Ajouter un modèle local</translation>
+        <source>Local Models</source>
+        <translation>Modèles locaux</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="148"/>
-        <source>Delete Local Model...</source>
-        <translation>Supprimer un modèle local...</translation>
+        <location filename="../ui/MyMenuBar.qml" line="147"/>
+        <source>Add Model...</source>
+        <translation>Ajouter un modèle...</translation>
     </message>
     <message>
         <location filename="../ui/MyMenuBar.qml" line="183"/>
-        <source>Add or Modify OpenAlex API key</source>
-        <translation>Ajouter ou modifier la clé API OpenAlex</translation>
+        <source>OpenAlex API key</source>
+        <translation>Clé API OpenAlex</translation>
     </message>
 </context>
 <context>

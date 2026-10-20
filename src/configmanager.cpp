@@ -32,6 +32,7 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   }
   ensureModelsDirectory();
   seedBundledModels();
+  selectDefaultModel();
   refreshProjectList();
 }
 
@@ -494,6 +495,31 @@ void ConfigManager::seedBundledModels() {
   };
 
   copyMissing(srcRoot, destRoot);
+}
+
+void ConfigManager::selectDefaultModel() {
+  // If the user has already picked a model, leave it alone.
+  if (!m_activeModel.isEmpty())
+    return;
+
+  // Pick the first local model that actually has a usable (non-mmproj) GGUF,
+  // so a fresh install works out of the box without the user touching Settings.
+  QDir dir(summarizersPath());
+  if (!dir.exists())
+    return;
+  const QStringList subdirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+  for (const QString &name : subdirs) {
+    const QStringList ggufs =
+        QDir(dir.absoluteFilePath(name))
+            .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
+    for (const QString &f : ggufs) {
+      if (!f.contains("mmproj", Qt::CaseInsensitive)) {
+        setActiveModel(name);
+        qDebug() << "[Config] Auto-selected default model:" << name;
+        return;
+      }
+    }
+  }
 }
 
 QString ConfigManager::modelsRoot() const {

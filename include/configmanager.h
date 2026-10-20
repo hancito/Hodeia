@@ -140,6 +140,9 @@ private:
   /// fills in any newly-bundled model without overwriting files the user
   /// already has.
   void seedBundledModels();
+  /// If no active model is selected (first run), pick the first available
+  /// local model from Models/Summarizers/ so the app works out of the box.
+  void selectDefaultModel();
   QString getFilePath() const;
   QString projectsRoot() const;
   QString modelsRoot() const;

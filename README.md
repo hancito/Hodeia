@@ -1,42 +1,30 @@
 # Hodeia
 
-**Your personal research assistant — powered by local AI, running entirely on your machine.**
+**Your personal research assistant — powered by AI.**
 
-Hodeia helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated structured summaries, pull their reference lists, and ask questions across your entire library — all without sending your data to the cloud.
+Hodeia helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated structured summaries, pull their reference lists, and ask questions across your entire library.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![C++23](https://img.shields.io/badge/C++-23-blue.svg)]
 [![Platform: Linux · Windows](https://img.shields.io/badge/Platform-Linux%20%C2%B7%20Windows-green.svg)]
 
-> _"Hodeia" — a nod to the Hodegoi (ἦδογοι / ὑδρογέες), the wandering scholars of antiquity. A fitting name for a tool that roams your library and answers your questions._
+> _"Hodeia" — from the Ancient Greek ὁδός (hodós), meaning "path." A fitting name for a tool that guides you through your library and answers your questions._
 
 ---
 
 ## Features
 
-- **📄 Import PDF papers** — Drag in individual files or entire folders. Text is extracted with MuPDF's layout-aware engine (columns, paragraphs, dehyphenation); scanned documents fall back to Tesseract OCR automatically.
-- **📝 Auto-summarize papers** — Get a structured summary per paper: title, authors, journal, year, topics, research objective, methodology, core findings, critical limitations, and a citable abstract.
-- **📚 References & citations via OpenAlex** — Pull each paper's references (works it cited) and the works that cite it straight from [OpenAlex](https://openalex.org), formatted as APA-style bibliographies. No data leaves your machine except these public lookups.
-- **🔍 Ask questions across your library (RAG)** — Query all your papers in natural language and get a synthesized, academic-style answer with inline citations drawn from the most relevant passages (vector search over sqlite-vec + E5 embeddings).
-- **🖼️ View papers visually** — Browse page-by-page thumbnails alongside the extracted text, the generated summary, the references, and a LaTeX view. Multimodal LLMs can reason over page images directly.
-- **📤 Export summaries** — Export any summary to Markdown or LaTeX.
-- **🎨 19 themes** — Catppuccin, Dracula, Gruvbox, Nord, Monokai, GitHub, and more.
-- **🌍 Localized UI** — English and French.
-- **🔒 100% private** — Everything runs locally. No accounts, no cloud, no telemetry, no data collection.
+- **Local AI first**: Hodeia is built around a local-AI-first strategy, a performance-focused stack (C++, llama.cpp, Qt, SQLite) keeps it fast and lightweight. If you prefer, you can also point it at a model server (Ollama, LM Studio, or any OpenAI-compatible API) for faster inference.
+- **Import PDF papers**: Add individual files or whole folders. Hodeia extracts the text automatically, and falls back to OCR for scanned documents.
+- **Summarize your papers**: Get a structured summary per paper — title, authors, journal, year, topics, research objective, methodology, key findings, limitations, and a citable abstract.
+- **References & citations**: After a paper is summarized, Hodeia pulls the works it cites and the works that cite it from [OpenAlex](https://openalex.org), formatted as APA-style bibliographies.
+- **Ask questions across your library**: Query all your papers in plain language and get a synthesized, academic-style answer with inline citations. The more papers you add, the better the answers.
+- **View papers visually**: Browse page-by-page thumbnails alongside the extracted text, the generated summary, and the references.
+- **Export summaries**: Export any summary — or a whole batch of them — to PDF.
+- **20+ themes**: Catppuccin, Dracula, Gruvbox, Nord, Monokai, GitHub, and more.
+- **Localized UI**: English and French.
 
----
-
-## How It Works
-
-Hodeia is a three-pipeline application:
-
-| Pipeline          | What it does                                                             | Key tech                             |
-| ----------------- | ------------------------------------------------------------------------ | ------------------------------------ |
-| **Ingestion**     | Dedup (MD5), extract text, OCR fallback, render thumbnails, chunk, embed | MuPDF, Tesseract, llama.cpp (E5)     |
-| **Summarization** | Load the chat model, ask for a structured summary, store it              | llama.cpp (GGUF), OpenAlex for cites |
-| **RAG query**     | Embed the question, retrieve top-K chunks, synthesize a cited answer     | sqlite-vec, llama.cpp                |
-
-Each **project** is an isolated workspace with its own SQLite database, PDFs, and thumbnails. Models are loaded and unloaded as needed so you never hold two in VRAM at once.
+Hodeia organizes your research into **projects**. Each project is an isolated workspace with its own database and summaries, so you can keep a separate project per research topic, course, or grant.
 
 Full architecture, pipeline detail, database schema, and per-platform build instructions live in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
@@ -44,51 +32,39 @@ Full architecture, pipeline detail, database schema, and per-platform build inst
 
 ## Tech Stack
 
-| Component           | Technology                                        |
-| ------------------- | ------------------------------------------------- |
-| UI framework        | Qt 6.10+ (Qt Quick / QML, QuickControls2)         |
-| Language            | C++23                                             |
-| Build system        | CMake 3.25+ (Ninja on all platforms)              |
-| Local LLM inference | llama.cpp (GGUF models)                           |
-| Multimodal          | mtmd with mmproj vision projectors                |
-| Remote LLM          | OpenAI-compatible REST API (Ollama, LM Studio, …) |
-| PDF parsing         | MuPDF                                             |
-| OCR                 | Tesseract + Leptonica                             |
-| Database            | SQLite3 (embedded, WAL mode)                      |
-| Vector search       | sqlite-vec (`vec0` virtual table)                 |
-| Embeddings          | multilingual-e5-small (384 dims)                  |
-| Citations           | OpenAlex (free, optional API key)                 |
-| GPU backends        | CUDA, Vulkan, CPU (auto-detected)                 |
+Hodeia prioritizes performance, so it is built on a fast, low-memory native stack written in C++. It runs models directly with [llama.cpp](https://github.com/ggml-org/llama.cpp) (no server), parses PDFs with MuPDF, and stores everything in a local SQLite database. It automatically uses your best available hardware (GPU or CPU).
+
+For the full component-by-component breakdown, see [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
 ---
 
 ## Supported Backends
 
-Hodeia can run models **locally** or against a **remote** endpoint — you can mix both.
+Hodeia can run models **locally** or against a **remote** endpoint — and you can mix both.
 
 | Backend               | Description                                                     |
 | --------------------- | --------------------------------------------------------------- |
-| **llama.cpp (local)** | Run GGUF models directly on your GPU (CUDA / Vulkan) or CPU     |
+| **Local (llama.cpp)** | Run GGUF models directly on your GPU (CUDA / Vulkan) or CPU     |
 | **Remote API**        | Connect to Ollama, LM Studio, or any OpenAI-compatible endpoint |
 
-To add a remote backend, open **Settings → Backends** and enter a name, URL, and (optionally) an API key.
+Everything is managed in **Settings**: pick a local model that you downloaded folder, or add a remote endpoint by entering a name, URL, and (optionally) an API key.
 
-### Model placement
+### Getting models
 
-Models live under `~/.local/share/Hodeia/Models/` (per-project data lives beside the project):
+Hodeia ships with a small **Qwen3.5-2B** model at _Q4_ so it works out of the box. For larger models, download a GGUF + MMPROJ files and add it in **Settings → Local Models** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
 
-```
-Models/
-├── Summarizers/        # Chat models used for summarization + RAG
-│   └── <model_name>/
-│       ├── model.gguf
-│       └── mmproj.gguf  # optional — vision projector for multimodal
-└── Embedders/          # Embedding model used for RAG retrieval
-    └── <model_name>/
-        └── model.gguf
-```
+**Recommended models** (Q4_K_XL quantization — the best quality-to-size balance). Pick the largest model your memory can hold; VRAM needs are for the model weights plus a small context. These models were tested and known to works fine with Hodeia.
 
-Any GGUF chat model works (Llama, Mistral, Qwen, etc.). A bundled `multilingual-e5-small` embedder is seeded into the data directory on first run.
+| Model                                                                      | Size (Q4) | Min VRAM / RAM | Best for                                               |
+| -------------------------------------------------------------------------- | --------- | -------------- | ------------------------------------------------------ |
+| [Qwen3.5-0.8B](https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/tree/main) | ~600 MB   | ~4 GB          | For really modest hardwre                              |
+| [Gemma4-2B](https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/tree/main)  | ~3 GB     | ~6 GB          | Better than the 0.8B model runs fine on integrated GPU |
+| [Qwen3.5-4B](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/main)     | ~2.5 GB   | ~6 GB          | Everyday summaries, better quality                     |
+| [Gemma4-4B](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/tree/main)  | ~6 GB     | ~8 GB          | Strong all-round reasoning                             |
+| [Qwen3.5-9B](https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/tree/main)     | ~5 GB     | ~8 GB          | High-quality summaries, dedicated GPU                  |
+| [Gemma4-12B](https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/tree/main) | ~7 GB     | ~12 GB         | Best quality, 12 GB+ VRAM                              |
+
+> **Higher quantization = better quality, more memory.** Q4 is the sweet spot; if you have extra VRAM, Q5/Q6/Q8 of the same model will be more accurate. A CPU-only machine can run the 2B/4B models (slower). When in doubt, start with the bundled 2B and step up as your hardware allows.
 
 ### Optional: OpenAlex API key
 
@@ -96,19 +72,28 @@ Citations are pulled from OpenAlex, which is free without a key. You can optiona
 
 ---
 
-## Quick Start
+## Download
 
-1. **Build from source** — Linux or Windows (macOS is **not yet available** — see [Platform Support](#platform-support)). One entry-point script per platform stages the dependencies and builds; see [docs/TECHNICAL.md](docs/TECHNICAL.md#building-from-source).
-2. **Load a model** — Place a GGUF chat model in `Models/Summarizers/<name>/model.gguf`. The embedder is bundled and seeded automatically.
-3. **Create a project** — File → **New Project**. Each project is an isolated workspace with its own database.
-4. **Import papers** — Use the toolbar to add PDFs or whole folders. Hodeia extracts text, renders thumbnails, chunks, embeds, and fetches references automatically.
-5. **Summarize & query** — Select papers and hit **Summarize**, or open the RAG window and ask anything across your library. Answers come back with citations to the source pages.
+The easiest way to get started is to grab a precompiled build from the [GitHub Releases](https://github.com/hancito/Hodeia/releases) page — no build tools required. Pick the archive for your platform:
+
+| Platform              | Asset                | How to install                                |
+| --------------------- | -------------------- | --------------------------------------------- |
+| Linux (Debian/Ubuntu) | `hodeia_*.deb`       | `sudo dpkg -i hodeia_*.deb` (or double-click) |
+| Linux (Fedora/RPM)    | `hodeia-*.rpm`       | `sudo rpm -i hodeia-*.rpm` (or double-click)  |
+| Linux (Arch)          | `PKGBUILD`           | Use the PKGBUILD or an aur helper             |
+| Windows               | `Hodeia-Setup-*.exe` | Run the installer                             |
+
+After installing, launch **Hodeia** from your applications menu. The app seeds its models and settings on first run — see [Getting models](#getting-models) to pick a model.
+
+> Want to compile from source instead? See [Building from Source](#building-from-source).
 
 ---
 
 ## Building from Source
 
-Hodeia is a C++/Qt application with a modular build: a slim top-level `CMakeLists.txt` detects the platform and routes to `cmake/Platform<OS>.cmake`, which sets up third-party linking, GPU-backend discovery, and post-build deployment.
+> **Just want to use Hodeia?** Skip to [Projects & Data Layout](#projects--data-layout) — you don't need to build anything. The rest of this section is for developers who want to compile from source.
+
+Hodeia is a C++/Qt application with a modular build: a top-level `CMakeLists.txt` detects your platform and routes to `cmake/Platform<OS>.cmake`, which sets up the third-party libraries, GPU-backend discovery, and post-build deployment.
 
 ### Prerequisites (all platforms)
 
@@ -137,21 +122,7 @@ Third-party libraries are staged into `external/` per platform:
 
 ### GPU backend selection
 
-At runtime the app calls `ggml_backend_load_all()` and auto-detects the best available backend (CUDA > Vulkan > CPU) from whichever libraries are present next to the binary.
-
-- **Linux** — CMake auto-detects CUDA or Vulkan at build time. Override with `-DLLAMA_FORCE_BACKEND=cpu|cuda|vulkan`.
-- **Windows** — all three backends (CPU + Vulkan + CUDA) ship in one binary; selection is fully runtime.
-- **macOS** — Metal only (the only GPU backend on Apple Silicon).
-
-### Post-build deployment
-
-Each platform's CMake module deploys the runtime automatically:
-
-- **Linux** — copies themes/fonts/tessdata + the embedder model, deploys the llama.cpp `.so` set (core + every CPU variant + CUDA/Vulkan) with unversioned symlinks, sets `$ORIGIN` RUNPATH via `patchelf`, copies `vec0.so`.
-- **Windows** — runs `windeployqt`, ships the llama.cpp DLLs (CPU variants + `ggml-cuda` + `ggml-vulkan` + `libomp`), CUDA runtime DLLs, `vulkan-1.dll`, Tesseract/Leptonica runtime DLLs, `vec0.dll`, and `Hodeia.exe`.
-- **macOS** — runs `macdeployqt`, sets `@executable_path` install names, ships the llama.cpp dylibs + `vec0.dylib` + `libomp.dylib` into the `.app` bundle.
-
-Full per-platform build steps (package installs, exact CMake flags, macOS source builds) are in [docs/TECHNICAL.md](docs/TECHNICAL.md#building-from-source).
+At runtime Hodeia automatically picks the best available backend (CUDA, then Vulkan, then CPU) — no configuration needed.
 
 ---
 
@@ -167,23 +138,23 @@ Full per-platform build steps (package installs, exact CMake flags, macOS source
 
 ## Projects & Data Layout
 
-Work is organized into **projects** — isolated workspaces, each with its own database and summaries. Create as many as you need (one per research topic, course, or grant). PDFs are ingested **in place** (referenced from their original location, not copied into the project); only page thumbnails are stored in the project's `IMG/` folder.
+Hodeia keeps everything in one data folder, organized by **project**. Each project is an isolated workspace with its own summaries and records — create as many as you like (one per research topic, course, or grant). Your PDFs are read **in place**: Hodeia references them from their original location and only stores the page thumbnails, so your files are never moved or duplicated.
 
 ```
 ~/.local/share/Hodeia/
-├── config.json                 # active theme, backends, models, RAG settings, language
+├── config.json          # your settings: theme, models, language, etc.
 ├── Projects/
 │   └── <project_name>/
-│       ├── <project_name>.db   # SQLite database (WAL mode)
-│       └── IMG/                # page thumbnails (PDFs are referenced in place, not copied)
+│       ├── <project_name>.db   # the project's data (summaries, etc.)
+│       └── IMG/                # page thumbnails
 └── Models/
-    ├── Summarizers/            # chat models (GGUF, optional mmproj)
-    └── Embedders/              # embedding model (GGUF)
+    ├── Summarizers/           # chat models you use (GGUF files)
+    └── Embedders/             # the embedding model (bundled)
 ```
 
-`config.json` controls the active theme, backend list, model selection, RAG settings (`topK`, `maxPages`, `visualMode`), the optional OpenAlex API key, and the UI language. See [docs/TECHNICAL.md](docs/TECHNICAL.md#configuration) for the full schema.
+> On Windows the data folder is `%LOCALAPPDATA%\Hodeia` instead.
 
-> On Windows the data directory is `%LOCALAPPDATA%\Hodeia` (the Qt `AppDataLocation`).
+See [docs/TECHNICAL.md](docs/TECHNICAL.md#configuration) for the full configuration schema.
 
 ---
 

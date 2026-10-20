@@ -139,14 +139,15 @@ MenuBar {
                 }
             }
         }
-        MenuItem {
-            text: qsTr("Add Local Model")
-            onTriggered: localModelDialog.open()
-        }
         Menu {
-            id: deleteModelMenu
-            title: qsTr("Delete Local Model...")
+            id: localModelMenu
+            title: qsTr("Local Models")
             width: 280
+            MenuItem {
+                text: qsTr("Add Model...")
+                onTriggered: localModelDialog.open()
+            }
+            MenuSeparator {}
             Repeater {
                 model: helpers.localModelList
                 delegate: Item {
@@ -169,10 +170,12 @@ MenuBar {
                         }
                         Label {
                             text: modelData
+                            Layout.fillWidth: true
                         }
                     }
                 }
             }
+            MenuSeparator {}
             MenuItem {
                 text: qsTr("Delete Selected")
                 enabled: mainWin.selectedModels.length > 0
@@ -180,7 +183,7 @@ MenuBar {
             }
         }
         MenuItem {
-            text: qsTr("Add or Modify OpenAlex API key")
+            text: qsTr("OpenAlex API key")
             onTriggered: menuBar.requestOpenAlexApiKey()
         }
     }

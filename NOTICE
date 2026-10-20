@@ -1,5 +1,5 @@
 Hodeia
-A personal research assistant powered by local AI.
+A personal research assistant powered by AI.
 
 Hodeia is free and open source software, licensed under the GNU Affero
 General Public License version 3.0 (AGPL-3.0). See LICENSE for the full
@@ -16,7 +16,7 @@ Qt and the Qt logo are trademarks of The Qt Company Ltd. in Finland and/or
 other countries worldwide. For all licenses, including LGPL and commercial
 licensing, please refer to https://www.qt.io/licenses/ .
 
-Hodeia is built with Qt 6.12+ and uses the following Qt open-source
+Hodeia is built with Qt 6.10+ and uses the following Qt open-source
 components (LGPL 3.0):
 
   - Qt Quick / QML (qtdeclarative)
