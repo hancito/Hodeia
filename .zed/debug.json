@@ -5,15 +5,15 @@
 [
   {
     "label": "Debug Hodeia (GDB)",
-    "process": "lldb",
-    "adapter": "CodeLLDB",
-    "process_args": ["./build/Hodeia", "--args"],
+    "process": "gdb",
+    "adapter": "GDB",
+    "process_args": ["./build/Debug/src/Hodeia", "--args"],
     "cwd": ".",
 
     "setup": [
       {
         "name": "build_project",
-        "command": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build",
+        "command": "cmake -S . -B build/Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build/Debug",
       },
     ],
     "delays": {
