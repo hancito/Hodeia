@@ -298,16 +298,15 @@ int main(int argc, char *argv[]) {
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
 
-  // When the user changes the language in Settings, reload the translator
-  // and the QML engine so all qsTr() calls re-evaluate with the new catalog.
+  // When the user changes the language in Settings, reload the translator and
+  // then retranslate the already-loaded QML with engine.retranslate()
   QObject::connect(&configManager, &ConfigManager::languageChanged,
                    [&engine, &app, &configManager]() {
                      loadTranslator(app, configManager.language());
-                     engine.clearComponentCache();
-                     engine.loadFromModule("HodeiaCPP", "Main");
+                     engine.retranslate();
                    });
 
-  engine.loadFromModule("HodeiaCPP", "Main");
+  engine.loadFromModule("Hodeia", "Main");
 
   return QGuiApplication::exec();
 }
