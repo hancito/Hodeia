@@ -44,7 +44,7 @@ The three worker pipelines run off the GUI thread:
 - **Summarization** — `SummaryController` owns a `Summarizer` worker; it loads/unloads models around the LLM call.
 - **RAG query** — `QueryController` owns a `QueryWorker`; each query runs on its own thread.
 
-`main.cpp` constructs the singletons, registers them on the QML context, and loads the `HodeiaCPP` QML module. It also sets up crash/diagnostic logging, console mirroring, llama.cpp log capture, font registration, and translation loading (see [Logging & Diagnostics](#logging--diagnostics)).
+`main.cpp` constructs the singletons, registers them on the QML context, and loads the `Hodeia` QML module. It also sets up crash/diagnostic logging, console mirroring, llama.cpp log capture, font registration, and translation loading (see [Logging & Diagnostics](#logging--diagnostics)).
 
 ---
 
@@ -180,7 +180,7 @@ Hodeia/
     └── hodeia_fr.ts                # French (English is the source language)
 ```
 
-> The CMake module URI is `HodeiaCPP` (the historical project name) — `engine.loadFromModule("HodeiaCPP", "Main")` in `main.cpp`.
+> The CMake module URI is `Hodeia` — `engine.loadFromModule("Hodeia", "Main")` in `main.cpp`.
 
 ---
 

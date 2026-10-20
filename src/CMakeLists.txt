@@ -145,7 +145,8 @@ foreach(_f ${_QML_FILES})
 endforeach()
 
 qt_add_qml_module(Hodeia
-    URI "HodeiaCPP"
+    URI "Hodeia"
+    OUTPUT_DIRECTORY Hodeia_app
     QML_FILES
         ${CMAKE_SOURCE_DIR}/ui/Colors.qml
         ${CMAKE_SOURCE_DIR}/ui/Fonts.qml
