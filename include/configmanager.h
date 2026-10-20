@@ -134,9 +134,12 @@ signals:
 private:
   void refreshProjectList();
   void ensureModelsDirectory();
-  /// Copy the default embedding model into the data dir if it is missing.
-  /// Runs once at startup so SqliteVecManager can find it on a fresh install.
-  void seedDefaultEmbedder();
+  /// Copy the bundled model tree (Embedders/ + Summarizers/) from the app
+  /// bundle into the data dir, copying only files that are missing. Idempotent:
+  /// on a fresh install it seeds every bundled model; on a version bump it
+  /// fills in any newly-bundled model without overwriting files the user
+  /// already has.
+  void seedBundledModels();
   QString getFilePath() const;
   QString projectsRoot() const;
   QString modelsRoot() const;

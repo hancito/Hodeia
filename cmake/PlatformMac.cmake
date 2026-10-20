@@ -173,12 +173,15 @@ function(hodeia_mac_deploy TARGET)
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
-  # --- Default embedding model (seeded into the data dir on first run) ---
+  # --- Bundled model tree (Embedders/ + Summarizers/) ---
+  # seedBundledModels() copies this from <exe>/Resources/Models/ into the user's
+  # data-dir Models/ on first run (copy-if-missing).  copy_directory keeps
+  # rebuilds cheap; the .gguf payloads are large but unchanged.
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/Resources/Embedders
-          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
-      COMMENT "Copying default embedding model")
+          ${CMAKE_SOURCE_DIR}/Resources/Models
+          $<TARGET_FILE_DIR:${TARGET}>/Resources/Models
+      COMMENT "Copying bundled model tree")
 
   # --- llama.cpp .dylib (single flat dir, all backends) ---
   # Every backend .dylib — core (libX.dylib) AND the unversioned MODULE libs

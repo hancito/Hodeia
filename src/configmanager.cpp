@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 #include <QUrl>
+#include <functional>
 
 ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   loadConfig(); // Automatically load the file when instantiated
@@ -30,7 +31,7 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
     (void)createProject("Default");
   }
   ensureModelsDirectory();
-  seedDefaultEmbedder();
+  seedBundledModels();
   refreshProjectList();
 }
 
@@ -452,41 +453,47 @@ void ConfigManager::ensureModelsDirectory() {
   }
 }
 
-void ConfigManager::seedDefaultEmbedder() {
-  static const QString kModelName =
-      QStringLiteral("multilingual-e5-small-q8_0.gguf");
-
-  const QString destDir = embeddersPath();
-  const QString destPath = destDir + "/" + kModelName;
-
-  // Nothing to do if the model is already in place.
-  if (QFile::exists(destPath))
-    return;
-
-  // The default model ships in the Resources/Embedders/ folder.  At runtime
-  // that folder lives next to the executable in a normal install.
+void ConfigManager::seedBundledModels() {
+  // The bundled model tree (Embedders/ + Summarizers/) ships in
+  // Resources/Models/ next to the executable in a normal install.  At startup
+  // we copy every file that is missing from the data dir into place.  This is
+  // idempotent: a fresh install seeds the whole tree, while a version bump only
+  // fills in newly-bundled models and never overwrites files the user already
+  // has (e.g. a model they deleted is not re-seeded, a renamed file is added).
   const QString appDir = QCoreApplication::applicationDirPath();
-  const QStringList candidates = {
-      appDir + "/Resources/Embedders/" + kModelName,
-      appDir + "/Embedders/" + kModelName,
-      appDir + "/" + kModelName,
-  };
-
-  for (const QString &src : candidates) {
-    if (!QFile::exists(src))
-      continue;
-
-    if (QFile::copy(src, destPath)) {
-      qInfo() << "[Config] Seeded default embedder model:" << destPath;
-      return;
-    }
-
-    qWarning() << "[Config] Failed to copy embedder model from" << src << "to"
-               << destPath;
+  const QString srcRoot = appDir + "/Resources/Models";
+  if (!QDir(srcRoot).exists()) {
+    qWarning() << "[Config] No bundled model tree found at" << srcRoot;
+    return;
   }
 
-  qWarning() << "[Config] No bundled embedder model found; looked in"
-             << candidates;
+  const QString destRoot = modelsRoot();
+
+  // Recursively copy files from `src` into `dest`, creating directories as
+  // needed and skipping files that already exist at the destination.
+  std::function<void(const QString &, const QString &)> copyMissing;
+  copyMissing = [&](const QString &src, const QString &dest) {
+    QDir srcDir(src);
+    if (!srcDir.exists())
+      return;
+    srcDir.setFilter(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
+    for (const QFileInfo &entry : srcDir.entryInfoList()) {
+      const QString destEntry = dest + "/" + entry.fileName();
+      if (entry.isDir()) {
+        copyMissing(entry.absoluteFilePath(), destEntry);
+      } else if (!QFile::exists(destEntry)) {
+        QDir().mkpath(QFileInfo(destEntry).absolutePath());
+        if (QFile::copy(entry.absoluteFilePath(), destEntry)) {
+          qInfo() << "[Config] Seeded bundled model:" << destEntry;
+        } else {
+          qWarning() << "[Config] Failed to copy bundled model from"
+                     << entry.absoluteFilePath() << "to" << destEntry;
+        }
+      }
+    }
+  };
+
+  copyMissing(srcRoot, destRoot);
 }
 
 QString ConfigManager::modelsRoot() const {

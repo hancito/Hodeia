@@ -20,7 +20,8 @@ produces a **self-contained folder** next to the `Hodeia` binary:
 - the llama.cpp `.so` set (core + every `ggml-cpu-<microarch>` variant + CUDA/Vulkan)
   with `$ORIGIN` rpath set via `patchelf`, plus unversioned dev symlinks
 - `vec0.so` (sqlite-vec)
-- `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Embedders/` (the ~126 MB E5 model)
+- `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Models/` (the bundled
+  `Embedders/` + `Summarizers/` GGUF models)
 - `i18n/*.qm` translations
 
 So a package is essentially **re-bundling that folder with the right metadata**.
@@ -70,18 +71,20 @@ fonts, tessdata, the embedder model, translations.
 
 **Recommendation: Option A.**
 
-### 2. Embedding model
+### 2. Bundled models
 
-`Resources/Embedders/multilingual-e5-small-q8_0.gguf` (~126 MB) is deployed
-next to the binary, which makes the package ~150–300 MB.
+`Resources/Models/` (the `multilingual-e5-small` embedder at ~126 MB plus the
+`Summarizers/` chat models, several GB) is deployed next to the binary, which
+makes the package several hundred MB to several GB.
 
 - **Bundle it (recommended).** Works fully offline out of the box. Accept the
   larger package.
 - **Download on first run.** Smaller package, but the current code seeds the
-  model from the bundled file (`seedDefaultEmbedder`), so this requires a code
+  models from the bundled tree (`seedBundledModels`), so this requires a code
   change to fetch from a URL instead.
 
-**Recommendation: bundle it** (quantized model is acceptable at 126 MB).
+**Recommendation: bundle it** (quantized models are acceptable; the app is
+designed to run fully locally).
 
 ---
 
@@ -98,7 +101,7 @@ deployed artifacts under the FHS layout:
 /usr/share/hodeia/ui/themes/...         # themes
 /usr/share/hodeia/Fonts/...             # fonts
 /usr/share/hodeia/tessdata/...          # tessdata
-/usr/share/hodeia/Resources/Embedders/  # embedder model
+/usr/share/hodeia/Resources/Models/     # bundled Embedders/ + Summarizers/ models
 /usr/share/hodeia/i18n/*.qm             # translations
 /usr/share/applications/hodeia.desktop  # desktop entry
 /usr/share/icons/hicolor/<size>/.../hodeia.png
@@ -200,7 +203,8 @@ already produces a **self-contained folder** next to `Hodeia.exe`:
 - the OCR runtime DLLs from vcpkg (`tesseract.dll`, `leptonica.dll`,
   `libpng16.dll`, `libjpeg-turbo.dll`, `openjp2-7.dll`, `gif.dll`, `z.dll`)
 - `vec0.dll` (sqlite-vec)
-- `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Embedders/` (the ~126 MB E5 model)
+- `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Models/` (the bundled
+  `Embedders/` + `Summarizers/` GGUF models)
 - `i18n/*.qm` translations
 - the Qt runtime (DLLs + plugins: `platforms/qwindows.dll`, `styles/`,
   `imageformats/`, etc.) via `windeployqt`
@@ -245,7 +249,7 @@ Hodeia-<version>-win64-portable.zip
     ├── ui/themes/
     ├── Fonts/
     ├── tessdata/
-    ├── Resources/Embedders/
+    ├── Resources/Models/
     └── i18n/
 ```
 

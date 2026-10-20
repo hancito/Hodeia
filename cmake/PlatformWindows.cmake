@@ -179,15 +179,15 @@ function(hodeia_windows_deploy TARGET)
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
-  # --- Bundled embedder model (Resources/Embedders/*.gguf) ---
-  # seedDefaultEmbedder() copies this from <exe>/Resources/Embedders/ into the
-  # user's AppData models dir on first run.  copy_if_different keeps rebuilds
-  # fast even though the .gguf is ~126 MB.
+  # --- Bundled model tree (Embedders/ + Summarizers/) ---
+  # seedBundledModels() copies this from <exe>/Resources/Models/ into the user's
+  # AppData Models dir on first run (copy-if-missing).  copy_directory keeps
+  # rebuilds cheap; the .gguf payloads are large but unchanged.
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/Resources/Embedders
-          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
-      COMMENT "Copying embedder model")
+          ${CMAKE_SOURCE_DIR}/Resources/Models
+          $<TARGET_FILE_DIR:${TARGET}>/Resources/Models
+      COMMENT "Copying bundled model tree")
 
   # --- Translations: qt_add_translations emits the .qm into the build tree
   #     (CMAKE_CURRENT_BINARY_DIR); the app loads it from <exe>/i18n/. ---

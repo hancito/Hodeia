@@ -185,12 +185,15 @@ function(hodeia_linux_deploy TARGET)
           ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:${TARGET}>/tessdata
       COMMENT "Copying tessdata")
 
-  # --- Default embedding model (seeded into the data dir on first run) ---
+  # --- Bundled model tree (Embedders/ + Summarizers/) ---
+  # seedBundledModels() copies this from <exe>/Resources/Models/ into the user's
+  # data-dir Models/ on first run (copy-if-missing).  copy_directory keeps
+  # rebuilds cheap; the .gguf payloads are large but unchanged.
   add_custom_command(TARGET ${TARGET} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/Resources/Embedders
-          $<TARGET_FILE_DIR:${TARGET}>/Resources/Embedders
-      COMMENT "Copying default embedding model")
+          ${CMAKE_SOURCE_DIR}/Resources/Models
+          $<TARGET_FILE_DIR:${TARGET}>/Resources/Models
+      COMMENT "Copying bundled model tree")
 
   # --- llama.cpp .so (single flat dir, all backends) ---
   # Every backend .so — versioned core libs (libX.so.0 / libX.so.0.N.M) AND the

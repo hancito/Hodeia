@@ -496,7 +496,7 @@ Each platform's `cmake/Platform<OS>.cmake` (`hodeia_<os>_deploy`) deploys the ru
 | **Vulkan**       | (system)                                                                                                 | `vulkan-1.dll` (vcpkg bin or SDK)                                                   | —                                                             |
 | **OCR**          | in-tree static                                                                                           | `tesseract*.dll`, `leptonica*.dll` + image codecs (vcpkg bin)                       | in-tree static                                                |
 | **Extension**    | `vec0.so`                                                                                                | `vec0.dll`                                                                          | `vec0.dylib`                                                  |
-| **Resources**    | `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Embedders/`                                              | same                                                                                | same                                                          |
+| **Resources**    | `ui/themes/`, `Fonts/`, `tessdata/`, `Resources/Models/` (bundled `Embedders/` + `Summarizers/` GGUF)    | same                                                                                | same                                                          |
 | **Translations** | `i18n/*.qm`                                                                                              | `i18n/*.qm`                                                                         | `i18n/*.qm`                                                   |
 | **Qt runtime**   | system Qt                                                                                                | `windeployqt`                                                                       | `macdeployqt` (frameworks + plugins)                          |
 
@@ -678,7 +678,7 @@ PDFs are ingested **in place** (referenced from their original location, not cop
             └── model.gguf
 ```
 
-A bundled `multilingual-e5-small-q8_0.gguf` (from `Resources/Embedders/`) is seeded into the data directory on first run, so RAG works without the user providing an embedder.
+The bundled model tree in `Resources/Models/` (the `Embedders/multilingual-e5-small` GGUF plus any `Summarizers/` chat models) is seeded into the data directory on first run (copy-if-missing), so RAG works without the user providing an embedder.
 
 ---
 
