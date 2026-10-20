@@ -1,0 +1,298 @@
+# Maintainer: hancito
+# Hodeia — local-AI research assistant for academic papers.
+#
+# Builds everything from source (llama.cpp, MuPDF, Tesseract, Leptonica,
+# sqlite-vec) at the pinned versions the app is developed against, then
+# installs the self-contained folder into /opt/hodeia with a symlink in
+# /usr/bin.  The app resolves every resource relative to the executable, so
+# the folder must stay together.
+#
+# GPU backend: if a CUDA toolkit is found at build time the package is built
+# with CUDA (no Vulkan); otherwise it is built with Vulkan.  CPU is always
+# included.  Detection is done once in prepare() and the result is written to
+# a file so build() can read it.
+
+pkgname=hodeia
+pkgver=0.1
+pkgrel=1
+pkgdesc="Local-AI research assistant for academic papers (Qt6 + llama.cpp)"
+arch=(x86_64)
+url="https://github.com/hancito/Hodeia"
+license=(AGPL-3.0)
+
+# Pinned dependency versions (must match scripts/Linux/get_depencies.sh)
+_llama_ver=v0.6.0
+_mupdf_ver=1.28.5
+_tess_ver=5.5.3
+_lepto_ver=1.87.0
+_sqlitevec_ver=v0.1.10-alpha.4
+
+depends=(
+  'qt6-base'
+  'qt6-declarative'
+  'qt6-shadertools'
+  'libpng'
+  'libjpeg-turbo'
+  'libtiff'
+  'zlib'
+  'libomp'
+)
+makedepends=(
+  'cmake'
+  'ninja'
+  'clang'
+  'patchelf'
+  'git'
+  'git-lfs'   # the bundled .gguf models are stored with git-lfs
+  'curl'
+)
+# Optional — CUDA toolkit is only needed if a CUDA device is present at build
+# time.  It is NOT a hard makedep so the package can still be built on
+# CPU/Vulkan-only machines.
+# (For CUDA builds, install 'nvidia-cuda-toolkit' from the community repo or
+#  the nvidia driver packages first.)
+
+# Hodeia is git-cloned (not a tarball) because the bundled .gguf models are
+# stored with git-lfs: a tarball would contain only the LFS pointer text, not
+# the real model bytes.  `git clone` + the LFS filter pulls the real data.
+#
+# The heavy dependencies (llama.cpp, MuPDF, Tesseract, Leptonica, sqlite-vec)
+# are NOT fetched by makepkg.  They are `git clone --branch`'d in prepare()
+# exactly like scripts/Linux/get_depencies.sh does.  Cloning (not a tarball) is
+# required because MuPDF needs its git submodules, and the versions are pinned
+# via --branch so the build is reproducible without makepkg fetching/hashing.
+source=(
+  "https://github.com/hancito/Hodeia.git"
+  "hodeia.desktop"
+)
+sha256sums=(
+  'SKIP'
+  'SKIP'
+)
+
+# ── GPU backend detection ──────────────────────────────────────────────────
+# Set to "cuda", "vulkan", or "cpu" — written by prepare(), read by build().
+_gpu_backend=""
+
+_prepare() {
+  # Detect CUDA: look for nvcc in the standard toolkit locations.
+  local cuda_toolkit=""
+  if [ -z "${CUDA_PATH:-}" ]; then
+    for d in /usr/local/cuda /opt/cuda /usr/lib/cuda; do
+      [ -x "$d/bin/nvcc" ] && { cuda_toolkit="$d"; break; }
+    done
+  else
+    cuda_toolkit="${CUDA_PATH}"
+  fi
+
+  if [ -n "$cuda_toolkit" ] && [ -x "$cuda_toolkit/bin/nvcc" ]; then
+    _gpu_backend="cuda"
+    echo ">> CUDA toolkit found: $cuda_toolkit — building with CUDA (no Vulkan)"
+  else
+    _gpu_backend="vulkan"
+    echo ">> No CUDA toolkit found — building with Vulkan"
+  fi
+
+  # Write the decision so build() (runs in a subshell) can read it.
+  echo "$_gpu_backend" > "${srcdir}/.gpu_backend"
+
+  # ── Clone the heavy dependencies (mirrors scripts/Linux/get_depencies.sh) ──
+  # Plain dir names (no version suffix) so the build steps below and the
+  # in-repo scripts reference the same paths.  Cloning — not a tarball — is
+  # what makes MuPDF's `git submodule update` work.
+  echo ">> Cloning dependencies (pinned versions)"
+  git clone --branch "$_llama_ver"      "https://github.com/ggml-org/llama.cpp.git"     "${srcdir}/llama.cpp"
+  git clone --branch "$_mupdf_ver"      "https://github.com/ArtifexSoftware/mupdf.git"  "${srcdir}/mupdf"
+  git clone --branch "$_tess_ver"       "https://github.com/tesseract-ocr/tesseract.git" "${srcdir}/tesseract"
+  git clone --branch "$_lepto_ver"      "https://github.com/DanBloomberg/leptonica.git"  "${srcdir}/leptonica"
+  git clone --branch "$_sqlitevec_ver"  "https://github.com/asg017/sqlite-vec"           "${srcdir}/sqlite-vec"
+
+  # makepkg git-cloned Hodeia at HEAD.  Pin it to the release tag so the build
+  # is reproducible, and materialize the git-lfs .gguf models (the LFS filter
+  # is configured by .gitattributes, so a normal checkout pulls the real bytes).
+  local hodeia_clone="${srcdir}/Hodeia"
+  git -C "$hodeia_clone" checkout "v${pkgver}"
+  git -C "$hodeia_clone" lfs pull || \
+    echo "WARNING: git-lfs pull failed — bundled models may be missing"
+}
+
+build() {
+  local hodeia_src="${srcdir}/Hodeia"
+  local ext_lib="${hodeia_src}/external/lib/linux"
+  local ext_inc="${hodeia_src}/external/include"
+  local build_root="${srcdir}/build"
+
+  mkdir -p "$ext_lib" "$ext_inc"
+
+  # ── 1. Build Leptonica (static) ────────────────────────────────────────
+  echo ">> Building Leptonica"
+  local leptonica_src="${srcdir}/leptonica"
+  local leptonica_build="${srcdir}/leptonica-build"
+  rm -rf "$leptonica_build"
+  mkdir -p "$leptonica_build"
+  cmake -S "$leptonica_src" -B "$leptonica_build" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_PROG=OFF \
+    -DENABLE_PNG=ON -DENABLE_JPEG=ON -DENABLE_TIFF=ON -DENABLE_ZLIB=ON \
+    -DENABLE_GIF=OFF -DENABLE_WEBP=OFF -DENABLE_OPENJPEG=OFF \
+    -G Ninja
+  cmake --build "$leptonica_build" -j"$(nproc)"
+
+  cp "$leptonica_build"/src/libleptonica.a "$ext_lib/"
+  mkdir -p "$ext_inc/leptonica"
+  cp "$leptonica_src"/src/*.h "$ext_inc/leptonica/"
+  [ -f "$leptonica_build/src/config_auto.h" ] && \
+    cp "$leptonica_build/src/config_auto.h" "$ext_inc/leptonica/"
+
+  # ── 2. Build Tesseract (static) ───────────────────────────────────────
+  echo ">> Building Tesseract"
+  local tesseract_src="${srcdir}/tesseract"
+  local tesseract_build="${srcdir}/tesseract-build"
+  rm -rf "$tesseract_build"
+  mkdir -p "$tesseract_build"
+  cmake -S "$tesseract_src" -B "$tesseract_build" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TRAINING_TOOLS=OFF \
+    -DBUILD_TESTS=OFF \
+    -DDISABLED_LEGACY_ENGINE=ON \
+    -DDISABLE_TIFF=ON -DDISABLE_ARCHIVE=ON -DDISABLE_CURL=ON \
+    -DGRAPHICS_DISABLED=ON \
+    -DLeptonica_DIR="$leptonica_build" \
+    -DCMAKE_CXX_FLAGS="-DDISABLED_LEGACY_ENGINE=1" \
+    -G Ninja
+  cmake --build "$tesseract_build" -j"$(nproc)"
+
+  cp "$tesseract_build"/libtesseract.a "$ext_lib/"
+  mkdir -p "$ext_inc/tesseract"
+  cp "$tesseract_src"/include/tesseract/*.h "$ext_inc/tesseract/"
+
+  # ── 3. Build MuPDF (static) ───────────────────────────────────────────
+  echo ">> Building MuPDF"
+  local mupdf_src="${srcdir}/mupdf"
+  cd "$mupdf_src"
+  # A real clone (not a tarball) is required here — this initializes the
+  # 18 vendored submodules (memento, freetype, harfbuzz, jbig2dec, ...).
+  git submodule update --init --depth 1
+  make libs build=release -j"$(nproc)"
+  cd "${srcdir}"
+
+  cp "$mupdf_src"/build/release/libmupdf*.a "$ext_lib/"
+  mkdir -p "$ext_inc/mupdf"
+  cp -r "$mupdf_src"/include/mupdf/. "$ext_inc/mupdf/"
+
+  # ── 4. Build sqlite-vec (loadable extension) ──────────────────────────
+  echo ">> Building sqlite-vec"
+  local sqlitevec_src="${srcdir}/sqlite-vec"
+  cd "$sqlitevec_src"
+  make loadable -j"$(nproc)"
+  cd "${srcdir}"
+
+  mkdir -p "$ext_lib/sqlitevec"
+  cp "$sqlitevec_src"/dist/vec0.so "$ext_lib/sqlitevec/"
+  mkdir -p "$ext_inc/SqliteVec"
+  cp "$sqlitevec_src"/sqlite-vec.h "$ext_inc/SqliteVec/"
+
+  # ── 5. Build llama.cpp (CPU + GPU) ────────────────────────────────────
+  echo ">> Building llama.cpp"
+  local llama_src="${srcdir}/llama.cpp"
+  local llama_build="${srcdir}/llama-build"
+
+  # GPU backend flags (from prepare())
+  local cuda_flag="-DGGML_CUDA=OFF"
+  local vulkan_flag="-DGGML_VULKAN=OFF"
+  local backend_file="${srcdir}/.gpu_backend"
+  if [ -f "$backend_file" ]; then
+    _gpu_backend="$(cat "$backend_file")"
+  fi
+  if [ "$_gpu_backend" = "cuda" ]; then
+    cuda_flag="-DGGML_CUDA=ON"
+    echo ">> CUDA backend enabled"
+  elif [ "$_gpu_backend" = "vulkan" ]; then
+    vulkan_flag="-DGGML_VULKAN=ON"
+    echo ">> Vulkan backend enabled"
+  fi
+
+  rm -rf "$llama_build"
+  cmake -S "$llama_src" -B "$llama_build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=ON \
+    -DLLAMA_BUILD_COMMON=ON \
+    -DLLAMA_BUILD_MTMD=ON \
+    -DGGML_BACKEND_DL=ON \
+    -DGGML_CPU_ALL_VARIANTS=ON \
+    -DGGML_NATIVE=OFF \
+    $cuda_flag \
+    $vulkan_flag
+
+  local llama_targets=(--target llama --target mtmd --target llama-common --target ggml)
+  [ "$_gpu_backend" = "cuda" ]   && llama_targets+=(--target ggml-cuda)
+  [ "$_gpu_backend" = "vulkan" ] && llama_targets+=(--target ggml-vulkan)
+  cmake --build "$llama_build" "${llama_targets[@]}" -j"$(nproc)"
+
+  # Stage all backend .so into the single flat dir
+  local llama_ext_lib="${ext_lib}/llamacpp"
+  rm -rf "$llama_ext_lib"
+  mkdir -p "$llama_ext_lib"
+  cp "$llama_build"/bin/lib*.so.*           "$llama_ext_lib/"
+  cp "$llama_build"/bin/libggml-cpu-*.so    "$llama_ext_lib/" 2>/dev/null
+  [ "$_gpu_backend" = "cuda" ]   && cp "$llama_build"/bin/libggml-cuda.so   "$llama_ext_lib/" 2>/dev/null
+  [ "$_gpu_backend" = "vulkan" ] && cp "$llama_build"/bin/libggml-vulkan.so "$llama_ext_lib/" 2>/dev/null
+  find "$llama_ext_lib" -maxdepth 1 -type l -delete
+
+  # Copy headers
+  local llama_ext_inc="${ext_inc}/llamacpp"
+  rm -rf "$llama_ext_inc"
+  mkdir -p "$llama_ext_inc/common/jinja"
+  cp "$llama_src"/include/llama.h        "$llama_ext_inc/"
+  cp "$llama_src"/include/llama-cpp.h    "$llama_ext_inc/"
+  cp "$llama_src"/ggml/include/*.h       "$llama_ext_inc/"
+  cp "$llama_src"/common/chat.h          "$llama_ext_inc/common/"
+  cp "$llama_src"/common/common.h        "$llama_ext_inc/common/"
+  cp "$llama_src"/common/sampling.h      "$llama_ext_inc/common/"
+  cp "$llama_src"/common/peg-parser.h    "$llama_ext_inc/common/"
+  cp "$llama_src"/common/json.h          "$llama_ext_inc/common/"
+  cp "$llama_src"/common/json-schema.h   "$llama_ext_inc/common/"
+  cp "$llama_src"/common/jinja/*.h       "$llama_ext_inc/common/jinja/"
+  cp "$llama_src"/tools/mtmd/mtmd.h      "$llama_ext_inc/"
+  cp "$llama_src"/tools/mtmd/mtmd-helper.h "$llama_ext_inc/"
+
+  # ── 6. Build Hodeia ───────────────────────────────────────────────────
+  echo ">> Building Hodeia"
+  rm -rf "$build_root"
+  cmake -S "$hodeia_src" -B "$build_root" -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build "$build_root" -j"$(nproc)"
+}
+
+package() {
+  local build_src="${srcdir}/build/src"
+  local hodeia_src="${srcdir}/Hodeia"
+
+  # Ship the self-contained folder (binary + llama .so + data files) into /opt.
+  mkdir -p "${pkgdir}/opt/hodeia"
+  cp -a "$build_src"/. "${pkgdir}/opt/hodeia/"
+
+  # Strip build-only artifacts from the shipped folder.
+  rm -rf "${pkgdir}/opt/hodeia"/{ \
+    CMakeFiles,cmake_install.cmake,*.log, \
+    Hodeia_autogen,HodeiaEngine_autogen,Hodeia_app, \
+    meta_types,qmltypes,.qt,.rcc, \
+    Hodeia_qmltyperegistrations.cpp, \
+    Hodeia.log \
+  } 2>/dev/null || true
+  find "${pkgdir}/opt/hodeia" -maxdepth 1 -name '*.a' -delete 2>/dev/null || true
+
+  # (tessdata is already in the shipped folder — copied from Resources/tessdata
+  #  by cmake/PlatformLinux.cmake's deploy step at build time.)
+
+  # Symlink the launcher into /usr/bin.
+  install -Dm 755 /dev/null "${pkgdir}/usr/bin/hodeia"
+  ln -sf /opt/hodeia/Hodeia "${pkgdir}/usr/bin/hodeia"
+
+  # Desktop entry + icon.
+  install -Dm 644 "${srcdir}/hodeia.desktop" \
+    "${pkgdir}/usr/share/applications/hodeia.desktop"
+  install -Dm 644 "${hodeia_src}/Resources/hodeia.png" \
+    "${pkgdir}/usr/share/icons/hicolor/512x512/apps/hodeia.png"
+}

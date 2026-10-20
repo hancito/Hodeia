@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hodeia
+Comment=Local-AI research assistant for academic papers
+Exec=hodeia
+Icon=hodeia
+Terminal=false
+Categories=Office;Science;
+Keywords=papers;pdf;research;ai;llm;summary;
