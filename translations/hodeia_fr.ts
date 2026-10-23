@@ -331,8 +331,24 @@
     </message>
     <message>
         <location filename="../ui/Main.qml" line="215"/>
+        <location filename="../ui/Main.qml" line="283"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="258"/>
+        <source>Project Already Exists</source>
+        <translation>Le projet existe déjà</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="263"/>
+        <source>Project &quot;%1&quot; already exists. Switch to it?</source>
+        <translation>Le projet « %1 » existe déjà. Voulez-vous y basculer ?</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="270"/>
+        <source>Switch</source>
+        <translation>Basculer</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="250"/>

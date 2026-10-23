@@ -233,11 +233,57 @@ ApplicationWindow {
             messageProjectName.visible = true;
             return;
         }
+        let existing = configManager.projectList;
+        if (existing.includes(name)) {
+            newProjectDialog.close();
+            nameField.clear();
+            existingProjectName = name;
+            existingProjectDialog.open();
+            return;
+        }
         let ok = configManager.createProject(name);
         if (ok) {
             let dbPath = configManager.projectDbPath(name);
             databaseManager.switchDatabase(dbPath);
             newProjectDialog.close();
+        }
+    }
+
+    property string existingProjectName
+
+    Dialog {
+        id: existingProjectDialog
+        anchors.centerIn: parent
+        modal: true
+        title: qsTr("Project Already Exists")
+        ColumnLayout {
+            spacing: 10
+            Label {
+                text: qsTr("Project \"%1\" already exists. Switch to it?").arg(existingProjectName)
+                wrapMode: Text.WordWrap
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Button {
+                    text: qsTr("Switch")
+                    highlighted: true
+                    onClicked: {
+                        let ok = configManager.switchToProject(existingProjectName);
+                        if (ok) {
+                            let dbPath = configManager.projectDbPath(existingProjectName);
+                            databaseManager.switchDatabase(dbPath);
+                        }
+                        existingProjectDialog.close();
+                    }
+                }
+                Item {
+                    Layout.fillWidth: true
+                }
+                Button {
+                    text: qsTr("Cancel")
+                    onClicked: existingProjectDialog.close()
+                }
+            }
         }
     }
 
