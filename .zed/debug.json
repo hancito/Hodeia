@@ -1,24 +1,57 @@
-// Project-local debug tasks
+// Project-local debug configurations
 //
 // For more documentation on how to configure debug tasks,
 // see: https://zed.dev/docs/debugger
+//
+// The "build" step only runs `cmake --build`: build/Debug and build/Sanitize
+// must have been configured once (tasks "Linux: Configure Debug" /
+// "Linux: Configure Sanitize").  CMake re-configures automatically afterwards.
 [
   {
     "label": "Debug Hodeia (GDB)",
-    "process": "gdb",
     "adapter": "GDB",
-    "process_args": ["./build/Debug/src/Hodeia", "--args"],
-    "cwd": ".",
-
-    "setup": [
-      {
-        "name": "build_project",
-        "command": "cmake -S . -B build/Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ && cmake --build build/Debug",
-      },
-    ],
-    "delays": {
-      "pre_restart_runnable_delay_ms": 2000,
-      "post_exit_delay_ms": 1000,
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/build/Debug/src/Hodeia",
+    "args": [],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "build": {
+      "command": "cmake",
+      "args": ["--build", "build/Debug"],
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+  },
+  {
+    "label": "Debug Hodeia (CodeLLDB)",
+    "adapter": "CodeLLDB",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/build/Debug/src/Hodeia",
+    "args": [],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "build": {
+      "command": "cmake",
+      "args": ["--build", "build/Debug"],
+      "cwd": "$ZED_WORKTREE_ROOT",
+    },
+  },
+  // ASan + UBSan build. abort_on_error=1 makes the debugger stop on the faulty
+  // line instead of the process just exiting.  detect_leaks=0 because the GPU
+  // drivers (Vulkan/CUDA) loaded by ggml report many false leaks; run the
+  // "Linux: Run (Sanitize, leaks)" task to check leaks explicitly.
+  {
+    "label": "Debug Hodeia (GDB, ASan+UBSan)",
+    "adapter": "GDB",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/build/Sanitize/src/Hodeia",
+    "args": [],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "env": {
+      "ASAN_OPTIONS": "abort_on_error=1:detect_leaks=0:halt_on_error=1",
+      "UBSAN_OPTIONS": "abort_on_error=1:print_stacktrace=1:halt_on_error=1",
+    },
+    "build": {
+      "command": "cmake",
+      "args": ["--build", "build/Sanitize"],
+      "cwd": "$ZED_WORKTREE_ROOT",
     },
   },
 ]

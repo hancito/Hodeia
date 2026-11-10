@@ -31,6 +31,29 @@ elseif(MSVC)
   add_compile_options(/W4 /permissive-)
 endif()
 
+# --- Sanitizers (GCC / Clang, Debug builds) ---------------------------------
+# Comma-separated list passed to -fsanitize=, e.g.:
+#   -DHODEIA_SANITIZE=address,undefined   (ASan + UBSan)
+#   -DHODEIA_SANITIZE=thread              (TSan — incompatible with ASan)
+# Use a dedicated build dir (build/Sanitize) so instrumented objects never mix
+# with the regular Debug/Release trees.  Third-party prebuilt libs (llama.cpp,
+# MuPDF, Tesseract) are not instrumented; only Hodeia's own code + sqlite3.c.
+set(HODEIA_SANITIZE "" CACHE STRING "Sanitizers to enable (e.g. address,undefined or thread)")
+if(HODEIA_SANITIZE)
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    message(FATAL_ERROR "HODEIA_SANITIZE requires GCC or Clang")
+  endif()
+  if(HODEIA_SANITIZE MATCHES "thread" AND HODEIA_SANITIZE MATCHES "address")
+    message(FATAL_ERROR "HODEIA_SANITIZE: 'thread' cannot be combined with 'address'")
+  endif()
+  if(HODEIA_ENABLE_LTO)
+    message(WARNING "HODEIA_SANITIZE with LTO: stack traces will be less precise")
+  endif()
+  add_compile_options(-fsanitize=${HODEIA_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=undefined)
+  add_link_options(-fsanitize=${HODEIA_SANITIZE})
+  message(STATUS "Sanitizers: ${HODEIA_SANITIZE}")
+endif()
+
 # --- Link-time optimisation --------------------------------------------------
 # Applied per-target in src/CMakeLists.txt (INTERFACE so the executable too).
 if(HODEIA_ENABLE_LTO)

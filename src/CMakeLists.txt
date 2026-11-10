@@ -63,6 +63,16 @@ add_library(HodeiaEngine STATIC
 )
 set_source_files_properties(${EXTERNAL}/sqlite3/sqlite3.c PROPERTIES LANGUAGE C)
 
+# UBSan: the prebuilt libmupdf.a is not sanitized, so on x86-64 its pool
+# allocator aligns structs (fz_stext_block…) to FZ_POINTER_ALIGN_MOD = 4 bytes
+# (see fitz/system.h).  Unaligned loads are legal on x86-64, but UBSan reports
+# every access from our code.  Disable only the alignment check, only in the
+# file that walks MuPDF structures.
+if(HODEIA_SANITIZE MATCHES "undefined")
+  set_source_files_properties(ingestionengine.cpp PROPERTIES
+      COMPILE_OPTIONS "-fno-sanitize=alignment")
+endif()
+
 # --- Include directories ---
 #   ${CMAKE_SOURCE_DIR}         → also gives direct access to include/ (flat).
 #   ${CMAKE_SOURCE_DIR}/include → PUBLIC staging area, isolated from external/.
