@@ -91,11 +91,18 @@ ApplicationWindow {
         mainWin: root
         onRequestNewProject: newProjectDialog.open()
         onRequestSwitchProject: function (projectName) {
-            let ok = configManager.switchToProject(projectName);
-            if (ok) {
-                let dbPath = configManager.projectDbPath(projectName);
-                databaseManager.switchDatabase(dbPath);
-            }
+            // Deferred: this runs from MenuItem.onTriggered, BEFORE the menu
+            // closes.  switchDatabase() resets the models, which destroys the
+            // view delegates — including the item the menu restores focus to on
+            // close → SEGV in QQuickDeliveryAgentPrivate::setFocusInScope.
+            // Qt.callLater lets the menu finish closing first.
+            Qt.callLater(function () {
+                let ok = configManager.switchToProject(projectName);
+                if (ok) {
+                    let dbPath = configManager.projectDbPath(projectName);
+                    databaseManager.switchDatabase(dbPath);
+                }
+            });
         }
         onRequestDeleteProject: deleteConfirmDialog.open()
         onRequestCleanProject: cleanProjectDialog.open()
@@ -268,12 +275,17 @@ ApplicationWindow {
                     text: qsTr("Switch")
                     highlighted: true
                     onClicked: {
-                        let ok = configManager.switchToProject(existingProjectName);
-                        if (ok) {
-                            let dbPath = configManager.projectDbPath(existingProjectName);
-                            databaseManager.switchDatabase(dbPath);
-                        }
+                        // Close first, then switch once the popup has restored
+                        // focus (see onRequestSwitchProject for the crash).
+                        let name = existingProjectName;
                         existingProjectDialog.close();
+                        Qt.callLater(function () {
+                            let ok = configManager.switchToProject(name);
+                            if (ok) {
+                                let dbPath = configManager.projectDbPath(name);
+                                databaseManager.switchDatabase(dbPath);
+                            }
+                        });
                     }
                 }
                 Item {
