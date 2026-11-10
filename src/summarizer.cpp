@@ -626,8 +626,9 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
     return;
   }
 
-  if (m_database->summaryModel())
-    m_database->summaryModel()->loadAll();
+  // Do NOT reload SummaryModel here: this runs on the Summarizer thread and the
+  // model is owned by / bound to the GUI thread.  The UI reloads it on the
+  // main thread from paperFinished / allFinished (SummaryDbPane.qml).
 
   // ── Update chunk metadata (clean_title + citation) ──
   QString citation =
@@ -656,7 +657,11 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
       db.prepare("INSERT INTO Citations (paper_hash, clean_title, work_id, "
                  "cites, cited_by) VALUES (?, ?, '', '', '') "
                  "ON CONFLICT(paper_hash) DO UPDATE SET clean_title = "
-                 "excluded.clean_title");
+                 "excluded.clean_title, "
+                 // Re-summarised: the metadata may have improved, so give an
+                 // unmatched paper another OpenAlex lookup right away.
+                 "lookup_status = CASE WHEN work_id = '' THEN 'pending' "
+                 "ELSE lookup_status END");
   if (refStmt.isValid()) {
     (void)refStmt.bind(1, hash);
     (void)refStmt.bind(2, summary.title);

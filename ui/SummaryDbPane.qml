@@ -73,6 +73,8 @@ Rectangle {
         }
         function onPaperFinished(hash, success, message) {
             summaryDbPane.paperProgress += 1;
+            if (success)
+                databaseManager.summaryModel.loadAll();
             if (summaryDbPane.statusBarLabel)
                 summaryDbPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
         }

@@ -108,4 +108,6 @@ void SummaryModel::loadAll() {
   }
 
   endResetModel();
+  ++m_version;
+  emit versionChanged();
 }

@@ -81,7 +81,17 @@ public:
 
   Q_INVOKABLE void loadAll();
 
+  // Bumped by loadAll(). QML bindings that read rows through functions
+  // (rowCount()/get()) are not notified by a model reset; reading `version`
+  // makes them re-evaluate (same pattern as CitationsModel).
+  Q_PROPERTY(int version READ version NOTIFY versionChanged)
+  int version() const { return m_version; }
+
+signals:
+  void versionChanged();
+
 private:
+  int m_version = 0;
   SqliteDb *m_db = nullptr;
   QVector<SummaryRow> m_rows;
   QString formatDate(const QDateTime &dt) const;

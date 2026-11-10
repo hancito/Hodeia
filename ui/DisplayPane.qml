@@ -13,6 +13,10 @@ Rectangle {
 
     // Resolve the raw JSON summary for the active paper
     readonly property string activeSummaryJson: {
+        // Read version so the binding re-evaluates after loadAll(): with a
+        // single paper activePaperHash never changes, so nothing else would
+        // refresh the displayed summary.
+        var v = databaseManager.summaryModel.version;
         if (activePaperHash === "")
             return "";
         for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
