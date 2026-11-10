@@ -86,7 +86,12 @@ void DatabaseManager::createTables() {
                       "cites TEXT NOT NULL DEFAULT '', "
                       "cited_by TEXT NOT NULL DEFAULT '', "
                       "cites_count INTEGER NOT NULL DEFAULT 0, "
-                      "cited_by_count INTEGER NOT NULL DEFAULT 0)");
+                      "cited_by_count INTEGER NOT NULL DEFAULT 0, "
+                      // OpenAlex lookup state: pending | matched | not_found.
+                      // not_found rows are not searched again for a while
+                      // (see OpenAlexClient::dbLoadPendingJobs).
+                      "lookup_status TEXT NOT NULL DEFAULT 'pending', "
+                      "lookup_at DATETIME)");
   if (!r3)
     qCritical() << "[Database] Citations table failed:" << r3.error();
   else
@@ -130,6 +135,7 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
   qDebug() << "Switched database to:" << m_dbPath;
   createTables();
   reloadModels();
+  emit databaseSwitched();
 
   return {};
 }
@@ -152,6 +158,10 @@ void DatabaseManager::setOpenAlexClient(OpenAlexClient *client) {
   // persisted — refresh all models so the UI picks up the new data.
   connect(client, &OpenAlexClient::referencesSaved, this,
           &DatabaseManager::reloadModels);
+  // Project switch: the client (own thread, queued) flushes its queue, aborts
+  // the in-flight request and rescans the new DB.
+  connect(this, &DatabaseManager::databaseSwitched, client,
+          &OpenAlexClient::onDatabaseSwitched);
 }
 
 void DatabaseManager::removeByHashes(const QStringList &hashes) {

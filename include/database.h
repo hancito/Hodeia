@@ -53,6 +53,10 @@ public:
   void beginDbOperation();
   void endDbOperation();
 
+signals:
+  // Emitted after switchDatabase() opened a new project DB.
+  void databaseSwitched();
+
 private:
   bool initDatabase();
   void createTables();
