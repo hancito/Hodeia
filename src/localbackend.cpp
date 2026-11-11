@@ -17,8 +17,9 @@
 #include <QImage>
 #include <QThread>
 #include <algorithm>
-#include <atomic>
 #include <cstring>
+#include <optional>
+#include <tuple>
 #include <vector>
 
 /// Static flag — ensures ggml + llama backends are initialised exactly once
@@ -94,6 +95,11 @@ LocalBackend::~LocalBackend() {
   }
 }
 
+void LocalBackend::ChatTemplatesDeleter::operator()(
+    common_chat_templates *t) const {
+  common_chat_templates_free(t);
+}
+
 // ── Model / mmproj loading ─────────────────────────────────────────
 
 /// Load a GGUF model and (optionally) detect a multimodal projector.
@@ -123,56 +129,43 @@ LocalBackend::loadModel(const QString &modelPath, const PromptPayload &payload,
   m_hasVision = !m_mmprojPath.isEmpty();
 
   // ── Detect devices (GPU + CPU for hybrid offloading) ─────────────
-  auto devices = detectDevices();
-  if (devices.empty()) {
+  if (detectDevices().empty()) {
     qCritical() << "[LocalBackend] No backend devices found";
     return std::unexpected{"No backend devices available"};
   }
 
-  // Identify primary device for logging
-  const char *devName = "";
-  {
-    struct ggml_backend_dev_props props;
-    ggml_backend_dev_get_props(devices[0], &props);
-    devName = props.name ? props.name : "unknown";
-  }
-
-  // Diagnostic: tag every loadModel call with a sequence id + thread so
-  // interleaved worker-thread output can be correlated in Hodeia.log.
-  static std::atomic<int> s_loadSeq{0};
-  const int loadSeq = ++s_loadSeq;
-  qDebug() << "[LocalBackend] DIAG loadModel BEGIN #" << loadSeq
-           << "| thread:" << QThread::currentThreadId() << "| path:" << path
+  qDebug() << "[LocalBackend] loadModel | path:" << path
            << "| mmproj:" << m_mmprojPath << "| headroom:" << responseHeadroom;
 
-  common_init_result_ptr result = loadModelWithDevices(
-      path, m_mmprojPath, devices, devName, &payload, responseHeadroom);
-
+  common_init_result_ptr result =
+      loadModelWithDevices(path, m_mmprojPath, &payload, responseHeadroom);
   if (!result) {
-    qCritical() << "[LocalBackend] DIAG loadModel #" << loadSeq
-                << "loadModelWithDevices FAILED (returned null)";
+    qCritical() << "[LocalBackend] Failed to load model:" << path;
     return std::unexpected{"Failed to load model: " + QString(path)};
   }
-
-  m_llamaModel = result->model();
-
-  // Steal pointers from the result — the common_init_result owns them,
-  // but we need direct pointers for the inference engine.
-  m_llamaCtx = result->context();
-
-  // Store the init_result so it keeps the model+context alive.
-  m_commonInit = std::move(result);
 
   // Cache chat templates — parsed once from GGUF metadata.
   // The model may define a Jinja-based template (most modern models do) or
   // fall back to a built-in named template (e.g. "llama-2", "chatml").
-  // The release() call transfers ownership from the unique_ptr to us.
-  m_chatTemplates = common_chat_templates_init(m_llamaModel, "").release();
+  // Parsing throws on a malformed template: report it as a load failure
+  // instead of letting the exception escape the worker thread.
+  try {
+    m_chatTemplates.reset(
+        common_chat_templates_init(result->model(), "").release());
+  } catch (const std::exception &e) {
+    qCritical() << "[LocalBackend] Invalid chat template:" << e.what();
+    return std::unexpected{tr("Invalid chat template in model: %1")
+                               .arg(QString::fromUtf8(e.what()))};
+  }
 
+  // Raw pointers for the inference engine; m_commonInit keeps them alive.
+  m_llamaModel = result->model();
+  m_llamaCtx = result->context();
+  m_commonInit = std::move(result);
+
+  m_responseHeadroom = responseHeadroom;
   m_modelPath = path;
   m_ready = true;
-  qDebug() << "[LocalBackend] DIAG loadModel #" << loadSeq
-           << "DONE — model+context created, ready";
 
   qDebug() << "[LocalBackend] Model loaded | ctx:" << llama_n_ctx(m_llamaCtx)
            << "| batch:" << llama_n_batch(m_llamaCtx)
@@ -190,85 +183,23 @@ LocalBackend::loadModel(const QString &modelPath, const PromptPayload &payload,
 // fits within the bottleneck GPU's free memory.
 // This replaces the "n_gpu_layers=999 + brute force fallback" approach.
 
-/// Size in bytes of one element of a ggml type.
-static int lb_type_size(int type) {
-  switch (type) {
-  case GGML_TYPE_F32:
-    return 4;
-  case GGML_TYPE_F16:
-  case GGML_TYPE_BF16:
-    return 2;
-  case GGML_TYPE_Q4_0:
-  case GGML_TYPE_Q4_1:
-  case GGML_TYPE_Q5_0:
-  case GGML_TYPE_Q5_1:
-  case GGML_TYPE_Q8_0:
-  case GGML_TYPE_Q8_1:
-  case GGML_TYPE_Q2_K:
-  case GGML_TYPE_Q3_K:
-  case GGML_TYPE_Q4_K:
-  case GGML_TYPE_Q5_K:
-  case GGML_TYPE_Q6_K:
-  case GGML_TYPE_Q8_K:
-  case GGML_TYPE_IQ2_XXS:
-  case GGML_TYPE_IQ2_XS:
-  case GGML_TYPE_IQ3_XXS:
-  case GGML_TYPE_IQ1_S:
-  case GGML_TYPE_IQ4_NL:
-  case GGML_TYPE_IQ3_S:
-  case GGML_TYPE_IQ2_S:
-  case GGML_TYPE_IQ4_XS:
-  case GGML_TYPE_IQ1_M:
-    return 1;
-  default:
-    return 4;
-  }
-}
-
-/// Block alignment in bytes for a ggml type.
-static int lb_type_align(int type) {
-  switch (type) {
-  case GGML_TYPE_F16:
-  case GGML_TYPE_BF16:
-    return 2;
-  case GGML_TYPE_Q4_0:
-  case GGML_TYPE_Q4_1:
-  case GGML_TYPE_Q5_0:
-  case GGML_TYPE_Q5_1:
-  case GGML_TYPE_Q8_0:
-  case GGML_TYPE_Q8_1:
-    return 32;
-  case GGML_TYPE_Q2_K:
-  case GGML_TYPE_Q3_K:
-  case GGML_TYPE_Q4_K:
-  case GGML_TYPE_Q5_K:
-  case GGML_TYPE_Q6_K:
-  case GGML_TYPE_Q8_K:
-  case GGML_TYPE_IQ2_XXS:
-  case GGML_TYPE_IQ2_XS:
-  case GGML_TYPE_IQ3_XXS:
-  case GGML_TYPE_IQ1_S:
-  case GGML_TYPE_IQ4_NL:
-  case GGML_TYPE_IQ3_S:
-  case GGML_TYPE_IQ2_S:
-  case GGML_TYPE_IQ4_XS:
-  case GGML_TYPE_IQ1_M:
-    return 256;
-  default:
-    return 1;
-  }
-}
-
-/// Allocated row size for a given ggml type and element count.
-/// GGML_PAD(ne * type_size, type_align).
+/// Bytes of one row of `ne` elements of a ggml type, as ggml allocates it
+/// (quantized types are stored in blocks: Q8_0 = 34 bytes / 32 elements,
+/// Q4_0 = 18 / 32).  `ne` is rounded up to the block size so ggml_row_size
+/// never asserts on an odd embedding width.
 static uint64_t lb_row_size(int type, int64_t ne) {
-  int sz = lb_type_size(type);
-  int al = lb_type_align(type);
-  return (((static_cast<uint64_t>(ne) * sz) + al - 1) / al) * al;
+  const auto t = static_cast<ggml_type>(type);
+  const int64_t blck = std::max<int64_t>(ggml_blck_size(t), 1);
+  return ggml_row_size(t, (ne + blck - 1) / blck * blck);
 }
 
 /// Round up to nearest multiple of 256 (llama.cpp pads n_ctx to 256).
 static uint32_t lb_pad256(uint32_t v) { return (v + 255U) & ~255U; }
+
+/// Short name of a KV cache type, for logs.
+static const char *lb_kv_name(int type) {
+  return ggml_type_name(static_cast<ggml_type>(type));
+}
 
 /// Estimate KV cache size in bytes for the given configuration.
 static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
@@ -277,7 +208,7 @@ static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
   uint32_t padded_ctx = lb_pad256(n_ctx);
   uint64_t k_bytes = lb_row_size(type_k, n_embd_k_gqa) * padded_ctx;
   uint64_t v_bytes = lb_row_size(type_v, n_embd_v_gqa) * padded_ctx;
-  uint64_t raw = (k_bytes + v_bytes) * std::max(n_layers, 1);
+  uint64_t raw = (k_bytes + v_bytes) * static_cast<uint64_t>(std::max(n_layers, 0));
   // Empirical correction: the naive row-size formula overestimates the
   // actual CUDA allocation by ~3.8x (measured on RTX 5070 Ti / gemma-4-12B).
   // llama.cpp uses a far more compact internal layout (shared K/V buffers,
@@ -295,18 +226,60 @@ struct probe_info {
   int32_t n_embd_v_gqa = 0;
   int32_t n_ctx_train = 0;
   uint64_t model_size = 0;
-  uint64_t mmproj_size = 0;
+  uint64_t mmproj_size = 0;   // mmproj weights + compute, all devices
   bool has_mmproj = false;
-  uint32_t prompt_tokens = 0;
+  uint32_t prompt_tokens = 0; // text + image tokens
+  uint32_t image_tokens = 0;  // image share of prompt_tokens (upper bound)
 };
+
+/// Tokens provisioned per image when sizing the context.  The exact count
+/// depends on the image size and is only known once the projector is loaded
+/// (Gemma 4: 70-1120, ~600 for a rendered page), so this is a middle ground
+/// between waste (reserving the model maximum) and truncation.  Capped at
+/// the projector's maximum when it reports one.  If the real total is
+/// higher, summarize() counts exactly and truncates the last pages.
+static constexpr int32_t kImageTokenEstimate = 800;
+
+/// Images a payload carries, in prompt order (one per marker).
+static std::vector<PageImage> lb_collect_images(const PromptPayload &payload) {
+  std::vector<PageImage> images;
+  if (!payload.pageBlocks.empty()) {
+    for (const auto &pb : payload.pageBlocks)
+      if (!pb.visualContext.data.empty())
+        images.push_back(pb.visualContext);
+  } else {
+    images = payload.visualContext; // legacy fallback
+  }
+  return images;
+}
+
+/// System prompt matching what the model will actually receive.
+static const QString &lb_system_prompt(const PromptPayload &payload,
+                                       bool withImages) {
+  return withImages || payload.textOnlySystemPrompt.isEmpty()
+             ? payload.systemPrompt
+             : payload.textOnlySystemPrompt;
+}
+
+/// Number of images a payload carries, without copying them.
+static size_t lb_count_images(const PromptPayload &payload) {
+  if (payload.pageBlocks.empty())
+    return payload.visualContext.size();
+  size_t n = 0;
+  for (const auto &pb : payload.pageBlocks)
+    if (!pb.visualContext.data.empty())
+      ++n;
+  return n;
+}
 
 /// Assemble the raw user-prompt text from a payload (no chat template, no
 /// image embeddings).  This is the single source of truth shared by prompt
 /// token-counting and the actual inference prompt, so the media marker and
 /// structure can never diverge between the two.
 ///
-/// \param marker    media-placeholder string (mtmd marker, or "<__media__>"
-///                  when no projector is loaded).
+/// \param marker    media-placeholder string (the mtmd marker).  Empty for
+///                  text-only inference: no marker and no image section is
+///                  emitted, so the model never sees a literal placeholder.
 /// \param maxChars  hard cap on prompt characters.  0 means "no cap" (used
 ///                  for token counting).  When set, the document body is
 ///                  truncated on BOTH the pageBlocks and legacy textContext
@@ -330,24 +303,34 @@ static QString lb_build_user_prompt(const PromptPayload &payload,
   if (!payload.pageBlocks.empty()) {
     for (const auto &pb : payload.pageBlocks) {
       userPrompt += QString("## Page %1\n").arg(pb.pageNumber);
-      if (!pb.visualContext.data.empty())
+      if (!marker.isEmpty() && !pb.visualContext.data.empty())
         userPrompt += marker + "\n";
       userPrompt += pb.text + "\n\n";
       if (budget > 0 && userPrompt.length() > budget) {
-        userPrompt = userPrompt.left(budget) + "\n\n... [truncated]";
+        userPrompt.truncate(budget);
+        // Never leave a partial media marker ("<__me") at the cut: it would
+        // reach the model as literal text.
+        for (qsizetype k = marker.length() - 1; k > 0; --k) {
+          if (userPrompt.endsWith(QStringView(marker).left(k))) {
+            userPrompt.chop(k);
+            break;
+          }
+        }
+        userPrompt += "\n\n... [truncated]";
         break;
       }
     }
   }
   // ── Legacy path (textContext + visualContext) ──
   else {
-    if (!payload.visualContext.empty()) {
+    if (!marker.isEmpty() && !payload.visualContext.empty()) {
       userPrompt += "## VISUAL CONTEXT\n";
       for (size_t i = 0; i < payload.visualContext.size(); ++i)
         userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
       userPrompt += "\n";
     }
-    userPrompt += payload.userMessage + "\n\n## TEXT CONTEXT\n\n";
+    // userMessage is already at the top of the prompt — don't repeat it.
+    userPrompt += "## TEXT CONTEXT\n\n";
     QString ctx = payload.textContext;
     if (budget > 0 && ctx.length() > budget) {
       ctx = ctx.left(budget) + "\n\n... [truncated]";
@@ -355,6 +338,35 @@ static QString lb_build_user_prompt(const PromptPayload &payload,
     userPrompt += ctx;
   }
   return userPrompt;
+}
+
+/// Wrap a system + user message in the model's chat template, with thinking
+/// disabled — prevents <|channel>thought tags from reasoning models like
+/// Gemma4 which break JSON output extraction. Shared by token counting and
+/// inference so both see the same prompt. The result keeps template parts
+/// and user-input parts apart (see InferenceEngine::tokenizePrompt). May
+/// throw on a malformed Jinja template.
+static common_chat_prompt lb_apply_chat_template(const common_chat_templates *tmpls,
+                                          const QString &systemPrompt,
+                                          const QString &userMessage) {
+  common_chat_templates_inputs inputs;
+  inputs.use_jinja = true;
+  inputs.add_generation_prompt = true;
+  inputs.enable_thinking = false;
+
+  if (!systemPrompt.isEmpty()) {
+    common_chat_msg sysMsg;
+    sysMsg.role = "system";
+    sysMsg.content = systemPrompt.toStdString();
+    inputs.messages.push_back(std::move(sysMsg));
+  }
+
+  common_chat_msg usrMsg;
+  usrMsg.role = "user";
+  usrMsg.content = userMessage.toStdString();
+  inputs.messages.push_back(std::move(usrMsg));
+
+  return common_chat_templates_apply(tmpls, inputs).prompt;
 }
 
 /// Probe model metadata (no GPU allocation) and optionally measure mmproj.
@@ -390,64 +402,62 @@ static probe_info lb_probe_model(const QString &modelPath,
   }
   info.model_size = llama_model_size(model);
 
-  // Count the exact prompt tokens while the no-alloc model is already open.
+  // Count the exact text tokens while the no-alloc model is already open.
+  // Images are only part of the prompt when a projector exists; their cost
+  // is added below from the projector's per-image maximum.
+  const bool vision = !mmprojPath.isEmpty();
   if (payload) {
-    auto tmpl = common_chat_templates_init(model, "");
-    std::string formatted;
-    if (tmpl) {
-      common_chat_templates_inputs inputs;
-      inputs.use_jinja = true;
-      inputs.add_generation_prompt = true;
-      inputs.enable_thinking = false;
-      if (!payload->systemPrompt.isEmpty()) {
-        common_chat_msg sysMsg;
-        sysMsg.role = "system";
-        sysMsg.content = payload->systemPrompt.toStdString();
-        inputs.messages.push_back(std::move(sysMsg));
-      }
-      common_chat_msg usrMsg;
-      usrMsg.role = "user";
-      // No char cap (0) — counting needs the full prompt; the marker is the
-      // mtmd default since no projector is loaded at probe time.
-      usrMsg.content =
-          lb_build_user_prompt(*payload, "<__media__>", 0).toStdString();
-      inputs.messages.push_back(std::move(usrMsg));
-      formatted = common_chat_templates_apply(tmpl.get(), inputs).prompt;
-      common_chat_templates_free(tmpl.release());
+    // No char cap (0) — counting needs the full prompt.
+    const QString userPrompt = lb_build_user_prompt(
+        *payload, vision ? QString::fromUtf8(mtmd_default_marker()) : QString(),
+        0);
+    common_chat_prompt prompt;
+    try {
+      auto tmpl = common_chat_templates_init(model, "");
+      if (tmpl)
+        prompt = lb_apply_chat_template(
+            tmpl.get(),
+            lb_system_prompt(*payload, vision && lb_count_images(*payload) > 0),
+            userPrompt);
+    } catch (const std::exception &e) {
+      // Malformed Jinja template: count the raw prompt instead; loadModel
+      // reports the template error when it initialises the real templates.
+      qWarning() << "[LocalBackend] lb_probe: chat template failed:"
+                 << e.what();
     }
-    const QString unformatted =
-        formatted.empty() ? lb_build_user_prompt(*payload, "<__media__>", 0)
-                          : QString();
-    const std::string text =
-        formatted.empty() ? unformatted.toStdString() : formatted;
-    auto *vocab = llama_model_get_vocab(model);
-    info.prompt_tokens =
-        static_cast<uint32_t>(common_tokenize(vocab, text, true, true).size());
+    if (prompt.parts.empty())
+      prompt.append(userPrompt.toStdString(), /*is_input=*/true);
+    info.prompt_tokens = static_cast<uint32_t>(
+        InferenceEngine::tokenizePrompt(llama_model_get_vocab(model), prompt)
+            .size());
   }
 
   llama_model_free(model);
 
-  // Measure mmproj size.  The mmproj uses a "clip" architecture which
-  // llama_model_load_from_file rejects.  Fallback to filesystem size.
-  if (!mmprojPath.isEmpty()) {
-    auto mmparams = llama_model_default_params();
-    mmparams.no_alloc = true;
-    mmparams.load_mode = LLAMA_LOAD_MODE_NONE;
-    auto *mm =
-        llama_model_load_from_file(mmprojPath.toUtf8().constData(), mmparams);
-    if (mm) {
-      info.mmproj_size = llama_model_size(mm);
-      info.has_mmproj = true;
-      llama_model_free(mm);
-    } else {
-      // Fallback: use file size as upper bound for weight memory.
-      QFileInfo fi(mmprojPath);
-      if (fi.exists()) {
-        info.mmproj_size = static_cast<uint64_t>(fi.size());
-        info.has_mmproj = true;
-        qDebug() << "[LocalBackend] lb_probe: mmproj via file size:"
-                 << (info.mmproj_size >> 20) << "MiB";
-      }
+  // Measure the mmproj without allocating it: weights + compute buffers per
+  // device, and the maximum tokens one image can take.
+  if (vision) {
+    const mtmd_memory_usage usage = mtmd_get_memory_usage(
+        mmprojPath.toUtf8().constData(), mtmd_context_params_default());
+    for (const auto &[dev, bytes] : usage.backend_mem_usage)
+      info.mmproj_size += bytes;
+    if (info.mmproj_size == 0) {
+      // Unreadable by mtmd: fall back to the file size as a weight estimate.
+      info.mmproj_size = static_cast<uint64_t>(QFileInfo(mmprojPath).size());
+    }
+    info.has_mmproj = info.mmproj_size > 0;
+
+    const size_t nImages = payload ? lb_count_images(*payload) : 0;
+    if (info.has_mmproj && nImages > 0) {
+      const int32_t perImage =
+          usage.image_max_tokens > 0
+              ? std::min(usage.image_max_tokens, kImageTokenEstimate)
+              : kImageTokenEstimate;
+      info.image_tokens = static_cast<uint32_t>(nImages * perImage);
+      info.prompt_tokens += info.image_tokens;
+      qDebug() << "[LocalBackend] lb_probe:" << nImages << "image(s) ×"
+               << perImage << "tokens (max per image"
+               << usage.image_max_tokens << ")";
     }
   }
 
@@ -496,9 +506,10 @@ static bool lb_is_integrated_gpu(const QString &name,
   return false;
 }
 
-/// Discover devices with free memory, returning {gpu_devs, cpu_dev}.
-static void lb_discover(std::vector<device_mem> &gpuDevs, device_mem *&cpuDev) {
-  cpuDev = nullptr;
+/// Discover GPU devices with their free memory.  The CPU device is not
+/// collected here: CPU paths use ggml_backend_dev_by_type(CPU) directly.
+static std::vector<device_mem> lb_discover() {
+  std::vector<device_mem> gpuDevs;
 
   for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
     auto dev = ggml_backend_dev_get(i);
@@ -530,10 +541,26 @@ static void lb_discover(std::vector<device_mem> &gpuDevs, device_mem *&cpuDev) {
                devName.contains("RADV", Qt::CaseInsensitive)) {
       // Vulkan on Linux reports type OTHER for GPUs — include by name
       gpuDevs.push_back(dm);
-    } else if (!cpuDev) {
-      cpuDev = new device_mem(std::move(dm));
     }
   }
+  return gpuDevs;
+}
+
+/// Pick the single GPU the model is loaded on (params.devices holds exactly
+/// one device).  Preference order: discrete over integrated, CUDA over other
+/// backends (the same physical GPU may be exposed by both CUDA and Vulkan),
+/// then the most free memory.  Returns nullptr when there is no GPU.
+static const device_mem *lb_pick_gpu(const std::vector<device_mem> &gpuDevs) {
+  const device_mem *best = nullptr;
+  auto key = [](const device_mem &d) {
+    return std::tuple(!d.is_integrated,
+                      d.name.startsWith("CUDA", Qt::CaseInsensitive),
+                      d.memory_free);
+  };
+  for (const auto &dm : gpuDevs)
+    if (!best || key(dm) > key(*best))
+      best = &dm;
+  return best;
 }
 
 /// Run the adaptive fitting loop. Returns a common_params tuned to fit
@@ -543,14 +570,7 @@ static common_params lb_fit_params(const probe_info &probe,
                                    const std::vector<device_mem> &gpuDevs,
                                    const QString &mmprojPath,
                                    uint32_t desiredCtx, uint32_t desiredUbatch,
-                                   uint32_t minCtx,
-                                   uint32_t estimatedTokens = 0) {
-  // If the caller didn't supply an estimate, use desiredCtx.
-  if (estimatedTokens == 0)
-    estimatedTokens = desiredCtx;
-  // Never estimate more than the context window we're asking for.
-  if (estimatedTokens > desiredCtx)
-    estimatedTokens = desiredCtx;
+                                   uint32_t minCtx) {
   common_params params;
   params.n_ctx = desiredCtx;
   params.n_batch = desiredCtx;
@@ -618,20 +638,15 @@ static common_params lb_fit_params(const probe_info &probe,
 
     qDebug() << "[LocalBackend] lb_fit: no GPU, CPU only"
              << "| n_ctx=" << n_ctx
-             << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
+             << "| kv_type=" << lb_kv_name(type_k)
              << "| est persistent=" << ((persistentWeights + kv) >> 20) << "MiB"
              << "/ " << (cpuAvailable >> 20) << "MiB available"
              << "| cpuFree=" << (cpuFree >> 20) << "MiB";
     return params;
   }
 
-  // Find bottleneck GPU (least free memory)
-  auto *bottleneck = &gpuDevs[0];
-  for (auto &dm : gpuDevs) {
-    if (dm.memory_free < bottleneck->memory_free) {
-      bottleneck = &dm;
-    }
-  }
+  // The model is loaded on exactly one GPU (params.devices = {bottleneck}).
+  const device_mem *bottleneck = lb_pick_gpu(gpuDevs);
 
   // 512 MiB safety margin for iGPUs, 2 GiB for discrete GPUs.
   // The CUDA runtime + driver + CUDA graph reserves need significant
@@ -656,7 +671,6 @@ static common_params lb_fit_params(const probe_info &probe,
 
   // Per-layer weight estimate
   uint64_t per_layer = probe.model_size / std::max(probe.n_layers, 1);
-  uint64_t non_layer = probe.model_size - per_layer * probe.n_layers;
 
   // --- Integrated GPU: all-or-nothing strategy ---
   // Splitting layers between iGPU and CPU triggers
@@ -753,184 +767,115 @@ static common_params lb_fit_params(const probe_info &probe,
     return params;
   }
 
-  // --- Discrete GPU path: progressive layer offload ---
-  // Strategy (priority order — cheapest first):
-  //   1. n_ubatch /2 (halves compute buffer, ~4 Go saved)
-  //   2. KV cache F16 → Q8_0 (halves KV cache, ~2 Go saved)
-  //   3. mmproj → CPU (free ~167 MiB)
-  //   4. Offload 1 layer to CPU at a time
-  //   5. After 30 % offload: n_ctx -10 %, KV Q8→Q4
-  // This ensures the _minimum_ number of layers ends up on CPU.
-  (void)non_layer;
-  int total_layers = probe.n_layers;
-  int offloaded = 0; // layers moved to CPU so far
+  // --- Discrete GPU path ---
+  // Reductions, cheapest in quality first; each OOM round applies the first
+  // one still possible, then re-estimates:
+  //   1. n_ubatch / 2 down to 2048     (smaller compute buffer, slower prompt)
+  //   2. KV cache F16 → Q8_0            (half the KV, negligible quality loss)
+  //   3. mmproj → CPU                   (slower image encoding only)
+  //   4. offload layers up to 30 %      (slower generation, full document)
+  //   5. n_ctx −10 % down to minCtx     (document gets truncated)
+  //   6. KV cache Q8_0 → Q4_0           (more quality loss)
+  //   7. offload the remaining layers
+  //   8. n_ubatch / 2 down to 512
+  // If nothing fits, the caller loads on CPU.
+  const int total_layers = probe.n_layers;
+  const int offload_30 = (total_layers * 30 + 99) / 100; // 30 %, rounded up
+  int offloaded = 0;                                     // layers on CPU
   uint32_t n_ctx = lb_pad256(desiredCtx);
+  const uint32_t ctx_floor = lb_pad256(std::min(minCtx, n_ctx));
   uint32_t n_ubatch = desiredUbatch;
-  int type_k = GGML_TYPE_F16;
-  int type_v = GGML_TYPE_F16;
-  bool mmproj_on_gpu = probe.has_mmproj; // never offloaded, always stays on GPU
-  bool kv_quantized = false;
-  bool post_30 = false; // enters here after 30% offload
+  int type_kv = GGML_TYPE_F16;
+  bool mmproj_on_gpu = probe.has_mmproj;
 
-  const int max_attempts = 200;
-  int attempts = 0;
-
-  while (attempts++ < max_attempts) {
-    int n_gpu_layers = total_layers - offloaded;
-    // Estimate memory demand (GPU-side only — CPU layers cost nothing here)
-    // Only GPU layers store their KV cache on GPU; CPU layers use system RAM.
-    int kv_layers = n_gpu_layers > 0 ? n_gpu_layers : probe.n_layers;
-    uint64_t kv_size =
-        lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa, kv_layers,
-                             n_ctx, type_k, type_v);
-    uint64_t gpu_weight =
-        n_gpu_layers > 0 ? static_cast<uint64_t>(n_gpu_layers) * per_layer : 0;
-    uint64_t mmproj_mem = probe.has_mmproj ? probe.mmproj_size : 0;
-    uint64_t compute_buf =
-        n_gpu_layers > 0
-            // CUDA graph reserve allocates per-layer activations.
-            // Calibrated: 8433 MiB measured for 48 layers, 8192 ubatch, 3840
-            // embd → ~6 bytes/element.  Bumped to 8 for headroom:
-            // sliding-window models (gemma4) allocate extra SWA buffers.
-            ? static_cast<uint64_t>(n_ubatch) * std::max(probe.n_embd, 1) *
-                  static_cast<uint64_t>(n_gpu_layers) * 8
-            : 0;
-    uint64_t gpu_total =
+  for (int attempts = 0; attempts < 500; ++attempts) {
+    const int n_gpu_layers = total_layers - offloaded;
+    // GPU-side demand only: layers on the CPU keep their weights and KV in
+    // system RAM (offload_kqv), so they cost nothing here.
+    const uint64_t kv_size =
+        lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
+                             n_gpu_layers, n_ctx, type_kv, type_kv);
+    const uint64_t gpu_weight = static_cast<uint64_t>(n_gpu_layers) * per_layer;
+    const uint64_t mmproj_mem = mmproj_on_gpu ? probe.mmproj_size : 0;
+    // CUDA graph reserve allocates per-layer activations.  Calibrated: 8433
+    // MiB measured for 48 layers, 8192 ubatch, 3840 embd → ~6 bytes/element.
+    // Bumped to 8 for headroom: sliding-window models (gemma4) allocate
+    // extra SWA buffers.
+    const uint64_t compute_buf = static_cast<uint64_t>(n_ubatch) *
+                                 std::max(probe.n_embd, 1) *
+                                 static_cast<uint64_t>(n_gpu_layers) * 8;
+    const uint64_t gpu_total =
         (gpu_weight + mmproj_mem + kv_size + compute_buf) * 105 / 100;
 
     if (gpu_total <= available) {
-      // Fits!
       params.n_gpu_layers = n_gpu_layers;
-      params.n_batch =
-          8192; // fixed: keeps Vulkan/CUDA command buffers manageable
+      params.n_ctx = n_ctx;
+      params.n_batch = 8192; // fixed: keeps Vulkan/CUDA command buffers manageable
       params.n_ubatch = n_ubatch;
       params.devices = {bottleneck->dev};
-      params.cache_type_k = static_cast<ggml_type>(type_k);
-      params.cache_type_v = static_cast<ggml_type>(type_v);
-      // llama.cpp uses n_gpu_layers to decide how many layers go to the first
-      // device (GPU); the remaining layers are automatically placed on the
-      // CPU backend — no need to pass the CPU device explicitly here.
-      if (n_gpu_layers < total_layers && n_gpu_layers > 0) {
-        qDebug() << "[LocalBackend] lb_fit: OK (split GPU/CPU)"
-                 << "| n_gpu_layers=" << n_gpu_layers
-                 << "| n_cpu_layers=" << offloaded << "| n_ctx=" << n_ctx
-                 << "| n_ubatch=" << n_ubatch
-                 << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
-                 << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
-                 << "MiB"
-                 << "| weights=" << (gpu_weight >> 20) << "MiB"
-                 << "| kv=" << (kv_size >> 20) << "MiB"
-                 << "| mmproj=" << (mmproj_mem >> 20) << "MiB"
-                 << "| compute=" << (compute_buf >> 20) << "MiB";
-      } else if (n_gpu_layers <= 0) {
-        params.n_gpu_layers = 0;
-        qDebug() << "[LocalBackend] lb_fit: OK (CPU only)"
-                 << "| n_ctx=" << n_ctx << "| n_ubatch=" << n_ubatch;
-      } else {
-        qDebug() << "[LocalBackend] lb_fit: OK (GPU only)"
-                 << "| n_gpu_layers=" << n_gpu_layers << "| n_ctx=" << n_ctx
-                 << "| n_ubatch=" << n_ubatch
-                 << "| kv_type=" << (type_k == GGML_TYPE_F16 ? "F16" : "Q8_0")
-                 << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
-                 << "MiB"
-                 << "| weights=" << (gpu_weight >> 20) << "MiB"
-                 << "| kv=" << (kv_size >> 20) << "MiB"
-                 << "| mmproj=" << (mmproj_mem >> 20) << "MiB"
-                 << "| compute=" << (compute_buf >> 20) << "MiB";
-      }
+      params.cache_type_k = static_cast<ggml_type>(type_kv);
+      params.cache_type_v = static_cast<ggml_type>(type_kv);
       if (probe.has_mmproj) {
         params.mmproj.path = mmprojPath.toStdString();
         params.mmproj_use_gpu = mmproj_on_gpu;
       }
+      // llama.cpp puts the first n_gpu_layers on the GPU device and the rest
+      // on the CPU backend — no need to pass the CPU device explicitly.
+      qDebug() << "[LocalBackend] lb_fit: OK"
+               << (n_gpu_layers == total_layers ? "(GPU only)"
+                   : n_gpu_layers > 0           ? "(split GPU/CPU)"
+                                                : "(CPU only)")
+               << "| n_gpu_layers=" << n_gpu_layers << "/" << total_layers
+               << "| n_ctx=" << n_ctx << "| n_ubatch=" << n_ubatch
+               << "| kv_type=" << lb_kv_name(type_kv)
+               << "| mmproj on" << (mmproj_on_gpu ? "GPU" : "CPU")
+               << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
+               << "MiB | weights=" << (gpu_weight >> 20)
+               << "MiB | kv=" << (kv_size >> 20)
+               << "MiB | mmproj=" << (mmproj_mem >> 20)
+               << "MiB | compute=" << (compute_buf >> 20) << "MiB";
       return params;
     }
 
-    // ── OOM: progressive reduction (cheapest first) ─────────────
-
-    // 1. n_ubatch /2 (halves compute buffer, biggest single win)
-    if (n_ubatch > 2048) {
-      uint32_t old = n_ubatch;
+    // ── OOM: apply the first reduction still possible ─────────────
+    if (n_ubatch > 2048) { // 1
+      const uint32_t old = n_ubatch;
       n_ubatch = std::max(n_ubatch / 2, 2048U);
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << old << "→"
                << n_ubatch;
-      continue;
-    }
-
-    // 2. KV cache F16 → Q8_0 (halves KV cache, ~2 Go saved)
-    if (!kv_quantized && type_k == GGML_TYPE_F16) {
-      kv_quantized = true;
-      type_k = type_v = GGML_TYPE_Q8_0;
+    } else if (type_kv == GGML_TYPE_F16) { // 2
+      type_kv = GGML_TYPE_Q8_0;
       qDebug() << "[LocalBackend] lb_fit: OOM → KV cache F16 → Q8_0";
-      continue;
-    }
-
-    // 3. Offload 1 layer to CPU at a time (granular, preserves GPU performance)
-    {
-      int next = offloaded + 1;
-      if (next <= total_layers) {
-        offloaded = next;
-        qDebug() << "[LocalBackend] lb_fit: OOM → offload 1 more layer to CPU"
-                 << "(total offloaded=" << offloaded << "/" << total_layers
-                 << ")";
-        // After 30 % offload, unlock the more aggressive parameter tweaks.
-        if (offloaded >= (total_layers * 30 + 9) / 10) {
-          post_30 = true;
-        }
-        continue;
-      }
-    }
-
-    // 4. mmproj → CPU (~167 MiB freed)
-    if (probe.has_mmproj && mmproj_on_gpu) {
+    } else if (mmproj_on_gpu) { // 3
       mmproj_on_gpu = false;
       qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
                << (probe.mmproj_size >> 20) << "MiB freed)";
-      continue;
-    }
-
-    // 5. After 30 % offload: touch other params
-    if (!post_30)
-      continue; // nothing left to try in this round
-
-    // 5a. Reduce n_ctx by 10 %
-    if (n_ctx > lb_pad256(minCtx)) {
-      uint32_t old = n_ctx;
-      n_ctx = lb_pad256(std::max(n_ctx - n_ctx / 10, lb_pad256(minCtx)));
+    } else if (offloaded < offload_30) { // 4
+      ++offloaded;
+      qDebug() << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
+               << "/" << total_layers << "to CPU";
+    } else if (n_ctx > ctx_floor) { // 5
+      const uint32_t old = n_ctx;
+      n_ctx = std::max(lb_pad256(n_ctx - n_ctx / 10), ctx_floor);
       if (n_ctx == old)
-        n_ctx = lb_pad256(minCtx);
+        n_ctx = ctx_floor;
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ctx" << old << "→" << n_ctx;
-      continue;
-    }
-
-    // 5b. Quantize KV cache: Q8_0 → Q4_K (last resort)
-    if (type_k == GGML_TYPE_Q8_0) {
-      type_k = type_v = GGML_TYPE_Q4_K;
-      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_K";
-      continue;
-    }
-
-    // 5c. Reduce n_ubatch by half (floor 64)
-    if (n_ubatch > 64) {
-      n_ubatch = std::max(n_ubatch / 2, 64U);
+    } else if (type_kv == GGML_TYPE_Q8_0) { // 6
+      type_kv = GGML_TYPE_Q4_0;
+      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_0";
+    } else if (offloaded < total_layers) { // 7
+      ++offloaded;
+      qDebug() << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
+               << "/" << total_layers << "to CPU";
+    } else if (n_ubatch > 512) { // 8
+      n_ubatch = std::max(n_ubatch / 2, 512U);
       qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << n_ubatch;
-      continue;
+    } else {
+      qWarning() << "[LocalBackend] lb_fit: cannot fit on GPU,"
+                 << (gpu_total >> 20) << "MiB needed vs" << (available >> 20)
+                 << "MiB available";
+      break;
     }
-
-    // 5d. Emergency: reduce n_ctx below minCtx
-    if (n_ctx > 256) {
-      uint32_t old = n_ctx;
-      n_ctx = lb_pad256(std::max(n_ctx - 256U, 256U));
-      if (n_ctx == old)
-        n_ctx = 256;
-      qDebug() << "[LocalBackend] lb_fit: OOM → emergency n_ctx" << n_ctx;
-      continue;
-    }
-
-    // Nothing left — give up
-    qWarning() << "[LocalBackend] lb_fit: cannot fit on GPU,"
-               << (gpu_total >> 20) << "MiB needed vs" << (available >> 20)
-               << "MiB available";
-    break;
   }
 
   // GPU fitting failed → CPU fallback
@@ -993,10 +938,9 @@ std::vector<ggml_backend_dev_t> LocalBackend::detectDevices() {
   return devs;
 }
 
-/// Build a common_init_result, handling hybrid model flash-attention
-/// re-init.  On failure returns nullptr and logs the error.
-common_init_result_ptr LocalBackend::createInitResult(common_params &params,
-                                                      bool hasMmprojOnGpu) {
+/// Build a common_init_result.  Never throws: exceptions from
+/// common_init_from_params are logged and reported as nullptr.
+common_init_result_ptr LocalBackend::createInitResult(common_params &params) {
   // llama_model_params.devices is a NULL-terminated C array of
   // ggml_backend_dev_t*.  common_params.devices is a std::vector, which is
   // NOT NULL-terminated, so common_model_params_to_llama's
@@ -1009,46 +953,51 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params,
   // (ggml_backend_dev_get_props on a garbage dev); on Linux the trailing heap
   // happens to be zero so it terminates early and "works".  Append a trailing
   // nullptr so .data() is a properly NULL-terminated array.
-  if (!params.devices.empty()) {
-    if (params.devices.back() != nullptr)
-      params.devices.push_back(nullptr);
-  }
-  auto result = common_init_from_params(params);
-  if (!result)
-    return nullptr;
-  if (!result->model() || !result->context())
-    return nullptr;
+  if (!params.devices.empty() && params.devices.back() != nullptr)
+    params.devices.push_back(nullptr);
 
-  // Hybrid models (Siglip + LLaMA) crash with flash attention because the
-  // vision encoder writes embeddings at unexpected positions.
-  if (llama_model_is_hybrid(result->model())) {
-    result.reset();
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-    qDebug() << "[LocalBackend] Flash attention set to AUTO (hybrid model)";
-    result = common_init_from_params(params);
+  try {
+    auto result = common_init_from_params(params);
     if (!result || !result->model() || !result->context())
       return nullptr;
+
+    // Hybrid models (recurrent + attention: Jamba, Granite…) are kept off
+    // flash attention.  Only reload when FA could actually be on.
+    if (llama_model_is_hybrid(result->model()) &&
+        params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED) {
+      result.reset();
+      params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+      qDebug() << "[LocalBackend] Hybrid model — reloading with flash "
+                  "attention disabled";
+      result = common_init_from_params(params);
+      if (!result || !result->model() || !result->context())
+        return nullptr;
+    }
+    return result;
+  } catch (const std::exception &e) {
+    qCritical() << "[LocalBackend] Exception while loading model:" << e.what();
+  } catch (...) {
+    qCritical() << "[LocalBackend] Unknown exception while loading model";
   }
-  return result;
+  return nullptr;
 }
 
 /// Model loader: adaptive memory fitting via lb strategy.
 ///
-/// Replaces the old "n_gpu_layers=999 + brute force fallback" with a
-/// three-phase approach:
-///   1. Probe the model (no GPU allocation) to get layers, embd, size.
+/// Three-phase approach:
+///   1. Probe the model (no GPU allocation) to get layers, embd, size and
+///      the exact prompt token count.
 ///   2. Run lb_fit_params which iteratively adjusts n_gpu_layers,
-///      n_ctx, KV cache type, and n_ubatch until it fits the bottleneck GPU.
-///   3. If GPU fitting fails entirely, fall back to pure CPU.
+///      n_ctx, KV cache type, and n_ubatch until it fits the chosen GPU.
+///   3. If GPU fitting or the GPU load fails, fall back to pure CPU.
 ///
 /// The mmproj path is stored in params so common_init_from_params knows
 /// about it, but the projector is lazy-loaded (not bound to GPU here).
-common_init_result_ptr LocalBackend::loadModelWithDevices(
-    const QString &path, const QString &mmprojPath,
-    const std::vector<ggml_backend_dev_t> &devices, const char *primaryName,
-    const PromptPayload *payload, uint32_t responseHeadroom) {
-  (void)primaryName;
-
+common_init_result_ptr
+LocalBackend::loadModelWithDevices(const QString &path,
+                                   const QString &mmprojPath,
+                                   const PromptPayload *payload,
+                                   uint32_t responseHeadroom) {
   // ── Phase 1: probe model metadata (no GPU allocation) ──────────
   // When a payload is given, the probe also counts the exact prompt token
   // count during this same no-alloc load.
@@ -1059,9 +1008,8 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
   }
 
   // ── Phase 2: discover devices and run adaptive fit ─────────────
-  std::vector<device_mem> gpuDevs;
-  device_mem *cpuDev = nullptr;
-  lb_discover(gpuDevs, cpuDev);
+  const std::vector<device_mem> gpuDevs = lb_discover();
+  const bool hasGpu = lb_pick_gpu(gpuDevs) != nullptr;
 
   // Size the KV cache from the exact prompt token count (measured during the
   // probe) plus the caller's generation headroom.
@@ -1078,150 +1026,85 @@ common_init_result_ptr LocalBackend::loadModelWithDevices(
       desiredCtx > static_cast<uint32_t>(probe.n_ctx_train)) {
     desiredCtx = static_cast<uint32_t>(probe.n_ctx_train);
   }
-  uint32_t desiredUbatch = 8192;
-  uint32_t minCtx = 2048;
+  const uint32_t desiredUbatch = 8192;
+  const uint32_t minCtx = 2048;
+
+  // Settings shared by the GPU attempt and the CPU fallback.
+  auto applyCommon = [&](common_params &p) {
+    p.model.path = path.toStdString();
+    p.cpuparams.n_threads = QThread::idealThreadCount();
+    p.cpuparams_batch.n_threads = QThread::idealThreadCount();
+    // We do our own fitting via lb_fit_params — disable the internal
+    // common_fit_params which re-probes all devices and can crash when
+    // multiple backends (CUDA + Vulkan) claim the same physical GPU.
+    p.fit_params = false;
+  };
+
+  // CPU-only load: weights, KV cache and mmproj all on the CPU device.
+  auto loadOnCpu = [&](common_params p) -> common_init_result_ptr {
+    applyCommon(p);
+    p.n_gpu_layers = 0;
+    p.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
+    if (auto *cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU))
+      p.devices = {cpu};
+    else
+      p.devices.clear(); // let llama.cpp pick its default
+    if (!mmprojPath.isEmpty()) {
+      p.mmproj.path = mmprojPath.toStdString();
+      p.mmproj_use_gpu = false;
+    }
+    // The model is on the CPU, so a GPU (if any) is free for the projector.
+    m_mmprojUseGpu = hasGpu;
+    qDebug() << "[LocalBackend] Loading on CPU | n_ctx=" << p.n_ctx;
+    return createInitResult(p);
+  };
 
   common_params params = lb_fit_params(probe, gpuDevs, mmprojPath, desiredCtx,
                                        desiredUbatch, minCtx);
 
-  // Remember whether we're on an integrated GPU — needed later to keep
-  // the mmproj off the GPU and preserve VRAM.
-  m_isIntegratedGPU = false;
-  for (auto &dm : gpuDevs) {
-    if (dm.is_integrated) {
-      m_isIntegratedGPU = true;
-      break;
-    }
+
+  if (params.n_gpu_layers == 0)
+    return loadOnCpu(params);
+
+  // GPU path: the fitter already set params.devices to {chosen GPU}.
+  // Do NOT push the CPU device here.  params.devices is the list of
+  // compute devices the model is split across; mixing a CPU device (which
+  // carries no device_id on Windows — it reports "unknown id") into a
+  // fully GPU-offloaded model's device list crashes llama's device
+  // scheduler / arch dispatch during llama_model_load_from_file
+  // (NULL function pointer, Windows-only).  llama.cpp keeps a CPU backend
+  // available via ggml_backend_load_all() for host ops and hybrid offload
+  // on its own, so an explicit CPU entry is not needed.
+  applyCommon(params);
+  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+  if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
+    // lb_fit_params only sets mmproj if probe confirmed it exists
+    params.mmproj.path = mmprojPath.toStdString();
   }
+  // The fitter decided where the projector goes (it reserved its VRAM when
+  // on GPU; the iGPU path keeps it on the CPU).
+  m_mmprojUseGpu = params.mmproj_use_gpu;
+  qDebug() << "[LocalBackend] Loading on GPU with fitted params:"
+           << "n_gpu_layers=" << params.n_gpu_layers
+           << "n_ctx=" << params.n_ctx << "n_ubatch=" << params.n_ubatch;
 
-  // Apply remaining common settings
-  params.model.path = path.toStdString();
-  params.cpuparams.n_threads = QThread::idealThreadCount();
-  params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-
-  // Diagnostic: the runtime was loading the mmproj as the main model
-  // ("CLIP cannot be used as main model"), which the code should not do.
-  // Print exactly what common_init_from_params will be handed so the
-  // offending path is visible in Hodeia.log.
-  qDebug() << "[LocalBackend] DIAG loadModelWithDevices -> model.path:"
-           << QString::fromStdString(params.model.path)
-           << "| mmproj.path:" << QString::fromStdString(params.mmproj.path)
-           << "| n_gpu_layers:" << params.n_gpu_layers
-           << "| n_devices:" << params.devices.size()
-           << "| thread:" << QThread::currentThreadId();
-
-  // Remember how many GPU layers we're actually using — needed later to
-  // decide whether the mmproj can live on the GPU (when model is on CPU,
-  // the iGPU is free for the mmproj).
-  m_gpuLayers = params.n_gpu_layers;
-
-  // We do our own fitting via lb_fit_params — disable the internal
-  // common_fit_params which re-probes all devices and can crash when
-  // multiple backends (CUDA + Vulkan) claim the same physical GPU.
-  params.fit_params = false;
-
-  if (params.n_gpu_layers != 0) {
-    // GPU path: the fitter already set params.devices to {bottleneck_gpu}.
-    // Do NOT push the CPU device here.  params.devices is the list of
-    // compute devices the model is split across; mixing a CPU device (which
-    // carries no device_id on Windows — it reports "unknown id") into a
-    // fully GPU-offloaded model's device list crashes llama's device
-    // scheduler / arch dispatch during llama_model_load_from_file
-    // (NULL function pointer, Windows-only).  llama.cpp keeps a CPU backend
-    // available via ggml_backend_load_all() for host ops and hybrid offload
-    // on its own, so an explicit CPU entry is not needed.
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
-    if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
-      // lb_fit_params only sets mmproj if probe confirmed it exists
-      params.mmproj.path = mmprojPath.toStdString();
-    }
-    qDebug() << "[LocalBackend] Loading on GPU with fitted params:"
-             << "n_gpu_layers=" << params.n_gpu_layers
-             << "n_ctx=" << params.n_ctx << "n_ubatch=" << params.n_ubatch;
-  } else {
-    // ── Phase 3: CPU fallback ────────────────────────────────────
-    if (cpuDev) {
-      params.devices = {cpuDev->dev};
-    } else {
-      // Last resort: use whatever device list detectDevices gave us
-      if (!devices.empty()) {
-        params.devices = {devices[0]};
-      }
-    }
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    if (!mmprojPath.isEmpty()) {
-      params.mmproj.path = mmprojPath.toStdString();
-      params.mmproj_use_gpu = false;
-    }
-    qDebug() << "[LocalBackend] Loading on CPU (GPU fit failed)"
-             << "n_ctx=" << params.n_ctx;
-    delete cpuDev;
-    return createInitResult(params, false);
-  }
-
-  // Step marker: this is the exact call that triggers
-  // llama_model_load_from_file inside common_init_from_params.  If the mmproj
-  // is loaded as the main model (CLIP error), it happens in this call.
-  qDebug()
-      << "[LocalBackend] DIAG >> createInitResult (common_init_from_params) "
-         "starting ...";
-  common_init_result_ptr result;
-  try {
-    result = createInitResult(params, params.mmproj_use_gpu);
-  } catch (const std::exception &e) {
-    qCritical() << "[LocalBackend] DIAG C++ EXCEPTION in createInitResult:"
-                << e.what();
-    result = nullptr;
-  } catch (...) {
-    qCritical() << "[LocalBackend] DIAG UNKNOWN C++ exception in "
-                   "createInitResult";
-    result = nullptr;
-  }
-  qDebug() << "[LocalBackend] DIAG << createInitResult returned"
-           << (result ? "OK" : "NULL");
+  common_init_result_ptr result = createInitResult(params);
   if (!result) {
-    qCritical() << "[LocalBackend] Fitted load failed, trying CPU fallback";
-    params =
-        lb_fit_params(probe, {}, mmprojPath, desiredCtx, desiredUbatch, minCtx);
-    params.model.path = path.toStdString();
-    params.cpuparams.n_threads = QThread::idealThreadCount();
-    params.cpuparams_batch.n_threads = QThread::idealThreadCount();
-    delete cpuDev;
-    if (params.devices.empty()) {
-      params.devices = devices.empty() ? devices : std::vector{devices[0]};
-    }
-    params.n_gpu_layers = 0;
-    params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    if (!mmprojPath.isEmpty()) {
-      params.mmproj.path = mmprojPath.toStdString();
-      params.mmproj_use_gpu = false;
-    }
-    if (params.devices.empty())
-      return nullptr;
-    return createInitResult(params, false);
+    qCritical() << "[LocalBackend] GPU load failed, trying CPU fallback";
+    return loadOnCpu(lb_fit_params(probe, {}, mmprojPath, desiredCtx,
+                                   desiredUbatch, minCtx));
   }
-
-  delete cpuDev;
-
-  qDebug() << "[LocalBackend] Model loaded | ctx:"
-           << llama_n_ctx(result->context())
-           << "| batch:" << llama_n_batch(result->context())
-           << "| ubatch:" << llama_n_ubatch(result->context());
   return result;
 }
 
 void LocalBackend::unloadModel() {
   unloadMmproj();
-  if (m_chatTemplates) {
-    common_chat_templates_free(m_chatTemplates);
-    m_chatTemplates = nullptr;
-  }
+  m_chatTemplates.reset();
   // Resetting the unique_ptr frees the common_init_result, which in turn
   // destroys the llama_model and llama_context (and their GPU buffers).
   m_commonInit.reset();
   m_llamaCtx = nullptr;
   m_llamaModel = nullptr;
-  m_gpuLayers = 0;
   m_hasVision = false;
   m_ready = false;
   m_modelPath.clear();
@@ -1255,9 +1138,9 @@ bool LocalBackend::isReady() const { return m_ready; }
 
 // ── Summarize entry point ──────────────────────────────────────────
 
-/// Main public entry point. Applies a conservative character budget to the
-/// prompt (so it never overflows the KV cache when the token estimate is
-/// low) and dispatches to text-only or multimodal inference.
+/// Main public entry point. Fits the prompt into the context while keeping
+/// the response headroom free, then dispatches to text-only or multimodal
+/// inference.
 QString LocalBackend::summarize(const PromptPayload &payload,
                                 bool *cancelFlag) {
   if (!m_ready) {
@@ -1265,59 +1148,89 @@ QString LocalBackend::summarize(const PromptPayload &payload,
     return QString();
   }
 
-  // Character budget for the prompt.  The KV cache was already sized at load
-  // time from the *exact* prompt token count plus the caller's generation
-  // headroom (see loadModelWithDevices), so there is room to spare.  This
-  // cap is only a safety net: it guards against the fitted n_ctx being
-  // smaller than expected (e.g. the fitter scaled it down to fit VRAM).
-  // 4 chars/token is conservative (typical English prose is ~4 chars/token),
-  // so a prompt of `ctxSize` tokens is ~4*ctxSize chars — keeping the
-  // rendered prompt within the context window.
-  int32_t ctxSize = llama_n_ctx(m_llamaCtx);
-  int maxChars = ctxSize * 4;
+  // Token budget for the prompt: the context minus the response headroom.
+  // n_ctx was sized at load time as prompt_tokens + headroom, but it can be
+  // smaller — capped at n_ctx_train for long documents, or shrunk by the
+  // fitter to fit VRAM.  In those cases the prompt must be truncated, or it
+  // would fill the whole context and leave nothing to generate into.
+  // Headroom is capped at half the context so a tiny n_ctx still gets a
+  // usable prompt.
+  const int32_t ctxSize = llama_n_ctx(m_llamaCtx);
+  const int32_t headroom =
+      std::min<int32_t>(static_cast<int32_t>(m_responseHeadroom), ctxSize / 2);
+  const int32_t promptBudget = ctxSize - headroom;
+  const llama_vocab *vocab = llama_model_get_vocab(m_llamaModel);
 
-  // Collect images from pageBlocks (preserving page order)
+  // Vision is used only when the payload has images AND the projector loads.
+  // Otherwise the prompt is built without media markers (text-only).
+  const std::vector<PageImage> allImages = lb_collect_images(payload);
+  bool useVision = false;
+  if (!allImages.empty() && m_hasVision) {
+    auto r = loadMmproj();
+    if (r)
+      useVision = true;
+    else
+      qWarning() << "[LocalBackend] mmproj unavailable, text-only:"
+                 << r.error();
+  }
+  const QString marker =
+      useVision ? QString::fromUtf8(mtmd_get_marker(m_mtmdCtx)) : QString();
+
+  // Build the prompt uncapped first (the common case: it fits as counted at
+  // load time).  If it doesn't, shrink the character cap in proportion to
+  // the token overflow and rebuild.  Truncation drops pages from the end,
+  // their markers with them, so only the first `markers` images are kept.
+  // Counting uses the exact tokenization of the inference path (image
+  // tokens included), so there is no chars-per-token guess.
+  int32_t maxChars = 0; // 0 = no cap
+  int32_t promptTokens = 0;
+  std::optional<common_chat_prompt> prompt;
   std::vector<PageImage> images;
-  if (!payload.pageBlocks.empty()) {
-    for (const auto &pb : payload.pageBlocks)
-      if (!pb.visualContext.data.empty())
-        images.push_back(pb.visualContext);
-  } else {
-    images = payload.visualContext; // legacy fallback
+  for (int attempt = 0; attempt < 6; ++attempt) {
+    prompt = buildFormattedPrompt(payload, marker, maxChars);
+    if (!prompt)
+      return QString();
+
+    images.clear();
+    if (useVision) {
+      const auto nMarkers = static_cast<size_t>(
+          QString::fromStdString(prompt->str()).count(marker));
+      images.assign(allImages.begin(),
+                    allImages.begin() +
+                        static_cast<std::ptrdiff_t>(
+                            std::min(nMarkers, allImages.size())));
+      promptTokens = InferenceEngine::countMultimodalTokens(m_mtmdCtx, *prompt,
+                                                            images);
+      if (promptTokens < 0)
+        return QString();
+    } else {
+      promptTokens = static_cast<int32_t>(
+          InferenceEngine::tokenizePrompt(vocab, *prompt).size());
+    }
+
+    if (promptTokens <= promptBudget)
+      break;
+    const int64_t current =
+        maxChars > 0 ? maxChars : QString::fromStdString(prompt->str()).length();
+    // 5 % extra margin so the next attempt usually lands under budget.
+    maxChars = static_cast<int32_t>(current * promptBudget / promptTokens *
+                                    95 / 100);
+    qDebug() << "[LocalBackend] Prompt" << promptTokens << "tokens > budget"
+             << promptBudget << "→ truncating to" << maxChars << "chars";
   }
+  if (promptTokens > promptBudget)
+    qWarning() << "[LocalBackend] Prompt still over budget after truncation:"
+               << promptTokens << "/" << promptBudget << "tokens";
 
-  uint64_t totalTextChars = 0;
-  for (const auto &pb : payload.pageBlocks)
-    totalTextChars += pb.text.length();
-  if (payload.pageBlocks.empty())
-    totalTextChars = payload.textContext.length();
-
-  qDebug() << "[LocalBackend] summarize() — ctxSize:" << ctxSize
-           << "| maxChars:" << maxChars
+  qDebug() << "[LocalBackend] summarize() | n_ctx:" << ctxSize
+           << "| prompt:" << promptTokens << "tokens | headroom:" << headroom
            << "| pages:" << payload.pageBlocks.size()
-           << "| text:" << totalTextChars << "chars"
-           << "| images:" << images.size();
+           << "| images:" << images.size() << "/" << allImages.size()
+           << (useVision ? "(vision)" : "(text-only)");
 
-  QString promptText = buildFormattedPrompt(payload, maxChars);
-
-  // Decide inference path: multimodal only when vision is available, the
-  // mmproj is currently loaded, and there are actual images to process.
-  // Note: m_mtmdCtx check is intentional here — if the mmproj hasn't been
-  // loaded yet we fall through to text-only.  The caller can retry after
-  // an explicit loadMmproj() call if needed.
-  if (m_hasVision && m_mtmdCtx && !images.empty()) {
-    return runMultimodalInference(promptText, images, cancelFlag);
-  }
-  return runTextInference(promptText, cancelFlag);
-}
-
-QString LocalBackend::generate(const QString &systemPrompt,
-                               const QString &userPrompt) {
-  PromptPayload p;
-  p.systemPrompt = systemPrompt;
-  p.userMessage = userPrompt;
-  p.textContext = userPrompt;
-  return summarize(p);
+  if (!images.empty())
+    return runMultimodalInference(*prompt, images, cancelFlag);
+  return runTextInference(*prompt, cancelFlag);
 }
 
 // ── Text-only inference ────────────────────────────────────────────
@@ -1333,12 +1246,12 @@ common_params_sampling LocalBackend::makeSamplingParams() const {
   return params;
 }
 
-QString LocalBackend::runTextInference(const QString &formattedText,
+QString LocalBackend::runTextInference(const common_chat_prompt &prompt,
                                        bool *cancelFlag) {
   InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
   if (cancelFlag)
     engine.setCancelFlag(cancelFlag);
-  QString result = engine.inferText(formattedText);
+  QString result = engine.inferText(prompt);
 
   if (result.isEmpty()) {
     qWarning() << "[LocalBackend] Text inference returned empty output";
@@ -1348,23 +1261,15 @@ QString LocalBackend::runTextInference(const QString &formattedText,
 
 // ── Multimodal inference ──────────────────────────────────────────
 
-/// Run inference with images. The mmproj is lazy-loaded before the call
-/// and unloaded immediately after — this keeps VRAM pressure low between
-/// text-only and multimodal workloads.
+/// Run inference with images.  The caller (summarize) has already loaded the
+/// mmproj; it stays resident until unloadModel().
 QString
-LocalBackend::runMultimodalInference(const QString &formattedText,
+LocalBackend::runMultimodalInference(const common_chat_prompt &prompt,
                                      const std::vector<PageImage> &images,
                                      bool *cancelFlag) {
-  if (!m_hasVision) {
-    qWarning() << "[LocalBackend] Multimodal inference requested but "
-                  "vision not available";
-    return QString();
-  }
-
-  // Lazy-load mmproj on first use (or if previously unloaded).
-  auto r = loadMmproj();
-  if (!r) {
-    qWarning() << "[LocalBackend] Failed to lazy-load mmproj:" << r.error();
+  if (!m_mtmdCtx) {
+    qWarning() << "[LocalBackend] Multimodal inference requested but the "
+                  "mmproj is not loaded";
     return QString();
   }
 
@@ -1374,11 +1279,7 @@ LocalBackend::runMultimodalInference(const QString &formattedText,
   InferenceEngine engine(m_llamaCtx, m_llamaModel, makeSamplingParams());
   if (cancelFlag)
     engine.setCancelFlag(cancelFlag);
-  QString result = engine.inferMultimodal(formattedText, images, m_mtmdCtx);
-
-  // Keep mmproj loaded — unloading and reloading it for every inference
-  // is expensive (GPU memory alloc + model load).  It will be cleaned up
-  // when unloadModel() is called.
+  QString result = engine.inferMultimodal(prompt, images, m_mtmdCtx);
 
   if (result.isEmpty()) {
     qWarning() << "[LocalBackend] Multimodal inference returned empty output";
@@ -1396,22 +1297,41 @@ std::expected<void, QString> LocalBackend::loadMmproj() {
 
   emit statusUpdated(tr("Loading multimodal projector: %1").arg(m_mmprojPath));
 
+  const QByteArray path = m_mmprojPath.toUtf8();
   auto mtmdParams = mtmd_context_params_default();
-  // On iGPU, keep mmproj on CPU only if the model itself is on the GPU.
-  // When the model is on CPU (context > 30k tokens), the iGPU is free
-  // and can accelerate the mmproj.
-  mtmdParams.use_gpu = !m_isIntegratedGPU || m_gpuLayers == 0;
+  // Placement decided at model load (fitter / CPU fallback).
+  mtmdParams.use_gpu = m_mmprojUseGpu;
   mtmdParams.n_threads = QThread::idealThreadCount();
   mtmdParams.warmup = false;
+  mtmdParams.print_timings = false;
 
-  m_mtmdCtx = mtmd_init_from_file(m_mmprojPath.toUtf8().constData(),
-                                  m_llamaModel, mtmdParams);
+  // Models with non-causal attention on images need each image to fit in a
+  // single ubatch: cap the per-image token budget to n_ubatch, like
+  // llama-server does (fewer tokens = lower image resolution).
+  const mtmd_memory_usage usage =
+      mtmd_get_memory_usage(path.constData(), mtmdParams);
+  const int32_t nUbatch = static_cast<int32_t>(llama_n_ubatch(m_llamaCtx));
+  if (usage.use_non_causal && usage.image_max_tokens > nUbatch) {
+    qWarning() << "[LocalBackend] Capping image tokens" << usage.image_max_tokens
+               << "→" << nUbatch << "(n_ubatch, non-causal image attention)";
+    mtmdParams.image_max_tokens = nUbatch;
+    mtmdParams.image_min_tokens =
+        std::min(mtmdParams.image_min_tokens, nUbatch);
+  }
+
+  m_mtmdCtx = mtmd_init_from_file(path.constData(), m_llamaModel, mtmdParams);
   if (!m_mtmdCtx) {
     qWarning() << "[LocalBackend] Failed to load mmproj:" << m_mmprojPath;
     return std::unexpected{tr("Failed to load mmproj: %1").arg(m_mmprojPath)};
   }
+  if (!mtmd_support_vision(m_mtmdCtx)) {
+    unloadMmproj();
+    return std::unexpected{tr("mmproj has no vision encoder: %1")
+                               .arg(m_mmprojPath)};
+  }
 
-  qDebug() << "[LocalBackend] mmproj loaded on GPU";
+  qDebug() << "[LocalBackend] mmproj loaded on"
+           << (mtmdParams.use_gpu ? "GPU" : "CPU");
   return {};
 }
 
@@ -1427,69 +1347,41 @@ void LocalBackend::unloadMmproj() {
 
 /// Assemble the user prompt from page blocks in interleaved format:
 /// <--image--> <--text--> <--image--> <--text--> …
-/// Then wrap in the model's chat template.  The marker is a special token
-/// placeholder (e.g. "<__media__>") that mtmd_tokenize replaces with image
-/// embeddings.
-QString LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
-                                           int32_t maxChars) {
-  const char *rawMarker =
-      m_mtmdCtx != nullptr ? mtmd_get_marker(m_mtmdCtx) : nullptr;
-  const QString marker =
-      rawMarker ? QString::fromUtf8(rawMarker) : QStringLiteral("<__media__>");
-
-  // Shared with token-counting (lb_build_user_prompt) so the prompt fed to
-  // inference is byte-for-byte what was counted when sizing the KV cache.
+/// then wrap it in the model's chat template.  `marker` is the mtmd media
+/// marker (one per image, replaced by its embeddings), or empty for a
+/// text-only prompt.
+std::optional<common_chat_prompt>
+LocalBackend::buildFormattedPrompt(const PromptPayload &payload,
+                                   const QString &marker, int32_t maxChars) {
+  // Shared with token-counting (lb_probe_model) so the prompt fed to
+  // inference is the one that was counted when sizing the KV cache.
   const QString userPrompt = lb_build_user_prompt(payload, marker, maxChars);
-
-  // ── Debug: show prompt before chat template ──
-  qDebug() << "========== PROMPT DEBUG ==========";
-  qDebug() << "SYSTEM:" << payload.systemPrompt.left(200) << "...";
-  QString dbg = userPrompt;
-  if (dbg.length() > 4000)
-    dbg =
-        dbg.left(4000) + QString("\n... [truncated for debug, total: %1 chars]")
-                             .arg(userPrompt.length());
-  qDebug().noquote() << "USER:" << dbg;
-  qDebug() << "====================================";
-
-  return applyChatTemplate(payload.systemPrompt, userPrompt);
+  return applyChatTemplate(lb_system_prompt(payload, !marker.isEmpty()),
+                           userPrompt);
 }
 
-QString LocalBackend::applyChatTemplate(const QString &systemPrompt,
-                                        const QString &userMessage) {
+std::optional<common_chat_prompt>
+LocalBackend::applyChatTemplate(const QString &systemPrompt,
+                                const QString &userMessage) {
   if (!m_chatTemplates) {
     qWarning() << "[LocalBackend] Chat templates not initialized";
-    return QString();
+    return std::nullopt;
   }
 
-  // Build inputs with thinking disabled — prevents <|channel>thought tags
-  // from reasoning models like Gemma4 which break JSON output extraction.
-  common_chat_templates_inputs inputs;
-  inputs.use_jinja = true;
-  inputs.add_generation_prompt = true;
-  inputs.enable_thinking = false;
-
-  if (!systemPrompt.isEmpty()) {
-    common_chat_msg sysMsg;
-    sysMsg.role = "system";
-    sysMsg.content = systemPrompt.toStdString();
-    inputs.messages.push_back(std::move(sysMsg));
+  common_chat_prompt prompt;
+  try {
+    prompt = lb_apply_chat_template(m_chatTemplates.get(), systemPrompt,
+                                    userMessage);
+  } catch (const std::exception &e) {
+    qCritical() << "[LocalBackend] Chat template failed:" << e.what();
+    return std::nullopt;
   }
 
-  common_chat_msg usrMsg;
-  usrMsg.role = "user";
-  usrMsg.content = userMessage.toStdString();
-  inputs.messages.push_back(std::move(usrMsg));
-
-  std::string formatted =
-      common_chat_templates_apply(m_chatTemplates, inputs).prompt;
-
-  if (formatted.empty()) {
+  if (prompt.parts.empty()) {
     qWarning() << "[LocalBackend] Chat template produced empty output";
-    return QString();
+    return std::nullopt;
   }
-
-  return QString::fromStdString(formatted);
+  return prompt;
 }
 
 // ── Path resolution ────────────────────────────────────────────────
@@ -1548,12 +1440,13 @@ PageImage PageImage::fromQImage(const QImage &img) {
                          : img.convertToFormat(QImage::Format_RGB888);
   pi.width = rgb.width();
   pi.height = rgb.height();
-  // Copy the pixels while `rgb` (and any temporary from convertToFormat) is
-  // still alive. `rgb.constBits()` stays valid for the duration of the copy;
-  // the resulting vector is self-contained, so the PageImage can outlive the
-  // source image safely.
-  const int bytes = rgb.sizeInBytes();
-  pi.data.assign(static_cast<const unsigned char *>(rgb.constBits()),
-                 static_cast<const unsigned char *>(rgb.constBits()) + bytes);
+  // Copy row by row: QImage pads every scanline to a 4-byte boundary, so for
+  // RGB888 with width*3 not a multiple of 4 the raw buffer contains padding
+  // bytes that would shear the image. mtmd expects tightly packed
+  // width*height*3 bytes.
+  const size_t rowBytes = static_cast<size_t>(pi.width) * 3;
+  pi.data.resize(rowBytes * static_cast<size_t>(pi.height));
+  for (int y = 0; y < pi.height; ++y)
+    std::memcpy(pi.data.data() + rowBytes * y, rgb.constScanLine(y), rowBytes);
   return pi;
 }

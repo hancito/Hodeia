@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <expected>
+#include <optional>
 #include <memory>
 #include <vector>
 
@@ -10,8 +11,9 @@ struct common_init_result;
 struct common_chat_templates;
 struct common_params;
 struct common_params_sampling;
+struct common_chat_prompt;
 
-// MOC scanner needs a type for detectBestDevice() return value.
+// MOC scanner needs a concrete type for ggml_backend_dev_t (detectDevices()).
 #ifndef GGML_BACKEND_H
 struct ggml_backend_device {};
 using ggml_backend_dev_t = ggml_backend_device *;
@@ -48,6 +50,10 @@ struct PageBlock {
 /// the model's chat template, and feeds it to the inference engine.
 struct PromptPayload {
   QString systemPrompt;
+  /// System prompt to use instead of systemPrompt when the backend cannot
+  /// pass the images (no projector, or it failed to load), so the model is
+  /// not told about figures it never receives.  Empty = use systemPrompt.
+  QString textOnlySystemPrompt;
   QString userMessage;
   QString textContext;
   std::vector<PageImage> visualContext; ///< raw RGB page images
@@ -61,8 +67,8 @@ struct PromptPayload {
 ///   1. Models are loaded through libcommon (common_init_from_params) which
 ///      handles device probing, flash-attention selection and VRAM fitting.
 ///   2. The mmproj (multimodal projector) is **lazy-loaded**: it stays off
-///      the GPU until the first multimodal request, then is unloaded
-///      immediately after — this avoids VRAM contention with the main model.
+///      the GPU until the first multimodal request, then stays resident until
+///      unloadModel() — this avoids VRAM contention during the model load.
 ///   3. Chat templates are parsed once from GGUF metadata and cached for
 ///      the lifetime of the loaded model.
 ///   4. All heavy lifting (tokenize → decode → sample) is delegated to
@@ -109,26 +115,26 @@ public:
   ///                    token boundary and returns the partial output.
   QString summarize(const PromptPayload &payload, bool *cancelFlag = nullptr);
 
-  /// Convenience wrapper around summarize() for simple text-only calls.
-  QString generate(const QString &systemPrompt, const QString &userPrompt);
-
 signals:
   /// Emitted when the backend status changes (loading, loaded, errors…).
   void statusUpdated(const QString &msg);
 
 private:
-  QString runMultimodalInference(const QString &formattedText,
+  QString runMultimodalInference(const common_chat_prompt &prompt,
                                  const std::vector<PageImage> &images,
                                  bool *cancelFlag);
-  QString runTextInference(const QString &formattedText, bool *cancelFlag);
+  QString runTextInference(const common_chat_prompt &prompt, bool *cancelFlag);
 
   /// Assemble the user/system prompt with visual markers + text context,
-  /// then wrap it in the model's chat template.
-  QString buildFormattedPrompt(const PromptPayload &payload, int32_t maxChars);
+  /// then wrap it in the model's chat template.  `marker` is empty for a
+  /// text-only prompt.  nullopt on template failure.
+  std::optional<common_chat_prompt>
+  buildFormattedPrompt(const PromptPayload &payload, const QString &marker,
+                       int32_t maxChars);
 
   /// Apply the model's Jinja chat template (cached in m_chatTemplates).
-  QString applyChatTemplate(const QString &systemPrompt,
-                            const QString &userMessage);
+  std::optional<common_chat_prompt>
+  applyChatTemplate(const QString &systemPrompt, const QString &userMessage);
 
   /// Resolve a relative or absolute model path to an absolute filesystem path.
   QString resolveModelPath(const QString &modelPath) const;
@@ -141,10 +147,9 @@ private:
   /// Unload the projector to free its GPU VRAM.
   void unloadMmproj();
 
-  /// Build and probe a common_init_result from params (including hybrid FA
-  /// re-init).  Returns nullptr on failure.
-  common_init_result_ptr createInitResult(common_params &params,
-                                          bool hasMmprojOnGpu);
+  /// Build a common_init_result from params (including hybrid-model FA
+  /// re-init).  Never throws; returns nullptr on failure.
+  common_init_result_ptr createInitResult(common_params &params);
 
   /// Detect devices and return {gpu, cpu} for hybrid offloading.
   std::vector<ggml_backend_dev_t> detectDevices();
@@ -155,17 +160,19 @@ private:
   /// \param responseHeadroom    tokens reserved for the generated response
   ///                            when sizing the KV cache from exact prompt
   ///                            tokens.
-  common_init_result_ptr
-  loadModelWithDevices(const QString &path, const QString &mmprojPath,
-                       const std::vector<ggml_backend_dev_t> &devices,
-                       const char *primaryName, const PromptPayload *payload,
-                       uint32_t responseHeadroom = 2048);
+  common_init_result_ptr loadModelWithDevices(const QString &path,
+                                              const QString &mmprojPath,
+                                              const PromptPayload *payload,
+                                              uint32_t responseHeadroom);
 
   /// libcommon init result — owns the llama_model + llama_context.
   common_init_result_ptr m_commonInit;
 
   /// Cached chat-template parser; initialised once from GGUF metadata.
-  common_chat_templates *m_chatTemplates = nullptr;
+  struct ChatTemplatesDeleter {
+    void operator()(common_chat_templates *t) const; // common_chat_templates_free
+  };
+  std::unique_ptr<common_chat_templates, ChatTemplatesDeleter> m_chatTemplates;
 
   /// Raw pointers into the model/context owned by m_commonInit.
   struct llama_context *m_llamaCtx = nullptr;
@@ -175,14 +182,18 @@ private:
   QString m_modelPath;
   QString m_mmprojPath;
 
-  /// Multimodal context — lazily loaded on first vision request, unloaded
-  /// after each inference to keep VRAM available for the main model.
+  /// Multimodal context — lazily loaded on first vision request, kept until
+  /// unloadModel().
   struct mtmd_context *m_mtmdCtx = nullptr;
 
   /// Set to true when an mmproj was found next to the model.
   bool m_hasVision = false;
-  bool m_isIntegratedGPU = false;
-  int32_t m_gpuLayers = 0; // actual n_gpu_layers used on last load
+  /// Where loadMmproj puts the projector, decided at model load: the
+  /// fitter's choice on the GPU path, any free GPU when the model is on CPU.
+  bool m_mmprojUseGpu = false;
+  /// Tokens reserved for the response when the KV cache was sized; the
+  /// prompt is truncated so this much context stays free for generation.
+  uint32_t m_responseHeadroom = 2048;
 
   common_params_sampling makeSamplingParams() const;
 };

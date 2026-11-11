@@ -126,9 +126,6 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
              << "—" << hash;
 
     PromptPayload payload = buildPrompt(hash);
-    qDebug() << "[Summarizer] Prompt built — text context:"
-             << payload.textContext.length()
-             << "chars, visuals:" << payload.visualContext.size();
 
     QString result;
     if (backend.isLocal)
@@ -317,131 +314,6 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
 
 /* ── Prompt building ────────────────────────────────────────────── */
 
-QString Summarizer::retrieveContext(const QString &paperHash) const {
-  if (!m_database || !m_database->isOpen()) {
-    qWarning() << "[Summarizer] database not open";
-    return QString();
-  }
-
-  QList<ChunkSearchResult> chunks =
-      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
-  if (chunks.isEmpty()) {
-    qDebug() << "[Summarizer] no chunks for hash:" << paperHash;
-    return QString();
-  }
-
-  QString context;
-  const int overlapChars = 200; // matches PdfWorker::m_overlapChars
-
-  for (int i = 0; i < chunks.size(); ++i) {
-    const auto &c = chunks[i];
-    QString text = c.text;
-
-    // Strip the trailing overlap that will be repeated in the next chunk.
-    // The last chunk keeps its full text — there's no successor to deduplicate.
-    if (i < chunks.size() - 1 && text.length() > overlapChars) {
-      text = text.left(text.length() - overlapChars);
-    }
-
-    context += QString("Page %1: %2\n\n").arg(c.page).arg(text);
-  }
-
-  // Count total OCR chars across all (pre-dedup) chunks
-  int totalOcrChars = 0;
-  for (const auto &c : chunks)
-    totalOcrChars += c.text.length();
-
-  qDebug() << "[Summarizer] retrieved" << chunks.size()
-           << "chunks | OCR total:" << totalOcrChars
-           << "chars (with overlap) | assembled context:" << context.length()
-           << "chars (deduplicated) | first chunk sample:"
-           << chunks.first().text.left(80) << "..."
-           << "for hash:" << paperHash;
-  return context;
-}
-
-std::vector<PageImage>
-Summarizer::retrieveVisualContext(const QString &paperHash) const {
-  std::vector<PageImage> result;
-
-  QString imgPath = m_config->projectImgPath(m_config->lastProject());
-  QDir imgDir(imgPath);
-  if (!imgDir.exists())
-    return result;
-
-  imgDir.setNameFilters({paperHash + "_page_*.png"});
-  QStringList paths;
-  for (const QFileInfo &fi : imgDir.entryInfoList())
-    paths.append(fi.absoluteFilePath());
-  paths.sort();
-
-  for (const QString &path : paths) {
-    QImage img(path);
-    if (img.isNull()) {
-      qWarning() << "[Summarizer] Failed to load image:" << path;
-      continue;
-    }
-    result.push_back(PageImage::fromQImage(img));
-  }
-
-  qDebug() << "[Summarizer] loaded" << result.size()
-           << "page image(s) for hash:" << paperHash;
-  return result;
-}
-
-/// Load only images from pages that contain figures or tables.
-std::vector<PageImage>
-Summarizer::retrieveReducedVisualContext(const QString &paperHash) const {
-  std::vector<PageImage> result;
-
-  // Find which pages have figures or tables from chunk metadata.
-  QList<ChunkSearchResult> chunks =
-      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
-
-  QSet<int> pagesWithVisuals;
-  for (const auto &c : chunks) {
-    if (!c.pageMetadata.isEmpty()) {
-      QJsonObject meta =
-          QJsonDocument::fromJson(c.pageMetadata.toUtf8()).object();
-      if (meta.value("has_figure").toBool(false) ||
-          meta.value("has_vector_graphics").toBool(false) ||
-          meta.value("has_table").toBool(false)) {
-        pagesWithVisuals.insert(c.page);
-      }
-    }
-  }
-
-  if (pagesWithVisuals.isEmpty()) {
-    qDebug() << "[Summarizer] reduced visual: no pages with figures/tables for"
-             << paperHash;
-    return result;
-  }
-
-  QString imgPath = m_config->projectImgPath(m_config->lastProject());
-  QDir imgDir(imgPath);
-  if (!imgDir.exists())
-    return result;
-
-  // Page numbers in the DB are 0-based; image files use 1-based (_page_001).
-  for (int page0 : pagesWithVisuals) {
-    QString fileName = QString("%1_page_%2.png")
-                           .arg(paperHash)
-                           .arg(page0 + 1, 3, 10, QChar('0'));
-    QString fullPath = imgDir.absoluteFilePath(fileName);
-
-    QImage img(fullPath);
-    if (img.isNull()) {
-      continue;
-    }
-    result.push_back(PageImage::fromQImage(img));
-  }
-
-  qDebug() << "[Summarizer] reduced visual:" << result.size()
-           << "page image(s) for" << pagesWithVisuals.size()
-           << "pages with figures/tables in" << paperHash;
-  return result;
-}
-
 PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   PromptPayload payload;
   payload.userMessage = s_userPrompt;
@@ -521,40 +393,25 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     payload.pageBlocks.push_back(std::move(pb));
   }
 
-  // ── Legacy fields (kept for backward compat) ──
-  payload.textContext = retrieveContext(paperHash);
-
   // ── System prompt selection ──
-  switch (mode) {
-  case VisualMode::TextOnly:
-    payload.systemPrompt = s_systemPromptText;
-    qDebug() << "[Summarizer] Visual: TEXT-ONLY mode —"
-             << payload.pageBlocks.size() << "page(s) for" << paperHash;
-    break;
-  case VisualMode::Full: {
-    payload.systemPrompt = s_systemPromptVisual;
-    payload.visualContext = retrieveVisualContext(paperHash);
-    int imgCount = 0;
-    for (const auto &pb : payload.pageBlocks)
-      if (!pb.visualContext.data.empty())
-        imgCount++;
-    qDebug() << "[Summarizer] Visual: FULL mode —" << payload.pageBlocks.size()
-             << "page(s), " << imgCount << "image(s) for" << paperHash;
-    break;
-  }
-  case VisualMode::Reduced: {
-    payload.systemPrompt = s_systemPromptVisual;
-    payload.visualContext = retrieveReducedVisualContext(paperHash);
-    int imgCount = 0;
-    for (const auto &pb : payload.pageBlocks)
-      if (!pb.visualContext.data.empty())
-        imgCount++;
-    qDebug() << "[Summarizer] Visual: REDUCED mode —"
-             << payload.pageBlocks.size() << "page(s), " << imgCount
-             << "with image(s) for" << paperHash;
-    break;
-  }
-  }
+  // The visual prompt only when images actually made it into the payload
+  // (Reduced mode on a paper without figures has none).  Backends that
+  // cannot pass the images fall back to textOnlySystemPrompt.
+  int imgCount = 0;
+  for (const auto &pb : payload.pageBlocks)
+    if (!pb.visualContext.data.empty())
+      ++imgCount;
+  const bool visual = mode != VisualMode::TextOnly && imgCount > 0;
+  payload.systemPrompt = visual ? s_systemPromptVisual : s_systemPromptText;
+  if (visual)
+    payload.textOnlySystemPrompt = s_systemPromptText;
+
+  const char *modeName = mode == VisualMode::Full      ? "FULL"
+                         : mode == VisualMode::Reduced ? "REDUCED"
+                                                       : "TEXT-ONLY";
+  qDebug() << "[Summarizer] Visual:" << modeName << "mode —"
+           << payload.pageBlocks.size() << "page(s)," << imgCount
+           << "image(s) for" << paperHash;
 
   return payload;
 }

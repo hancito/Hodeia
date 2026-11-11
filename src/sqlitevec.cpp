@@ -67,12 +67,11 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   // cannot interleave on the same context.
   const QMutexLocker locker(&m_lock);
 
-  // Init llama backends (idempotent, safe to call from any thread). Move
-  // common_init() inside call_once so it is not invoked concurrently with
-  // the backend init.
+  // Init llama backends once.  No common_init(): it calls
+  // llama_log_set(common_log_default_callback), which would replace the
+  // filtered log callback installed by main.cpp (initLlamaLogging).
   static std::once_flag s_initFlag;
   std::call_once(s_initFlag, []() {
-    common_init();
     ggml_backend_load_all();
     llama_backend_init();
   });

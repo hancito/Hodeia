@@ -214,16 +214,9 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
       messages.append(systemMessage(systemPrompt));
     messages.append(textUserMessage(fullText));
 
-    // ── Debug ──
-    qDebug() << "========== PROMPT DEBUG (remote/text-only) ==========";
-    qDebug() << "SYSTEM:" << systemPrompt.left(200) << "...";
-    QString dbg = fullText;
-    if (dbg.length() > 4000)
-      dbg =
-          dbg.left(4000) +
-          QString("\n... [truncated, total: %1 chars]").arg(fullText.length());
-    qDebug().noquote() << "USER:" << dbg;
-    qDebug() << "====================================================";
+    qDebug() << "[RemoteBackend] Interleaved request (text-only) |"
+             << payload.pageBlocks.size() << "page(s) |" << fullText.length()
+             << "chars | system prompt:" << systemPrompt.length() << "chars";
 
     sendRequest(
         buildRequest(buildCompletionUrl()),
@@ -264,26 +257,20 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
     messages.append(systemMessage(systemPrompt));
   messages.append(msg);
 
-  // ── Debug ──
-  qDebug() << "========== PROMPT DEBUG (remote/multimodal) ==========";
-  qDebug() << "SYSTEM:" << systemPrompt.left(200) << "...";
-  qDebug() << "Content parts:" << contentParts.size() << "(for"
-           << payload.pageBlocks.size() << "pages)";
-  for (int i = 0; i < contentParts.size(); ++i) {
-    QJsonObject part = contentParts[i].toObject();
-    if (part.value("type") == "text") {
-      QString t = part.value("text").toString();
-      if (t.length() > 800)
-        t = t.left(800) + "...";
-      qDebug().noquote() << "  part[" << i << "] text:" << t;
-    } else {
-      qDebug()
-          << "  part[" << i << "] image ("
-          << part.value("image_url").toObject().value("url").toString().left(60)
-          << "...)";
-    }
+  int nImages = 0;
+  qsizetype nTextChars = 0;
+  for (const auto &partValue : contentParts) {
+    const QJsonObject part = partValue.toObject();
+    if (part.value("type") == "text")
+      nTextChars += part.value("text").toString().length();
+    else
+      ++nImages;
   }
-  qDebug() << "======================================================";
+  qDebug() << "[RemoteBackend] Interleaved request (multimodal) |"
+           << payload.pageBlocks.size() << "page(s) |" << nImages
+           << "image(s) |" << nTextChars
+           << "text chars | system prompt:" << systemPrompt.length()
+           << "chars";
 
   sendRequest(
       buildRequest(buildCompletionUrl()),

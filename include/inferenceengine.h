@@ -4,11 +4,14 @@
 #include <QString>
 #include <memory>
 #include <stdint.h>
+#include <string>
 #include <vector>
 
 struct llama_context;
 struct llama_model;
 struct mtmd_context;
+struct llama_vocab;
+struct common_chat_prompt;
 struct common_sampler;
 struct common_params_sampling;
 struct PageImage;
@@ -33,25 +36,32 @@ class InferenceEngine : public QObject {
 
 public:
   InferenceEngine(struct llama_context *ctx, struct llama_model *model,
-                  const common_params_sampling &samplingParams,
+                  common_params_sampling samplingParams,
                   QObject *parent = nullptr);
   ~InferenceEngine() override;
 
-  /// Run text-only inference.  `prompt` is the already-template-
-  /// formatted chat string (e.g. after applyChatTemplate).
-  QString inferText(const QString &prompt);
+  /// Run text-only inference on a chat-template-rendered prompt.  Template
+  /// parts are tokenized with special-token parsing, user-input parts
+  /// (the document text) without it, so text inside a PDF cannot inject
+  /// control tokens such as <end_of_turn>.
+  QString inferText(const common_chat_prompt &prompt);
 
-  /// Run multimodal inference.  `prompt` contains the media marker
-  /// (e.g. "<__media__>") at the positions where images should be
-  /// injected.  `images` are raw RGB pixel buffers.  `mctx` is the
-  /// mtmd multimodal context (loaded alongside the mmproj).
-  QString inferMultimodal(const QString &prompt,
+  /// Run multimodal inference.  The user-input parts of `prompt` contain the
+  /// media marker (mtmd_get_marker) once per image, in order; `images` are
+  /// raw RGB pixel buffers.  `mctx` is the loaded mtmd (mmproj) context.
+  QString inferMultimodal(const common_chat_prompt &prompt,
                           const std::vector<PageImage> &images,
                           struct mtmd_context *mctx);
 
-  /// Optional stop sequence — generation stops when output ends with this
-  /// string.
-  void setStopSequence(const QString &seq) { m_stopSequence = seq; }
+  /// Tokenize a rendered prompt exactly as inferText() does.
+  static std::vector<llama_token> tokenizePrompt(const struct llama_vocab *vocab,
+                                                 const common_chat_prompt &prompt);
+
+  /// Number of tokens (KV cells) a multimodal prompt takes, text + images,
+  /// tokenized exactly as inferMultimodal() does.  -1 on error.
+  static int32_t countMultimodalTokens(struct mtmd_context *mctx,
+                                       const common_chat_prompt &prompt,
+                                       const std::vector<PageImage> &images);
 
   /// Optional cooperative-cancellation flag. When the pointed-to value is
   /// true, generation stops at the next token boundary and the partial
@@ -65,26 +75,21 @@ signals:
 
 private:
   /// Shared generation loop: prompt is already decoded into the KV
-  /// cache; this samples tokens until EOS or a stop condition.
-  QString generate();
+  /// cache up to position `nPast` (exclusive); this samples tokens until
+  /// EOS, cancellation or the token budget. (llama_pos is int32_t.)
+  QString generate(int32_t nPast);
 
   /// Clear the KV cache so each inference starts from a clean slate.
   void clearKvCache();
 
-  /// Current number of consumed positions (max position + 1) across all
-  /// sequences; used to resume generation after a prompt / multimodal pass.
-  /// (llama_pos is int32_t in llama.h.)
-  int32_t currentNpast() const;
-
-  /// Detokenize a single token, stripping leading-space when the
-  /// model uses space-prefix encoding.
-  QString tokenToPiece(llama_token tok) const;
+  /// Detokenize a single token to raw UTF-8 bytes. The result may be an
+  /// incomplete UTF-8 sequence, so callers must accumulate before decoding.
+  std::string tokenToPiece(llama_token tok) const;
 
   struct llama_context *m_ctx = nullptr;
   struct llama_model *m_model = nullptr;
   const struct llama_vocab *m_vocab = nullptr;
   int32_t m_n_batch = 0;
-  QString m_stopSequence;
   bool *m_cancelFlag = nullptr;
 
   /// common_sampler wraps the full sampling chain (sampling.h).

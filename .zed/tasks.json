@@ -138,8 +138,10 @@
     "label": "Linux: Build & Run (Sanitize)",
     "command": "cmake --build build/Sanitize && ./build/Sanitize/src/Hodeia",
     "cwd": "$ZED_WORKTREE_ROOT",
+    // protect_shadow_gap=0: the CUDA driver maps memory inside ASan's shadow
+    // gap; without it cuInit fails and ggml silently falls back to Vulkan.
     "env": {
-      "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+      "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1:protect_shadow_gap=0",
       "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1",
     },
     "use_new_terminal": true,

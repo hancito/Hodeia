@@ -3,6 +3,7 @@
 #include "enginemanager.h"
 #include "helpers.h"
 #include "llama.h"
+#include "mtmd-helper.h"
 #include "openalex.h"
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
@@ -162,33 +163,53 @@ static void initConsoleLogging() {
 /// diagnostics such as "failed to load ggml-cuda.dll" or "backend ... is not
 /// supported on this system" (the latter is logged at INFO level — silently
 /// dropped if we only forward ERROR and above).
+static void llamaLogCallback(enum ggml_log_level level, const char *text,
+                             void *) {
+  // Surface backend-load failures and warnings without the model loader's
+  // INFO metadata dump or mtmd's per-chunk DEBUG trace (which prints the
+  // whole prompt text). GGML_LOG_LEVEL_CONT continues the previous message:
+  // keep it only if that message was kept.
+  static thread_local bool s_lastKept = false;
+  if (level != GGML_LOG_LEVEL_CONT)
+    s_lastKept = level >= GGML_LOG_LEVEL_WARN;
+  if (!s_lastKept)
+    return;
+  const char *tag = "INFO";
+  switch (level) {
+  case GGML_LOG_LEVEL_ERROR:
+    tag = "CRIT";
+    break;
+  case GGML_LOG_LEVEL_WARN:
+    tag = "WARN";
+    break;
+  case GGML_LOG_LEVEL_INFO:
+    tag = "INFO";
+    break;
+  default:
+    tag = "DEBUG";
+    break;
+  }
+  logOut(tag, QString::fromLatin1("llama.cpp: ") +
+                  QString::fromUtf8(text ? text : ""));
+}
+
+// From llama.cpp common/log.h (not staged in external/include): messages
+// above this verbosity are dropped by libcommon's own logger ("cmn ..."
+// lines), which writes to stderr directly rather than through
+// llama_log_set.  LOG_LEVEL_WARN = 2 keeps warnings and errors only.
+void common_log_set_verbosity_thold(int verbosity);
+
 static void initLlamaLogging() {
-  llama_log_set(
-      [](enum ggml_log_level level, const char *text, void *) {
-        // Surface backend-load failures and warnings without the model
-        // loader's INFO metadata dump. GGML_LOG_LEVEL_CONT continues a
-        // previous message, so keep it for multi-line output.
-        if (level < GGML_LOG_LEVEL_WARN && level != GGML_LOG_LEVEL_CONT)
-          return;
-        const char *tag = "INFO";
-        switch (level) {
-        case GGML_LOG_LEVEL_ERROR:
-          tag = "CRIT";
-          break;
-        case GGML_LOG_LEVEL_WARN:
-          tag = "WARN";
-          break;
-        case GGML_LOG_LEVEL_INFO:
-          tag = "INFO";
-          break;
-        default:
-          tag = "DEBUG";
-          break;
-        }
-        logOut(tag, QString::fromLatin1("llama.cpp: ") +
-                        QString::fromUtf8(text ? text : ""));
-      },
-      nullptr);
+#ifdef Q_OS_WIN
+  // UTF-8 console (was done by llama.cpp's common_init(), no longer called).
+  SetConsoleOutputCP(CP_UTF8);
+  SetConsoleCP(CP_UTF8);
+#endif
+  llama_log_set(llamaLogCallback, nullptr);
+  common_log_set_verbosity_thold(2 /* LOG_LEVEL_WARN */);
+  // mtmd (multimodal) and its helpers have their own logger, which by
+  // default prints everything — DEBUG included — to stderr.
+  mtmd_helper_log_set(llamaLogCallback, nullptr);
 }
 
 // Register the custom Fonts
