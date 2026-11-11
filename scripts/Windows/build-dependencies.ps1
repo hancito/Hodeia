@@ -52,9 +52,13 @@ Write-Host ">> sqlite-vec"
 & (Join-Path $scriptDir "build-sqlitevec.ps1") -SourceDir $SqliteVecSourceDir
 
 # --- vcpkg install (manifest mode, driven by vcpkg.json) -------------------
-# The overlay port vcpkg-overlay/ports/libmupdf builds MuPDF 1.28.5 from
+# The overlay port vcpkg-overlay/ports/libmupdf builds MuPDF 1.28.6 from
 # $MupdfSourceDir instead of the stock vcpkg port (which pins 1.26.10).
+# vcpkg cannot see that external tree, so update-mupdf-stamp.ps1 writes its
+# git state into the port directory, which IS part of the package ABI.
 Write-Host ">> vcpkg install (overlay: libmupdf from $MupdfSourceDir)"
+# Fold the MuPDF checkout state into the port ABI so source changes trigger a rebuild.
+& (Join-Path $scriptDir "update-mupdf-stamp.ps1") -MupdfSourceDir $MupdfSourceDir
 Push-Location $repoRoot
 try {
     $vcpkgCmd = "set MUPDF_LOCAL_SOURCE=$MupdfSourceDir && `"$VcpkgRoot\vcpkg.exe`" install --triplet x64-windows --overlay-ports `"$repoRoot\vcpkg-overlay\ports`""

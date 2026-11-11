@@ -12,12 +12,12 @@ $ErrorActionPreference = "Stop"
 # This script lives in <repo>/scripts/Windows, so the repo root is two levels up.
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
-$buildDir = Join-Path $repoRoot "build-windows"
+$buildDir = Join-Path $repoRoot "build"
 if (Test-Path $buildDir) {
     Remove-Item $buildDir -Recurse -Force
-    Write-Host "Removed build-windows/"
+    Write-Host "Removed build/"
 } else {
-    Write-Host "build-windows/ not found - nothing to clean"
+    Write-Host "build/ not found - nothing to clean"
 }
 
 Write-Host "Run .\build-app.ps1 to rebuild."

@@ -1,10 +1,15 @@
-# Overlay port: build MuPDF 1.28.5 from a local source checkout.
+# Overlay port: build MuPDF from a local source checkout.
 #
 # The local source path is read from the MUPDF_LOCAL_SOURCE environment
-# variable, which build_windows.ps1 sets before invoking vcpkg install:
+# variable, which build-dependencies.ps1 / build-app.ps1 set before vcpkg runs:
 #
 #   $env:MUPDF_LOCAL_SOURCE = "D:\Developpement\Dependencies\mupdf"
 #   vcpkg install --triplet x64-windows --overlay-ports ...
+#
+# vcpkg does not hash that external tree into the package ABI.  Those scripts
+# therefore run update-mupdf-stamp.ps1 first, which writes the checkout's git
+# state to source-stamp.txt in this directory; since every port file is part
+# of the ABI, any change to the MuPDF source forces a rebuild.
 
 # Default local source path; can be overridden by MUPDF_LOCAL_SOURCE env var.
 if(DEFINED ENV{MUPDF_LOCAL_SOURCE})

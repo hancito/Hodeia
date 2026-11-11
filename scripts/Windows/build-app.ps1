@@ -12,15 +12,18 @@ param(
     [string]$Configuration = "Release",
     [string]$BuildDir,
     [string]$QtPrefix   = "C:\Qt\6.12.0\msvc2022_64",
-    [string]$VcpkgRoot  = "C:\vcpkg"
+    [string]$VcpkgRoot  = "C:\vcpkg",
+    [string]$MupdfSourceDir = "D:\Developpement\Dependencies\mupdf"
 )
 
 $ErrorActionPreference = "Continue"
 # This script lives in <repo>/scripts/Windows, so the repo root is two levels up.
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
+# One build dir per configuration: Ninja is single-config, so sharing a dir
+# would make every Release<->Debug switch reconfigure and rebuild everything.
 if (-not $BuildDir) {
-    $BuildDir = Join-Path $repoRoot "build-windows"
+    $BuildDir = Join-Path $repoRoot "build\$Configuration"
 }
 New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
 
@@ -61,16 +64,23 @@ $toolchain = Join-Path $VcpkgRoot "scripts\buildsystems\vcpkg.cmake"
 if (-not (Test-Path $toolchain)) { throw "vcpkg toolchain not found at $toolchain" }
 
 # --- Configure ---------------------------------------------------------------
+# The vcpkg toolchain runs a manifest install during configure; keep the
+# libmupdf port ABI in sync with the local MuPDF checkout so it is rebuilt
+# when the source changes, and point the overlay port at that checkout.
+& (Join-Path $PSScriptRoot "update-mupdf-stamp.ps1") -MupdfSourceDir $MupdfSourceDir
+$env:MUPDF_LOCAL_SOURCE = $MupdfSourceDir
 $overlayPorts = Join-Path $repoRoot "vcpkg-overlay\ports"
 $cmakeArgs = @(
     "-S", $repoRoot,
     "-B", $BuildDir,
     "-G", "Ninja",
     "-DCMAKE_BUILD_TYPE=$Configuration",
+    # LTO (/GL + /LTCG) only for Release, like the Linux Release task.
+    "-DHODEIA_ENABLE_LTO=$(if ($Configuration -eq 'Release') { 'ON' } else { 'OFF' })",
     "-DCMAKE_TOOLCHAIN_FILE=$toolchain",
     "-DCMAKE_PREFIX_PATH=$QtPrefix",
     "-DVCPKG_OVERLAY_PORTS=$overlayPorts",
-    "-DMUPDF_LOCAL_SOURCE=D:/Developpement/Dependencies/mupdf"
+    "-DMUPDF_LOCAL_SOURCE=$($MupdfSourceDir -replace '\\', '/')"
 )
 
 Write-Host ">> cmake configure"

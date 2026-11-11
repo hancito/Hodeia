@@ -6,7 +6,7 @@
 #   .\clean-deps.ps1 -KeepVcpkg      # keep vcpkg binary cache
 #   .\clean-deps.ps1 -KeepLlama      # keep staged llama.cpp DLLs
 #   .\clean-deps.ps1 -KeepSqliteVec  # keep vec0.dll
-#   .\clean-deps.ps1 -KeepBuild      # keep the build-windows/ dir
+#   .\clean-deps.ps1 -KeepBuild      # keep the build/ dir
 
 [CmdletBinding()]
 param(
@@ -62,10 +62,12 @@ if (Test-Path $vcpkgRoot) {
 }
 
 # --- build directories ---------------------------------------------------------
-Remove-Path "build-windows" `
-    (Join-Path $repoRoot "build-windows") -keep:$KeepBuild
+# build/ holds build/Release and build/Debug (same layout as Linux).
 Remove-Path "build" `
     (Join-Path $repoRoot "build") -keep:$KeepBuild
+# Legacy build dirs from older layouts.
+Remove-Path "build-windows" `
+    (Join-Path $repoRoot "build-windows") -keep:$KeepBuild
 Remove-Path "build-debug" `
     (Join-Path $repoRoot "build-debug") -keep:$KeepBuild
 
