@@ -140,6 +140,12 @@ endif()
 # ===========================================================================
 qt_add_executable(Hodeia main.cpp)
 
+# Windows: embed the application icon in Hodeia.exe (used by Explorer, the
+# taskbar and every shortcut, including the installer's desktop icon).
+if(WIN32)
+  target_sources(Hodeia PRIVATE hodeia.rc)
+endif()
+
 set_source_files_properties(../ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(../ui/Fonts.qml  PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
