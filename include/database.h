@@ -40,6 +40,11 @@ public:
   Q_INVOKABLE std::expected<void, QString>
   switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
+  // Delete projects from disk.  Closes the shared connection first when the
+  // active project is among them (an open SQLite file cannot be deleted on
+  // Windows), then opens the new active project's database.  Returns an
+  // empty string on success, otherwise a user-facing error message.
+  Q_INVOKABLE QString deleteProjects(const QStringList &projectNames);
   // Wire up the OpenAlex client so a finished citation save refreshes all
   // models.  Called once from main() after the client is constructed.
   void setOpenAlexClient(OpenAlexClient *client);

@@ -355,6 +355,7 @@ ConfigManager::deleteProjects(const QStringList &projectNames) {
   }
 
   bool anyDeleted = false;
+  QStringList failed;
 
   for (const QString &projectName : projectNames) {
     if (projectName.trimmed().isEmpty())
@@ -367,34 +368,40 @@ ConfigManager::deleteProjects(const QStringList &projectNames) {
       continue;
     }
 
-    anyDeleted = true;
-
-    // Remove all contents and the project folder itself
-    dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
-    const QFileInfoList entries = dir.entryInfoList();
-    for (const QFileInfo &entry : entries) {
-      if (entry.isDir()) {
-        QDir(entry.absoluteFilePath()).removeRecursively();
-      } else {
-        QFile::remove(entry.absoluteFilePath());
-      }
+    // Remove the folder and everything in it (project .db plus its SQLite
+    // -wal/-shm side files, IMG/, ...).  On Windows a file that is still
+    // open cannot be deleted, so the caller must close the project database
+    // first (see DatabaseManager::deleteProjects).  removeRecursively() keeps
+    // going on errors and reports overall failure, so check the result.
+    if (!dir.removeRecursively()) {
+      qWarning() << "Project could not be fully deleted (file in use?):"
+                 << projectDir;
+      failed << projectName.trimmed();
+      continue;
     }
-    dir.rmdir(projectDir);
 
+    anyDeleted = true;
     emit projectDeleted(projectName.trimmed());
     qDebug() << "Project deleted:" << projectDir;
   }
 
   refreshProjectList();
 
-  // If the active project was deleted, switch to another
-  if (activeWillBeDeleted) {
+  // If the active project was deleted, switch to another.  A project whose
+  // folder could not be removed is still listed, so it may be picked again.
+  if (activeWillBeDeleted && !failed.contains(m_lastProject.trimmed())) {
     if (!m_projectList.isEmpty()) {
       (void)switchToProject(m_projectList.first());
     } else {
       (void)createProject("Default");
     }
   }
+
+  if (!failed.isEmpty())
+    return std::unexpected{
+        tr("Could not fully delete project(s): %1. A file may still be in "
+           "use.")
+            .arg(failed.join(", "))};
 
   if (!anyDeleted)
     return std::unexpected{tr("No projects were deleted (none existed)")};

@@ -347,11 +347,11 @@ ApplicationWindow {
             }
         }
         onAccepted: {
-            configManager.deleteProjects(root.selectedProjects);
-            // Switch DB to the new active project (set automatically by C++)
-            let newActive = configManager.lastProject;
-            let dbPath = configManager.projectDbPath(newActive);
-            databaseManager.switchDatabase(dbPath);
+            // Closes the active DB before deleting its files, then opens the
+            // new active project's DB (chosen by ConfigManager).
+            let err = databaseManager.deleteProjects(root.selectedProjects);
+            if (err !== "")
+                console.warn("Project deletion:", err);
             root.selectedProjects = [];
         }
         onRejected: {

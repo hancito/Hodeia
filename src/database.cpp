@@ -146,6 +146,47 @@ void DatabaseManager::reloadModels() {
   m_citationsModel->loadAll();
 }
 
+QString DatabaseManager::deleteProjects(const QStringList &projectNames) {
+  if (!m_config)
+    return tr("No configuration available");
+
+  const QString active = m_config->lastProject().trimmed();
+  bool deletingActive = false;
+  for (const QString &name : projectNames) {
+    if (name.trimmed() == active) {
+      deletingActive = true;
+      break;
+    }
+  }
+
+  if (deletingActive) {
+    // Same guard as switchDatabase(): never close the connection under a
+    // worker that is mid-statement on it.
+    if (m_opsInFlight.loadRelaxed() > 0) {
+      qWarning() << "[Database] deleteProjects refused — a worker operation "
+                    "is in flight.";
+      return tr("Cannot delete the active project while an operation is in "
+                "progress.");
+    }
+    // Release the .db (and its -wal/-shm files) so they can be deleted.
+    m_db.close();
+  }
+
+  const auto result = m_config->deleteProjects(projectNames);
+
+  // Reopen whatever is active now: the replacement project if the active one
+  // was deleted, or the same one again if its deletion failed.
+  if (deletingActive || !m_db.isOpen()) {
+    auto switchResult =
+        switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+    if (!switchResult)
+      return result ? switchResult.error()
+                    : result.error() + "\n" + switchResult.error();
+  }
+
+  return result ? QString() : result.error();
+}
+
 void DatabaseManager::beginDbOperation() {
   m_opsInFlight.fetchAndAddOrdered(1);
 }

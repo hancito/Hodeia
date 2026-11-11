@@ -10,6 +10,7 @@
 #include "thememanager.h"
 
 #include <QDir>
+#include <QStandardPaths>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QIcon>
@@ -50,6 +51,15 @@ static void initCrashLog() {
   const QString appDir = QCoreApplication::applicationDirPath();
   s_logPath = appDir + "/Hodeia.log";
   s_logFile = fopen(s_logPath.toUtf8().constData(), "wb");
+  if (!s_logFile) {
+    // The exe dir is not writable in an all-users install (Program Files):
+    // fall back to the per-user data dir (%APPDATA%/Hodeia, ~/.local/share/...).
+    const QString dataDir =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dataDir);
+    s_logPath = dataDir + "/Hodeia.log";
+    s_logFile = fopen(s_logPath.toUtf8().constData(), "wb");
+  }
   // Every log line is flushed (see crashLogWrite), so the file always holds
   // the full output up to the moment of a hard crash.  That is enough to see
   // the last thing the app / llama.cpp did before it died.
