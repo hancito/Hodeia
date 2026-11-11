@@ -101,7 +101,7 @@ Hodeia/
 │       ├── build-llama.ps1         #   build/stage llama.cpp (combined, CPU+Vulkan+CUDA)
 │       ├── build-sqlitevec.ps1     #   fetch or build vec0.dll
 │       ├── build-app.ps1           #   configure + build the app
-│       ├── clean-app.ps1           #   remove build-windows/
+│       ├── clean-app.ps1           #   remove build/ (Release + Debug)
 │       └── clean-deps.ps1          #   remove staged deps + vcpkg cache
 │
 ├── include/                        # Public C++ headers (flat, isolated from external/)
@@ -460,11 +460,11 @@ The single binary links **all three backends**; `ggml_backend_load_all()` picks 
 Under the hood it configures with the **Ninja** generator, the MSVC toolchain, the vcpkg toolchain file, and the Qt MSVC prefix:
 
 ```bash
-cmake -S . -B build-windows -G Ninja \
+cmake -S . -B build/Release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=<vcpkg>\scripts\buildsystems\vcpkg.cmake \
   -DCMAKE_PREFIX_PATH=<Qt MSVC prefix>
-cmake --build build-windows --config Release
+cmake --build build/Release --config Release
 ```
 
 > The MSVC compiler is picked up from the **VS Developer Prompt** environment (or via `vcvarsall`); with the Ninja generator there is no `-A x64` (x64 is the default MSVC toolchain).

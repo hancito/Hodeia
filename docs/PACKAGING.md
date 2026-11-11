@@ -265,13 +265,20 @@ gives a proper installer + uninstaller + Start-Menu/desktop shortcuts +
 optional "add to PATH".
 
 - Write `package/windows/hodeia.iss`:
-  - `Source: build-windows\Hodeia.exe` + every DLL + data dirs (use
-    `Source: "..\..\build-windows\*"; DestDir: "{app}"; Flags: recursesubdirs`
+  - `Source: build\Release\Hodeia.exe` + every DLL + data dirs (use
+    `Source: "..\..\build\Release\*"; DestDir: "{app}"; Flags: recursesubdirs`
     to grab the whole deploy folder).
   - `Setup icon` + `AppId` GUID (stable across versions so upgrades work).
   - `ArchitecturesInstallIn64BitMode=x64`.
   - Optionally install the VC++ Redist silently as a pre-install step.
 - Build: `iscc hodeia.iss` → `Hodeia-Setup-<version>.exe`.
+- **Implemented:** `package/windows/hodeia.iss`, driven by
+  `scripts/Windows/package-app.ps1` (Zed task "Windows: Package Installer").
+  It packages `build/Release` (minus CMake/Ninja artefacts) into
+  `dist/Hodeia-Setup-<version>-x64.exe`: per-user install by default (no
+  admin; all-users optional), VC++ runtime installed only if missing/older,
+  Start-Menu + optional desktop shortcut, FR/EN wizard. Version comes from
+  `project(VERSION)` in `CMakeLists.txt`.
 - Inno Setup's compiler is in the PATH on GitHub's `windows-latest` runner.
 
 ### Tier 3 — Auto-update (later)
@@ -322,7 +329,7 @@ A single job (no matrix needed — x64-only for now):
 3. **Verify CRT** (optional but nice): run a dependency scanner and fail if
    an unexpected CRT is referenced.
 4. **Package**
-   - Tier 1: `Compress-Archive build-windows Hodeia-<ver>-win64-portable.zip`.
+   - Tier 1: `Compress-Archive build/Release Hodeia-<ver>-win64-portable.zip`.
    - Tier 2: `iscc package\windows\hodeia.iss` → `Hodeia-Setup-<ver>.exe`.
 5. **Sign** (if using SignPath): `signpath/github-action` with the secret
    `SIGNPATH_CLOUD_API_KEY`, signing `Hodeia.exe` + the installer.

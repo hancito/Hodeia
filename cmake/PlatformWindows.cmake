@@ -189,15 +189,16 @@ function(hodeia_windows_deploy TARGET)
           $<TARGET_FILE_DIR:${TARGET}>/Resources/Models
       COMMENT "Copying bundled model tree")
 
-  # --- Translations: qt_add_translations emits the .qm into the build tree
-  #     (CMAKE_CURRENT_BINARY_DIR); the app loads it from <exe>/i18n/. ---
-  file(GLOB _QMF "${CMAKE_CURRENT_BINARY_DIR}/*.qm")
-  if(_QMF)
+  # --- Translations: the app loads them from <exe>/i18n/.  Use the .qm list
+  #     from qt_add_translations (as Linux/macOS do): a configure-time
+  #     file(GLOB) finds nothing in a fresh build dir, since the .qm files are
+  #     only generated during the build. ---
+  if(HODEIA_QM_FILES)
     add_custom_command(TARGET ${TARGET} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
             $<TARGET_FILE_DIR:${TARGET}>/i18n
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${_QMF} $<TARGET_FILE_DIR:${TARGET}>/i18n
+            ${HODEIA_QM_FILES} $<TARGET_FILE_DIR:${TARGET}>/i18n
         COMMENT "Copying translations (.qm)")
   endif()
 
