@@ -3,45 +3,30 @@
 // Linux tasks use CMake + Ninja + clang.
 [
   // ===== Windows =====
+  // Each configuration has its own build dir (build/Release, build/Debug — same layout as Linux)
+  // so switching between them never forces a full rebuild.
+  // Release: /O2 /Ob2 + LTO (/GL, /LTCG).  Debug: /Od /Ob0 /RTC1, debug CRT and debug vcpkg DLLs.
+
   {
-    "label": "Windows: Build (Release)",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1",
-    "use_new_terminal": false,
-    "reveal": "always",
-    "reveal_target": "dock",
-    "show_summary": true,
-    "show_command": true,
-    "tags": ["build", "windows"],
-  },
-  {
-    "label": "Windows: Run",
-    "command": "cmd /c \"cd /d build-windows && Hodeia.exe\"",
+    "label": "Windows: Build & Run (Release)",
+    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 -Configuration Release && cd /d build\\Release && Hodeia.exe\"",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
     "show_summary": true,
     "show_command": true,
-    "tags": ["run", "windows"],
+    "tags": ["build_and_run", "windows", "release"],
   },
+
   {
-    "label": "Windows: Build & Run",
-    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 && cd /d build-windows && Hodeia.exe\"",
+    "label": "Windows: Build & Run (Debug)",
+    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 -Configuration Debug && cd /d build\\Debug && Hodeia.exe\"",
     "use_new_terminal": true,
     "reveal": "always",
     "reveal_target": "dock",
     "show_summary": true,
     "show_command": true,
-    "tags": ["build_and_run", "windows"],
-  },
-  {
-    "label": "Windows: Build Debug",
-    "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& .\\scripts\\Windows\\build-app.ps1 -Configuration Debug\"",
-    "use_new_terminal": false,
-    "reveal": "always",
-    "reveal_target": "dock",
-    "show_summary": true,
-    "show_command": true,
-    "tags": ["build", "windows"],
+    "tags": ["build_and_run", "windows", "debug"],
   },
   {
     "label": "Windows: Build Dependencies",
@@ -52,6 +37,16 @@
     "show_summary": true,
     "show_command": true,
     "tags": ["build", "windows"],
+  },
+  {
+    "label": "Windows: Package Installer (Inno Setup)",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/package-app.ps1",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "show_summary": true,
+    "show_command": true,
+    "tags": ["package", "windows", "release"],
   },
   {
     "label": "Windows: Clean App Build",
