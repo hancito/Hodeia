@@ -4,6 +4,7 @@
 #include "localbackend.h"
 #include "remotebackend.h"
 #include "sqlitevec.h"
+#include "textformat.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -19,12 +20,111 @@ static const QString s_systemPrompt = []() {
   return R"(You are an expert academic research assistant.
 You are provided with highly relevant pages extracted from multiple research papers.
 Each page is presented with its image (when available) followed by its extracted text.
-Synthesize a cohesive, detailled, comprehensive response answering the user's query utilizing both
-the textual evidence and visual figures/tables/charts provided. Cite sources explicitly.
-When you cite the context use a clean academic citation.
-Use LaTeX for mathematics.
+Synthesize a cohesive, detailed, comprehensive response answering the user's query utilizing both
+the textual evidence and visual figures/tables/charts provided.
+
+Citations: each page context is labelled with a reference number in square brackets, e.g. [3].
+Cite every claim taken from the context inline using ONLY these reference numbers,
+e.g. "... latent classes [3]." or "... as shown in [2][5]."
+Never write author names, years or page numbers in a citation yourself, and ignore any page
+numbers printed inside the page text: the reference numbers are converted into full citations
+automatically. Do NOT add a references, bibliography or sources section at the end.
+
+Mathematics: NEVER use LaTeX ($...$, $$...$$, \(...\), \frac, \text, \epsilon, _{...}, ^{...}).
+Write formulas as plain Unicode text: Greek letters (α β γ ε θ μ σ π),
+superscripts/subscripts (x², xᵢ, Uᵢₙ), and symbols (√ ± × ÷ ≠ ≤ ≥ ≈ ∑ ∫ → ∞ Δ ∈ ∀).
+Prefer a flat, readable form (e.g. "Uᵢₙ = V(Xₙ, Xᵢ; b) + εᵢₙ", "μ = 5.2, σ = 1.3");
+write fractions as "a/b".
 Output the response in Markdown.)";
 }();
+
+/// Formatting reminder appended at the very end of the user message: models
+/// weigh the end of the prompt most, and the system prompt alone is often
+/// ignored after a long context.
+static const QString s_formatReminder = QStringLiteral(
+    "Formatting rules (mandatory): cite only with the bracketed reference "
+    "numbers of the page contexts, e.g. [3] or [2][5] — no author names or "
+    "page numbers; no final references section; no LaTeX at all — write math "
+    "in plain Unicode (εᵢₙ, x², ≠, ≤).");
+
+/// Pages are stored 0-based in the database; readers and the page image
+/// files (hash_page_001.png) use 1-based numbering.
+static int displayPage(const PageContext &pc) { return pc.page + 1; }
+
+/// Short inline label for a paper: its formatted citation, else its title,
+/// else a hash prefix.
+static QString inlineLabel(const PageContext &pc) {
+  if (!pc.citation.isEmpty())
+    return pc.citation;
+  if (!pc.cleanTitle.isEmpty())
+    return pc.cleanTitle;
+  return pc.paperHash.left(12) + "...";
+}
+
+/// Replace the model's reference tags ([3], [2][5], [2, 5]) with full inline
+/// citations built from the retrieved pages, e.g.
+/// "(Walker, Ben-Akiva (2002), pp. 5, 7; Marley (2002), p. 2)", so the inline
+/// pages always match the Sources footer. Tags that reference no known page
+/// context are left untouched; Markdown links "[x](url)" are skipped.
+static QString resolveCitations(const QString &text,
+                                const QList<PageContext> &pages) {
+  static const QRegularExpression tags(QStringLiteral(
+      "(?:\\[\\s*\\d+(?:\\s*[,;]\\s*\\d+)*\\s*\\])+(?!\\()"));
+  static const QRegularExpression number(QStringLiteral("\\d+"));
+
+  QString out;
+  qsizetype last = 0;
+  auto it = tags.globalMatch(text);
+  while (it.hasNext()) {
+    const auto mt = it.next();
+    out += text.mid(last, mt.capturedStart() - last);
+    last = mt.capturedEnd();
+
+    // Group the referenced pages by paper, in citation order.
+    QStringList order;
+    QHash<QString, QList<int>> pagesByLabel;
+    auto nums = number.globalMatch(mt.captured(0));
+    while (nums.hasNext()) {
+      const int idx = nums.next().captured(0).toInt() - 1;
+      if (idx < 0 || idx >= pages.size())
+        continue;
+      const QString label = inlineLabel(pages[idx]);
+      if (!pagesByLabel.contains(label))
+        order.append(label);
+      QList<int> &list = pagesByLabel[label];
+      if (!list.contains(displayPage(pages[idx])))
+        list.append(displayPage(pages[idx]));
+    }
+    if (order.isEmpty()) {
+      out += mt.captured(0);
+      continue;
+    }
+
+    QStringList parts;
+    for (const QString &label : order) {
+      QList<int> list = pagesByLabel.value(label);
+      std::sort(list.begin(), list.end());
+      QStringList pageNums;
+      for (int p : list)
+        pageNums.append(QString::number(p));
+      parts.append(TextFormat::escapeMarkdown(label) +
+                   (list.size() > 1 ? ", pp. " : ", p. ") +
+                   pageNums.join(", "));
+    }
+    out += "(" + parts.join("; ") + ")";
+  }
+  out += text.mid(last);
+  return out;
+}
+
+/// Label identifying a source: "citation: title", the title alone, or a hash
+/// prefix when the paper has no metadata.
+static QString sourceLabel(const PageContext &pc) {
+  if (pc.cleanTitle.isEmpty())
+    return pc.paperHash.left(12) + "...";
+  return pc.citation.isEmpty() ? pc.cleanTitle
+                               : pc.citation + ": " + pc.cleanTitle;
+}
 
 /* ── Construction / destruction ─────────────────────────────────── */
 
@@ -87,27 +187,33 @@ void QueryWorker::executeQuery(const QString &queryText, int maxPages) {
            << "chars, visuals:" << payload.visualContext.size();
 
   // 5. Run inference
-  QString result;
-  if (backend.isLocal)
-    result = queryLocal(payload, backend);
-  else
-    result = queryRemote(payload, backend);
+  std::expected<QString, QString> inference =
+      backend.isLocal ? queryLocal(payload, backend)
+                      : queryRemote(payload, backend);
 
   if (m_cancelled) {
     // The user stopped the query mid-inference. Do NOT persist a partial
     // response — the run was abandoned, not completed.
     emit queryFinished(QString(), false, tr("Query cancelled"));
     qDebug() << "[QueryWorker] ✗ Query cancelled by user — no DB write";
-  } else if (result.isEmpty()) {
+  } else if (!inference) {
+    emit queryFinished(QString(), false, inference.error());
+    qDebug() << "[QueryWorker] ✗ Query failed:" << inference.error();
+  } else if (inference->trimmed().isEmpty()) {
     QString msg = tr("Empty response from model");
     emit queryFinished(QString(), false, msg);
     qDebug() << "[QueryWorker] ✗ Query failed:" << msg;
   } else {
-    // Append sources footer
-    if (!citations.isEmpty()) {
-      result +=
-          "\n\n**" + tr("Sources Consulted") + ":**\n" + citations.join("\n");
-    }
+    // Models often emit LaTeX despite the prompt; MarkdownText can't render it.
+    QString result = TextFormat::latexToUnicode(*inference,
+                                                TextFormat::Target::Markdown);
+    // Turn [n] reference tags into citations matching the Sources footer.
+    result = resolveCitations(result, pages);
+    // Append sources footer. The label is deliberately not translated: the
+    // response is persisted, and "Sources" reads the same in English and
+    // French, so stored history stays consistent across UI languages.
+    if (!citations.isEmpty())
+      result += "\n\n**Sources:**\n" + citations.join("\n");
     saveQuery(queryText, result, backend.modelName);
     emit queryFinished(result, true, QString());
     qDebug() << "[QueryWorker] ✓ Query answered (" << result.length()
@@ -168,8 +274,14 @@ void QueryWorker::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
 
 /* ── Local query ────────────────────────────────────────────────── */
 
-QString QueryWorker::queryLocal(const PromptPayload &payload,
-                                const BackendInfo &backend) {
+std::expected<QString, QString>
+QueryWorker::queryLocal(const PromptPayload &payload,
+                        const BackendInfo &backend) {
+  if (backend.modelPath.isEmpty()) {
+    qWarning() << "[QueryWorker] No .gguf model found for" << backend.modelName;
+    return std::unexpected(
+        tr("No model file found for \"%1\"").arg(backend.modelName));
+  }
   // The backend counts the exact prompt tokens during its no-alloc probe and
   // sizes the KV cache as prompt_tokens + headroom, so no char heuristic here.
   qDebug() << "[QueryWorker] Loading local model:" << backend.modelPath;
@@ -180,7 +292,8 @@ QString QueryWorker::queryLocal(const PromptPayload &payload,
       m_chatBackend->loadModel(backend.modelPath, payload, m_headroom);
   if (!loadResult) {
     qWarning() << "[QueryWorker] Failed to load model:" << loadResult.error();
-    return QString();
+    return std::unexpected(
+        tr("Failed to load model: %1").arg(loadResult.error()));
   }
   qDebug() << "[QueryWorker] Model loaded in" << loadTimer.elapsed() << "ms";
 
@@ -198,8 +311,9 @@ QString QueryWorker::queryLocal(const PromptPayload &payload,
 
 /* ── Remote query ───────────────────────────────────────────────── */
 
-QString QueryWorker::queryRemote(const PromptPayload &payload,
-                                 const BackendInfo &backend) {
+std::expected<QString, QString>
+QueryWorker::queryRemote(const PromptPayload &payload,
+                         const BackendInfo &backend) {
   QString apiUrl = backend.config.value("url").toString();
   QString apiKey = backend.config.value("api_key").toString();
 
@@ -268,10 +382,13 @@ QString QueryWorker::queryRemote(const PromptPayload &payload,
     m_remoteBackend->cancel();
     qWarning() << "[QueryWorker] Remote request timed out after"
                << kRemoteTimeoutMs / 1000 << "s";
-    return QString();
+    return std::unexpected(tr("Remote request timed out after %1 minutes")
+                               .arg(kRemoteTimeoutMs / 60000));
   }
-  if (!error.isEmpty())
-    return QString();
+  if (!error.isEmpty()) {
+    qWarning() << "[QueryWorker] Remote request failed:" << error;
+    return std::unexpected(tr("Remote request failed: %1").arg(error));
+  }
   return result;
 }
 
@@ -331,7 +448,7 @@ QList<PageContext> QueryWorker::retrieveAndGroupPages(const QString &queryText,
     if (imgDir.exists()) {
       QString imgFile = QString("%1_page_%2.png")
                             .arg(c.paperHash)
-                            .arg(pc.page, 3, 10, QChar('0'));
+                            .arg(displayPage(pc), 3, 10, QChar('0'));
       QString absoluteImg = imgDir.absoluteFilePath(imgFile);
       if (QFile::exists(absoluteImg))
         pc.imageFile = absoluteImg;
@@ -356,21 +473,18 @@ QueryWorker::buildCitationsFooter(const QList<PageContext> &pages) const {
   // Group by source string, collect page numbers.
   QMap<QString, QSet<int>> sourcePages;
 
+  // Keep sources in retrieval (relevance) order, not alphabetical order.
+  QStringList sourceOrder;
   for (const auto &pc : pages) {
-    QString src;
-    if (!pc.cleanTitle.isEmpty()) {
-      src = pc.citation.isEmpty() ? pc.cleanTitle
-                                  : pc.citation + ": " + pc.cleanTitle;
-    } else {
-      src = pc.paperHash.left(12) + "...";
-    }
-    sourcePages[src].insert(pc.page);
+    QString src = sourceLabel(pc);
+    if (!sourcePages.contains(src))
+      sourceOrder.append(src);
+    sourcePages[src].insert(displayPage(pc));
   }
 
   QStringList citations;
-  for (auto it = sourcePages.constBegin(); it != sourcePages.constEnd(); ++it) {
-    QString src = it.key();
-    QList<int> sortedPages = it.value().values();
+  for (const QString &src : sourceOrder) {
+    QList<int> sortedPages = sourcePages.value(src).values();
     std::sort(sortedPages.begin(), sortedPages.end());
     QString pagesStr = QString();
     for (int i = 0; i < sortedPages.size(); ++i) {
@@ -378,7 +492,9 @@ QueryWorker::buildCitationsFooter(const QList<PageContext> &pages) const {
         pagesStr += ", ";
       pagesStr += QString::number(sortedPages[i]);
     }
-    citations.append("- " + src + " (Pages: " + pagesStr + ")");
+    citations.append("- " + TextFormat::escapeMarkdown(src) +
+                     " (Pages: " + pagesStr +
+                     ")");
   }
 
   return citations;
@@ -391,25 +507,25 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
   PromptPayload payload;
   payload.systemPrompt = s_systemPrompt;
 
+  const bool useVisual = m_config->useVisualContext();
+
   // Build structured text context: one block per page.
   QStringList blocks;
   for (int i = 0; i < pages.size(); ++i) {
     const PageContext &pc = pages[i];
-    QString src =
-        pc.cleanTitle.isEmpty()
-            ? pc.paperHash.left(12) + "..."
-            : (pc.citation.isEmpty() ? pc.cleanTitle
-                                     : pc.citation + ": " + pc.cleanTitle);
+    const QString src = sourceLabel(pc);
 
-    QString block = QString("=== PAGE CONTEXT %1 (%2 - Page %3) ===\n")
+    // The bracketed number is the reference tag the model cites with; it is
+    // resolved back to this page by resolveCitations().
+    QString block = QString("=== PAGE CONTEXT [%1] — %2, page %3 ===\n")
                         .arg(i + 1)
                         .arg(src)
-                        .arg(pc.page);
+                        .arg(displayPage(pc));
 
     for (const QString &chunk : pc.textChunks)
       block += chunk + "\n[---]\n";
 
-    block += "Citation: " + pc.citation + "\n\n";
+    block += "\n";
     blocks.append(block);
 
     // Build PageBlock with image
@@ -417,31 +533,26 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
     pb.pageNumber = i + 1;
     pb.text = block;
 
-    if (m_config->useVisualContext() && !pc.imageFile.isEmpty()) {
+    if (useVisual && !pc.imageFile.isEmpty()) {
       QImage img(pc.imageFile);
-      if (!img.isNull())
+      if (!img.isNull()) {
         pb.visualContext = PageImage::fromQImage(img);
+        // Legacy (non-interleaved) multimodal path: reuse the decoded pixels
+        // instead of decoding the PNG a second time.
+        payload.visualContext.push_back(pb.visualContext);
+      }
     }
     payload.pageBlocks.push_back(std::move(pb));
   }
 
   payload.textContext = blocks.join("\n");
   payload.userMessage = "Core Task Query: " + queryText +
+                        "\n\n" + s_formatReminder +
                         "\n\nSynthesize your final cross-paper response now:";
 
-  // Load page images for multimodal backends (legacy).
-  if (m_config->useVisualContext()) {
-    for (const auto &pc : pages) {
-      if (pc.imageFile.isEmpty())
-        continue;
-      QImage img(pc.imageFile);
-      if (img.isNull())
-        continue;
-      payload.visualContext.push_back(PageImage::fromQImage(img));
-    }
+  if (useVisual)
     qDebug() << "[QueryWorker] Visual context —" << payload.visualContext.size()
              << "image(s) loaded";
-  }
 
   return payload;
 }

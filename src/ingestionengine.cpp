@@ -186,68 +186,108 @@ QList<TextChunk> PdfWorker::chunkDocumentText(
     const QString &paperHash, const QVector<PageMetadata> &pageMeta) const {
   QList<TextChunk> chunks;
 
-  // Rejoin words broken by OCR line-wraps (e.g. "punish-\nment" →
-  // "punishment").
-  QString text = fullText;
-  text.replace(QRegularExpression("-\\s*\\n\\s*"), "");
-  text.replace(QRegularExpression("(?<=[a-zA-Z])\\n(?=[a-zA-Z])"), " ");
+  // 0) Normalise the text while keeping a per-character page map aligned
+  //    with it: every character removed from the text is removed from the
+  //    page map too, so offsets in `text` always resolve to the right page.
+  //
+  //    Rejoin words broken by OCR line-wraps ("punish-\nment" →
+  //    "punishment"); this shortens the text, hence the joint rebuild.
+  static const QRegularExpression hyphenBreak(QStringLiteral("-\\s*\\n\\s*"));
+  const quint16 lastPage = pageMap.isEmpty() ? 0 : pageMap.last();
+  QString text;
+  QVector<quint16> textPages;
+  text.reserve(fullText.size());
+  textPages.reserve(fullText.size());
+  auto copyRange = [&](qsizetype from, qsizetype to) {
+    text += QStringView(fullText).mid(from, to - from);
+    for (qsizetype i = from; i < to; ++i)
+      textPages.push_back(i < pageMap.size() ? pageMap[i] : lastPage);
+  };
+  {
+    qsizetype pos = 0;
+    auto it = hyphenBreak.globalMatch(fullText);
+    while (it.hasNext()) {
+      const auto m = it.next();
+      copyRange(pos, m.capturedStart());
+      pos = m.capturedEnd();
+    }
+    copyRange(pos, fullText.size());
+  }
+  // Same-length substitution (one '\n' → one ' '): the page map stays valid.
+  static const QRegularExpression softWrap(
+      QStringLiteral("(?<=[a-zA-Z])\\n(?=[a-zA-Z])"));
+  text.replace(softWrap, QStringLiteral(" "));
+
+  auto pageAt = [&](qsizetype offset) -> int {
+    return offset < textPages.size() ? textPages[offset] : lastPage;
+  };
 
   // 1) Sentence segmentation — split after . ! ? followed by whitespace.
-  QStringList sentences;
-  int lastEnd = 0;
-  QRegularExpression sentRe(R"((?<=[.!?])\s+)");
-  auto matchIter = sentRe.globalMatch(text);
-  while (matchIter.hasNext()) {
-    auto match = matchIter.next();
-    QString sentence = text.mid(lastEnd, match.capturedStart() - lastEnd +
-                                             match.capturedLength());
-    if (!sentence.trimmed().isEmpty())
-      sentences.append(sentence.trimmed());
-    lastEnd = match.capturedEnd();
-  }
-  if (lastEnd < text.length()) {
-    QString remainder = text.mid(lastEnd).trimmed();
-    if (!remainder.isEmpty())
-      sentences.append(remainder);
+  //    Each sentence keeps the offset of its first non-space character so
+  //    its page can be resolved exactly.
+  struct Sentence {
+    QString text;
+    int page;
+  };
+  QList<Sentence> sentences;
+  auto addSentence = [&](qsizetype from, qsizetype to) {
+    while (from < to && text[from].isSpace())
+      ++from;
+    const QString s = text.mid(from, to - from).trimmed();
+    if (!s.isEmpty())
+      sentences.append({s, pageAt(from)});
+  };
+  {
+    static const QRegularExpression sentRe(QStringLiteral("(?<=[.!?])\\s+"));
+    qsizetype lastEnd = 0;
+    auto it = sentRe.globalMatch(text);
+    while (it.hasNext()) {
+      const auto m = it.next();
+      addSentence(lastEnd, m.capturedEnd());
+      lastEnd = m.capturedEnd();
+    }
+    addSentence(lastEnd, text.size());
   }
 
   // 2) Greedy sentence packing with fixed overlap.
-  //    runningOffset tracks the position in fullText so we can resolve
-  //    the page number for each emitted chunk via pageMap.
+  //    A chunk's page is the page of its first *new* sentence (not of the
+  //    overlap carried over from the previous chunk): that is where most of
+  //    its content comes from.
   QString currentChunk;
+  int chunkPage = 0;
   int chunkIdx = 0;
-  int runningOffset = 0;
+
+  auto emitChunk = [&]() {
+    TextChunk tc;
+    tc.text = currentChunk.trimmed();
+    tc.paperHash = paperHash;
+    tc.page = chunkPage;
+    tc.chunkIdx = chunkIdx++;
+    chunks.append(tc);
+  };
 
   for (const auto &sent : sentences) {
-    QString candidate =
-        currentChunk.isEmpty() ? sent : currentChunk + " " + sent;
-    if (candidate.length() > m_maxChunkChars && !currentChunk.isEmpty()) {
-      TextChunk tc;
-      tc.text = currentChunk.trimmed();
-      tc.paperHash = paperHash;
-      tc.page = pageMap.value(runningOffset, 0);
-      tc.chunkIdx = chunkIdx++;
-      chunks.append(tc);
-
+    if (currentChunk.isEmpty()) {
+      currentChunk = sent.text;
+      chunkPage = sent.page;
+      continue;
+    }
+    const QString candidate = currentChunk + " " + sent.text;
+    if (candidate.length() > m_maxChunkChars) {
+      emitChunk();
       // Keep the tail of the current chunk as overlap for the next one.
-      int overlapStart = qMax(0, currentChunk.length() - m_overlapChars);
-      QString overlapText = currentChunk.mid(overlapStart);
-      runningOffset += overlapText.length();
-      currentChunk = overlapText + " " + sent;
+      const int overlapStart =
+          qMax(0, int(currentChunk.length()) - m_overlapChars);
+      currentChunk = currentChunk.mid(overlapStart) + " " + sent.text;
+      chunkPage = sent.page;
     } else {
       currentChunk = candidate;
     }
   }
 
   // Flush the last accumulated chunk.
-  if (!currentChunk.trimmed().isEmpty()) {
-    TextChunk tc;
-    tc.text = currentChunk.trimmed();
-    tc.paperHash = paperHash;
-    tc.page = pageMap.value(runningOffset, 0);
-    tc.chunkIdx = chunkIdx++;
-    chunks.append(tc);
-  }
+  if (!currentChunk.trimmed().isEmpty())
+    emitChunk();
 
   // Debug: total text in chunks vs input
   int totalChunkChars = 0;
@@ -284,7 +324,9 @@ QList<TextChunk> PdfWorker::chunkDocumentText(
            << "| avg chunk:"
            << (chunks.isEmpty() ? 0 : totalChunkChars / chunks.size())
            << "chars"
-           << "| first chunk:" << chunks.first().text.left(80) << "...";
+           << "| first chunk:"
+           << (chunks.isEmpty() ? QString() : chunks.first().text.left(80))
+           << "...";
 
   return chunks;
 }
@@ -719,11 +761,11 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       // 1. Build structured text with layout-aware options + image detection
       // ------------------------------------------------------------------
       page = fz_load_page(ctx, doc, i);
-      if (!page) {
-        qWarning() << "[PdfWorker] fz_load_page failed for page" << i + 1
-                   << "— skipping";
-        break;
-      }
+      // Never break/return out of fz_try (it corrupts MuPDF's exception
+      // stack): throw instead, fz_catch below skips this page.
+      if (!page)
+        fz_throw(ctx, FZ_ERROR_GENERIC, "fz_load_page failed for page %d",
+                 i + 1);
       textPage = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
 
       fz_stext_options opts = {};

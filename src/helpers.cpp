@@ -1,5 +1,6 @@
 #include "helpers.h"
 #include "configmanager.h"
+#include "textformat.h"
 
 #include <QAtomicInt>
 #include <QDir>
@@ -230,17 +231,24 @@ PaperSummary Helpers::parseSummaryJson(const QString &raw) {
       qInfo() << "[Helpers] Repaired malformed summary JSON via" << repairName;
   }
 
+  // Models often emit LaTeX despite the prompt; convert it to Unicode here so
+  // every consumer (UI, HTML/PDF export) and already-stored summaries benefit.
+  auto clean = [](const QJsonValue &v) {
+    return TextFormat::latexToUnicode(v.toString(),
+                                      TextFormat::Target::PlainText);
+  };
+
   QJsonObject obj = doc.object();
-  summary.title = obj.value("title").toString();
+  summary.title = clean(obj.value("title"));
   summary.journal = obj.value("journal").toString();
   summary.year = obj.value("year").toInt();
-  summary.researchObjective = obj.value("researchObjective").toString();
-  summary.methodology = obj.value("methodology").toString();
+  summary.researchObjective = clean(obj.value("researchObjective"));
+  summary.methodology = clean(obj.value("methodology"));
   for (const auto &f : obj.value("coreFindingsAndSignificance").toArray())
-    summary.coreFindingsAndSignificance.append(f.toString());
+    summary.coreFindingsAndSignificance.append(clean(f));
   for (const auto &l : obj.value("criticalLimitations").toArray())
-    summary.criticalLimitations.append(l.toString());
-  summary.citableSummary = obj.value("citableSummary").toString();
+    summary.criticalLimitations.append(clean(l));
+  summary.citableSummary = clean(obj.value("citableSummary"));
   for (const auto &a : obj.value("authors").toArray())
     summary.authors.append(a.toString());
   for (const auto &t : obj.value("topics").toArray())

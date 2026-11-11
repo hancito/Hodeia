@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QVariantMap>
+#include <expected>
 #include <vector>
 
 #include "localbackend.h"
@@ -60,9 +61,11 @@ private:
   bool prepareGpu(bool isLocal);
   void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
 
-  /* inference */
-  QString queryLocal(const PromptPayload &payload, const BackendInfo &backend);
-  QString queryRemote(const PromptPayload &payload, const BackendInfo &backend);
+  /* inference — return the generated text, or a user-facing error message */
+  std::expected<QString, QString> queryLocal(const PromptPayload &payload,
+                                             const BackendInfo &backend);
+  std::expected<QString, QString> queryRemote(const PromptPayload &payload,
+                                              const BackendInfo &backend);
 
   /* retrieval & grouping */
   QList<PageContext> retrieveAndGroupPages(const QString &queryText,
