@@ -113,12 +113,13 @@ Third-party libraries are staged into `external/` per platform:
 
 | Platform | Script (from the repo root)                                                       | What it does                                                                                                                                        |
 | -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `scripts/Linux/get_depencies.sh` → then CMake                                     | Clones/locates sources, then `scripts/Linux/build_{llama,mupdf,tesseract,sqlitevec}.sh` stage each dependency. Build the app with CMake + Ninja.    |
+| Linux    | `scripts/Linux/get_depedencies.sh` → then CMake                                   | Clones/locates sources, then `scripts/Linux/build_{llama,mupdf,tesseract,sqlitevec}.sh` stage each dependency. Build the app with CMake + Ninja.    |
 | Windows  | `scripts/Windows/build-dependencies.ps1`, then `scripts/Windows/build-app.ps1`    | Stages llama.cpp + sqlite-vec, runs `vcpkg install`, configures (MSVC + Ninja) + builds. All three backends ship; best is auto-detected at runtime. |
 | macOS    | **Not yet available** — see [TECHNICAL.md](docs/TECHNICAL.md#macos-apple-silicon) | Experimental & untested. When released: compile the five dependencies, then CMake + Ninja; `macdeployqt` bundles everything into `Hodeia.app`.      |
 
 > The Windows scripts live in `scripts/Windows/`, the Linux scripts in `scripts/Linux/`.
 > Run the PowerShell scripts from a **VS Developer Prompt** (MSVC toolchain on PATH).
+> To build the Windows installer, run `scripts/Windows/package-app.ps1` (Inno Setup). On Arch, `package/arch/PKGBUILD` builds everything from source with `makepkg -s`. See [docs/PACKAGING.md](docs/PACKAGING.md).
 
 ### GPU backend selection
 
@@ -152,7 +153,7 @@ Hodeia keeps everything in one data folder, organized by **project**. Each proje
     └── Embedders/             # the embedding model (bundled)
 ```
 
-> On Windows the data folder is `%LOCALAPPDATA%\Hodeia` instead.
+> On Windows the data folder is `%APPDATA%\Hodeia` instead. Uninstalling Hodeia never touches it.
 
 See [docs/TECHNICAL.md](docs/TECHNICAL.md#configuration) for the full configuration schema.
 
@@ -185,6 +186,7 @@ Hodeia is built with **Qt** (LGPL 3.0) and includes other third-party open-sourc
 ## Links
 
 - **Technical documentation** — [docs/TECHNICAL.md](docs/TECHNICAL.md)
+- **Packaging** — [docs/PACKAGING.md](docs/PACKAGING.md)
 - **OpenAlex** — [https://openalex.org](https://openalex.org) (citation data source)
 - **llama.cpp** — [https://github.com/ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp)
 - **MuPDF** — [https://mupdf.com](https://mupdf.com)

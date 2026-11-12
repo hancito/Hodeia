@@ -81,7 +81,12 @@ Hodeia/
 ├── LICENSE                         # AGPL-3.0
 ├── README.md                       # User-facing README
 ├── docs/
-│   └── TECHNICAL.md               # This file
+│   ├── TECHNICAL.md               # This file
+│   └── PACKAGING.md               # Packaging status + plan (Linux / Windows)
+│
+├── package/
+│   ├── arch/                       # PKGBUILD + hodeia.desktop (installs to /opt/hodeia)
+│   └── windows/hodeia.iss          # Inno Setup installer script
 │
 ├── cmake/                          # Modular CMake scripts
 │   ├── CompilerFlags.cmake         # C++23, warnings, optimisation, LTO (opt-in)
@@ -91,7 +96,7 @@ Hodeia/
 │
 ├── scripts/
 │   ├── Linux/                      # Dependency build scripts (see "Building from source")
-│   │   ├── get_depencies.sh        #   clone/locate sources
+│   │   ├── get_depedencies.sh      #   clone/locate sources
 │   │   ├── build_llama.sh          #   llama.cpp (CPU+CUDA+Vulkan combined, .so)
 │   │   ├── build_mupdf.sh          #   MuPDF (static .a)
 │   │   ├── build_tesseract.sh      #   Tesseract + Leptonica (static .a)
@@ -102,7 +107,9 @@ Hodeia/
 │       ├── build-sqlitevec.ps1     #   fetch or build vec0.dll
 │       ├── build-app.ps1           #   configure + build the app
 │       ├── clean-app.ps1           #   remove build/ (Release + Debug)
-│       └── clean-deps.ps1          #   remove staged deps + vcpkg cache
+│       ├── clean-deps.ps1          #   remove staged deps + vcpkg cache
+│       ├── package-app.ps1         #   build the Inno Setup installer → dist/
+│       └── update-mupdf-stamp.ps1  #   stamp the local MuPDF checkout so vcpkg rebuilds on change
 │
 ├── include/                        # Public C++ headers (flat, isolated from external/)
 │   ├── thememanager.h  configmanager.h  database.h  summary.h  query.h
@@ -110,7 +117,7 @@ Hodeia/
 │   ├── ingestionengine.h  enginemanager.h  sqlitedb.h  sqlitevec.h
 │   ├── localbackend.h  inferenceengine.h  remotebackend.h  summarizer.h
 │   ├── summarythreadmanager.h  queryworker.h  querycontroller.h
-│   └── openalex.h  helpers.h
+│   └── openalex.h  helpers.h  textformat.h
 │
 ├── src/                            # C++ source files + target definitions
 │   ├── CMakeLists.txt              # add_library(HodeiaEngine) + qt_add_executable(Hodeia)
@@ -135,7 +142,9 @@ Hodeia/
 │   ├── citationsmodel.cpp          # CitationsModel over the Citations table (APA format)
 │   ├── openalex.cpp                # OpenAlexClient: references / citing works
 │   ├── thememanager.cpp            # JSON-based theme loading
-│   └── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
+│   ├── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
+│   ├── textformat.cpp              # LLM output cleanup: LaTeX → Unicode, Markdown escaping
+│   └── hodeia.rc                   # Windows only: embeds the app icon in Hodeia.exe
 │
 ├── ui/                             # QML files
 │   ├── Main.qml                    # Main window (split view: paper list + detail)
@@ -235,7 +244,7 @@ The scripts under `scripts/Linux/` build and stage each dependency into `externa
 
 ```bash
 cd scripts/Linux
-./get_depencies.sh            # clone/locate sources (llama.cpp, mupdf, tesseract, leptonica, sqlite-vec)
+./get_depedencies.sh          # clone/locate sources (llama.cpp, mupdf, tesseract, leptonica, sqlite-vec)
 ./build_llama.sh              # llama.cpp → external/lib/linux/llamacpp/  (flat, all backends)
 ./build_mupdf.sh              # MuPDF       → external/lib/linux/libmupdf*.a
 ./build_tesseract.sh          # Tesseract + Leptonica → external/lib/linux/  (+ tessdata)
@@ -259,6 +268,11 @@ cmake --build .
 > `-DLLAMA_FORCE_BACKEND=cpu|cuda|vulkan`. The forced value only sets the
 > `HODEIA_BACKEND_*` compile definition — the actual backend is chosen at runtime by
 > `ggml_backend_load_all()` from whichever `.so` are present.
+
+> **Sanitizer builds (GCC/Clang):** add `-DHODEIA_SANITIZE=address,undefined` (ASan + UBSan) or
+> `-DHODEIA_SANITIZE=thread` (TSan; it cannot be combined with `address`). The prebuilt MuPDF uses
+> 4-byte struct alignment on x86-64, so UBSan's alignment check is turned off for
+> `ingestionengine.cpp` only. The Zed tasks `Linux: Configure/Build & Run (Sanitize)` set this up.
 
 ### macOS (Apple Silicon)
 
@@ -435,7 +449,9 @@ It:
 1. locates vcpkg and the MSVC Qt build;
 2. builds/stages llama.cpp via `scripts\Windows\build-llama.ps1` (CPU + Vulkan + CUDA, one combined build, into the flat `external\lib\windows\llamacpp\`);
 3. provides `vec0.dll` via `scripts\Windows\build-sqlitevec.ps1` (downloads the pinned `v0.1.10-alpha.4` loadable, verifies SHA-256; or `-Method build` to compile from source with `cl.exe`);
-4. runs `vcpkg install --triplet x64-windows` (manifest mode, with the `vcpkg-overlay`).
+4. runs `scripts\Windows\update-mupdf-stamp.ps1`, then `vcpkg install --triplet x64-windows` (manifest mode, with the `vcpkg-overlay`).
+
+> **MuPDF source stamp:** vcpkg hashes the port directory into the package ABI but knows nothing about the external MuPDF checkout the overlay builds from. `update-mupdf-stamp.ps1` writes `vcpkg-overlay/ports/libmupdf/source-stamp.txt` (HEAD commit, submodule commits, hash of uncommitted changes), so any change to the MuPDF checkout forces vcpkg to rebuild `libmupdf` instead of reusing a stale cached package. `build-dependencies.ps1` and `build-app.ps1` run it automatically.
 
 The staged llama.cpp set (all backends in one flat dir):
 
@@ -473,6 +489,17 @@ cmake --build build/Release --config Release
 
 The MSVC linker (`link.exe`) needs an import lib per DLL, but the prebuilt DLLs don't ship them. `cmake/PlatformWindows.cmake` generates the `.lib` files with **`llvm-dlltool`** (part of the VS LLVM toolset) when available; otherwise it links the DLLs **by full path** (MSVC `link.exe` resolves the undecorated C exports and emits an import lib automatically).
 
+The application icon is embedded in `Hodeia.exe` through `src/hodeia.rc`, so Explorer, the taskbar and every shortcut (including the installer's) pick it up.
+
+#### Building the installer
+
+```powershell
+.\scripts\Windows\package-app.ps1          # package the existing build\Release
+.\scripts\Windows\package-app.ps1 -Build   # build Release first
+```
+
+Requires Inno Setup 6.5.2+ or 7 (`winget install JRSoftware.InnoSetup`). The script refuses non-Release builds, reads the version from `project(Hodeia VERSION …)` in `CMakeLists.txt`, and compiles `package/windows/hodeia.iss` into `dist\Hodeia-Setup-<version>-x64.exe`. Also available as the Zed task "Windows: Package Installer (Inno Setup)". See [PACKAGING.md](PACKAGING.md) for what the installer does.
+
 ---
 
 ## GPU Backend Selection
@@ -502,7 +529,7 @@ Each platform's `cmake/Platform<OS>.cmake` (`hodeia_<os>_deploy`) deploys the ru
 
 > **Windows C/C++ runtime (UCRT):** `ucrtbase.dll` / `vcruntime140.dll` are part of Windows 10/11, so no VC++ Redist is needed for Win10+ targets. `windeployqt` copies them if it detects the VS Build Tools.
 >
-> To create an installer, package the output folder with [Inno Setup](https://jrsoftware.org/isinfo.php) or [NSIS](https://nsis.sourceforge.net/).
+> To create the Windows installer from this folder, run `scripts\Windows\package-app.ps1` (Inno Setup; see [Building the installer](#building-the-installer)).
 
 ### Resulting `external/lib/` layout
 
@@ -541,29 +568,33 @@ external/lib/
 2. **Text extraction** — MuPDF's structured-text engine performs DFS traversal with column segmentation, paragraph breaks, dehyphenation, and clip preservation.
 3. **OCR fallback** — if a page yields < 100 characters, Tesseract runs at 300 DPI grayscale. APIs are cached per-thread to minimize initialization overhead.
 4. **Thumbnail generation** — 150 DPI page images rendered as PNGs.
-5. **Chunking** — full text split into ~1500-character segments with 200-character overlap; page mapping preserved.
+5. **Chunking** — words broken by line-wrap hyphens are rejoined, the text is split into sentences, and sentences are packed into ~1500-character chunks with a 200-character overlap. A per-character page map is kept aligned with the normalized text, so each chunk gets the exact page of its first *new* sentence (not of the overlap carried over from the previous chunk).
 6. **Embedding** — batches of 64 chunks sent through the E5 model; 384-dim vectors stored in the `chunks` (`vec0`) virtual table.
 7. **Batch processing** — 10 PDFs per batch, with incremental progress reporting and memory cleanup.
 
 ### Summarization Pipeline
 
-1. All text chunks (and page images, if multimodal) loaded for the selected paper.
-2. Embedding model unloaded to free GPU memory.
-3. Chat model loaded (with `mmproj` if multimodal).
-4. Structured prompt requesting a JSON response: title, authors, journal, year, topics, research objective, methodology, core findings, critical limitations, citable summary, references.
-5. Response parsed and stored in the `Summaries` table.
-6. Chunk metadata updated (clean title, citation); a `Citations` row is created.
-7. Chat model unloaded, embedding model reloaded.
-8. `OpenAlexClient::checkEmptyReferences` fires (on `summaryFinished`) to fetch references for the new paper.
+1. The paper's chunks are loaded and merged back **per page** (the overlap is stripped), giving one text block per page.
+2. Page images are attached according to `visualMode`: **Full** = every page, **Reduced** = only pages whose metadata flags a figure, vector graphics or a table, **Text only** = none. The blocks are sent **interleaved** (image, text, image, text, …) in page order.
+3. The visual system prompt is used only if at least one image actually made it into the payload; otherwise (or if the backend cannot pass images) the text-only prompt is used, so the model is never told about figures it does not receive.
+4. Embedding model unloaded to free GPU memory.
+5. Chat model loaded; the KV cache is sized from the exact prompt token count plus the response headroom (see [LocalBackend Details](#localbackend-details)).
+6. Structured prompt requesting a JSON response: title, authors, journal, year, topics, research objective, methodology, core findings, critical limitations, citable summary, references.
+7. Response parsed (malformed JSON is repaired when possible) and stored in the `Summaries` table. LaTeX in the text fields is converted to Unicode at parse time (see [Text Post-Processing](#text-post-processing)).
+8. Chunk metadata updated (clean title, citation); a `Citations` row is created.
+9. Chat model unloaded, embedding model reloaded.
+10. `OpenAlexClient::checkEmptyReferences` fires (on `summaryFinished`) to queue the new paper for an OpenAlex lookup.
 
 ### RAG Query Pipeline
 
 1. User query embedded and compared against the `chunks` index (retrieves more than `maxPages`, e.g. `max(maxPages*4, 80)`, to survive dedup).
 2. Retrieved chunks grouped and deduplicated by `(paper_hash, page)`, truncated to `maxPages`.
 3. Page images loaded (if `visualMode` includes visual context).
-4. Structured prompt built with page contexts, citation markers, and the user query.
-5. LLM synthesizes a cross-paper response with academic-style citations.
-6. Result persisted in the `Queries` table.
+4. Structured prompt built: each page context is labelled with a numbered reference tag (`=== PAGE CONTEXT [3] — <source>, page 7 ===`). The model is told to cite **only** with these tags (`[3]`, `[2][5]`), never with author names or page numbers, to add no references section, and to write math in plain Unicode instead of LaTeX. These rules are repeated at the very end of the user message, since models weigh the end of a long prompt most.
+5. LLM synthesizes a cross-paper response.
+6. Post-processing: LaTeX is converted to Unicode (Markdown target), then `resolveCitations` replaces each tag group with a full inline citation built from the retrieved pages — e.g. `(Walker, Ben-Akiva (2002), pp. 5, 7; Marley (2002), p. 2)` — so inline pages always match the footer. Unknown tags and Markdown links are left untouched.
+7. A `**Sources:**` footer is appended, listing sources in retrieval (relevance) order with their pages. Page numbers shown to the user are 1-based (stored 0-based). The footer label is deliberately not translated so stored history reads the same in every UI language.
+8. Result persisted in the `Queries` table. A failed query (missing model file, model load failure, remote timeout or HTTP error) reports a user-facing error message instead of an empty answer.
 
 ---
 
@@ -609,6 +640,8 @@ Each project is one SQLite file (`<project_name>.db`, WAL mode). Three tables pl
 | `cited_by`       | TEXT    | JSON array of works that **cite** this paper (or a marker string) |
 | `cites_count`    | INTEGER | Total OpenAlex count for `cites`                                  |
 | `cited_by_count` | INTEGER | Total OpenAlex count for `cited_by`                               |
+| `lookup_status`  | TEXT    | OpenAlex lookup state: `pending` (default), `matched`, `not_found` |
+| `lookup_at`      | DATETIME | When the work was matched / last reported not found              |
 
 The `CitationsModel` joins `Citations` to `Summaries` (so only summarized papers appear) and formats both sections as APA-style bibliographies for the QML display pane.
 
@@ -632,7 +665,7 @@ The `CitationsModel` joins `Citations` to `Summaries` (so only summarized papers
 
 ### `config.json`
 
-Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.json`; Windows: `%LOCALAPPDATA%\Hodeia\config.json`):
+Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.json`; Windows: `%APPDATA%\Hodeia\config.json`):
 
 ```json
 {
@@ -678,29 +711,65 @@ PDFs are ingested **in place** (referenced from their original location, not cop
             └── model.gguf
 ```
 
+**Deleting projects** goes through `DatabaseManager::deleteProjects`. If the active project is among those deleted, it first closes the SQLite connection (an open `.db` and its `-wal`/`-shm` files cannot be deleted on Windows), refusing if a worker operation is in flight. It then removes the folders and reopens the new active project. A folder that cannot be fully removed is reported to the user and stays in the project list.
+
 The bundled model tree in `Resources/Models/` (the `Embedders/multilingual-e5-small` GGUF plus any `Summarizers/` chat models) is seeded into the data directory on first run (copy-if-missing), so RAG works without the user providing an embedder.
 
 ---
 
 ## LocalBackend Details
 
-The `LocalBackend` wraps llama.cpp's `common` library:
+The `LocalBackend` wraps llama.cpp's `common` library. Token-level work (tokenize → decode → sample) is delegated to `InferenceEngine`.
 
-- **Adaptive GPU fitting** — iteratively adjusts `n_gpu_layers`, `n_ctx`, KV cache type, and `n_ubatch` to fit available VRAM.
-- **Integrated GPU support** — all-or-nothing layer offload to avoid Vulkan scheduler overflow.
-- **Lazy `mmproj` loading** — vision projectors loaded on-demand when multimodal context is needed.
-- **Chat template parsing** — Jinja templates extracted from GGUF metadata.
-- **Hybrid offloading** — manual GPU + CPU layer split when VRAM is constrained.
+**Model loading** (`loadModelWithDevices`), in three phases:
+
+1. **Probe** — the GGUF is opened without allocating (`no_alloc`, mmap off) to read layers, embedding sizes and model size, measure the `mmproj`, and count the **exact prompt tokens** of the payload in the same pass.
+2. **Fit** — the KV cache is sized as `prompt tokens + response headroom` (capped at `n_ctx_train`). The model goes on **exactly one GPU**, picked as: discrete over integrated, CUDA over other backends (the same card can be exposed by both CUDA and Vulkan), then most free memory. libcommon's own fitter is disabled (`fit_params = false`).
+   - **Discrete GPU** (2 GiB safety margin) — on each estimated OOM, the first reduction still possible is applied, cheapest in quality first: `n_ubatch` ÷2 down to 2048 → KV cache F16 → Q8_0 → `mmproj` to CPU → offload up to 30 % of layers to CPU → `n_ctx` −10 % down to the floor (document truncated) → KV Q8_0 → Q4_0 → offload the remaining layers → `n_ubatch` ÷2 down to 512.
+   - **Integrated GPU** (512 MiB margin) — all-or-nothing offload (splitting layers triggers a Vulkan scheduler overflow), Q8_0 KV cache, context capped below ~30k tokens (larger contexts are unstable on AMD radv); only `n_ctx` is reduced.
+   - **CPU only** — same idea against free system RAM (4 GiB kept for the OS/GUI/OCR): KV F16 → Q8_0, then shrink `n_ctx` down to 4096.
+3. **Load** — if the GPU load fails, the backend falls back to a CPU load.
+
+**Inference** (`summarize`):
+
+- **Prompt budget** — the prompt may use `n_ctx − headroom` tokens (headroom capped at half the context). If the prompt is over budget (e.g. `n_ctx` was capped or shrunk by the fitter), the character cap is reduced in proportion to the overflow and the prompt rebuilt, up to 6 times. Truncation drops pages from the end, together with their images. Counting uses the exact inference tokenization, images included — no chars-per-token guess.
+- **Lazy `mmproj`** — the vision projector is loaded on the first multimodal request and then **stays resident until `unloadModel()`**. Its placement is decided at model load (the fitter's choice on GPU; any free GPU when the model itself is on CPU). If it cannot be loaded, the request falls back to text-only, without media markers and with the text-only system prompt.
+- **Chat template** — the Jinja template from the GGUF metadata is applied with thinking disabled (reasoning models such as Gemma 4 would otherwise emit thought tags that break JSON extraction). The rendered prompt keeps template parts and user-input parts apart.
+- **Prompt-injection safety** — template parts are tokenized with special-token parsing, user input (the document text) **without** it, so text inside a PDF cannot inject control tokens such as `<end_of_turn>`.
+- **UTF-8 safe detokenization** — tokens are detokenized to raw bytes and accumulated before decoding, since one token can end in the middle of a multi-byte character.
 - **Runtime backend discovery** — `ggml_backend_load_all()` selects the best CPU microarch variant and auto-detects CUDA/Vulkan from the deployed libraries.
 
 ## OpenAlex Citations
 
-`OpenAlexClient` runs on its own thread and queries the OpenAlex works API (`https://api.openalex.org/works`):
+`OpenAlexClient` runs on its own thread and queries the OpenAlex works API (`https://api.openalex.org/works`). For each paper it resolves the OpenAlex work, then fetches the works it cites (`Citations.cites`) and the works citing it (`Citations.cited_by`).
 
-- **On summarize** — connected to `SummaryController::summaryFinished`, it fetches the references (works the paper cited) and the citing works, stores them as JSON in the `Citations` table.
-- **Startup catch-up** — on launch, `checkEmptyReferences` scans for `Citations` rows that still carry the "no references found" marker and re-fetches them (covers papers summarized in a prior session before OpenAlex was reachable).
-- **Pagination** — 100 works per page (the 200-page cap is deprecated); the stored counts reflect OpenAlex's true totals.
+**Triggers**
+
+- **On summarize** — connected to `SummaryController::summaryFinished`.
+- **Startup catch-up** — `checkEmptyReferences` scans for `Citations` rows still missing data (covers papers summarized while OpenAlex was unreachable).
+- **Project switch** — `DatabaseManager::databaseSwitched` → `onDatabaseSwitched`: the queue is flushed, the in-flight request aborted and the new project rescanned. A generation counter makes late replies and retry timers from the old project no-ops.
+
+**Work resolution** — skipped if the `work_id` is already known. Otherwise a 3-tier search: exact title → semantic search → first-author search. Each candidate is scored by `bestCandidate` (title, then authors, then year, then journal, with fuzzy matching and an author-majority gate). If a candidate with the exact same title is rejected by the author gate, the cascade stops early. A paper with no confident match is marked `lookup_status = 'not_found'` and is not searched again for **30 days**; a match sets `matched`.
+
+**Threading and DB access**
+
+- Papers are processed **one at a time** from a de-duplicated queue; within a paper, the two citation lists are fetched **in parallel**, each with its own buffer.
+- The client never touches SQLite from its own thread: every read and write is posted to the main thread, which owns the connection. Each write carries the DB path it was scanned from and is dropped if the active project changed in the meantime.
+
+**Network**
+
+- **Retries** — HTTP 429, 5xx and timeouts are retried up to 3 times with backoff, honouring `Retry-After`. An unreadable reply keeps the paper pending instead of marking it not found.
+- **Pagination** — 100 works per page, sorted most-cited first; at most **100 works** are stored per list, while `cites_count` / `cited_by_count` keep OpenAlex's true totals.
 - **Optional API key** — `openAlexApiKey` (if set) is sent to raise rate limits; otherwise requests are anonymous.
+
+## Text Post-Processing
+
+`TextFormat` (`textformat.h/.cpp`) cleans LLM output for display. It is shared by `QueryWorker` (RAG answers) and `Helpers::parseSummaryJson` (summaries).
+
+- **`latexToUnicode(text, target)`** — models often emit LaTeX despite being told not to, and neither Qt's `MarkdownText` nor the HTML views can render it. Math spans (`$$…$$`, `\[…\]`, `\(…\)`, `$…$`) are rewritten as readable Unicode (`εᵢₙ`, `x²`, `≠`, `a/b`…). Inline `$…$` must hug its content, so currency (`$5 and $10`) is kept. With `Target::Markdown`, code spans are left untouched and `*` / `_` inside formulas are escaped.
+- **`escapeMarkdown(text)`** — escapes Markdown syntax so a label (e.g. a paper title in a citation) renders verbatim.
+
+Because summaries are converted at parse time, summaries stored before this conversion existed are also cleaned when displayed or exported.
 
 ## Theme System
 
@@ -724,9 +793,9 @@ Themes are JSON files in `ui/themes/` with a Catppuccin-style palette:
 
 `main.cpp` installs a unified logging sink before any model is loaded:
 
-- **Crash log** — `Hodeia.log` in the executable directory, overwritten each run, flushed on every line. Captures the last output before a hard crash even when the app is double-clicked with no console.
-- **Console mirroring** — on Windows a `WIN32` GUI build has no console, so when launched from a shell the app attaches to the parent console (`WriteConsoleW`) and mirrors `qDebug`/`qWarning` there; on Linux/macOS the standard terminal behavior is preserved.
-- **llama.cpp log capture** — `llama_log_set` forwards ggml/llama output (INFO and above) into the same sink, so backend-load diagnostics (e.g. "failed to load ggml-cuda.dll") are visible.
+- **Crash log** — `Hodeia.log` in the executable directory, overwritten each run, flushed on every line. Captures the last output before a hard crash even when the app is double-clicked with no console. If the executable directory is not writable (e.g. an all-users install under `Program Files`), the log goes to the per-user data directory instead (`%APPDATA%\Hodeia` on Windows, `~/.local/share/Hodeia` on Linux).
+- **Console mirroring** — on Windows a `WIN32` GUI build has no console, so when launched from a shell the app attaches to the parent console (`WriteConsoleW`, UTF-8 code page) and mirrors `qDebug`/`qWarning` there; on Linux/macOS the standard terminal behavior is preserved.
+- **llama.cpp log capture** — `llama_log_set` forwards ggml/llama **warnings and errors** into the same sink, so backend-load diagnostics (e.g. "failed to load ggml-cuda.dll") are visible without the model loader's INFO metadata dump. Continuation lines are kept only if the message they continue was kept. The mtmd (multimodal) logger is routed through the same filter (it would otherwise print its DEBUG trace, including the whole prompt, to stderr), and libcommon's own logger is limited to warnings. `common_init()` is deliberately not called, because it would replace this filtered callback.
 - **Translation loading** — `loadTranslator` loads `i18n/hodeia_<lang>.qm`; changing the language in Settings reloads the translator and re-loads the QML module so all `qsTr()` calls re-evaluate.
 
 ---
@@ -742,5 +811,6 @@ Themes are JSON files in `ui/themes/` with a Catppuccin-style palette:
 | E5 multilingual embeddings                   | Strong cross-language retrieval without a separate embedding service                                  |
 | Chunking at ~1500 chars                      | Balances embedding quality with context window efficiency                                             |
 | Unloading models between pipelines           | GPU VRAM is the bottleneck; never hold chat + embedding models simultaneously                         |
+| Numbered reference tags in RAG prompts       | Models invent author names / page numbers; tags are resolved to exact citations after generation     |
 | OpenAlex as a side channel                   | Citations are public data; fetched async so they never block summarization/RAG                        |
 | AGPL-3.0 + Qt (LGPL)                         | The Qt citation + third-party notices are in `NOTICE`                                                 |

@@ -1,11 +1,18 @@
-# Packaging Plan (Linux + Windows)
+# Packaging (Linux + Windows)
 
-> **Status: PLANNING NOTES — not yet implemented.** This captures how to ship
-> Hodeia on **Linux** (`.deb`, `.rpm`, Arch `pkg.tar.zst`) and **Windows**
-> (self-contained folder → portable zip / installer). The build system is not
-> wired for packaging yet; everything below is the proposed design to review.
+> **Status**
 >
-> Last updated: 2026-10-09.
+> | Target                        | State                                                        |
+> | ----------------------------- | ------------------------------------------------------------ |
+> | Windows installer (Inno Setup) | ✅ Implemented — `package/windows/hodeia.iss` + `scripts/Windows/package-app.ps1` |
+> | Arch Linux (`PKGBUILD`)        | ✅ Prototype — `package/arch/PKGBUILD`, self-contained `/opt/hodeia` layout |
+> | Debian / Fedora (`.deb`, `.rpm`) | 📝 Planned — no CPack / `install()` rules yet             |
+> | CI (GitHub Actions)            | 📝 Planned                                                   |
+> | Code signing                   | 📝 Not decided                                               |
+>
+> The sections marked **planned** below are the proposed design to review.
+>
+> Last updated: 2026-11-12.
 
 ---
 
@@ -47,7 +54,31 @@ fonts, tessdata, the embedder model, translations.
 
 ---
 
-## Two open decisions (need a call before implementing)
+## Arch Linux — implemented (`package/arch/PKGBUILD`)
+
+The Arch package uses the **self-contained `/opt` layout (Option B below)**
+and builds **everything from source**:
+
+- Hodeia is `git clone`d (not a tarball), because the bundled `.gguf` models
+  are stored with **git-lfs** — a tarball would only contain the LFS pointers.
+  The clone is checked out at tag `v${pkgver}`.
+- `prepare()` clones the dependencies at pinned versions (llama.cpp `v0.6.0`,
+  MuPDF `1.28.5` with its submodules, Tesseract `5.5.3`, Leptonica `1.87.0`,
+  sqlite-vec `v0.1.10-alpha.4`) and detects the GPU backend: **CUDA** if
+  `nvcc` is found, otherwise **Vulkan** (CPU is always included).
+- `build()` builds Leptonica → Tesseract → MuPDF (static) → sqlite-vec →
+  llama.cpp (flat `.so` set) → Hodeia.
+- `package()` copies the deploy folder to `/opt/hodeia` (minus build
+  artefacts), symlinks `/usr/bin/hodeia`, and installs `hodeia.desktop`
+  (`Categories=Office;Science;`) and the icon.
+
+Build with `makepkg -s` from `package/arch/`. Runtime `depends`: `qt6-base`,
+`qt6-declarative`, `qt6-shadertools`, `libpng`, `libjpeg-turbo`, `libtiff`,
+`zlib`, `libomp`. Makedepends include `git-lfs`.
+
+---
+
+## Two open decisions for `.deb` / `.rpm` (need a call before implementing)
 
 ### 1. Packaging model
 
@@ -69,7 +100,8 @@ fonts, tessdata, the embedder model, translations.
   `makepkg` scripts that bundle the existing deploy folder, without touching
   CMake. Fastest, least maintainable.
 
-**Recommendation: Option A.**
+**Recommendation: Option A.** (The Arch `PKGBUILD` currently uses Option B;
+moving it to Option A would follow once the `install()` rules exist.)
 
 ### 2. Bundled models
 
@@ -136,9 +168,11 @@ include(CPack)
 
 Build: `cmake --build . && cpack -G DEB` (and `cpack -G RPM`).
 
-### Step 3 — Arch `PKGBUILD`
+### Step 3 — Arch `PKGBUILD` (Option A variant)
 
-`package/arch/PKGBUILD` (plus the `.desktop` + icon in `package/arch/`):
+> A working `/opt` PKGBUILD already exists — see
+> [Arch Linux — implemented](#arch-linux--implemented-packagearchpkgbuild).
+> The sketch below is what it would become under Option A.
 
 ```bash
 pkgname=hodeia
@@ -185,9 +219,8 @@ upload artifact.
 
 # Windows Packaging
 
-> **Status: PLANNING NOTES — not yet implemented.** The Windows build is
-> already self-contained; shipping is mostly about verifying the CRT, choosing
-> a delivery format, adding code signing, and wiring CI.
+> **Status: installer implemented** (Tier 2 below). Still open: code
+> signing, CI, portable ZIP, auto-update.
 
 ## Current state (what we already have)
 
@@ -273,12 +306,28 @@ optional "add to PATH".
   - Optionally install the VC++ Redist silently as a pre-install step.
 - Build: `iscc hodeia.iss` → `Hodeia-Setup-<version>.exe`.
 - **Implemented:** `package/windows/hodeia.iss`, driven by
-  `scripts/Windows/package-app.ps1` (Zed task "Windows: Package Installer").
-  It packages `build/Release` (minus CMake/Ninja artefacts) into
-  `dist/Hodeia-Setup-<version>-x64.exe`: per-user install by default (no
-  admin; all-users optional), VC++ runtime installed only if missing/older,
-  Start-Menu + optional desktop shortcut, FR/EN wizard. Version comes from
-  `project(VERSION)` in `CMakeLists.txt`.
+  `scripts/Windows/package-app.ps1` (Zed task "Windows: Package Installer
+  (Inno Setup)"; `-Build` builds Release first). Requires Inno Setup
+  6.5.2+ or 7 (`winget install JRSoftware.InnoSetup`).
+  - Packages `build/Release` (minus CMake/Ninja artefacts, `.lib`/`.pdb`/…)
+    into `dist/Hodeia-Setup-<version>-x64.exe`. Refuses non-Release builds
+    (debug CRT/Qt DLLs are not redistributable). Version comes from
+    `project(VERSION)` in `CMakeLists.txt`.
+  - Per-user install by default (no admin, `%LOCALAPPDATA%\Programs`);
+    all-users (`Program Files`) can be picked in a dialog. Windows 10+, x64.
+  - VC++ runtime (`vc_redist.x64.exe`, staged by `windeployqt`) installed
+    only if missing or older.
+  - Start-Menu shortcut + optional desktop shortcut; the icon comes from
+    `Hodeia.exe` (embedded via `src/hodeia.rc`). FR/EN wizard.
+  - **Updates:** run the new `Setup.exe` over an existing install. The fixed
+    `AppId` (**must never change**) lets it reuse the previous install dir
+    and tasks, close a running Hodeia, ask before downgrading, and silently
+    uninstall the previous version first so files that are no longer
+    shipped do not linger.
+  - User data (`%APPDATA%\Hodeia`: projects, models, config) is never touched
+    by install, update or uninstall.
+  - ~3 GB payload (mostly `.gguf` + CUDA DLLs): non-solid LZMA2; a single
+    `Setup.exe` can hold up to ~4.2 GB compressed.
 - Inno Setup's compiler is in the PATH on GitHub's `windows-latest` runner.
 
 ### Tier 3 — Auto-update (later)
@@ -330,7 +379,9 @@ A single job (no matrix needed — x64-only for now):
    an unexpected CRT is referenced.
 4. **Package**
    - Tier 1: `Compress-Archive build/Release Hodeia-<ver>-win64-portable.zip`.
-   - Tier 2: `iscc package\windows\hodeia.iss` → `Hodeia-Setup-<ver>.exe`.
+   - Tier 2: `pwsh scripts/Windows/package-app.ps1` → `dist/Hodeia-Setup-<ver>-x64.exe`
+     (it passes the `AppVersion` / `BuildDir` / `VCRedistBuild` defines that
+     `hodeia.iss` requires — do not call `iscc` on the `.iss` directly).
 5. **Sign** (if using SignPath): `signpath/github-action` with the secret
    `SIGNPATH_CLOUD_API_KEY`, signing `Hodeia.exe` + the installer.
 6. **Upload**
@@ -361,40 +412,38 @@ windows:
     - name: Build app
       run: pwsh scripts/Windows/build-app.ps1 -Configuration Release
     - name: Build installer
-      run: iscc package\windows\hodeia.iss
-      shell: pwsh
+      run: pwsh scripts/Windows/package-app.ps1
     - name: Sign (optional)
       uses: signpath/github-action@v1
       with:
-        artifacts: "Hodeia-Setup-*.exe"
+        artifacts: "dist/Hodeia-Setup-*.exe"
         # ... SignPath config
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: hodeia-windows
         path: |
-          Hodeia-Setup-*.exe
+          dist/Hodeia-Setup-*.exe
           Hodeia-*-win64-portable.zip
 ```
 
 ---
 
-## Files to create / change (when green-lit)
+## Files
 
-**Linux**
+**Already in the repo**
 
-- `CMakeLists.txt` — add `install()` rules + CPack block.
+- `package/arch/PKGBUILD` + `package/arch/hodeia.desktop` — Arch package (`/opt` layout).
+- `package/windows/hodeia.iss` — Inno Setup script.
+- `scripts/Windows/package-app.ps1` — installer build driver.
+- `src/hodeia.rc` — embeds the icon in `Hodeia.exe`.
+
+**To create / change (when green-lit)**
+
+- `CMakeLists.txt` — add `install()` rules + CPack block (`.deb` / `.rpm`).
 - `cmake/PlatformLinux.cmake` — adjust rpath for the FHS lib location (Option A).
-- `package/arch/PKGBUILD` — new.
-- `package/hodeia.desktop` — new (Name, Exec, Icon, Categories=Office;Science).
-
-**Windows**
-
-- `package/windows/hodeia.iss` — new (Inno Setup script).
-- `NOTICE` — already lists the third-party components; no change needed, but
-  the installer can surface it in the license page.
-- (Optional) `package/windows/vc_redist.x64.exe` — if you choose to bundle the
-  VC++ Redist.
+- `NOTICE` — already lists the third-party components; the installer could
+  show it on the license page (it currently shows `LICENSE`).
 
 **Shared / CI**
 
@@ -404,10 +453,11 @@ windows:
 
 **Linux**
 
-- [ ] Choose packaging model (A/B/C) — see "Two open decisions".
-- [ ] Decide: bundle vs download the embedder model.
+- [ ] Choose packaging model (A/B/C) for `.deb` / `.rpm` — see "Two open decisions" (Arch uses B today).
+- [x] Bundle vs download the models — bundled (git-lfs in the Arch build).
 - [ ] Confirm the exact Qt6 package names per distro (versions differ by release).
-- [ ] Decide on a `.desktop` Categories value + which icon sizes to ship.
+- [x] `.desktop` Categories — `Office;Science;`.
+- [ ] Which icon sizes to ship (one PNG today).
 - [ ] Whether to ship `arm64` builds too (the CMake already supports the
       `GGML_CPU_ALL_VARIANTS` set; the `.so` set is arch-specific, so an arm64
       build needs to be built on arm64).
@@ -416,11 +466,10 @@ windows:
 
 **Windows**
 
-- [ ] Tier choice: portable ZIP only, or ZIP + Inno Setup (recommended).
+- [x] Tier choice — Inno Setup installer. (Portable ZIP still optional.)
 - [ ] Code-signing provider: SignPath (free OSS tier) vs CA cert vs none.
-- [ ] Whether to bundle `vcruntime140.dll` / `msvcp140.dll` or rely on the
-      system / VC++ Redist.
-- [ ] App ID GUID + publisher name for the installer (must be stable).
+- [x] CRT — the VC++ Redist is shipped in the installer, installed only if missing/older.
+- [x] App ID GUID — fixed in `hodeia.iss` (must never change). Publisher name is "Hodeia".
 - [ ] Auto-update (Tier 3) — defer until there's a release cadence.
 - [ ] `arm64` Windows builds (the CMake + prebuilt llama DLLs are x64-only
       today; an arm64 build needs an arm64 toolchain + rebuild of llama.cpp).
