@@ -217,6 +217,15 @@ static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
   return raw * 26 / 100;
 }
 
+/// V cache type actually used for a requested KV type: llama.cpp rejects a
+/// quantized V cache without flash attention, so it stays F16 then (see
+/// LocalBackend::createInitResult).  A quantized K cache is always allowed.
+static int lb_v_type(int type_kv, bool flash_attn) {
+  return !flash_attn && ggml_is_quantized(static_cast<ggml_type>(type_kv))
+             ? GGML_TYPE_F16
+             : type_kv;
+}
+
 /// Probe a GGUF model without allocating GPU memory, returning the
 /// structural info needed for memory estimation.
 struct probe_info {
@@ -228,6 +237,7 @@ struct probe_info {
   uint64_t model_size = 0;
   uint64_t mmproj_size = 0;   // mmproj weights + compute, all devices
   bool has_mmproj = false;
+  bool is_hybrid = false;     // recurrent + attention: loaded without flash attn
   uint32_t prompt_tokens = 0; // text + image tokens
   uint32_t image_tokens = 0;  // image share of prompt_tokens (upper bound)
 };
@@ -401,6 +411,7 @@ static probe_info lb_probe_model(const QString &modelPath,
     info.n_embd_v_gqa = info.n_embd_k_gqa;
   }
   info.model_size = llama_model_size(model);
+  info.is_hybrid = llama_model_is_hybrid(model);
 
   // Count the exact text tokens while the no-alloc model is already open.
   // Images are only part of the prompt when a projector exists; their cost
@@ -607,6 +618,8 @@ static common_params lb_fit_params(const probe_info &probe,
     // Try full context with F16 KV first; if it doesn't fit, shrink n_ctx
     // and/or quantize KV (F16 → Q8_0) until it fits.  Floor n_ctx at the
     // caller's minCtx (4096) — below that multimodal inference is useless.
+    // The CPU load always runs without flash attention, so only K can be
+    // quantized; V stays F16.
     uint32_t n_ctx = lb_pad256(desiredCtx);
     uint32_t floor_ctx = lb_pad256(std::max(minCtx, 4096U));
     int type_k = GGML_TYPE_F16;
@@ -615,9 +628,10 @@ static common_params lb_fit_params(const probe_info &probe,
     uint64_t kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
                                        probe.n_layers, n_ctx, type_k, type_v);
     while (persistentWeights + kv > cpuAvailable) {
-      // First try quantizing KV (cheap, ~half the cache).
+      // First try quantizing KV (cheap, ~a quarter of the cache for K only).
       if (type_k == GGML_TYPE_F16) {
-        type_k = type_v = GGML_TYPE_Q8_0;
+        type_k = GGML_TYPE_Q8_0;
+        type_v = lb_v_type(type_k, /*flash_attn=*/false);
         kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
                                   probe.n_layers, n_ctx, type_k, type_v);
         continue;
@@ -638,8 +652,8 @@ static common_params lb_fit_params(const probe_info &probe,
 
     qDebug() << "[LocalBackend] lb_fit: no GPU, CPU only"
              << "| n_ctx=" << n_ctx
-             << "| kv_type=" << lb_kv_name(type_k)
-             << "| est persistent=" << ((persistentWeights + kv) >> 20) << "MiB"
+             << "| kv_type K=" << lb_kv_name(type_k)
+             << "V=" << lb_kv_name(type_v) << "| est persistent=" << ((persistentWeights + kv) >> 20) << "MiB"
              << "/ " << (cpuAvailable >> 20) << "MiB available"
              << "| cpuFree=" << (cpuFree >> 20) << "MiB";
     return params;
@@ -705,9 +719,13 @@ static common_params lb_fit_params(const probe_info &probe,
 
     // Use Q8_0 KV cache on iGPU to reduce memory pressure (~120 MiB for a
     // 36k context vs ~240 MiB for F16).  Q4_K is not viable — the Vulkan
-    // backend cannot execute SET_ROWS on Q4_K view tensors.
+    // backend cannot execute SET_ROWS on Q4_K view tensors.  Hybrid models
+    // run without flash attention, so their V cache stays F16.
     int iGPU_type_k = GGML_TYPE_Q8_0;
-    int iGPU_type_v = GGML_TYPE_Q8_0;
+    int iGPU_type_v = lb_v_type(iGPU_type_k, !probe.is_hybrid);
+    const QString iGPU_kv_name = QString("K=%1 V=%2")
+                                     .arg(lb_kv_name(iGPU_type_k))
+                                     .arg(lb_kv_name(iGPU_type_v));
     params.cache_type_k = static_cast<ggml_type>(iGPU_type_k);
     params.cache_type_v = static_cast<ggml_type>(iGPU_type_v);
 
@@ -729,7 +747,7 @@ static common_params lb_fit_params(const probe_info &probe,
                << "| model=" << (probe.model_size >> 20) << "MiB"
                << "| kv=" << (kv_size >> 20) << "MiB"
                << "| n_ctx=" << desiredCtx << "| n_ubatch=" << params.n_ubatch
-               << "| kv_type=Q8_0";
+               << "| kv_type" << iGPU_kv_name;
       return params;
     }
 
@@ -753,7 +771,7 @@ static common_params lb_fit_params(const probe_info &probe,
                  << "| n_ctx=" << fit_ctx
                  << "| persistent=" << ((probe.model_size + fit_kv) >> 20)
                  << "MiB /" << (available >> 20) << "MiB"
-                 << "| kv_type=Q8_0";
+                 << "| kv_type" << iGPU_kv_name;
         return params;
       }
       fit_ctx = lb_pad256(fit_ctx - 1024U);
@@ -785,16 +803,19 @@ static common_params lb_fit_params(const probe_info &probe,
   uint32_t n_ctx = lb_pad256(desiredCtx);
   const uint32_t ctx_floor = lb_pad256(std::min(minCtx, n_ctx));
   uint32_t n_ubatch = desiredUbatch;
-  int type_kv = GGML_TYPE_F16;
+  int type_kv = GGML_TYPE_F16; // K type; V follows unless flash attn is off
   bool mmproj_on_gpu = probe.has_mmproj;
+  // Hybrid models run without flash attention (V cache stays F16).
+  const bool flash_attn = !probe.is_hybrid;
 
   for (int attempts = 0; attempts < 500; ++attempts) {
     const int n_gpu_layers = total_layers - offloaded;
+    const int type_v = lb_v_type(type_kv, flash_attn);
     // GPU-side demand only: layers on the CPU keep their weights and KV in
     // system RAM (offload_kqv), so they cost nothing here.
     const uint64_t kv_size =
         lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                             n_gpu_layers, n_ctx, type_kv, type_kv);
+                             n_gpu_layers, n_ctx, type_kv, type_v);
     const uint64_t gpu_weight = static_cast<uint64_t>(n_gpu_layers) * per_layer;
     const uint64_t mmproj_mem = mmproj_on_gpu ? probe.mmproj_size : 0;
     // CUDA graph reserve allocates per-layer activations.  Calibrated: 8433
@@ -814,7 +835,7 @@ static common_params lb_fit_params(const probe_info &probe,
       params.n_ubatch = n_ubatch;
       params.devices = {bottleneck->dev};
       params.cache_type_k = static_cast<ggml_type>(type_kv);
-      params.cache_type_v = static_cast<ggml_type>(type_kv);
+      params.cache_type_v = static_cast<ggml_type>(type_v);
       if (probe.has_mmproj) {
         params.mmproj.path = mmprojPath.toStdString();
         params.mmproj_use_gpu = mmproj_on_gpu;
@@ -827,8 +848,8 @@ static common_params lb_fit_params(const probe_info &probe,
                                                 : "(CPU only)")
                << "| n_gpu_layers=" << n_gpu_layers << "/" << total_layers
                << "| n_ctx=" << n_ctx << "| n_ubatch=" << n_ubatch
-               << "| kv_type=" << lb_kv_name(type_kv)
-               << "| mmproj on" << (mmproj_on_gpu ? "GPU" : "CPU")
+               << "| kv_type K=" << lb_kv_name(type_kv)
+               << "V=" << lb_kv_name(type_v) << "| mmproj on" << (mmproj_on_gpu ? "GPU" : "CPU")
                << "| GPU" << (gpu_total >> 20) << "MiB /" << (available >> 20)
                << "MiB | weights=" << (gpu_weight >> 20)
                << "MiB | kv=" << (kv_size >> 20)
@@ -956,19 +977,35 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params) {
   if (!params.devices.empty() && params.devices.back() != nullptr)
     params.devices.push_back(nullptr);
 
+  // llama.cpp rejects a quantized V cache without flash attention
+  // ("quantized V cache requires flash_attn to be enabled").  A quantized K
+  // cache is fine, so only V falls back to F16.
+  auto fixVCacheForNoFa = [&params]() {
+    if (params.flash_attn_type == LLAMA_FLASH_ATTN_TYPE_DISABLED &&
+        ggml_is_quantized(params.cache_type_v)) {
+      qDebug() << "[LocalBackend] Flash attention disabled — V cache"
+               << ggml_type_name(params.cache_type_v) << "→ F16";
+      params.cache_type_v = GGML_TYPE_F16;
+    }
+  };
+
   try {
+    fixVCacheForNoFa();
     auto result = common_init_from_params(params);
     if (!result || !result->model() || !result->context())
       return nullptr;
 
     // Hybrid models (recurrent + attention: Jamba, Granite…) are kept off
-    // flash attention.  Only reload when FA could actually be on.
+    // flash attention.  Only reload when FA could actually be on — the
+    // fitted loader already disables it up front, this is a safety net for
+    // callers that did not probe the model.
     if (llama_model_is_hybrid(result->model()) &&
         params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED) {
       result.reset();
       params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
       qDebug() << "[LocalBackend] Hybrid model — reloading with flash "
                   "attention disabled";
+      fixVCacheForNoFa();
       result = common_init_from_params(params);
       if (!result || !result->model() || !result->context())
         return nullptr;
@@ -1076,7 +1113,10 @@ LocalBackend::loadModelWithDevices(const QString &path,
   // available via ggml_backend_load_all() for host ops and hybrid offload
   // on its own, so an explicit CPU entry is not needed.
   applyCommon(params);
-  params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_AUTO;
+  // Hybrid models run without flash attention; deciding it here (the fitter
+  // sized the V cache accordingly) avoids createInitResult's reload.
+  params.flash_attn_type = probe.is_hybrid ? LLAMA_FLASH_ATTN_TYPE_DISABLED
+                                           : LLAMA_FLASH_ATTN_TYPE_AUTO;
   if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
     // lb_fit_params only sets mmproj if probe confirmed it exists
     params.mmproj.path = mmprojPath.toStdString();
