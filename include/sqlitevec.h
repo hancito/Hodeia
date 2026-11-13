@@ -43,6 +43,15 @@ public:
   QVector<float> embed(const QStringList &texts,
                        EmbedMode mode = EmbedMode::Passage);
 
+  // Token count of `text` with the embedding model's own tokenizer, without
+  // the E5 prefix.  Loads the model on first use; -1 if it can't be loaded.
+  int countTokens(const QString &text);
+
+  // Largest chunk (in tokens, prefix excluded) that the embedding model can
+  // read without truncation: its context minus the "passage: " prefix and a
+  // safety margin.  0 if the model can't be loaded.
+  int maxChunkTokens();
+
   // Insert chunks into the vec0 table. Returns count of inserted rows.
   int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks);
 

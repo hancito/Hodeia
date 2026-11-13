@@ -98,6 +98,21 @@ public:
                                          const PromptPayload &payload,
                                          uint32_t responseHeadroom = 2048);
 
+  /// Where a model would run for a given prompt size (no model is loaded).
+  enum class Placement { Gpu, Split, Cpu };
+  struct ContextEstimate {
+    bool valid = false;  ///< false: model missing or unreadable
+    int autoTokens = 0;  ///< default prompt budget: largest fully on GPU (≤16k)
+    int maxTokens = 0;   ///< model context limit minus the response headroom
+    Placement placement = Placement::Cpu; ///< for the requested budget
+    bool truncated = false; ///< requested budget won't fit, prompt gets cut
+  };
+  /// Estimate placement for `promptTokens` (0 = the auto budget) plus
+  /// `responseHeadroom`, with the same memory fitting as loadModel().
+  static ContextEstimate estimateContext(const QString &modelPath,
+                                         int promptTokens,
+                                         uint32_t responseHeadroom);
+
   /// Returns true if a model is loaded and ready for inference.
   bool isReady() const;
 
@@ -140,7 +155,9 @@ private:
   QString resolveModelPath(const QString &modelPath) const;
 
   /// Search for an mmproj file near the model or in the bundled Mmproj dir.
-  QString resolveMmprojPath(const QString &modelPath) const;
+  static QString resolveMmprojPath(const QString &modelPath);
+  /// Load the ggml backends (once per process) and init the llama runtime.
+  static void ensureRuntime();
 
   /// Lazy-load the multimodal projector onto the GPU.
   std::expected<void, QString> loadMmproj();

@@ -249,44 +249,105 @@ QList<TextChunk> PdfWorker::chunkDocumentText(
     addSentence(lastEnd, text.size());
   }
 
-  // 2) Greedy sentence packing with fixed overlap.
-  //    A chunk's page is the page of its first *new* sentence (not of the
-  //    overlap carried over from the previous chunk): that is where most of
-  //    its content comes from.
-  QString currentChunk;
-  int chunkPage = 0;
-  int chunkIdx = 0;
+  // 2) Token budget, taken from the embedding model so no chunk is ever
+  //    truncated when it is embedded (the tail of an over-long chunk would
+  //    be unsearchable).  Chunks aim at ~3/4 of the model's limit and carry
+  //    whole sentences of overlap from the previous chunk.
+  const int hardMax = [&] {
+    const int fromModel = m_vecManager ? m_vecManager->maxChunkTokens() : 0;
+    return fromModel > 0 ? fromModel : FallbackMaxChunkTokens;
+  }();
+  const int target = hardMax * 3 / 4;
+  const int overlapBudget = target / 6;
 
-  auto emitChunk = [&]() {
-    TextChunk tc;
-    tc.text = currentChunk.trimmed();
-    tc.paperHash = paperHash;
-    tc.page = chunkPage;
-    tc.chunkIdx = chunkIdx++;
-    chunks.append(tc);
+  auto countTokens = [&](const QString &t) -> int {
+    const int n = m_vecManager ? m_vecManager->countTokens(t) : -1;
+    // Fallback estimate: scientific text averages well under 3 chars/token.
+    return n >= 0 ? n : int(t.length() / 3) + 1;
   };
 
+  // A sentence longer than the limit (tables, reference lists, OCR without
+  // punctuation) is cut at whitespace into pieces of about `target` tokens.
+  struct Piece {
+    QString text;
+    int page;
+    int tokens;
+  };
+  QList<Piece> pieces;
   for (const auto &sent : sentences) {
-    if (currentChunk.isEmpty()) {
-      currentChunk = sent.text;
-      chunkPage = sent.page;
+    const int n = countTokens(sent.text);
+    if (n <= hardMax) {
+      pieces.append({sent.text, sent.page, n});
       continue;
     }
-    const QString candidate = currentChunk + " " + sent.text;
-    if (candidate.length() > m_maxChunkChars) {
-      emitChunk();
-      // Keep the tail of the current chunk as overlap for the next one.
-      const int overlapStart =
-          qMax(0, int(currentChunk.length()) - m_overlapChars);
-      currentChunk = currentChunk.mid(overlapStart) + " " + sent.text;
-      chunkPage = sent.page;
-    } else {
-      currentChunk = candidate;
+    const double charsPerToken = double(sent.text.length()) / n;
+    const int pieceChars = qMax(32, int(target * charsPerToken));
+    qsizetype from = 0;
+    while (from < sent.text.length()) {
+      qsizetype to = qMin(sent.text.length(), from + pieceChars);
+      if (to < sent.text.length()) {
+        const qsizetype space = sent.text.lastIndexOf(' ', to);
+        if (space > from)
+          to = space;
+      }
+      const QString part = sent.text.mid(from, to - from).trimmed();
+      if (!part.isEmpty())
+        pieces.append({part, sent.page, countTokens(part)});
+      from = to;
     }
   }
 
+  // 3) Greedy packing.  A chunk's page is the page of its first *new* piece
+  //    (not of the overlap carried over from the previous chunk): that is
+  //    where most of its content comes from.
+  QList<Piece> current;
+  int currentTokens = 0;
+  int firstNew = 0; // index in `current` of the first non-overlap piece
+  int chunkIdx = 0;
+  int maxEmitted = 0;
+
+  auto emitChunk = [&]() {
+    QStringList parts;
+    for (const auto &pc : current)
+      parts << pc.text;
+    TextChunk tc;
+    tc.text = parts.join(' ');
+    tc.paperHash = paperHash;
+    tc.page = current[qMin(firstNew, int(current.size()) - 1)].page;
+    tc.chunkIdx = chunkIdx++;
+    chunks.append(tc);
+    maxEmitted = qMax(maxEmitted, currentTokens);
+  };
+
+  for (const auto &piece : pieces) {
+    if (current.size() > firstNew && currentTokens + piece.tokens > target) {
+      emitChunk();
+      // Carry trailing whole pieces as overlap (never the whole chunk).
+      QList<Piece> keep;
+      int keepTokens = 0;
+      for (qsizetype i = current.size() - 1; i > 0; --i) {
+        if (keepTokens + current[i].tokens > overlapBudget)
+          break;
+        keep.prepend(current[i]);
+        keepTokens += current[i].tokens;
+      }
+      current = keep;
+      currentTokens = keepTokens;
+      firstNew = int(current.size());
+    }
+    // Overlap + a long piece could exceed what the model reads: drop the
+    // overlap rather than truncate the chunk.
+    if (currentTokens + piece.tokens > hardMax) {
+      current.clear();
+      currentTokens = 0;
+      firstNew = 0;
+    }
+    current.append(piece);
+    currentTokens += piece.tokens;
+  }
+
   // Flush the last accumulated chunk.
-  if (!currentChunk.trimmed().isEmpty())
+  if (current.size() > firstNew)
     emitChunk();
 
   // Debug: total text in chunks vs input
@@ -321,7 +382,8 @@ QList<TextChunk> PdfWorker::chunkDocumentText(
            << "| input:" << fullText.length() << "chars"
            << "| output:" << chunks.size() << "chunks," << totalChunkChars
            << "chars total"
-           << "| avg chunk:"
+           << "| tokens: target" << target << "max" << hardMax
+           << "largest" << maxEmitted << "| avg chunk:"
            << (chunks.isEmpty() ? 0 : totalChunkChars / chunks.size())
            << "chars"
            << "| first chunk:"

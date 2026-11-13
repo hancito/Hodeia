@@ -678,9 +678,34 @@
         <translation>Posez une question sur votre bibliothèque d&apos;articles...</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="117"/>
-        <source>Max Pages</source>
-        <translation>Pages max</translation>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>Context</source>
+        <translation>Contexte</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>Auto (%1)</source>
+        <translation>Auto (%1)</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>GPU + CPU</source>
+        <translation>GPU + CPU</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>CPU (slow)</source>
+        <translation>CPU (lent)</translation>
+    </message>
+    <message>
+        <location filename="../ui/QueryPane.qml" line="0"/>
+        <source>%1 · truncated</source>
+        <translation>%1 · tronqué</translation>
     </message>
     <message>
         <location filename="../ui/QueryPane.qml" line="132"/>

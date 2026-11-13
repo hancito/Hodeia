@@ -14,7 +14,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QImage>
+#include <QMutex>
 #include <QThread>
 #include <algorithm>
 #include <cstring>
@@ -26,9 +28,17 @@
 /// across the lifetime of the process, even if multiple backend instances
 /// are created.
 static bool s_llamaInitialized = false;
+/// The ggml backend registry outlives llama_backend_free(), so backends must
+/// be loaded only once per process: loading them again would register every
+/// device a second time.
+static bool s_backendsLoaded = false;
 
 LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
-  if (!s_llamaInitialized) {
+  ensureRuntime();
+}
+
+void LocalBackend::ensureRuntime() {
+  if (!s_backendsLoaded) {
     // Auto-detect CUDA, Metal, Vulkan, etc.  In a release build this runs
     // SILENT (ggml_backend_load_all_from_path sets silent=true under NDEBUG),
     // so a backend that fails to load produces no diagnostic at all.  To
@@ -82,6 +92,9 @@ LocalBackend::LocalBackend(QObject *parent) : QObject(parent) {
                       "check that ggml-cuda.dll / ggml-vulkan.dll are next to "
                       "the exe and the CUDA runtime DLLs are present.";
     }
+    s_backendsLoaded = true;
+  }
+  if (!s_llamaInitialized) {
     llama_backend_init(); // start thread pools / memory allocators
     s_llamaInitialized = true;
   }
@@ -574,6 +587,14 @@ static const device_mem *lb_pick_gpu(const std::vector<device_mem> &gpuDevs) {
   return best;
 }
 
+/// Silences lb_fit_params' logging while LocalBackend::estimateContext runs
+/// it repeatedly (once per candidate context size).
+static thread_local bool s_fitQuiet = false;
+#define LB_FIT_LOG(fn)                                                         \
+  if (s_fitQuiet) {                                                            \
+  } else                                                                       \
+    fn()
+
 /// Run the adaptive fitting loop. Returns a common_params tuned to fit
 /// within the available GPU memory. On failure (no GPU or cannot fit),
 /// returns params configured for pure CPU.
@@ -650,7 +671,7 @@ static common_params lb_fit_params(const probe_info &probe,
     params.cache_type_k = static_cast<ggml_type>(type_k);
     params.cache_type_v = static_cast<ggml_type>(type_v);
 
-    qDebug() << "[LocalBackend] lb_fit: no GPU, CPU only"
+    LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: no GPU, CPU only"
              << "| n_ctx=" << n_ctx
              << "| kv_type K=" << lb_kv_name(type_k)
              << "V=" << lb_kv_name(type_v) << "| est persistent=" << ((persistentWeights + kv) >> 20) << "MiB"
@@ -672,13 +693,13 @@ static common_params lb_fit_params(const probe_info &probe,
                  : 2UL * 1024 * 1024 * 1024; // 2 GiB for discrete
   if (bottleneck->memory_free <= effective_margin) {
     params.n_gpu_layers = 0;
-    qWarning() << "[LocalBackend] lb_fit: GPU" << bottleneck->name
+    LB_FIT_LOG(qWarning) << "[LocalBackend] lb_fit: GPU" << bottleneck->name
                << "has insufficient free memory, CPU only";
     return params;
   }
   uint64_t available = bottleneck->memory_free - effective_margin;
   if (integrated) {
-    qDebug() << "[LocalBackend] lb_fit: integrated GPU detected ("
+    LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: integrated GPU detected ("
              << bottleneck->name << "), margin=" << (effective_margin >> 20)
              << "MiB, available=" << (available >> 20) << "MiB";
   }
@@ -700,7 +721,7 @@ static common_params lb_fit_params(const probe_info &probe,
     // below 30k tokens the driver is stable enough.
     const uint32_t iGPU_safe_ctx = 30000;
     if (desiredCtx > iGPU_safe_ctx) {
-      qWarning() << "[LocalBackend] lb_fit: iGPU skipped — context"
+      LB_FIT_LOG(qWarning) << "[LocalBackend] lb_fit: iGPU skipped — context"
                  << desiredCtx << "exceeds safe limit (" << iGPU_safe_ctx
                  << "), falling back to CPU";
       params.n_gpu_layers = 0;
@@ -741,7 +762,7 @@ static common_params lb_fit_params(const probe_info &probe,
         params.mmproj.path = mmprojPath.toStdString();
         params.mmproj_use_gpu = false; // lazy-loaded, not counted
       }
-      qDebug() << "[LocalBackend] lb_fit: iGPU OK (full params)"
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: iGPU OK (full params)"
                << "| persistent=" << (persistent >> 20) << "MiB /"
                << (available >> 20) << "MiB"
                << "| model=" << (probe.model_size >> 20) << "MiB"
@@ -767,7 +788,7 @@ static common_params lb_fit_params(const probe_info &probe,
           params.mmproj.path = mmprojPath.toStdString();
           params.mmproj_use_gpu = false;
         }
-        qDebug() << "[LocalBackend] lb_fit: iGPU OK (reduced ctx)"
+        LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: iGPU OK (reduced ctx)"
                  << "| n_ctx=" << fit_ctx
                  << "| persistent=" << ((probe.model_size + fit_kv) >> 20)
                  << "MiB /" << (available >> 20) << "MiB"
@@ -778,7 +799,7 @@ static common_params lb_fit_params(const probe_info &probe,
     }
 
     // Weights alone don't fit → CPU fallback
-    qWarning() << "[LocalBackend] lb_fit: iGPU cannot fit model ("
+    LB_FIT_LOG(qWarning) << "[LocalBackend] lb_fit: iGPU cannot fit model ("
                << (probe.model_size >> 20) << "MiB model vs"
                << (available >> 20) << "MiB available), CPU fallback";
     params.n_gpu_layers = 0;
@@ -842,7 +863,7 @@ static common_params lb_fit_params(const probe_info &probe,
       }
       // llama.cpp puts the first n_gpu_layers on the GPU device and the rest
       // on the CPU backend — no need to pass the CPU device explicitly.
-      qDebug() << "[LocalBackend] lb_fit: OK"
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OK"
                << (n_gpu_layers == total_layers ? "(GPU only)"
                    : n_gpu_layers > 0           ? "(split GPU/CPU)"
                                                 : "(CPU only)")
@@ -862,37 +883,37 @@ static common_params lb_fit_params(const probe_info &probe,
     if (n_ubatch > 2048) { // 1
       const uint32_t old = n_ubatch;
       n_ubatch = std::max(n_ubatch / 2, 2048U);
-      qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << old << "→"
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → n_ubatch" << old << "→"
                << n_ubatch;
     } else if (type_kv == GGML_TYPE_F16) { // 2
       type_kv = GGML_TYPE_Q8_0;
-      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache F16 → Q8_0";
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → KV cache F16 → Q8_0";
     } else if (mmproj_on_gpu) { // 3
       mmproj_on_gpu = false;
-      qDebug() << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → mmproj → CPU ("
                << (probe.mmproj_size >> 20) << "MiB freed)";
     } else if (offloaded < offload_30) { // 4
       ++offloaded;
-      qDebug() << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
                << "/" << total_layers << "to CPU";
     } else if (n_ctx > ctx_floor) { // 5
       const uint32_t old = n_ctx;
       n_ctx = std::max(lb_pad256(n_ctx - n_ctx / 10), ctx_floor);
       if (n_ctx == old)
         n_ctx = ctx_floor;
-      qDebug() << "[LocalBackend] lb_fit: OOM → n_ctx" << old << "→" << n_ctx;
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → n_ctx" << old << "→" << n_ctx;
     } else if (type_kv == GGML_TYPE_Q8_0) { // 6
       type_kv = GGML_TYPE_Q4_0;
-      qDebug() << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_0";
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → KV cache Q8_0 → Q4_0";
     } else if (offloaded < total_layers) { // 7
       ++offloaded;
-      qDebug() << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → offload layer" << offloaded
                << "/" << total_layers << "to CPU";
     } else if (n_ubatch > 512) { // 8
       n_ubatch = std::max(n_ubatch / 2, 512U);
-      qDebug() << "[LocalBackend] lb_fit: OOM → n_ubatch" << n_ubatch;
+      LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → n_ubatch" << n_ubatch;
     } else {
-      qWarning() << "[LocalBackend] lb_fit: cannot fit on GPU,"
+      LB_FIT_LOG(qWarning) << "[LocalBackend] lb_fit: cannot fit on GPU,"
                  << (gpu_total >> 20) << "MiB needed vs" << (available >> 20)
                  << "MiB available";
       break;
@@ -1135,6 +1156,85 @@ LocalBackend::loadModelWithDevices(const QString &path,
                                    desiredUbatch, minCtx));
   }
   return result;
+}
+
+/// Where a prompt of `promptTokens` (+ headroom) would run, using the same
+/// probe and fitting as loadModelWithDevices — without loading anything.
+LocalBackend::ContextEstimate
+LocalBackend::estimateContext(const QString &modelPath, int promptTokens,
+                              uint32_t responseHeadroom) {
+  ContextEstimate est;
+  if (modelPath.isEmpty() || !QFile::exists(modelPath))
+    return est;
+  ensureRuntime();
+
+  // The probe reads the GGUF metadata (and measures the projector): cache it
+  // per model, the UI re-estimates on every change of the setting.
+  static QMutex cacheLock;
+  static QHash<QString, probe_info> cache;
+  const QString mmprojPath = resolveMmprojPath(modelPath);
+  probe_info probe;
+  {
+    const QMutexLocker locker(&cacheLock);
+    const QString key = modelPath + '|' + mmprojPath;
+    auto it = cache.constFind(key);
+    if (it == cache.constEnd())
+      it = cache.insert(key, lb_probe_model(modelPath, mmprojPath, nullptr));
+    probe = *it;
+  }
+  if (!probe.n_layers)
+    return est;
+
+  const std::vector<device_mem> gpuDevs = lb_discover();
+  const uint32_t ctxLimit =
+      probe.n_ctx_train > 0 ? static_cast<uint32_t>(probe.n_ctx_train) : 131072;
+  constexpr uint32_t Ubatch = 8192, MinCtx = 2048;
+
+  s_fitQuiet = true;
+  // Placement for a prompt budget, mirroring loadModelWithDevices: GPU fit
+  // first; a CPU-only result there means the CPU fallback (fitted on RAM).
+  auto place = [&](uint32_t prompt, bool *truncated) {
+    const uint32_t desired = std::min(prompt + responseHeadroom, ctxLimit);
+    common_params p = lb_fit_params(probe, gpuDevs, mmprojPath, desired,
+                                    Ubatch, MinCtx);
+    Placement where;
+    if (gpuDevs.empty() || p.n_gpu_layers == 0) {
+      where = Placement::Cpu;
+      p = lb_fit_params(probe, {}, mmprojPath, desired, Ubatch, MinCtx);
+    } else {
+      where = p.n_gpu_layers >= probe.n_layers ? Placement::Gpu
+                                               : Placement::Split;
+    }
+    // The fitter shrinks n_ctx as a last resort; the prompt is then cut.
+    const auto nCtx = static_cast<uint32_t>(std::max(p.n_ctx, 0));
+    *truncated = nCtx < desired && lb_pad256(desired) > nCtx;
+    return where;
+  };
+
+  est.maxTokens =
+      static_cast<int>(ctxLimit > responseHeadroom ? ctxLimit - responseHeadroom
+                                                   : ctxLimit / 2);
+
+  // Auto: the largest budget that runs fully on the GPU, capped at 16k
+  // (beyond that a small model rarely uses the extra context well — the
+  // user can still raise it).  Without a fitting GPU: 8k on the CPU.
+  constexpr int AutoCap = 16384, AutoFloor = 4096, Step = 1024;
+  est.autoTokens = 8192;
+  for (int b = std::min(AutoCap, est.maxTokens); b >= AutoFloor; b -= Step) {
+    bool cut = false;
+    if (place(static_cast<uint32_t>(b), &cut) == Placement::Gpu && !cut) {
+      est.autoTokens = b;
+      break;
+    }
+  }
+  est.autoTokens = std::min(est.autoTokens, est.maxTokens);
+
+  const int requested = promptTokens > 0 ? promptTokens : est.autoTokens;
+  est.placement = place(static_cast<uint32_t>(requested), &est.truncated);
+  s_fitQuiet = false;
+
+  est.valid = true;
+  return est;
 }
 
 void LocalBackend::unloadModel() {
@@ -1444,7 +1544,7 @@ QString LocalBackend::resolveModelPath(const QString &modelPath) const {
 /// Search for mmproj file: model directory → bundled Mmproj directory.
 /// We look for any file containing "mmproj" in the model's directory first,
 /// then fall back to well-known paths in the application bundle.
-QString LocalBackend::resolveMmprojPath(const QString &modelPath) const {
+QString LocalBackend::resolveMmprojPath(const QString &modelPath) {
   QString dir = QFileInfo(modelPath).absoluteDir().absolutePath();
   QString stem = QFileInfo(modelPath).completeBaseName();
 

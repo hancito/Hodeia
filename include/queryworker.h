@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QSet>
 #include <QVariantMap>
 #include <expected>
 
@@ -18,6 +19,8 @@ struct PageContext {
   QString citation;
   QStringList textChunks; ///< may hold multiple chunks from the same page
   QString imageFile;      ///< absolute PNG path, empty if unavailable
+  bool withImage = false; ///< image sent to the model (visual mode, within
+                          ///< the image cap and the token budget)
 };
 
 /// Orchestrator for RAG queries over the paper library.
@@ -32,11 +35,32 @@ public:
                        QObject *parent = nullptr);
   ~QueryWorker() override;
 
+  /// Tokens reserved for the generated response when sizing the local
+  /// model's KV cache (prompt_tokens + headroom).  RAG answers synthesize
+  /// across multiple papers with citations, so this is larger than the
+  /// summary headroom.
+  static constexpr uint32_t ResponseHeadroom = 4096;
+  /// Prompt budget used for remote backends in "auto" mode (their context
+  /// size is unknown to the app).
+  static constexpr int RemoteAutoTokens = 16384;
+  /// Upper bound offered for remote backends.
+  static constexpr int RemoteMaxTokens = 262144;
+
+  struct BackendInfo {
+    bool isLocal;
+    QString modelName;
+    QString modelPath;
+    QVariantMap config;
+  };
+  /// The backend and model a query would use right now.
+  static BackendInfo resolveBackend(ConfigManager *config);
+
 public slots:
   /// Execute a RAG query.
-  /// \param queryText    the user's natural-language question
-  /// \param maxPages     hard cap on the number of unique pages to consider
-  void executeQuery(const QString &queryText, int maxPages);
+  /// \param queryText      the user's natural-language question
+  /// \param contextTokens  prompt budget in tokens; 0 = auto (largest that
+  ///                       runs fully on the GPU for a local model)
+  void executeQuery(const QString &queryText, int contextTokens);
   void stop();
 
 signals:
@@ -46,16 +70,6 @@ signals:
   void stopped();
 
 private:
-  /* backend resolution */
-  struct BackendInfo {
-    bool isLocal;
-    QString modelName;
-    QString modelPath;
-    QVariantMap config;
-  };
-
-  BackendInfo resolveBackend();
-
   /* GPU lifecycle */
   bool prepareGpu(bool isLocal);
   void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
@@ -67,13 +81,17 @@ private:
                                               const BackendInfo &backend);
 
   /* retrieval & grouping */
+  /// Fill `budgetTokens` with the most relevant chunks, grouped by page.
   QList<PageContext> retrieveAndGroupPages(const QString &queryText,
-                                           int maxPages) const;
+                                           int budgetTokens) const;
+  /// Token count with the embedding tokenizer (chars/3 if unavailable).
+  int countTokens(const QString &text) const;
 
   /* prompt building */
   PromptPayload buildPrompt(const QList<PageContext> &pages,
                             const QString &queryText) const;
-  QStringList buildCitationsFooter(const QList<PageContext> &pages) const;
+  QStringList buildCitationsFooter(const QList<PageContext> &pages,
+                                   const QSet<int> &cited) const;
 
   /* result handling */
   void saveQuery(const QString &queryText, const QString &response,
@@ -88,11 +106,6 @@ private:
   void resetCancellation() { m_cancelled = false; }
 
   bool m_stopping = false;
-  // Tokens reserved for the generated response when sizing the local model's
-  // KV cache (prompt_tokens + m_headroom). RAG answers synthesize across
-  // multiple papers with citations, so this is larger than the summary
-  // headroom.
-  uint32_t m_headroom = 4096;
   bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;

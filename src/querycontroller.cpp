@@ -9,7 +9,45 @@ QueryController::QueryController(ConfigManager *config,
 
 QueryController::~QueryController() { stopQuery(); }
 
-void QueryController::startQuery(const QString &queryText, int maxPages) {
+QVariantMap QueryController::contextInfo(int contextTokens) const {
+  const QueryWorker::BackendInfo backend =
+      QueryWorker::resolveBackend(m_config);
+  if (!backend.isLocal) {
+    return {{"remote", true},
+            {"autoTokens", QueryWorker::RemoteAutoTokens},
+            {"maxTokens", QueryWorker::RemoteMaxTokens},
+            {"placement", QString()},
+            {"truncated", false}};
+  }
+  const LocalBackend::ContextEstimate est = LocalBackend::estimateContext(
+      backend.modelPath, contextTokens, QueryWorker::ResponseHeadroom);
+  if (!est.valid) {
+    return {{"remote", false},
+            {"autoTokens", 8192},
+            {"maxTokens", QueryWorker::RemoteMaxTokens},
+            {"placement", QString()},
+            {"truncated", false}};
+  }
+  QString placement;
+  switch (est.placement) {
+  case LocalBackend::Placement::Gpu:
+    placement = QStringLiteral("gpu");
+    break;
+  case LocalBackend::Placement::Split:
+    placement = QStringLiteral("split");
+    break;
+  case LocalBackend::Placement::Cpu:
+    placement = QStringLiteral("cpu");
+    break;
+  }
+  return {{"remote", false},
+          {"autoTokens", est.autoTokens},
+          {"maxTokens", est.maxTokens},
+          {"placement", placement},
+          {"truncated", est.truncated}};
+}
+
+void QueryController::startQuery(const QString &queryText, int contextTokens) {
   // Clean up any leftover objects from a previous run
   if (m_thread && m_thread->isRunning()) {
     return;
@@ -35,9 +73,10 @@ void QueryController::startQuery(const QString &queryText, int maxPages) {
   QueryWorker *const worker = m_worker;
 
   // Trigger work
-  connect(thread, &QThread::started, worker, [worker, queryText, maxPages]() {
-    worker->executeQuery(queryText, maxPages);
-  });
+  connect(thread, &QThread::started, worker,
+          [worker, queryText, contextTokens]() {
+            worker->executeQuery(queryText, contextTokens);
+          });
 
   // When done: quit the thread.
   connect(worker, &QueryWorker::queryFinished, thread, &QThread::quit);

@@ -51,9 +51,9 @@ private:
   QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
                                    const QString &dbPath) const;
 
-  // Chunking parameters
-  int m_maxChunkChars = 1500;
-  int m_overlapChars = 200;
+  // Chunk size limit (tokens) when the embedding model can't be loaded to
+  // provide its own; otherwise chunks follow SqliteVecManager::maxChunkTokens.
+  static constexpr int FallbackMaxChunkTokens = 480;
 
   SqliteVecManager *m_vecManager = nullptr;
   std::atomic<bool> m_stopFlag{false};

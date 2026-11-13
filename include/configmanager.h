@@ -31,6 +31,9 @@ class ConfigManager : public QObject {
                  visualModeChanged)
   Q_PROPERTY(
       QString language READ language WRITE setLanguage NOTIFY languageChanged)
+  /// Prompt budget for library queries, in tokens; 0 = auto.
+  Q_PROPERTY(int queryContextTokens READ queryContextTokens WRITE
+                 setQueryContextTokens NOTIFY queryContextTokensChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -46,6 +49,7 @@ public:
   QStringList projectList() const { return m_projectList; }
   QString visualMode() const;
   QString language() const;
+  int queryContextTokens() const { return m_queryContextTokens; }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -61,6 +65,7 @@ public:
   void setOpenAlexApiKey(const QString &key);
   void setVisualMode(const QString &mode);
   void setLanguage(const QString &lang);
+  void setQueryContextTokens(int tokens);
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
   bool useVisualContext() const;
@@ -130,6 +135,7 @@ signals:
 
   void visualModeChanged();
   void languageChanged();
+  void queryContextTokensChanged();
 
 private:
   void refreshProjectList();
@@ -158,4 +164,5 @@ private:
   QStringList m_projectList;
   int m_visualModeIndex = 1; // 0=TextOnly, 1=Reduced, 2=Full
   QString m_language = QStringLiteral("en");
+  int m_queryContextTokens = 0; // 0 = auto
 };

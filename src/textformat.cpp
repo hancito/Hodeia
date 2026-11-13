@@ -249,4 +249,58 @@ QString escapeMarkdown(const QString &text) {
   return out;
 }
 
+QString normalizeMarkdown(const QString &text) {
+  // A line made only of bold text, optionally ending with ':' inside or
+  // outside the emphasis: "**Title**", "**Title:**", "__Title__:".
+  static const QRegularExpression boldTitle(QStringLiteral(
+      "^\\s*(\\*\\*|__)([^*_\\n]{1,120}?)\\s*:?\\s*\\1\\s*:?\\s*$"));
+  static const QRegularExpression heading(QStringLiteral("^\\s{0,3}#{1,6}\\s"));
+  static const QRegularExpression fence(QStringLiteral("^\\s*(```|~~~)"));
+  static const QRegularExpression listItem(
+      QStringLiteral("^\\s*([-*+]|\\d+[.)])\\s+\\S"));
+
+  const QStringList lines = text.split('\n');
+  QStringList out;
+  bool inFence = false;
+  bool needBlank = false; // a blank line is due before the next content line
+  for (const QString &line : lines) {
+    if (fence.match(line).hasMatch())
+      inFence = !inFence;
+    if (inFence || line.startsWith(QLatin1String("```"))) {
+      needBlank = false;
+      out.append(line);
+      continue;
+    }
+
+    QString l = line;
+    bool isHeading = heading.match(l).hasMatch();
+    if (!isHeading) {
+      const auto m = boldTitle.match(l);
+      if (m.hasMatch()) {
+        l = QStringLiteral("### ") + m.captured(2).trimmed();
+        isHeading = true;
+      }
+    }
+
+    if (isHeading) {
+      if (!out.isEmpty() && !out.last().trimmed().isEmpty())
+        out.append(QString());
+      out.append(l);
+      needBlank = true;
+      continue;
+    }
+    // A list right after a paragraph line: separate it so it doesn't read
+    // as part of the paragraph.
+    const bool startsList = listItem.match(l).hasMatch() && !out.isEmpty() &&
+                            !out.last().trimmed().isEmpty() &&
+                            !listItem.match(out.last()).hasMatch() &&
+                            !out.last().front().isSpace();
+    if ((needBlank && !l.trimmed().isEmpty()) || startsList)
+      out.append(QString());
+    needBlank = false;
+    out.append(l);
+  }
+  return out.join('\n');
+}
+
 } // namespace TextFormat

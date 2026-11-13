@@ -20,4 +20,12 @@ QString latexToUnicode(const QString &text, Target target);
 /// Escape the characters Markdown would interpret so @p text renders verbatim.
 QString escapeMarkdown(const QString &text);
 
+/// Make an LLM's Markdown render as intended in Qt's MarkdownText.  Models
+/// often write a section title as a bold-only line followed by a single
+/// newline ("**Title**\nText…"); in Markdown that soft break joins the title
+/// to the paragraph.  Such lines become "### Title" headings; headings and
+/// lists that follow a paragraph get blank lines around them.  Fenced code
+/// blocks are left untouched.
+QString normalizeMarkdown(const QString &text);
+
 } // namespace TextFormat

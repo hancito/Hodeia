@@ -31,6 +31,22 @@ Rectangle {
         return "";
     }
 
+    // Context budget for the active backend; re-evaluated when the setting,
+    // the backend or the model changes.
+    readonly property var contextInfo: {
+        configManager.activeBackend;
+        configManager.activeModel;
+        return queryController.contextInfo(contextSpinner.value);
+    }
+
+    // 16384 → "16k", 20000 → "19.5k"
+    function formatTokens(v) {
+        if (v < 1024)
+            return String(v);
+        const k = v / 1024;
+        return (Number.isInteger(k) ? k : k.toFixed(1)) + "k";
+    }
+
     border.width: 1
     border.color: Colors.surface1
     radius: Style.radiusLarge
@@ -66,7 +82,7 @@ Rectangle {
                 placeholderText: qsTr("Query your library")
                 text: queryPane.activeQueryText
                 enabled: !queryPane.querying
-                onAccepted: queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
+                onAccepted: queryController.startQuery(queryLlm.text, contextSpinner.value)
             }
 
             StyledBusyIndicator {
@@ -82,7 +98,7 @@ Rectangle {
                 icon.source: queryPane.querying ? "qrc:/Resources/circle-xmark.svg" : "qrc:/Resources/ai-svgrepo-com.svg"
                 highlighted: true
                 destructive: queryPane.querying
-                onClicked: queryPane.querying ? queryController.stopQuery() : queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
+                onClicked: queryPane.querying ? queryController.stopQuery() : queryController.startQuery(queryLlm.text, contextSpinner.value)
             }
         }
 
@@ -117,14 +133,46 @@ Rectangle {
                 spacing: 10
                 Layout.fillWidth: true
                 Label {
-                    text: qsTr("Max Pages")
+                    text: qsTr("Context")
                 }
+                // Prompt budget in tokens (0 = auto).  Type e.g. "24k",
+                // "20000" or "auto".
                 StyledSpinBox {
-                    id: maxPagesSpinner
-                    from: 10
-                    to: 300
-                    value: 50
-                    stepSize: 1
+                    id: contextSpinner
+                    Layout.preferredWidth: 170
+                    from: 0
+                    to: queryPane.contextInfo.maxTokens
+                    stepSize: 2048
+                    editable: true
+                    value: configManager.queryContextTokens
+                    onValueModified: configManager.queryContextTokens = value
+                    validator: RegularExpressionValidator {
+                        regularExpression: /^\s*(auto.*|\d+(\.\d+)?\s*k?)\s*$/i
+                    }
+                    textFromValue: function (v) {
+                        return v === 0 ? qsTr("Auto (%1)").arg(queryPane.formatTokens(queryPane.contextInfo.autoTokens)) : queryPane.formatTokens(v);
+                    }
+                    valueFromText: function (text) {
+                        const t = text.trim().toLowerCase();
+                        if (t.startsWith("auto"))
+                            return 0;
+                        const n = parseFloat(t);
+                        if (isNaN(n))
+                            return value;
+                        return Math.round(t.endsWith("k") ? n * 1024 : n);
+                    }
+                }
+                // Where the local model will run with this budget.
+                Label {
+                    visible: !queryPane.contextInfo.remote && queryPane.contextInfo.placement !== ""
+                    font.pixelSize: Style.fontSmall
+                    font.bold: true
+                    text: {
+                        const p = queryPane.contextInfo.placement;
+                        const where = p === "gpu" ? qsTr("GPU") : p === "split" ? qsTr("GPU + CPU") : qsTr("CPU (slow)");
+                        return queryPane.contextInfo.truncated ? qsTr("%1 · truncated").arg(where) : where;
+                    }
+                    color: queryPane.contextInfo.truncated || queryPane.contextInfo.placement === "cpu" ? Colors.red : queryPane.contextInfo.placement === "split" ? Colors.primary : Colors.green
                 }
 
                 Item {

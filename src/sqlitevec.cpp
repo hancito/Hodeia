@@ -228,6 +228,31 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
   return results;
 }
 
+/* ── Token counting ──────────────────────────────────────────── */
+
+int SqliteVecManager::countTokens(const QString &text) {
+  if (!m_ready && !initialize())
+    return -1;
+  const QMutexLocker locker(&m_lock);
+  if (!m_llamaModel)
+    return -1;
+  const auto tokens =
+      common_tokenize(llama_model_get_vocab(m_llamaModel),
+                      text.toStdString(), /*add_special=*/false,
+                      /*parse_special=*/false);
+  return static_cast<int>(tokens.size());
+}
+
+int SqliteVecManager::maxChunkTokens() {
+  const int prefixTokens = countTokens(QString::fromUtf8(PassagePrefix));
+  if (prefixTokens < 0)
+    return 0;
+  // Margin: tokenizing a whole chunk can merge/split differently than the
+  // sum of its sentences, and the encoder may add special tokens.
+  constexpr int SafetyMargin = 16;
+  return qMax(64, m_maxTokens - prefixTokens - SafetyMargin);
+}
+
 /* ── Chunk insertion ─────────────────────────────────────────── */
 
 int SqliteVecManager::insertChunks(SqliteDb &db,

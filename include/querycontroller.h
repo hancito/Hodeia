@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QThread>
+#include <QVariantMap>
 
 class ConfigManager;
 class DatabaseManager;
@@ -18,8 +19,18 @@ public:
                            QObject *parent = nullptr);
   ~QueryController() override;
 
+  /// Context budget info for the active backend, for the query UI:
+  ///   remote      — true for a remote backend (no placement estimate)
+  ///   autoTokens  — budget used when the setting is 0 ("auto")
+  ///   maxTokens   — largest budget offered
+  ///   placement   — "gpu", "split" (GPU + CPU), "cpu" or "" (remote/unknown)
+  ///   truncated   — the requested budget won't fit; the prompt gets cut
+  /// \param contextTokens  requested budget; 0 = auto
+  Q_INVOKABLE QVariantMap contextInfo(int contextTokens) const;
+
 public slots:
-  void startQuery(const QString &queryText, int maxPages);
+  /// \param contextTokens  prompt budget in tokens; 0 = auto
+  void startQuery(const QString &queryText, int contextTokens);
   void stopQuery();
 
 signals:
