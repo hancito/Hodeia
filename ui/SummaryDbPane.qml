@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Controls.impl
 import QtQuick.Dialogs
 import QtQuick.Layouts
 
@@ -65,9 +66,9 @@ Rectangle {
     }
 
     border.width: 1
-    radius: 5
+    border.color: Colors.surface1
+    radius: Style.radiusLarge
     color: Colors.surface0
-    opacity: 1
 
     Connections {
         target: engineController
@@ -121,13 +122,10 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.bottomMargin: 5
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
-        anchors.topMargin: 15
-        spacing: 5
+        anchors.margins: Style.paneMargin
+        spacing: Style.spacing
 
-        TextField {
+        StyledTextField {
             id: paperSearch
             Layout.fillWidth: true
             placeholderText: qsTr("Search paper")
@@ -137,10 +135,9 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             spacing: 5
-            Button {
+            StyledButton {
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Summarize")
+                toolTip: qsTr("Summarize")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -161,9 +158,8 @@ Rectangle {
                 }
             }
 
-            Button {
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Refresh")
+            StyledButton {
+                toolTip: qsTr("Refresh")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -174,9 +170,8 @@ Rectangle {
                 }
             }
 
-            Button {
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Generate Report from selection")
+            StyledButton {
+                toolTip: qsTr("Generate Report from selection")
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -198,10 +193,10 @@ Rectangle {
                 }
             }
 
-            Button {
+            StyledButton {
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Delete")
+                toolTip: qsTr("Delete")
+                destructive: true
                 icon.width: 24
                 icon.height: 24
                 Layout.fillWidth: true
@@ -223,7 +218,7 @@ Rectangle {
             Layout.fillWidth: true
             visible: summaryDbPane.summarizing
 
-            ProgressBar {
+            StyledProgressBar {
                 id: summarizeProgress
                 from: 0
                 to: 100
@@ -255,8 +250,9 @@ Rectangle {
                     Layout.fillWidth: true
                 }
 
-                Button {
+                StyledButton {
                     id: stopSummarize
+                    destructive: true
                     text: qsTr("Stop")
                     icon.source: "qrc:/Resources/circle-xmark.svg"
                     onClicked: {
@@ -281,7 +277,7 @@ Rectangle {
             spacing: 5
             Layout.fillWidth: true
 
-            CheckBox {
+            StyledCheckBox {
                 id: selectAllCheckbox
                 enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                 text: qsTr("Select All")
@@ -314,7 +310,7 @@ Rectangle {
                 text: qsTr("Sort by")
             }
 
-            ComboBox {
+            StyledComboBox {
                 id: sortComboBox
                 model: [qsTr("Title"), qsTr("Date"), qsTr("Pages"), qsTr("Model"), qsTr("Year"), qsTr("Citations")]
                 Layout.fillWidth: true
@@ -338,7 +334,7 @@ Rectangle {
                 }
             }
 
-            CheckBox {
+            StyledCheckBox {
                 id: descendingCheckBox
                 text: qsTr("Descending")
                 onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
@@ -378,20 +374,7 @@ Rectangle {
                 }
             }
 
-            ScrollBar.vertical: ScrollBar {
-                id: paperScrollBar
-                policy: ScrollBar.AsNeeded
-                width: 10
-                contentItem: Rectangle {
-                    implicitWidth: 8
-                    color: paperScrollBar.active ? Colors.overlay2 : Colors.surface2
-                    radius: 4
-                }
-                background: Rectangle {
-                    width: 8
-                    color: "transparent"
-                }
-            }
+            ScrollBar.vertical: StyledScrollBar {}
 
             model: databaseManager.summaryProxyModel
             spacing: 5
@@ -410,18 +393,10 @@ Rectangle {
                 height: 120
                 border.width: summaryDbPane.activePaperHash === paperHash ? 2 : 1
                 border.color: summaryDbPane.activePaperHash === paperHash ? Colors.primary : Colors.surface1
-                radius: 4
+                radius: Style.radiusSmall
                 color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
                 focus: summaryDbPane.activePaperHash === paperHash
 
-                // Soft blurred halo behind the active card (the glow)
-                Loader {
-                    id: cardGlow
-                    anchors.fill: parent
-                    sourceComponent: Colors.glowHalo
-                    onLoaded: item.source = card
-                    visible: summaryDbPane.activePaperHash === paperHash
-                }
 
                 MouseArea {
                     id: mouseArea
@@ -438,11 +413,9 @@ Rectangle {
                     anchors.margins: 8
                     spacing: 1
                     RowLayout {
-                        CheckBox {
+                        StyledCheckBox {
                             enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
                             checked: summaryDbPane.selectedPapers.includes(paperHash)
-                            icon.height: 8
-                            font.pixelSize: 10
                             onCheckedChanged: {
                                 if (checked) {
                                     summaryDbPane.addSelectedPaper(paperHash);
@@ -469,12 +442,12 @@ Rectangle {
                     RowLayout {
                         Layout.fillWidth: true
                         Label {
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                             text: qsTr("Year: %1 · %2 pages ").arg(year).arg(pagesNum)
                             font.family: Fonts.mono
                         }
                         Label {
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                             // "cited by N" only makes sense once OpenAlex has
                             // populated cites_count (0 = not fetched yet).
                             text: citesCount > 0 ? qsTr("· cited by %1").arg(citesCount) : ""
@@ -487,27 +460,18 @@ Rectangle {
                         Label {
                             text: formattedDate
                             font.family: Fonts.mono
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                         }
                     }
 
                     RowLayout {
                         Layout.fillWidth: true
-                        ToolButton {
-                            icon.source: llmodel ? "qrc:Resources/circle-check.svg" : "qrc:Resources/circle-xmark.svg"
-
-                            display: AbstractButton.IconOnly
-
-                            // Define the internal icon size
-                            icon.width: 20
-                            icon.height: 20
-                            icon.color: llmodel ? Colors.green : Colors.red
-
-                            // Define how much space the button takes in the Layout
-                            Layout.preferredWidth: 24
-                            Layout.preferredHeight: 24
-
-                            // Optional: Align it vertically to the center of the row
+                        // Summary status (display only, not a button)
+                        IconImage {
+                            source: llmodel ? "qrc:Resources/circle-check.svg" : "qrc:Resources/circle-xmark.svg"
+                            sourceSize.width: 20
+                            sourceSize.height: 20
+                            color: llmodel ? Colors.green : Colors.red
                             Layout.alignment: Qt.AlignVCenter
                         }
                         Item {
@@ -517,7 +481,7 @@ Rectangle {
                         Label {
                             text: llmodel
                             font.family: Fonts.mono
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                         }
                     }
                 }
@@ -540,15 +504,15 @@ Rectangle {
     }
 
     // Delete papers confirmation dialog
-    Dialog {
+    StyledDialog {
         id: deletePapersDialog
         anchors.centerIn: parent
-        modal: true
+        destructive: true
         width: 420
         title: qsTr("Delete Papers")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
-            width: deletePapersDialog.width
+            width: deletePapersDialog.availableWidth
             text: qsTr("Delete the selected paper(s)? This cannot be undone.")
             wrapMode: Text.WordWrap
         }

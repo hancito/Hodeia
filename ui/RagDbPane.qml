@@ -36,22 +36,20 @@ Rectangle {
     }
 
     border.width: 1
-    radius: 5
+    border.color: Colors.surface1
+    radius: Style.radiusLarge
     color: Colors.surface0
-    opacity: 1.0
-
-
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 5
-        spacing: 5
+        anchors.margins: Style.paneMargin
+        spacing: Style.spacing
         RowLayout {
             Layout.fillWidth: true
             Label {
                 text: qsTr("Query History")
                 Layout.fillWidth: true
-                font.pointSize: 16
+                font.pixelSize: Style.fontTitle
                 font.weight: Font.Bold
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
@@ -62,7 +60,7 @@ Rectangle {
             spacing: 5
             Layout.fillWidth: true
 
-            CheckBox {
+            StyledCheckBox {
                 id: selectAllCheckbox
                 text: qsTr("Select All")
                 checked: false
@@ -80,7 +78,7 @@ Rectangle {
             Item {
                 Layout.fillWidth: true
             }
-            ComboBox {
+            StyledComboBox {
                 id: sortComboBox
                 model: [qsTr("Date"), qsTr("Model")]
                 Layout.fillWidth: true
@@ -95,7 +93,7 @@ Rectangle {
                 }
             }
 
-            CheckBox {
+            StyledCheckBox {
                 id: descendingQueries
                 text: qsTr("Descending")
                 onCheckedChanged: databaseManager.queryProxyModel.sortDescending = checked
@@ -137,20 +135,7 @@ Rectangle {
                 }
             }
 
-            ScrollBar.vertical: ScrollBar {
-                id: queryScrollBar
-                policy: ScrollBar.AsNeeded
-                width: 10
-                contentItem: Rectangle {
-                    implicitWidth: 8
-                    color: queryScrollBar.active ? Colors.overlay2 : Colors.surface2
-                    radius: 4
-                }
-                background: Rectangle {
-                    width: 8
-                    color: "transparent"
-                }
-            }
+            ScrollBar.vertical: StyledScrollBar {}
 
             model: databaseManager.queryProxyModel
             spacing: 5
@@ -166,18 +151,10 @@ Rectangle {
                 height: 80
                 border.width: dbPane.activeQueryId === id ? 2 : 1
                 border.color: dbPane.activeQueryId === id ? Colors.primary : Colors.surface1
-                radius: 4
+                radius: Style.radiusSmall
                 color: mouseArea.containsMouse ? Colors.surface1 : Colors.surface0
                 focus: dbPane.activeQueryId === id
 
-                // Soft blurred halo behind the active query card (the glow)
-                Loader {
-                    id: queryGlow
-                    anchors.fill: parent
-                    sourceComponent: Colors.glowHalo
-                    onLoaded: item.source = queryCard
-                    visible: dbPane.activeQueryId === id
-                }
 
                 MouseArea {
                     id: mouseArea
@@ -194,10 +171,8 @@ Rectangle {
                     anchors.margins: 8
                     spacing: 1
                     RowLayout {
-                        CheckBox {
+                        StyledCheckBox {
                             checked: dbPane.selectedQueryIds.includes(id)
-                            icon.height: 8
-                            font.pixelSize: 10
                             onCheckedChanged: {
                                 if (checked) {
                                     dbPane.addSelectedQuery(id);
@@ -219,7 +194,7 @@ Rectangle {
                         Label {
                             text: model || ""
                             font.family: Fonts.mono
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                         }
                         Item {
                             Layout.fillWidth: true
@@ -227,7 +202,7 @@ Rectangle {
                         Label {
                             text: formattedDate || ""
                             font.family: Fonts.mono
-                            font.pixelSize: 12
+                            font.pixelSize: Style.fontSmall
                         }
                     }
                 }
@@ -243,8 +218,9 @@ Rectangle {
                 Layout.fillWidth: true
             }
 
-            Button {
+            StyledButton {
                 text: qsTr("Delete")
+                destructive: true
                 icon.width: 24
                 icon.height: 24
                 icon.source: "qrc:/Resources/trash-can.svg"
@@ -260,15 +236,15 @@ Rectangle {
     }
 
     // Delete queries confirmation dialog
-    Dialog {
+    StyledDialog {
         id: deleteQueriesDialog
         anchors.centerIn: parent
-        modal: true
+        destructive: true
         width: 420
         title: qsTr("Delete Queries")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
-            width: deleteQueriesDialog.width
+            width: deleteQueriesDialog.availableWidth
             text: qsTr("Delete the selected query(ies)? This cannot be undone.")
             wrapMode: Text.WordWrap
         }

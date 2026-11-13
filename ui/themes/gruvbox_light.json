@@ -1,6 +1,6 @@
 {
   "name": "GruvBox Light",
-  "primary":     "#b57614",
+  "primary":    "#af3a03",
 
   "red":        "#9d0006",
   "green":      "#79740e",
@@ -13,6 +13,6 @@
   "surface1":   "#d5c4a1",
   "surface0":   "#ebdbb2",
   "base":       "#fbf1c7",
-  "mantle":     "#f5edd2",
+  "mantle":     "#faf3cf",
   "crust":      "#f9f5d7"
 }

@@ -6,13 +6,13 @@
   "green":      "#008700",
 
   "text":       "#242933",
-  "overlay2":   "#6f8aab",
-  "overlay1":   "#555f70",
-  "overlay0":   "#858795",
-  "surface2":   "#f1e6d4",
-  "surface1":   "#f4f1dd",
-  "surface0":   "#f8f5e3",
+  "overlay2":   "#676a6c",
+  "overlay1":   "#828482",
+  "overlay0":   "#9c9d98",
+  "surface2":   "#c4c4b9",
+  "surface1":   "#d7d5c8",
+  "surface0":   "#e7e5d5",
   "base":       "#f8f5e3",
-  "mantle":     "#f1e6d4",
-  "crust":      "#ece5cd"
+  "mantle":     "#faf8eb",
+  "crust":      "#fcfbf4"
 }

@@ -1,0 +1,18 @@
+{
+  "name": "Everforest Dark",
+  "primary":    "#a7c080",
+
+  "red":        "#e67e80",
+  "green":      "#83c092",
+
+  "text":       "#d3c6aa",
+  "overlay2":   "#9da9a0",
+  "overlay1":   "#859289",
+  "overlay0":   "#7a8478",
+  "surface2":   "#56635f",
+  "surface1":   "#475258",
+  "surface0":   "#3d484d",
+  "base":       "#2d353b",
+  "mantle":     "#232a2e",
+  "crust":      "#171c1f"
+}

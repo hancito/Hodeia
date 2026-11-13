@@ -5,6 +5,20 @@ import QtQuick.Layouts
 
 ToolBar {
     id: toolBar
+    leftPadding: Style.paneMargin
+    rightPadding: Style.paneMargin
+    topPadding: 4
+    bottomPadding: 4
+
+    background: Rectangle {
+        color: Colors.mantle
+        Rectangle {
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 1
+            color: Colors.surface0
+        }
+    }
 
     // ── Properties migrated from LeftPane ──
     property int elapsedTime: 0
@@ -130,28 +144,29 @@ ToolBar {
         spacing: 10
         Layout.fillWidth: true
         // Add file button
-        Button {
+        StyledButton {
             id: addfilebtn
+            flat: true
             enabled: !toolBar.busy
-            ToolTip.text: qsTr("Add a file")
-            ToolTip.visible: hovered
+            toolTip: qsTr("Add a file")
             display: AbstractButton.IconOnly
-            padding: 0
-            icon.width: 40
-            icon.height: 40
+            padding: 4
+            icon.width: 32
+            icon.height: 32
             icon.source: "qrc:/Resources/arrow-right-to-file.svg"
             onClicked: pdfFileDialog.open()
         }
 
         // Add folder button
-        Button {
+        StyledButton {
             id: addfolderbtn
+            flat: true
             enabled: !toolBar.busy
-            ToolTip.text: qsTr("Add a folder")
-            ToolTip.visible: hovered
-            padding: 0
-            icon.width: 40
-            icon.height: 40
+            toolTip: qsTr("Add a folder")
+            display: AbstractButton.IconOnly
+            padding: 4
+            icon.width: 32
+            icon.height: 32
             icon.source: "qrc:/Resources/folder-open.svg"
             onClicked: pdfFolderDialog.open()
         }
@@ -159,13 +174,10 @@ ToolBar {
         ToolSeparator {}
 
         // ── Progress section (inline in toolbar) ──
-        BusyIndicator {
+        StyledBusyIndicator {
             id: spinner
             running: false
             visible: false
-            Layout.preferredWidth: 48
-            Layout.preferredHeight: 48
-            palette.dark: Colors.primary
         }
 
         Label {
@@ -207,22 +219,16 @@ ToolBar {
             text: qsTr("Active Model")
         }
 
-        ComboBox {
+        StyledComboBox {
             id: modelComboBox
             Layout.preferredWidth: 300
-
-            background: Rectangle {
-                palette.text: Colors.text
-                color: Colors.surface1
-                border.width: 2
-            }
             onCurrentTextChanged: {
                 if (currentText !== "") {
                     configManager.activeModel = currentText;
                 }
             }
         }
-        ComboBox {
+        StyledComboBox {
             id: visualModeCombo
             Layout.preferredWidth: 220
             Component.onCompleted: {
@@ -243,9 +249,12 @@ ToolBar {
             Layout.fillWidth: true
         }
         // ── Query section ──
-        ToolButton {
+        StyledButton {
+            flat: true
             text: qsTr("Query your library")
             Layout.minimumHeight: 40
+            icon.width: 24
+            icon.height: 24
             icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
             onClicked: toolBar.openRagWindow()
         }

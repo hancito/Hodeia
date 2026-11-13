@@ -1,18 +1,18 @@
 {
   "name": "Nord",
-  "primary":    "#81a1c1",
+  "primary":    "#88c0d0",
 
   "red":        "#bf616a",
   "green":      "#a3be8c",
 
   "text":       "#eceff4",
-  "overlay2":   "#d8dee9",
-  "overlay1":   "#d8dee9",
-  "overlay0":   "#4c566a",
+  "overlay2":   "#b9c1d0",
+  "overlay1":   "#8f99ae",
+  "overlay0":   "#616e88",
   "surface2":   "#4c566a",
   "surface1":   "#434c5e",
   "surface0":   "#3b4252",
-  "base":       "#3b4252",
-  "mantle":     "#2e3440",
-  "crust":      "#2e3440"
+  "base":       "#2e3440",
+  "mantle":     "#232832",
+  "crust":      "#181c24"
 }

@@ -1,18 +1,18 @@
 {
   "name": "Github Light",
-  "primary":    "#79c0ff",
+  "primary":    "#0969da",
 
-  "red":        "#ffa198",
-  "green":      "#56d364",
+  "red":        "#cf222e",
+  "green":      "#1a7f37",
 
   "text":       "#1f2328",
   "overlay2":   "#444952",
-  "overlay1":   "#61666E",
-  "overlay0":   "#7F838A",
-  "surface2":   "#9DA1A6",
-  "surface1":   "#BBBEC2",
-  "surface0":   "#D8DBDE",
+  "overlay1":   "#61666e",
+  "overlay0":   "#7f838a",
+  "surface2":   "#9da1a6",
+  "surface1":   "#bbbec2",
+  "surface0":   "#d8dbde",
   "base":       "#f6f8fa",
-  "mantle":     "#FBFCFD",
+  "mantle":     "#fbfcfd",
   "crust":      "#ffffff"
 }

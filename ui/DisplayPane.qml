@@ -9,7 +9,8 @@ Rectangle {
     property string activePaperHash: ""
     color: Colors.surface0
     border.width: 1
-    radius: 5
+    border.color: Colors.surface1
+    radius: Style.radiusLarge
 
     // Resolve the raw JSON summary for the active paper
     readonly property string activeSummaryJson: {
@@ -46,31 +47,22 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.rightMargin: 5
-        anchors.leftMargin: 5
-        anchors.topMargin: 5
-        anchors.bottomMargin: 5
-        spacing: 15
+        anchors.margins: Style.paneMargin
+        spacing: Style.paneMargin
 
-        TabBar {
+        StyledTabBar {
             id: tabBar
             Layout.fillWidth: true
-            // Soft blurred accent glow around the tab bar
-            Loader {
-                anchors.fill: parent
-                sourceComponent: Colors.glowHalo
-                onLoaded: item.source = tabBar
-            }
-            TabButton {
+            StyledTabButton {
                 text: qsTr("Summary")
             }
-            TabButton {
+            StyledTabButton {
                 text: qsTr("References (Cited)")
             }
-            TabButton {
+            StyledTabButton {
                 text: qsTr("Cited by")
             }
-            TabButton {
+            StyledTabButton {
                 text: qsTr("PDF")
             }
         }
@@ -86,14 +78,16 @@ Rectangle {
                 text: qsTr("Page")
                 opacity: 0.7
             }
-            ToolButton {
+            StyledButton {
+                flat: true
+                display: AbstractButton.IconOnly
                 icon.source: "qrc:/Resources/arrow-circle-left.svg"
                 icon.width: 20
                 icon.height: 20
                 enabled: pageSpinner.value > pageSpinner.from
                 onClicked: pageSpinner.value -= 1
             }
-            SpinBox {
+            StyledSpinBox {
                 id: pageSpinner
                 from: 1
                 to: Math.max(displayPane.pageImages.length, 1)
@@ -105,7 +99,9 @@ Rectangle {
                 text: "/" + displayPane.pageImages.length
                 opacity: 0.7
             }
-            ToolButton {
+            StyledButton {
+                flat: true
+                display: AbstractButton.IconOnly
                 icon.source: "qrc:/Resources/arrow-circle-right.svg"
                 icon.width: 20
                 icon.height: 20
@@ -122,7 +118,9 @@ Rectangle {
                 text: qsTr("Zoom")
                 opacity: 0.7
             }
-            ToolButton {
+            StyledButton {
+                flat: true
+                display: AbstractButton.IconOnly
                 icon.source: "qrc:/Resources/magnifying-glass-minus.svg"
                 icon.width: 20
                 icon.height: 20
@@ -133,10 +131,12 @@ Rectangle {
                 id: zoomLabel
                 text: Math.round(pdfTab.pdfZoomLevel * 100) + "%"
                 font.family: Fonts.mono
-                font.pixelSize: 12
+                font.pixelSize: Style.fontSmall
                 opacity: 0.7
             }
-            ToolButton {
+            StyledButton {
+                flat: true
+                display: AbstractButton.IconOnly
                 id: zoomInBtn
                 icon.source: "qrc:/Resources/magnifying-glass-plus.svg"
                 icon.width: 20
@@ -144,12 +144,13 @@ Rectangle {
                 enabled: pdfTab.pdfZoomLevel < 5
                 onClicked: pdfTab.pdfZoomLevel = Math.min(5, pdfTab.pdfZoomLevel + 0.25)
             }
-            ToolButton {
+            StyledButton {
+                flat: true
+                display: AbstractButton.IconOnly
                 icon.source: "qrc:/Resources/arrow-rotate-back.svg"
                 icon.width: 20
                 icon.height: 20
-                ToolTip.visible: hovered
-                ToolTip.text: qsTr("Reset zoom")
+                toolTip: qsTr("Reset zoom")
                 onClicked: pdfTab.pdfZoomLevel = 1
             }
         }
@@ -172,7 +173,12 @@ Rectangle {
                         Layout.fillHeight: true
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                        ScrollBar.vertical: StyledScrollBar {
+                            parent: scrollView
+                            x: scrollView.width - width
+                            y: scrollView.topPadding
+                            height: scrollView.availableHeight
+                        }
 
                         TextEdit {
                             id: textEditor
@@ -180,7 +186,7 @@ Rectangle {
                             textFormat: TextEdit.RichText
                             color: Colors.text
                             font.family: Fonts.text
-                            font.pointSize: 13
+                            font.pixelSize: Style.fontReading
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
                             text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : qsTr("Please make a summary of this paper")
@@ -195,7 +201,7 @@ Rectangle {
                             Layout.fillWidth: true
                         }
 
-                        Button {
+                        StyledButton {
                             text: qsTr("PDF")
                             icon.width: 24
                             icon.height: 24
@@ -228,15 +234,21 @@ Rectangle {
                         anchors.leftMargin: 5
                         spacing: 10
                         ScrollView {
+                            id: refScroll
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                            ScrollBar.vertical: StyledScrollBar {
+                                parent: refScroll
+                                x: refScroll.width - width
+                                y: refScroll.topPadding
+                                height: refScroll.availableHeight
+                            }
                             TextArea {
                                 readOnly: true
                                 textFormat: TextEdit.MarkdownText
                                 hoverEnabled: true
                                 selectByMouse: true
-                                font.pointSize: 12
+                                font.pixelSize: Style.fontReading
                                 wrapMode: TextEdit.WordWrap
                                 MouseArea {
                                     anchors.fill: parent
@@ -309,8 +321,8 @@ Rectangle {
                     contentWidth: pdfTab.effContentW
                     contentHeight: pdfTab.effContentH
 
-                    ScrollBar.vertical: ScrollBar {}
-                    ScrollBar.horizontal: ScrollBar {}
+                    ScrollBar.vertical: StyledScrollBar {}
+                    ScrollBar.horizontal: StyledScrollBar {}
 
                     Image {
                         id: pdfImageItem
@@ -340,7 +352,7 @@ Rectangle {
                     anchors.centerIn: parent
                     opacity: displayPane.pageImages.length === 0 ? 0.5 : 0
                     text: displayPane.activePaperHash === "" ? qsTr("Select a paper to view its pages") : qsTr("No page images found")
-                    font.pixelSize: 14
+                    font.pixelSize: Style.fontBody
                     horizontalAlignment: Text.AlignHCenter
                 }
             }

@@ -1,0 +1,18 @@
+{
+  "name": "Tokyo Night",
+  "primary":    "#7aa2f7",
+
+  "red":        "#f7768e",
+  "green":      "#9ece6a",
+
+  "text":       "#c0caf5",
+  "overlay2":   "#a9b1d6",
+  "overlay1":   "#737aa2",
+  "overlay0":   "#565f89",
+  "surface2":   "#414868",
+  "surface1":   "#3b4261",
+  "surface0":   "#292e42",
+  "base":       "#1a1b26",
+  "mantle":     "#16161e",
+  "crust":      "#09090e"
+}

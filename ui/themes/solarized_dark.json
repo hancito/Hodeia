@@ -5,14 +5,14 @@
   "red":        "#dc322f",
   "green":      "#859900",
 
-  "text":       "#839496",
-  "overlay2":   "#586e75",
+  "text":       "#93a1a1",
+  "overlay2":   "#839496",
   "overlay1":   "#657b83",
   "overlay0":   "#586e75",
-  "surface2":   "#073642",
-  "surface1":   "#002b36",
+  "surface2":   "#32515b",
+  "surface1":   "#1f444e",
   "surface0":   "#073642",
   "base":       "#002b36",
-  "mantle":     "#073642",
-  "crust":      "#002229"
+  "mantle":     "#001e27",
+  "crust":      "#00131a"
 }

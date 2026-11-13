@@ -3,13 +3,12 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-Dialog {
+StyledDialog {
     id: backendWindow
     width: 520
     height: 600
     title: qsTr("Backend Management")
     anchors.centerIn: parent
-    modal: true
     focus: true
     standardButtons: Dialog.Ok | Dialog.Cancel
     Component.onCompleted: {
@@ -45,7 +44,7 @@ Dialog {
         spacing: 10
 
         // --- Existing backends list ---
-        GroupBox {
+        StyledGroupBox {
             Layout.fillWidth: true
             Layout.fillHeight: true
             title: qsTr("Backends")
@@ -67,7 +66,7 @@ Dialog {
                         Layout.fillWidth: true
                     }
 
-                    Button {
+                    StyledButton {
                         text: qsTr("Edit")
                         visible: modelData.name !== "Llama.cpp"
                         onClicked: {
@@ -79,8 +78,9 @@ Dialog {
                         }
                     }
 
-                    Button {
+                    StyledButton {
                         text: qsTr("Remove")
+                        destructive: true
                         visible: modelData.name !== "Llama.cpp"
                         onClicked: {
                             configManager.removeBackend(modelData.name);
@@ -95,7 +95,7 @@ Dialog {
         }
 
         // --- Add / Edit form ---
-        GroupBox {
+        StyledGroupBox {
             Layout.fillWidth: true
             title: editingIndex >= 0 ? qsTr("Edit Backend") : qsTr("Add Backend")
 
@@ -109,7 +109,7 @@ Dialog {
                         text: qsTr("Name")
                         Layout.preferredWidth: 80
                     }
-                    TextField {
+                    StyledTextField {
                         id: nameValue
                         Layout.fillWidth: true
                         enabled: editingIndex < 0
@@ -123,7 +123,7 @@ Dialog {
                         text: qsTr("URL")
                         Layout.preferredWidth: 80
                     }
-                    TextField {
+                    StyledTextField {
                         id: urlValue
                         Layout.fillWidth: true
                         placeholderText: "http://localhost:11434/v1"
@@ -136,7 +136,7 @@ Dialog {
                         text: qsTr("API Key")
                         Layout.preferredWidth: 80
                     }
-                    TextField {
+                    StyledTextField {
                         id: keyValue
                         Layout.fillWidth: true
                         echoMode: TextField.Password
@@ -144,7 +144,7 @@ Dialog {
                     }
                 }
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: qsTr("Check Connection")
                     highlighted: false
@@ -168,7 +168,7 @@ Dialog {
                     wrapMode: Text.WordWrap
                 }
 
-                Button {
+                StyledButton {
                     Layout.fillWidth: true
                     text: editingIndex >= 0 ? qsTr("Save Changes") : qsTr("Add Backend")
                     highlighted: true

@@ -4,62 +4,20 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
-ApplicationWindow {
+ThemedWindow {
     id: root
     width: 1920
     height: 1080
 
     visible: true
-    font.family: Fonts.ui
     //icon.source: "qrc:/Resources/hodeia.png"
     property var secondaryWindow: null
     property var windowComponent: null
     property var selectedProjects: []
     property var selectedModels: []
 
-    readonly property var activeTheme: themeManager.activeTheme || {}
     readonly property var activeProject: configManager.lastProject || {}
     title: qsTr("Hodeia - %1").arg(activeProject)
-    // Derived colors (mirrors _theme.py update_palette logic)
-    readonly property color highlightedTextColor: Colors.primary === "#cba6f7" ? Colors.mantle : Colors.text
-
-    // Global palette applied to all QtQuick.Controls
-    palette.base: Colors.crust
-    palette.alternateBase: Colors.base
-    palette.window: Colors.base
-
-    palette.windowText: Colors.text
-    palette.button: Colors.base
-    palette.buttonText: Colors.text
-    palette.brightText: Colors.mantle
-    palette.text: Colors.text
-    palette.placeholderText: Colors.overlay1
-    palette.light: Colors.crust
-    palette.midlight: Colors.mantle
-    palette.mid: Colors.surface0
-    palette.dark: Colors.surface1
-    palette.shadow: Colors.overlay0
-    palette.highlight: Colors.primary
-    palette.highlightedText: highlightedTextColor
-
-    // Inactive
-    palette.inactive.highlight: Colors.surface1
-    palette.inactive.link: Colors.surface1
-    palette.inactive.linkVisited: Colors.surface1
-
-    // Disabled
-    palette.disabled.windowText: Colors.overlay1
-    palette.disabled.base: Colors.base
-    palette.disabled.alternateBase: Colors.base
-    palette.disabled.text: Colors.overlay1
-    palette.disabled.placeholderText: Colors.overlay1
-    palette.disabled.button: Colors.base
-    palette.disabled.buttonText: Colors.overlay1
-    palette.disabled.brightText: Colors.mantle
-    palette.disabled.highlight: Colors.surface2
-    palette.disabled.highlightedText: Colors.surface0
-    palette.disabled.link: Colors.surface0
-    palette.disabled.linkVisited: Colors.surface0
 
     Component.onCompleted: {
         // Load the QML file as a component
@@ -141,32 +99,16 @@ ApplicationWindow {
         }
     }
 
-    // Apply theme to the entire window content
-    background: Rectangle {
-        color: Colors.base || Colors.background || "#1e1e1e"
-    }
 
     GridLayout {
         anchors.fill: parent
-        anchors.top: parent.top
-        anchors.topMargin: 10
-        anchors.left: parent.left
-        anchors.leftMargin: 10
-        anchors.right: parent.right
-        anchors.rightMargin: 10
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 10
+        anchors.margins: Style.paneMargin
 
         SplitView {
             id: mainSplitView
             Layout.fillHeight: true
             Layout.fillWidth: true
-            spacing: 10
-            handle: Rectangle {
-                implicitWidth: 5
-                color: "transparent"
-                opacity: 0
-            }
+            handle: SplitHandleBar {}
 
             SummaryDbPane {
                 id: summaryDbPaneItem
@@ -183,23 +125,39 @@ ApplicationWindow {
     }
 
     // New Project input dialog
-    Dialog {
+    StyledDialog {
         id: newProjectDialog
         anchors.centerIn: parent
-        modal: true
+        width: 420
         title: qsTr("New Project")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Component.onCompleted: {
+            const create = standardButton(Dialog.Ok);
+            create.text = qsTr("Create");
+            create.enabled = Qt.binding(() => nameField.text.trim() !== "");
+        }
+        onAboutToShow: {
+            nameField.clear();
+            messageProjectName.visible = false;
+        }
+        onAccepted: root.doCreateProject()
         ColumnLayout {
             anchors.fill: parent
             spacing: 10
             Label {
                 text: qsTr("Enter the Project Name")
             }
-            TextField {
+            StyledTextField {
                 id: nameField
                 Layout.fillWidth: true
                 placeholderText: qsTr("Type here...")
                 focus: true
-                onAccepted: doCreateProject()
+                onAccepted: {
+                    if (text.trim() === "")
+                        messageProjectName.visible = true;
+                    else
+                        newProjectDialog.accept();
+                }
             }
             Label {
                 id: messageProjectName
@@ -208,29 +166,6 @@ ApplicationWindow {
                 horizontalAlignment: Text.AlignHCenter
                 color: Colors.red
             }
-            RowLayout {
-                Layout.fillWidth: true
-                Button {
-                    text: qsTr("Create")
-                    highlighted: true
-                    onClicked: root.doCreateProject()
-                }
-                Item {
-                    Layout.fillWidth: true
-                }
-                Button {
-                    text: qsTr("Cancel")
-                    onClicked: {
-                        newProjectDialog.close();
-                        nameField.clear();
-                        messageProjectName.visible = false;
-                    }
-                }
-            }
-        }
-        onClosed: {
-            nameField.clear();
-            messageProjectName.visible = false;
         }
     }
 
@@ -242,8 +177,6 @@ ApplicationWindow {
         }
         let existing = configManager.projectList;
         if (existing.includes(name)) {
-            newProjectDialog.close();
-            nameField.clear();
             existingProjectName = name;
             existingProjectDialog.open();
             return;
@@ -252,63 +185,47 @@ ApplicationWindow {
         if (ok) {
             let dbPath = configManager.projectDbPath(name);
             databaseManager.switchDatabase(dbPath);
-            newProjectDialog.close();
         }
     }
 
     property string existingProjectName
 
-    Dialog {
+    StyledDialog {
         id: existingProjectDialog
         anchors.centerIn: parent
-        modal: true
+        width: 420
         title: qsTr("Project Already Exists")
-        ColumnLayout {
-            spacing: 10
-            Label {
-                text: qsTr("Project \"%1\" already exists. Switch to it?").arg(existingProjectName)
-                wrapMode: Text.WordWrap
-            }
-            RowLayout {
-                Layout.fillWidth: true
-                Button {
-                    text: qsTr("Switch")
-                    highlighted: true
-                    onClicked: {
-                        // Close first, then switch once the popup has restored
-                        // focus (see onRequestSwitchProject for the crash).
-                        let name = existingProjectName;
-                        existingProjectDialog.close();
-                        Qt.callLater(function () {
-                            let ok = configManager.switchToProject(name);
-                            if (ok) {
-                                let dbPath = configManager.projectDbPath(name);
-                                databaseManager.switchDatabase(dbPath);
-                            }
-                        });
-                    }
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Switch")
+        onAccepted: {
+            // The dialog is closed by now; switch once it has restored focus
+            // (see onRequestSwitchProject for the crash).
+            let name = existingProjectName;
+            Qt.callLater(function () {
+                let ok = configManager.switchToProject(name);
+                if (ok) {
+                    let dbPath = configManager.projectDbPath(name);
+                    databaseManager.switchDatabase(dbPath);
                 }
-                Item {
-                    Layout.fillWidth: true
-                }
-                Button {
-                    text: qsTr("Cancel")
-                    onClicked: existingProjectDialog.close()
-                }
-            }
+            });
+        }
+        Label {
+            width: existingProjectDialog.availableWidth
+            text: qsTr("Project \"%1\" already exists. Switch to it?").arg(existingProjectName)
+            wrapMode: Text.WordWrap
         }
     }
 
     // Clean project confirmation dialog
-    Dialog {
+    StyledDialog {
         id: cleanProjectDialog
         anchors.centerIn: parent
-        modal: true
+        destructive: true
         width: 420
         title: qsTr("Clean Project")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
-            width: cleanProjectDialog.width
+            width: cleanProjectDialog.availableWidth
             text: qsTr("Clean project \"%1\"? All files and data will be permanently removed.").arg(activeProject)
             wrapMode: Text.WordWrap
         }
@@ -322,10 +239,10 @@ ApplicationWindow {
     }
 
     // Delete project confirmation dialog
-    Dialog {
+    StyledDialog {
         id: deleteConfirmDialog
         anchors.centerIn: parent
-        modal: true
+        destructive: true
         width: 420
         title: qsTr("Delete Projects")
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -360,10 +277,10 @@ ApplicationWindow {
     }
 
     // Delete model confirmation dialog
-    Dialog {
+    StyledDialog {
         id: deleteModelDialog
         anchors.centerIn: parent
-        modal: true
+        destructive: true
         width: 420
         title: qsTr("Delete Models")
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -394,10 +311,9 @@ ApplicationWindow {
     }
 
     // OpenAlex API key dialog
-    Dialog {
+    StyledDialog {
         id: openAlexKeyDialog
         anchors.centerIn: parent
-        modal: true
         width: 420
         title: qsTr("OpenAlex API Key")
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -408,7 +324,7 @@ ApplicationWindow {
                 text: qsTr("Enter your OpenAlex API key:")
                 Layout.fillWidth: true
             }
-            TextField {
+            StyledTextField {
                 id: openAlexKeyField
                 Layout.fillWidth: true
                 placeholderText: qsTr("Paste your API key...")
@@ -428,10 +344,9 @@ ApplicationWindow {
     }
 
     // Dialog for adding a local GGUF model (+ optional mmproj)
-    Dialog {
+    StyledDialog {
         id: localModelDialog
         anchors.centerIn: parent
-        modal: true
         title: qsTr("Add Local Model")
         standardButtons: Dialog.Ok | Dialog.Cancel
         width: 520
@@ -447,13 +362,13 @@ ApplicationWindow {
                     text: qsTr("Model:")
                     Layout.minimumWidth: 60
                 }
-                TextField {
+                StyledTextField {
                     id: modelPathField
                     Layout.fillWidth: true
                     placeholderText: qsTr("Select a .gguf model file...")
                     readOnly: true
                 }
-                Button {
+                StyledButton {
                     text: qsTr("Browse...")
                     onClicked: localModelFileDlg.open()
                 }
@@ -467,13 +382,13 @@ ApplicationWindow {
                     text: qsTr("MMProj:")
                     Layout.minimumWidth: 60
                 }
-                TextField {
+                StyledTextField {
                     id: mmprojPathField
                     Layout.fillWidth: true
                     placeholderText: qsTr("Optional — select a .gguf mmproj file...")
                     readOnly: true
                 }
-                Button {
+                StyledButton {
                     text: qsTr("Browse...")
                     onClicked: localMmprojFileDlg.open()
                 }
@@ -540,16 +455,9 @@ ApplicationWindow {
     }
 
     // Status bar
-    footer: ToolBar {
-        height: 30
-        Label {
-            id: footerLabel
-            anchors.fill: parent
-            font.family: Fonts.mono
-            verticalAlignment: Text.AlignLeft
-            horizontalAlignment: Text.AlignLeft
-            text: qsTr("%1 -- Ready").arg(activeProject)
-            Component.onCompleted: text = qsTr("%1 -- Ready").arg(activeProject)
-        }
+    footer: StatusBar {
+        id: footerLabel
+        text: qsTr("%1 -- Ready").arg(activeProject)
+        Component.onCompleted: text = qsTr("%1 -- Ready").arg(activeProject)
     }
 }

@@ -32,9 +32,9 @@ Rectangle {
     }
 
     border.width: 1
-    radius: 5
+    border.color: Colors.surface1
+    radius: Style.radiusLarge
     color: Colors.surface0
-    opacity: 1.0
 
     Connections {
         target: queryController
@@ -56,11 +56,11 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 5
-        spacing: 5
+        anchors.margins: Style.paneMargin
+        spacing: Style.spacing
         RowLayout {
             Layout.fillWidth: true
-            TextField {
+            StyledTextField {
                 id: queryLlm
                 Layout.fillWidth: true
                 placeholderText: qsTr("Query your library")
@@ -69,22 +69,19 @@ Rectangle {
                 onAccepted: queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
             }
 
-            BusyIndicator {
+            StyledBusyIndicator {
                 running: queryPane.querying
                 visible: queryPane.querying
-                Layout.preferredWidth: 48
-                Layout.preferredHeight: 48
-                palette.dark: Colors.primary
             }
 
-            Button {
-                ToolTip.visible: hovered && !queryPane.querying
+            StyledButton {
                 text: queryPane.querying ? qsTr("Stop") : qsTr("Query")
-                ToolTip.text: queryPane.querying ? qsTr("Stop") : qsTr("Query")
+                toolTip: queryPane.querying ? "" : qsTr("Query")
                 icon.width: 24
                 icon.height: 24
                 icon.source: queryPane.querying ? "qrc:/Resources/circle-xmark.svg" : "qrc:/Resources/ai-svgrepo-com.svg"
-                highlighted: queryPane.querying
+                highlighted: true
+                destructive: queryPane.querying
                 onClicked: queryPane.querying ? queryController.stopQuery() : queryController.startQuery(queryLlm.text, maxPagesSpinner.value)
             }
         }
@@ -94,14 +91,20 @@ Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
             ScrollView {
+                id: answerScroll
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                ScrollBar.vertical: StyledScrollBar {
+                    parent: answerScroll
+                    x: answerScroll.width - width
+                    y: answerScroll.topPadding
+                    height: answerScroll.availableHeight
+                }
                 TextArea {
                     id: textEditor
                     readOnly: true
                     font.family: Fonts.text
-                    font.pointSize: 13
+                    font.pixelSize: Style.fontReading
                     textFormat: TextEdit.MarkdownText
                     wrapMode: TextEdit.WordWrap
                     // Prefer the active query response; fall back to lastResponse from a live query.
@@ -116,7 +119,7 @@ Rectangle {
                 Label {
                     text: qsTr("Max Pages")
                 }
-                SpinBox {
+                StyledSpinBox {
                     id: maxPagesSpinner
                     from: 10
                     to: 300
@@ -128,7 +131,7 @@ Rectangle {
                     Layout.fillWidth: true
                 }
 
-                Button {
+                StyledButton {
                     text: qsTr("Export")
                     icon.width: 24
                     icon.height: 24

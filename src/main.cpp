@@ -251,6 +251,18 @@ static void registerApplicationFonts(const QString &fontsDir) {
 
 // Main app section. The entry point
 int main(int argc, char *argv[]) {
+#ifdef Q_OS_LINUX
+  // Native file dialogs through xdg-desktop-portal.  This is a
+  // QGuiApplication (no Qt Widgets), so desktop themes whose dialogs are
+  // widget-based (KDE Plasma) can't provide one and QtQuick.Dialogs falls back
+  // to its built-in QML dialog — which only supports single selection, so
+  // "Add files" (FileDialog.OpenFiles) could pick one PDF at a time.  The
+  // portal theme only replaces dialogs; fonts, icons, etc. still come from the
+  // desktop's own theme.  Respect an explicit user choice.
+  if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORMTHEME"))
+    qputenv("QT_QPA_PLATFORMTHEME", "xdgdesktopportal");
+#endif
+
   QGuiApplication app(argc, argv);
   app.setApplicationName("Hodeia");
   app.setApplicationDisplayName("Hodeia");

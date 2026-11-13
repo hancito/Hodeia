@@ -2,7 +2,6 @@
 pragma Singleton
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Effects
 
 QtObject {
     readonly property var _theme: themeManager.activeTheme || {}
@@ -24,14 +23,24 @@ QtObject {
     readonly property color mantle: _theme.mantle || "#181825"
     readonly property color crust: _theme.crust || "#11111b"
 
-    // Soft blurred halo (the glow). Instantiate over the element to highlight:
-    //   Loader { sourceComponent: Colors.glowHalo; onLoaded: item.source = target }
-    // The consumer sets `item.source` (the element to glow).
-    readonly property Component glowHalo: Component {
-        MultiEffect {
-            shadowEnabled: true
-            shadowColor: Colors.primary
-            shadowBlur: 0.01
+    // Text / icons drawn on an accent fill: whichever of crust (the darkest
+    // shade in dark themes, the lightest in light themes) and text contrasts
+    // more with the fill, so it stays readable whatever the theme.
+    readonly property color onPrimary: onColor(primary)
+    readonly property color onRed: onColor(red)
+
+    // WCAG relative luminance and contrast ratio.
+    function luminance(c) {
+        function lin(v) {
+            return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
         }
+        return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+    }
+    function contrast(a, b) {
+        const la = luminance(a), lb = luminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+    function onColor(fill) {
+        return contrast(crust, fill) >= contrast(text, fill) ? crust : text;
     }
 }

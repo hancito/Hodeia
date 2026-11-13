@@ -1,0 +1,18 @@
+{
+  "name": "Solarized Light",
+  "primary":    "#268bd2",
+
+  "red":        "#dc322f",
+  "green":      "#859900",
+
+  "text":       "#073642",
+  "overlay2":   "#586e75",
+  "overlay1":   "#657b83",
+  "overlay0":   "#93a1a1",
+  "surface2":   "#c0c4bb",
+  "surface1":   "#d7d6c8",
+  "surface0":   "#eee8d5",
+  "base":       "#fdf6e3",
+  "mantle":     "#fef9eb",
+  "crust":      "#fefbf4"
+}

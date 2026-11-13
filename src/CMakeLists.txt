@@ -148,6 +148,7 @@ endif()
 
 set_source_files_properties(../ui/Colors.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(../ui/Fonts.qml  PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(../ui/Style.qml  PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 # QML files live in project/ui/ but the CMakeLists is in project/src/.
 # qt_add_qml_module resolves QML_FILES relative to the current source dir,
@@ -156,7 +157,14 @@ set_source_files_properties(../ui/Fonts.qml  PROPERTIES QT_QML_SINGLETON_TYPE TR
 set(_QML_FILES
     Colors.qml Fonts.qml Main.qml MyMenuBar.qml DisplayPane.qml
     SummaryDbPane.qml RagWindow.qml RagDbPane.qml QueryPane.qml
-    BackendWindow.qml MyToolBar.qml)
+    BackendWindow.qml MyToolBar.qml
+    # Shared styled components (see Style.qml)
+    Style.qml PopupBackground.qml CheckIndicator.qml StyledButton.qml
+    StyledCheckBox.qml StyledComboBox.qml StyledTextField.qml StyledSpinBox.qml
+    StyledScrollBar.qml StyledDialog.qml StatusBar.qml SplitHandleBar.qml
+    StyledMenu.qml StyledMenuItem.qml StyledMenuSeparator.qml MenuCheckRow.qml
+    StyledTabBar.qml StyledTabButton.qml StyledProgressBar.qml StyledGroupBox.qml
+    StyledToolTip.qml StyledBusyIndicator.qml ThemedWindow.qml)
 foreach(_f ${_QML_FILES})
   set_source_files_properties(${CMAKE_SOURCE_DIR}/ui/${_f}
       PROPERTIES QT_RESOURCE_ALIAS "${_f}")
@@ -177,6 +185,29 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/QueryPane.qml
         ${CMAKE_SOURCE_DIR}/ui/BackendWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/MyToolBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/Style.qml
+        ${CMAKE_SOURCE_DIR}/ui/PopupBackground.qml
+        ${CMAKE_SOURCE_DIR}/ui/CheckIndicator.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledButton.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledCheckBox.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledComboBox.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledTextField.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledSpinBox.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledScrollBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledDialog.qml
+        ${CMAKE_SOURCE_DIR}/ui/StatusBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/SplitHandleBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledMenu.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledMenuItem.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledMenuSeparator.qml
+        ${CMAKE_SOURCE_DIR}/ui/MenuCheckRow.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledTabBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledTabButton.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledProgressBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledGroupBox.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledToolTip.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledBusyIndicator.qml
+        ${CMAKE_SOURCE_DIR}/ui/ThemedWindow.qml
 )
 
 # ---------------------------------------------------------------------------
