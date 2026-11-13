@@ -64,5 +64,13 @@ Write-Host ">> Inno Setup: Hodeia $version (VC++ runtime build $redistBuild)"
 & $iscc "/DAppVersion=$version" "/DBuildDir=$((Resolve-Path $BuildDir).Path)" "/DVCRedistBuild=$redistBuild" $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
+# --- GitHub release assets are capped at 2 GiB per file --------------------------
+$installer = Join-Path $repoRoot "dist\Hodeia-Setup-$version-x64.exe"
+$sizeBytes = (Get-Item $installer).Length
+$sizeGiB = [math]::Round($sizeBytes / 1GB, 2)
+if ($sizeBytes -ge 2GB) {
+    throw "Installer is $sizeGiB GiB: GitHub release assets must be under 2 GiB. Ship a smaller bundled model."
+}
+
 Write-Host ""
-Write-Host "Installer: $(Join-Path $repoRoot "dist\Hodeia-Setup-$version-x64.exe")"
+Write-Host "Installer: $installer ($sizeGiB GiB)"

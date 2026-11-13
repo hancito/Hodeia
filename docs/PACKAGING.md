@@ -326,8 +326,9 @@ optional "add to PATH".
     shipped do not linger.
   - User data (`%APPDATA%\Hodeia`: projects, models, config) is never touched
     by install, update or uninstall.
-  - ~3 GB payload (mostly `.gguf` + CUDA DLLs): non-solid LZMA2; a single
-    `Setup.exe` can hold up to ~4.2 GB compressed.
+  - ~2.3 GB payload (mostly `.gguf` + CUDA DLLs): non-solid LZMA2; a single
+    `Setup.exe` can hold up to ~4.2 GB compressed, but GitHub release assets
+    are capped at 2 GiB — `package-app.ps1` fails if the installer exceeds it.
 - Inno Setup's compiler is in the PATH on GitHub's `windows-latest` runner.
 
 ### Tier 3 — Auto-update (later)

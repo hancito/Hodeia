@@ -51,13 +51,13 @@ Everything is managed in **Settings**: pick a local model that you downloaded fo
 
 ### Getting models
 
-Hodeia ships with a small **Qwen3.5-2B** model at _Q4_ so it works out of the box. For larger models, download a GGUF + MMPROJ files and add it in **Settings → Local Models** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
+Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the box. For larger models, download a GGUF + MMPROJ files and add it in **Settings → Local Models** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
 
 **Recommended models** (Q4_K_XL quantization — the best quality-to-size balance). Pick the largest model your memory can hold; VRAM needs are for the model weights plus a small context. These models were tested and known to works fine with Hodeia.
 
 | Model                                                                      | Size (Q4) | Min VRAM / RAM | Best for                                               |
 | -------------------------------------------------------------------------- | --------- | -------------- | ------------------------------------------------------ |
-| [Qwen3.5-0.8B](https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/tree/main) | ~600 MB   | ~4 GB          | For really modest hardwre                              |
+| [Qwen3.5-2B](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/tree/main)     | ~1.4 GB   | ~6 GB          | For modest hardware runs fine on integrated GPU        |
 | [Gemma4-2B](https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/tree/main)  | ~3 GB     | ~6 GB          | Better than the 0.8B model runs fine on integrated GPU |
 | [Qwen3.5-4B](https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/main)     | ~2.5 GB   | ~6 GB          | Everyday summaries, better quality                     |
 | [Gemma4-4B](https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/tree/main)  | ~6 GB     | ~8 GB          | Strong all-round reasoning                             |

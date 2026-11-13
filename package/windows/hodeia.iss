@@ -62,9 +62,10 @@ MinVersion=10.0
 OutputDir=..\..\dist
 OutputBaseFilename=Hodeia-Setup-{#AppVersion}-x64
 
-; ~3 GB payload, mostly already-compressed .gguf models and CUDA DLLs:
+; ~2.3 GB payload, mostly already-compressed .gguf models and CUDA DLLs:
 ; non-solid LZMA2 keeps compile time and memory reasonable.  A single
-; Setup.exe can hold up to ~4.2 GB of compressed data (Inno Setup >= 6.5.2).
+; Setup.exe can hold up to ~4.2 GB of compressed data (Inno Setup >= 6.5.2),
+; but GitHub release assets are capped at 2 GiB: package-app.ps1 checks it.
 Compression=lzma2/normal
 SolidCompression=no
 LZMAUseSeparateProcess=yes
