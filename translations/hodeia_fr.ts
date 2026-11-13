@@ -929,13 +929,13 @@
     </message>
     <message>
         <location filename="../ui/SummaryDbPane.qml" line="90"/>
-        <source>Summarize done: %1/%2</source>
-        <translation>Résumés terminés : %1/%2</translation>
+        <source>Summarize done: %1/%2 in %3</source>
+        <translation>Résumés terminés : %1/%2 en %3</translation>
     </message>
     <message>
         <location filename="../ui/SummaryDbPane.qml" line="101"/>
-        <source>Summarization stopped by user</source>
-        <translation>Résumé arrêté par l&apos;utilisateur</translation>
+        <source>Summarization stopped by user after %1</source>
+        <translation>Résumé arrêté par l&apos;utilisateur après %1</translation>
     </message>
     <message>
         <location filename="../ui/SummaryDbPane.qml" line="116"/>

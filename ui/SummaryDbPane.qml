@@ -13,9 +13,26 @@ Rectangle {
     property int paperProgress: 0
     property int totalPapers: 0
     property int elapsedTime: 0
+    property double summaryStartMs: 0
     property bool summarizing: false
     property bool ingesting: false
     property var reportJsons: []
+
+    // Wall-clock duration since summaryStartMs, as "1h 02m", "3m 05s" or "42s".
+    function summaryDuration() {
+        var totalSec = Math.round((Date.now() - summaryStartMs) / 1000);
+        if (totalSec >= 3600) {
+            var h = Math.floor(totalSec / 3600);
+            var m = Math.floor((totalSec % 3600) / 60);
+            return h + "h " + m.toString().padStart(2, "0") + "m";
+        }
+        if (totalSec >= 60) {
+            var min = Math.floor(totalSec / 60);
+            var s = totalSec % 60;
+            return min + "m " + s.toString().padStart(2, "0") + "s";
+        }
+        return totalSec + "s";
+    }
 
     function addSelectedPaper(hash) {
         if (!selectedPapers.includes(hash) && hash !== "") {
@@ -87,7 +104,7 @@ Rectangle {
             databaseManager.summaryModel.loadAll();
             numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = qsTr("Summarize done: %1/%2").arg(successCount).arg(total);
+                summaryDbPane.statusBarLabel.text = qsTr("Summarize done: %1/%2 in %3").arg(successCount).arg(total).arg(summaryDbPane.summaryDuration());
         }
         function onSummaryStopped() {
             summarizeTimer.stop();
@@ -98,7 +115,7 @@ Rectangle {
             databaseManager.summaryModel.loadAll();
             numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = qsTr("Summarization stopped by user");
+                summaryDbPane.statusBarLabel.text = qsTr("Summarization stopped by user after %1").arg(summaryDbPane.summaryDuration());
         }
     }
 
@@ -136,6 +153,7 @@ Rectangle {
                     summaryDbPane.totalPapers = summaryDbPane.selectedPapers.length;
                     summaryDbPane.paperProgress = 0;
                     summaryDbPane.elapsedTime = 0;
+                    summaryDbPane.summaryStartMs = Date.now();
                     summaryDbPane.summarizing = true;
                     summarizeTimer.start();
                     summaryController.startSummarize(summaryDbPane.selectedPapers);
