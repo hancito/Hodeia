@@ -3,7 +3,6 @@
 #include "common/chat.h"
 #include "common/common.h"
 #include "common/sampling.h"
-#include "llama-cpp.h"
 #include "llama.h"
 #include "localbackend.h"
 #include "mtmd-helper.h"

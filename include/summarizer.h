@@ -3,7 +3,6 @@
 #include <QObject>
 #include <QStringList>
 #include <QVariantMap>
-#include <vector>
 
 #include "helpers.h"
 #include "localbackend.h"

@@ -20,8 +20,6 @@
 #include <QTextStream>
 #include <QTimer>
 #include <QTranslator>
-#include <print>
-#include <string>
 
 #ifdef Q_OS_WIN
 #include <windows.h>

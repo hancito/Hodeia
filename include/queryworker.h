@@ -3,7 +3,6 @@
 #include <QObject>
 #include <QVariantMap>
 #include <expected>
-#include <vector>
 
 #include "localbackend.h"
 
