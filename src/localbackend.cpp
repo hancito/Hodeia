@@ -17,6 +17,7 @@
 #include <QHash>
 #include <QImage>
 #include <QMutex>
+#include <QRegularExpression>
 #include <QThread>
 #include <algorithm>
 #include <cstring>
@@ -503,31 +504,77 @@ struct device_mem {
   bool is_integrated = false; // true for iGPU / shared-memory GPU
 };
 
-/// Heuristic: detect integrated GPUs from the Vulkan device name/description.
-/// Vulkan reports iGPUs as GGML_BACKEND_DEVICE_TYPE_OTHER (not IGPU), so we
-/// must guess from the string.  Common patterns: "Radeon Graphics" (AMD APU),
-/// "Intel UHD/Iris/Xe", "AMD Radeon Graphics" (no discrete model number like
-/// "RX 6700" or "RX 7800").
-static bool lb_is_integrated_gpu(const QString &name,
+/// Fallback guess from the device name and description, for backends that
+/// don't say whether a GPU is integrated.  The ggml device *name* is often
+/// just "Vulkan0" / "CUDA0": the product name is in the description, e.g.
+/// "AMD Radeon Graphics (RADV RENOIR)".
+static bool lb_name_looks_integrated(const QString &name,
+                                     const QString &description) {
+  const QString s = (name + " " + description).toLower();
+
+  // NVIDIA: only the Jetson SoCs are integrated (GeForce MX, NVS, RTX
+  // laptop GPUs all have dedicated VRAM).
+  static const QRegularExpression nvSoc(
+      QStringLiteral("\\b(tegra|orin|xavier)\\b"));
+  if (nvSoc.match(s).hasMatch())
+    return true;
+  if (s.contains("nvidia") || s.contains("geforce") || s.contains("quadro") ||
+      s.contains("tesla"))
+    return false;
+
+  // Intel: discrete Arc carries a model number ("Arc A770", "Arc B580",
+  // "Arc Pro A60"); Meteor/Lunar Lake iGPUs are plain "Arc Graphics", older
+  // ones UHD / Iris / HD Graphics.
+  if (s.contains("intel")) {
+    static const QRegularExpression arcDiscrete(QStringLiteral(
+        "\\barc(\\(tm\\))?\\s+(pro\\s+)?[ab]\\d{2,3}\\b"));
+    return !arcDiscrete.match(s).hasMatch();
+  }
+
+  // AMD discrete: "RX 7800 XT", "Radeon Pro W7900", "Radeon VII", Instinct.
+  static const QRegularExpression amdDiscrete(QStringLiteral(
+      "\\b(rx\\s*\\d|radeon(\\(tm\\))? pro\\b|radeon vii|instinct|firepro)"));
+  if (amdDiscrete.match(s).hasMatch())
+    return false;
+  // AMD APUs: "AMD Radeon Graphics", "Radeon 780M Graphics", "Radeon 8060S
+  // Graphics", "Radeon Vega 8 Graphics"…
+  static const QRegularExpression amdApu(QStringLiteral(
+      "radeon(\\(tm\\))?\\s+((\\d{3,4}[ms]|vega(\\s*\\d+)?)\\s+)?graphics"));
+  if (amdApu.match(s).hasMatch())
+    return true;
+  // …or only a RADV / ROCm APU code name.
+  static const QRegularExpression amdApuCode(QStringLiteral(
+      "\\b(raven2?|picasso|renoir|cezanne|lucienne|barcelo|rembrandt|"
+      "mendocino|vangogh|phoenix\\d?|hawk point|strix|krackan|gfx90c|"
+      "gfx1103|gfx115[0-3])(?![a-z0-9])")); // "GFX1103_R1" too
+  return amdApuCode.match(s).hasMatch();
+}
+
+/// Whether a GPU shares system memory.  The backend's own answer comes
+/// first: Vulkan maps VkPhysicalDeviceType, CUDA/HIP the device's
+/// "integrated" property.  The name heuristic is only a fallback for
+/// device types that don't tell; a disagreement is logged, not acted on.
+static bool lb_is_integrated_gpu(enum ggml_backend_dev_type type,
+                                 const QString &name,
                                  const QString &description) {
-  QString n = name.toLower();
-  QString d = description.toLower();
-  QString combined = n + " " + d;
-
-  // Intel integrated
-  if (n.contains("intel") || n.contains("uhd") || n.contains("iris"))
+  // CPU descriptions such as "AMD Ryzen 5 4600H with Radeon Graphics" would
+  // match the APU patterns: never run the heuristic on them.
+  if (type == GGML_BACKEND_DEVICE_TYPE_CPU ||
+      type == GGML_BACKEND_DEVICE_TYPE_META)
+    return false;
+  const bool byName = lb_name_looks_integrated(name, description);
+  switch (type) {
+  case GGML_BACKEND_DEVICE_TYPE_IGPU:
     return true;
-
-  // AMD: "Radeon Graphics" (APU/iGPU) vs "RX 6xxx/7xxx" (discrete)
-  if ((n.contains("radeon graphics") || combined.contains("radon graphics")) &&
-      !n.contains("rx "))
-    return true;
-
-  // NVIDIA: integrated Optimus / mobile entry-level
-  if (n.contains("nvs") || n.contains("geforce mx"))
-    return true;
-
-  return false;
+  case GGML_BACKEND_DEVICE_TYPE_GPU:
+    if (byName)
+      qWarning() << "[LocalBackend]" << name << "(" << description
+                 << ") is reported as a discrete GPU but its name suggests "
+                    "an integrated one — trusting the driver";
+    return false;
+  default:
+    return byName;
+  }
 }
 
 /// Discover GPU devices with their free memory.  The CPU device is not
@@ -555,15 +602,15 @@ static std::vector<device_mem> lb_discover() {
     dm.memory_free = props.memory_free;
     dm.memory_total = props.memory_total;
     dm.is_gpu = gpu;
-    dm.is_integrated = props.type == GGML_BACKEND_DEVICE_TYPE_IGPU ||
-                       lb_is_integrated_gpu(devName, devDesc);
+    dm.is_integrated = lb_is_integrated_gpu(props.type, devName, devDesc);
 
     if (gpu) {
       gpuDevs.push_back(dm);
     } else if (dm.is_integrated ||
                devName.contains("Vulkan", Qt::CaseInsensitive) ||
                devName.contains("RADV", Qt::CaseInsensitive)) {
-      // Vulkan on Linux reports type OTHER for GPUs — include by name
+      // A GPU behind a backend that reports another device type (older
+      // ggml-vulkan builds did): include it by name.
       gpuDevs.push_back(dm);
     }
   }
