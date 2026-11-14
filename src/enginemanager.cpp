@@ -88,6 +88,8 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
           &EngineController::ingestionStarted);
   connect(thisWorker, &PdfWorker::status, this,
           &EngineController::ingestionStatus);
+  connect(thisWorker, &PdfWorker::ingestionError, this,
+          &EngineController::ingestionError);
 
   // After ingestion: unload the embedding model to free its arena,
   // then reload it.  This runs on the main thread after the worker

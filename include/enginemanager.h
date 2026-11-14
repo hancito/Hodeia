@@ -24,6 +24,7 @@ signals:
   void ingestionFinished();
   void ingestionStarted();
   void ingestionStatus(QString statusLog);
+  void ingestionError(QString message);
 
 private:
   void releaseAndReloadModel();

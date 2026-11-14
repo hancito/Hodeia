@@ -75,9 +75,12 @@ signals:
 
 private:
   /// Shared generation loop: prompt is already decoded into the KV
-  /// cache up to position `nPast` (exclusive); this samples tokens until
-  /// EOS, cancellation or the token budget. (llama_pos is int32_t.)
-  QString generate(int32_t nPast);
+  /// cache up to position `nPast` (exclusive) and occupies `nCells` KV
+  /// cells; this samples tokens until EOS, cancellation or the token
+  /// budget (n_ctx - nCells). The two differ for M-RoPE models, where an
+  /// image advances the position by less than its token count.
+  /// (llama_pos is int32_t.)
+  QString generate(int32_t nPast, int32_t nCells);
 
   /// Clear the KV cache so each inference starts from a clean slate.
   void clearKvCache();

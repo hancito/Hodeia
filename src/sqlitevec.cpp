@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QFile>
 #include <QMutexLocker>
+#include <atomic>
 #include <expected>
 #include <mutex>
 
@@ -170,10 +171,16 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
                         /*add_special=*/false, /*parse_special=*/true);
 
     if (tokens.empty()) {
-      // Empty or whitespace-only text — embed as zero vector
-      for (int d = 0; d < m_dim; ++d)
-        results.append(0.0f);
-      continue;
+      // Never legitimate: the E5 prefix alone yields tokens.  Seen when the
+      // app's C++ runtime doesn't match llama-common.dll (Debug /MDd build
+      // against the Release DLLs): common_tokenize silently returns nothing.
+      // Fail the whole call rather than store zero vectors that make every
+      // similarity search meaningless.
+      qCritical() << "[SqliteVec] Tokenizer returned no tokens for a"
+                  << prefixed.length()
+                  << "char text — embedding aborted (C++ runtime mismatch "
+                     "with llama-common? use a Release/RelWithDebInfo build)";
+      return {};
     }
 
     // Truncate to context window
@@ -240,6 +247,19 @@ int SqliteVecManager::countTokens(const QString &text) {
       common_tokenize(llama_model_get_vocab(m_llamaModel),
                       text.toStdString(), /*add_special=*/false,
                       /*parse_special=*/false);
+  if (tokens.empty() && !text.trimmed().isEmpty()) {
+    // A non-blank text always yields tokens: this is a tokenizer failure
+    // (e.g. C++ runtime mismatch with llama-common.dll).  Report "unknown"
+    // so callers fall back to their character estimate instead of counting
+    // 0 — which once packed whole papers into a single chunk.
+    static std::atomic_bool warned{false};
+    if (!warned.exchange(true))
+      qCritical() << "[SqliteVec] Tokenizer returned no tokens for non-empty "
+                     "text — falling back to character estimates (C++ "
+                     "runtime mismatch with llama-common? use a "
+                     "Release/RelWithDebInfo build)";
+    return -1;
+  }
   return static_cast<int>(tokens.size());
 }
 

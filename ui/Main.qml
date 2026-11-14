@@ -94,7 +94,8 @@ ThemedWindow {
                     });
                 }
             } else {
-                console.log("Component not ready:", root.windowComponent.errorString());
+                console.warn("Component not ready:", root.windowComponent.errorString());
+                messageBox.showError(qsTr("Cannot Open Query Window"), root.windowComponent.errorString());
             }
         }
     }
@@ -268,7 +269,7 @@ ThemedWindow {
             // new active project's DB (chosen by ConfigManager).
             let err = databaseManager.deleteProjects(root.selectedProjects);
             if (err !== "")
-                console.warn("Project deletion:", err);
+                messageBox.showError(qsTr("Project Deletion Failed"), err);
             root.selectedProjects = [];
         }
         onRejected: {
@@ -335,6 +336,20 @@ ThemedWindow {
         }
         onAccepted: {
             configManager.openAlexApiKey = openAlexKeyField.text.trim();
+        }
+    }
+
+    // User-facing information and errors for the main window.
+    MessageBox {
+        id: messageBox
+    }
+
+    // Ingestion error: papers that could not be indexed (and were removed
+    // again so they can be re-added).
+    Connections {
+        target: engineController
+        function onIngestionError(message) {
+            messageBox.showError(qsTr("Indexing Failed"), message);
         }
     }
 

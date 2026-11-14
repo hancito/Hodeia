@@ -164,7 +164,7 @@ set(_QML_FILES
     StyledScrollBar.qml StyledDialog.qml StatusBar.qml SplitHandleBar.qml
     StyledMenu.qml StyledMenuItem.qml StyledMenuSeparator.qml MenuCheckRow.qml
     StyledTabBar.qml StyledTabButton.qml StyledProgressBar.qml StyledGroupBox.qml
-    StyledToolTip.qml StyledBusyIndicator.qml ThemedWindow.qml)
+    StyledToolTip.qml StyledBusyIndicator.qml ThemedWindow.qml MessageBox.qml)
 foreach(_f ${_QML_FILES})
   set_source_files_properties(${CMAKE_SOURCE_DIR}/ui/${_f}
       PROPERTIES QT_RESOURCE_ALIAS "${_f}")
@@ -208,6 +208,7 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/StyledToolTip.qml
         ${CMAKE_SOURCE_DIR}/ui/StyledBusyIndicator.qml
         ${CMAKE_SOURCE_DIR}/ui/ThemedWindow.qml
+        ${CMAKE_SOURCE_DIR}/ui/MessageBox.qml
 )
 
 # ---------------------------------------------------------------------------
@@ -217,6 +218,21 @@ qt_add_translations(Hodeia
     TS_FILES ${CMAKE_SOURCE_DIR}/translations/hodeia_fr.ts
     QM_FILES_OUTPUT_VARIABLE HODEIA_QM_FILES
 )
+
+# Deploy the .qm files to <exe>/i18n/, where main.cpp loads them (all
+# platforms).  A custom target, not a POST_BUILD step of Hodeia: POST_BUILD
+# only runs when the executable is relinked, so a translation-only change
+# left a stale .qm in i18n/.  copy_if_different keeps no-op builds cheap.
+if(HODEIA_QM_FILES)
+  add_custom_target(Hodeia_deploy_translations ALL
+      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:Hodeia>/i18n
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${HODEIA_QM_FILES} $<TARGET_FILE_DIR:Hodeia>/i18n
+      DEPENDS ${HODEIA_QM_FILES}
+      COMMENT "Deploying translations (.qm)"
+      VERBATIM)
+  add_dependencies(Hodeia_deploy_translations Hodeia_lrelease)
+endif()
 
 # Resources
 set(_RES_FILES

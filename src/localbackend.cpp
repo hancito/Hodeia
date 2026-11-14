@@ -12,6 +12,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QHash>
@@ -253,15 +254,15 @@ struct probe_info {
   bool has_mmproj = false;
   bool is_hybrid = false;     // recurrent + attention: loaded without flash attn
   uint32_t prompt_tokens = 0; // text + image tokens
-  uint32_t image_tokens = 0;  // image share of prompt_tokens (upper bound)
+  uint32_t image_tokens = 0;  // image share of prompt_tokens (exact or estimate)
 };
 
-/// Tokens provisioned per image when sizing the context.  The exact count
-/// depends on the image size and is only known once the projector is loaded
-/// (Gemma 4: 70-1120, ~600 for a rendered page), so this is a middle ground
-/// between waste (reserving the model maximum) and truncation.  Capped at
-/// the projector's maximum when it reports one.  If the real total is
-/// higher, summarize() counts exactly and truncates the last pages.
+/// Fallback tokens per image when the probe cannot count them exactly
+/// (projector failed to load on the CPU).  The real count depends on the
+/// model and image size (Gemma 4: 70-1120, Qwen-VL: ~2200 for a rendered
+/// page).  Capped at the projector's maximum when it reports one.  If the
+/// real total is higher, summarize() counts exactly and truncates the last
+/// pages.
 static constexpr int32_t kImageTokenEstimate = 800;
 
 /// Images a payload carries, in prompt order (one per marker).
@@ -283,17 +284,6 @@ static const QString &lb_system_prompt(const PromptPayload &payload,
   return withImages || payload.textOnlySystemPrompt.isEmpty()
              ? payload.systemPrompt
              : payload.textOnlySystemPrompt;
-}
-
-/// Number of images a payload carries, without copying them.
-static size_t lb_count_images(const PromptPayload &payload) {
-  if (payload.pageBlocks.empty())
-    return payload.visualContext.size();
-  size_t n = 0;
-  for (const auto &pb : payload.pageBlocks)
-    if (!pb.visualContext.data.empty())
-      ++n;
-  return n;
 }
 
 /// Assemble the raw user-prompt text from a payload (no chat template, no
@@ -428,21 +418,22 @@ static probe_info lb_probe_model(const QString &modelPath,
   info.is_hybrid = llama_model_is_hybrid(model);
 
   // Count the exact text tokens while the no-alloc model is already open.
-  // Images are only part of the prompt when a projector exists; their cost
-  // is added below from the projector's per-image maximum.
+  // Images are only part of the prompt when a projector exists; their exact
+  // cost is measured below with a temporary CPU projector.
   const bool vision = !mmprojPath.isEmpty();
+  const std::vector<PageImage> images =
+      vision && payload ? lb_collect_images(*payload) : std::vector<PageImage>{};
+  common_chat_prompt prompt;
   if (payload) {
     // No char cap (0) — counting needs the full prompt.
     const QString userPrompt = lb_build_user_prompt(
         *payload, vision ? QString::fromUtf8(mtmd_default_marker()) : QString(),
         0);
-    common_chat_prompt prompt;
     try {
       auto tmpl = common_chat_templates_init(model, "");
       if (tmpl)
         prompt = lb_apply_chat_template(
-            tmpl.get(),
-            lb_system_prompt(*payload, vision && lb_count_images(*payload) > 0),
+            tmpl.get(), lb_system_prompt(*payload, !images.empty()),
             userPrompt);
     } catch (const std::exception &e) {
       // Malformed Jinja template: count the raw prompt instead; loadModel
@@ -455,6 +446,45 @@ static probe_info lb_probe_model(const QString &modelPath,
     info.prompt_tokens = static_cast<uint32_t>(
         InferenceEngine::tokenizePrompt(llama_model_get_vocab(model), prompt)
             .size());
+  }
+
+  // Exact image cost: an image's token count depends on the model and the
+  // image size (Qwen-VL: ~2200 for a rendered page, Gemma 4: up to 1120),
+  // and only an mtmd context can compute it.  Load the projector on the CPU
+  // (no VRAM, so the fit below is undisturbed), tokenize the full prompt —
+  // image preprocessing only, the encoder never runs — and free it.  The
+  // mtmd context needs the text model for metadata only (embedding width,
+  // vocab), so the no-alloc probe model is enough.  ~1 GiB of RAM for a
+  // moment; the GPU load in loadMmproj() then reads the file from the OS
+  // cache.  Falls back to the per-image estimate below on failure.
+  bool imagesCounted = false;
+  if (!images.empty() && !prompt.parts.empty()) {
+    QElapsedTimer timer;
+    timer.start();
+    auto cparams = mtmd_context_params_default();
+    cparams.use_gpu = false;
+    cparams.warmup = false;
+    cparams.print_timings = false;
+    cparams.n_threads = QThread::idealThreadCount();
+    mtmd::context_ptr mctx(
+        mtmd_init_from_file(mmprojPath.toUtf8().constData(), model, cparams));
+    const int32_t total =
+        mctx ? InferenceEngine::countMultimodalTokens(mctx.get(), prompt, images)
+             : -1;
+    if (total > 0) {
+      const uint32_t textTokens = info.prompt_tokens;
+      info.prompt_tokens = static_cast<uint32_t>(total);
+      info.image_tokens =
+          info.prompt_tokens > textTokens ? info.prompt_tokens - textTokens : 0;
+      imagesCounted = true;
+      qDebug() << "[LocalBackend] lb_probe: exact multimodal count:" << total
+               << "tokens (" << images.size() << "image(s) ≈"
+               << info.image_tokens << "tokens) in" << timer.elapsed() << "ms";
+    } else {
+      qWarning() << "[LocalBackend] lb_probe: exact image count failed"
+                 << (mctx ? "(tokenize)" : "(mmproj load)")
+                 << "— using the per-image estimate";
+    }
   }
 
   llama_model_free(model);
@@ -472,16 +502,15 @@ static probe_info lb_probe_model(const QString &modelPath,
     }
     info.has_mmproj = info.mmproj_size > 0;
 
-    const size_t nImages = payload ? lb_count_images(*payload) : 0;
-    if (info.has_mmproj && nImages > 0) {
+    if (info.has_mmproj && !images.empty() && !imagesCounted) {
       const int32_t perImage =
           usage.image_max_tokens > 0
               ? std::min(usage.image_max_tokens, kImageTokenEstimate)
               : kImageTokenEstimate;
-      info.image_tokens = static_cast<uint32_t>(nImages * perImage);
+      info.image_tokens = static_cast<uint32_t>(images.size() * perImage);
       info.prompt_tokens += info.image_tokens;
-      qDebug() << "[LocalBackend] lb_probe:" << nImages << "image(s) ×"
-               << perImage << "tokens (max per image"
+      qDebug() << "[LocalBackend] lb_probe:" << images.size() << "image(s) ×"
+               << perImage << "tokens (estimate, max per image"
                << usage.image_max_tokens << ")";
     }
   }

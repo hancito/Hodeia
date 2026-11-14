@@ -159,15 +159,8 @@ endif()
 #    Called from src/CMakeLists.txt after the target is created.
 # ===========================================================================
 function(hodeia_linux_deploy TARGET)
-  # --- Translations (.qm files) ---
-  foreach(_qm ${HODEIA_QM_FILES})
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET}>/i18n
-        COMMAND ${CMAKE_COMMAND} -E copy
-            ${_qm}
-            $<TARGET_FILE_DIR:${TARGET}>/i18n/
-        COMMENT "Copying translations")
-  endforeach()
+  # Translations (.qm) are deployed by the Hodeia_deploy_translations target
+  # (src/CMakeLists.txt), not here.
 
   # --- Themes & fonts ---
   add_custom_command(TARGET ${TARGET} POST_BUILD

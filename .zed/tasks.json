@@ -18,6 +18,23 @@
     "tags": ["build_and_run", "windows", "release"],
   },
 
+  // RelWithDebInfo: /O2 + symbols on the release CRT (/MD), no LTO. Use this to debug
+  // anything that touches llama.cpp: the prebuilt llama.cpp DLLs are Release (/MD),
+  // and libcommon's C++ API (std::string / std::vector across the DLL boundary) is
+  // ABI-incompatible with the Debug CRT (/MDd, _ITERATOR_DEBUG_LEVEL=2).
+  {
+    "label": "Windows: Build & Run (RelWithDebInfo)",
+    "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 -Configuration RelWithDebInfo && cd /d build\\RelWithDebInfo && Hodeia.exe\"",
+    "use_new_terminal": true,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "show_summary": true,
+    "show_command": true,
+    "tags": ["build_and_run", "windows", "relwithdebinfo"],
+  },
+
+  // Debug (/MDd): crashes in llama-common.dll as soon as a model is loaded (CRT/ABI
+  // mismatch with the Release llama.cpp DLLs, see above). Only for non-inference work.
   {
     "label": "Windows: Build & Run (Debug)",
     "command": "cmd /c \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Windows/build-app.ps1 -Configuration Debug && cd /d build\\Debug && Hodeia.exe\"",

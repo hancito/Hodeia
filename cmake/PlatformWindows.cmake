@@ -189,18 +189,8 @@ function(hodeia_windows_deploy TARGET)
           $<TARGET_FILE_DIR:${TARGET}>/Resources/Models
       COMMENT "Copying bundled model tree")
 
-  # --- Translations: the app loads them from <exe>/i18n/.  Use the .qm list
-  #     from qt_add_translations (as Linux/macOS do): a configure-time
-  #     file(GLOB) finds nothing in a fresh build dir, since the .qm files are
-  #     only generated during the build. ---
-  if(HODEIA_QM_FILES)
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            $<TARGET_FILE_DIR:${TARGET}>/i18n
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${HODEIA_QM_FILES} $<TARGET_FILE_DIR:${TARGET}>/i18n
-        COMMENT "Copying translations (.qm)")
-  endif()
+  # Translations (.qm) are deployed by the Hodeia_deploy_translations target
+  # (src/CMakeLists.txt), not here.
 
   # --- llama.cpp: every core DLL + all CPU variants + backend + libomp ---
   # The per-microarch ggml-cpu-* DLLs must sit next to the exe so ggml can

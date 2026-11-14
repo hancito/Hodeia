@@ -208,7 +208,7 @@ Rectangle {
                             icon.source: "qrc:/Resources/file-pdf-solid-full.svg"
                             onClicked: {
                                 if (!displayPane.activeSummaryJson) {
-                                    console.warn("No summary to export");
+                                    messageBox.showInfo(qsTr("No Summary"), qsTr("This paper has no summary to export yet. Summarize it first."));
                                     return;
                                 }
                                 pdfSaveDialog.open();
@@ -367,9 +367,13 @@ Rectangle {
         onAccepted: {
             var result = helpers.exportSummaryToPdf(displayPane.activeSummaryJson, selectedFile.toString());
             if (result)
-                console.log("PDF saved to:", result);
+                messageBox.showInfo(qsTr("PDF Saved"), qsTr("The summary was saved to:\n%1").arg(result));
             else
-                console.warn("PDF export failed");
+                messageBox.showError(qsTr("PDF Export Failed"), qsTr("The summary could not be saved. See the log for details."));
         }
+    }
+
+    MessageBox {
+        id: messageBox
     }
 }

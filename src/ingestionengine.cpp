@@ -448,6 +448,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   const int batchSize = 10;
   int savedCount = 0;
   int errorCount = 0;
+  QStringList failedTitles; // papers dropped because indexing failed
   int total = urlsToProcess.size();
 
   for (int i = 0; i < total; i += batchSize) {
@@ -512,13 +513,22 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       QString statusMsg = tr("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
 
+      bool indexed = false;
       if (m_vecManager) {
-        ingestChunks(allChunks, dbPath);
+        indexed = ingestChunks(allChunks, dbPath);
       } else {
         qWarning() << "[PdfWorker] embedding model not loaded, skipping vector "
                       "storage";
-        emit status(tr("Warning: embedding model not loaded, skipping vector "
-                       "storage"));
+      }
+      if (!indexed) {
+        // A paper without chunks can be neither summarized nor queried, and
+        // a re-import would skip it (its hash is already known): remove it
+        // so the user can add it again once the cause is fixed.
+        removePapers(rows, dbPath);
+        savedCount -= rows.size();
+        errorCount += rows.size();
+        for (const auto &row : rows)
+          failedTitles << row.title;
       }
 
       allChunks.clear();
@@ -536,6 +546,15 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   if (errorCount > 0)
     qWarning() << "[PdfWorker] Total skipped due to errors:" << errorCount;
 
+  if (!failedTitles.isEmpty()) {
+    emit ingestionError(
+        tr("These papers could not be indexed for search and were not "
+           "added:") +
+        "\n\n• " + failedTitles.join("\n• ") + "\n\n" +
+        tr("The embedding model could not process their text. See the log "
+           "for details, then add the files again."));
+  }
+
   emit finished();
 }
 
@@ -543,24 +562,26 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 //  Database writes
 // ============================================================================
 
-void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
+/// Embed and store the chunks in one transaction.  Returns false when nothing
+/// was stored (the transaction is rolled back on any failure).
+bool PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
                              const QString &dbPath) {
   if (chunks.isEmpty())
-    return;
+    return true;
 
   SqliteDb db;
   auto openResult = db.open(dbPath);
   if (!openResult) {
     qCritical() << "[PdfWorker] Failed to open database for chunk ingestion:"
                 << openResult.error();
-    return;
+    return false;
   }
 
   auto txResult = db.transaction();
   if (!txResult) {
     qCritical() << "[PdfWorker] Failed to start transaction for chunks:"
                 << txResult.error();
-    return;
+    return false;
   }
 
   int inserted = m_vecManager->insertChunks(db, chunks);
@@ -574,7 +595,7 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
       qCritical() << "[PdfWorker] Chunk transaction rollback failed:"
                   << rbResult.error();
     }
-    return;
+    return false;
   }
 
   auto commitResult = db.commit();
@@ -582,11 +603,47 @@ void PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     qCritical() << "[PdfWorker] Chunk transaction commit failed:"
                 << commitResult.error();
     (void)db.rollback();
+    return false;
   }
 
   auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   if (!wpResult) {
     qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
+  }
+  return true;
+}
+
+/// Delete the Summaries rows of papers whose indexing failed, so that a
+/// later import does not skip them as already known.
+void PdfWorker::removePapers(const QList<SummaryRow> &rows,
+                             const QString &dbPath) {
+  if (rows.isEmpty())
+    return;
+
+  SqliteDb db;
+  auto openResult = db.open(dbPath);
+  if (!openResult) {
+    qCritical() << "[PdfWorker] Failed to open database to remove papers:"
+                << openResult.error();
+    return;
+  }
+
+  SqliteStatement stmt =
+      db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
+  if (!stmt.isValid()) {
+    qCritical() << "[PdfWorker] Prepare failed for paper removal";
+    return;
+  }
+  for (const auto &row : rows) {
+    auto bindResult = stmt.bind(1, row.paperHash);
+    auto execResult = bindResult ? stmt.exec() : bindResult;
+    if (!execResult)
+      qCritical() << "[PdfWorker] Failed to remove paper" << row.title << ":"
+                  << execResult.error();
+    else
+      qWarning() << "[PdfWorker] Removed unindexed paper:"
+                 << row.paperHash.left(12) << row.title;
+    stmt.resetAndClearBindings();
   }
 }
 

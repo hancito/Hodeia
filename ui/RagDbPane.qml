@@ -25,9 +25,13 @@ Rectangle {
         selectedQueryIds = result;
     }
 
+    function showNoSelection() {
+        messageBox.showInfo(qsTr("No Queries Selected"), qsTr("Select at least one query first."));
+    }
+
     function deleteSelected() {
         if (selectedQueryIds.length === 0) {
-            console.log("No queries selected");
+            showNoSelection();
             return;
         }
         console.log("Deleting", selectedQueryIds.length, "queries");
@@ -226,7 +230,7 @@ Rectangle {
                 icon.source: "qrc:/Resources/trash-can.svg"
                 onClicked: {
                     if (dbPane.selectedQueryIds.length === 0) {
-                        footerLabel.text = qsTr("No queries selected");
+                        dbPane.showNoSelection();
                         return;
                     }
                     deleteQueriesDialog.open();
@@ -250,5 +254,9 @@ Rectangle {
         }
         onAccepted: dbPane.deleteSelected()
         onRejected: footerLabel.text = qsTr("Deletion cancelled")
+    }
+
+    MessageBox {
+        id: messageBox
     }
 }

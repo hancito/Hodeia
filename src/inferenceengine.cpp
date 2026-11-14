@@ -241,7 +241,7 @@ QString InferenceEngine::inferText(const common_chat_prompt &prompt) {
     pos = end;
   }
 
-  return generate(nTokens);
+  return generate(nTokens, nTokens);
 }
 
 // ── Multimodal inference ──────────────────────────────────────────
@@ -352,24 +352,28 @@ QString InferenceEngine::inferMultimodal(const common_chat_prompt &prompt,
 
   qDebug() << "[InferenceEngine] Multimodal prompt decoded, n_past=" << nPast;
   // Pass the mtmd-computed n_past through: for M-RoPE models it advances by
-  // the image's n_pos and can differ from the KV cache's max position.
-  return generate(nPast);
+  // the image's n_pos, fewer than its tokens.  The KV cells actually used
+  // are the token count, which is what bounds the generation budget.
+  return generate(nPast, static_cast<int32_t>(nTokens));
 }
 
 // ── Shared generation loop ────────────────────────────────────────
 
-QString InferenceEngine::generate(llama_pos nPast) {
+QString InferenceEngine::generate(llama_pos nPast, int32_t nCells) {
   if (!m_sampler) {
     qCritical() << "[InferenceEngine] No sampler available";
     return QString();
   }
 
-  // Token budget: the remaining context. LocalBackend sizes n_ctx as
+  // Token budget: the free KV cells. LocalBackend sizes n_ctx as
   // prompt_tokens + response headroom, so this is effectively the headroom.
+  // Each generated token takes one cell, so the budget is counted in cells,
+  // not positions (nPast < nCells for M-RoPE models with images).
   const auto nCtx = (llama_pos)llama_n_ctx(m_ctx);
-  const int32_t limit = std::max<int32_t>(0, nCtx - nPast);
+  const int32_t limit = std::max<int32_t>(0, nCtx - nCells);
   qDebug() << "[InferenceEngine] Generating | n_past:" << nPast
-           << "| n_ctx:" << nCtx << "| token budget:" << limit;
+           << "| kv cells:" << nCells << "| n_ctx:" << nCtx
+           << "| token budget:" << limit;
 
   // Raw UTF-8 bytes of the whole output. A single token may hold an
   // incomplete UTF-8 sequence (byte-fallback tokens, emoji, CJK...), so we

@@ -51,9 +51,13 @@ Rectangle {
         selectedPapers = result;
     }
 
+    function showNoSelection() {
+        messageBox.showInfo(qsTr("No Papers Selected"), qsTr("Select at least one paper first."));
+    }
+
     function deleteSelected() {
         if (selectedPapers.length === 0) {
-            console.log("No papers selected");
+            showNoSelection();
             return;
         }
         console.log("Deleting", selectedPapers.length, "papers");
@@ -144,7 +148,7 @@ Rectangle {
                 icon.source: "qrc:/Resources/ai-svgrepo-com.svg"
                 onClicked: {
                     if (summaryDbPane.selectedPapers.length === 0) {
-                        console.log("No papers selected");
+                        summaryDbPane.showNoSelection();
                         return;
                     }
                     summaryDbPane.totalPapers = summaryDbPane.selectedPapers.length;
@@ -178,7 +182,7 @@ Rectangle {
                 icon.source: "qrc:/Resources/list.svg"
                 onClicked: {
                     if (summaryDbPane.selectedPapers.length === 0) {
-                        console.log("No papers selected");
+                        summaryDbPane.showNoSelection();
                         return;
                     }
                     var jsons = [];
@@ -203,8 +207,7 @@ Rectangle {
                 icon.source: "qrc:/Resources/trash-can.svg"
                 onClicked: {
                     if (summaryDbPane.selectedPapers.length === 0) {
-                        if (summaryDbPane.statusBarLabel)
-                            summaryDbPane.statusBarLabel.text = qsTr("No papers selected");
+                        summaryDbPane.showNoSelection();
                         return;
                     }
                     deletePapersDialog.open();
@@ -497,10 +500,14 @@ Rectangle {
         onAccepted: {
             var result = helpers.generateReport(summaryDbPane.reportJsons, selectedFile.toString());
             if (result)
-                console.log("Report saved to:", result);
+                messageBox.showInfo(qsTr("Report Saved"), qsTr("The report was saved to:\n%1").arg(result));
             else
-                console.warn("Report export failed");
+                messageBox.showError(qsTr("Report Export Failed"), qsTr("The report could not be saved. See the log for details."));
         }
+    }
+
+    MessageBox {
+        id: messageBox
     }
 
     // Delete papers confirmation dialog

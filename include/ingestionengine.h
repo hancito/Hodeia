@@ -29,6 +29,9 @@ signals:
   void started();
   void status(QString statusLog);
   void embeddingProgress(int current, int total);
+  /// Emitted once, before finished(), when some papers could not be
+  /// indexed (they were removed again so they can be re-added).
+  void ingestionError(QString message);
 
 private:
   ExtractionResult extractText(const QUrl &fileUrl,
@@ -46,7 +49,8 @@ private:
   QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
                                           const QString &imgPath) const;
   void savePapers(const QList<SummaryRow> &rows, const QString &dbPath);
-  void ingestChunks(const QList<TextChunk> &chunks, const QString &dbPath);
+  bool ingestChunks(const QList<TextChunk> &chunks, const QString &dbPath);
+  void removePapers(const QList<SummaryRow> &rows, const QString &dbPath);
   QStringList getAllPaperHashes(const QString &dbPath) const;
   QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
                                    const QString &dbPath) const;

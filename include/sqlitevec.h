@@ -44,7 +44,8 @@ public:
                        EmbedMode mode = EmbedMode::Passage);
 
   // Token count of `text` with the embedding model's own tokenizer, without
-  // the E5 prefix.  Loads the model on first use; -1 if it can't be loaded.
+  // the E5 prefix.  Loads the model on first use; -1 if it can't be loaded
+  // or the tokenizer fails (no tokens for a non-blank text).
   int countTokens(const QString &text);
 
   // Largest chunk (in tokens, prefix excluded) that the embedding model can
