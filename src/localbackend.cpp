@@ -187,6 +187,7 @@ LocalBackend::loadModel(const QString &modelPath, const PromptPayload &payload,
            << "| batch:" << llama_n_batch(m_llamaCtx)
            << "| ubatch:" << llama_n_ubatch(m_llamaCtx)
            << "| vision:" << m_hasVision;
+  InferenceEngine::logGpuMemory(QStringLiteral("after model load"));
   emit statusUpdated(tr("Model loaded: %1").arg(path));
   return {};
 }
@@ -247,6 +248,7 @@ static int lb_v_type(int type_kv, bool flash_attn) {
 struct probe_info {
   int32_t n_layers = 0;
   int32_t n_embd = 0;
+  int32_t n_head = 0;
   int32_t n_embd_k_gqa = 0;
   int32_t n_embd_v_gqa = 0;
   int32_t n_ctx_train = 0;
@@ -412,6 +414,7 @@ static probe_info lb_probe_model(const QString &modelPath,
   {
     int n_head = std::max(llama_model_n_head(model), 1);
     int n_head_kv = std::max(llama_model_n_head_kv(model), 1);
+    info.n_head = n_head;
     info.n_embd_k_gqa = info.n_embd / n_head * n_head_kv;
     info.n_embd_v_gqa = info.n_embd_k_gqa;
   }
@@ -886,7 +889,9 @@ static common_params lb_fit_params(const probe_info &probe,
   // --- Discrete GPU path ---
   // Reductions, cheapest in quality first; each OOM round applies the first
   // one still possible, then re-estimates:
-  //   1. n_ubatch / 2 down to 2048     (smaller compute buffer, slower prompt)
+  //   1. n_ubatch / 2 down to 2048, or 512 without flash attention (smaller
+  //      compute buffer, slower prompt; without FA the KQ matrix shrinks
+  //      with n_ubatch, so this is by far the cheapest reduction)
   //   2. KV cache F16 → Q8_0            (half the KV, negligible quality loss)
   //   3. mmproj → CPU                   (slower image encoding only)
   //   4. offload layers up to 30 %      (slower generation, full document)
@@ -905,6 +910,7 @@ static common_params lb_fit_params(const probe_info &probe,
   bool mmproj_on_gpu = probe.has_mmproj;
   // Hybrid models run without flash attention (V cache stays F16).
   const bool flash_attn = !probe.is_hybrid;
+  const uint32_t ubatch_floor_1 = flash_attn ? 2048U : 512U;
 
   for (int attempts = 0; attempts < 500; ++attempts) {
     const int n_gpu_layers = total_layers - offloaded;
@@ -920,9 +926,19 @@ static common_params lb_fit_params(const probe_info &probe,
     // MiB measured for 48 layers, 8192 ubatch, 3840 embd → ~6 bytes/element.
     // Bumped to 8 for headroom: sliding-window models (gemma4) allocate
     // extra SWA buffers.
-    const uint64_t compute_buf = static_cast<uint64_t>(n_ubatch) *
-                                 std::max(probe.n_embd, 1) *
-                                 static_cast<uint64_t>(n_gpu_layers) * 8;
+    const uint64_t compute_base = static_cast<uint64_t>(n_ubatch) *
+                                  std::max(probe.n_embd, 1) *
+                                  static_cast<uint64_t>(n_gpu_layers) * 8;
+    // Without flash attention, llama.cpp materializes one layer's attention
+    // scores: F32, n_ctx × n_ubatch × n_head.  It grows with the context and
+    // dominates at long prompts — measured on Qwen3.5-9B (hybrid, 16 heads),
+    // n_ctx 43264, n_ubatch 2048: ~5360 MiB vs 5408 MiB from this formula.
+    const uint64_t kq_buf =
+        flash_attn || n_gpu_layers == 0
+            ? 0
+            : static_cast<uint64_t>(n_ctx) * n_ubatch *
+                  static_cast<uint64_t>(std::max(probe.n_head, 1)) * 4;
+    const uint64_t compute_buf = compute_base + kq_buf;
     const uint64_t gpu_total =
         (gpu_weight + mmproj_mem + kv_size + compute_buf) * 105 / 100;
 
@@ -952,14 +968,15 @@ static common_params lb_fit_params(const probe_info &probe,
                << "MiB | weights=" << (gpu_weight >> 20)
                << "MiB | kv=" << (kv_size >> 20)
                << "MiB | mmproj=" << (mmproj_mem >> 20)
-               << "MiB | compute=" << (compute_buf >> 20) << "MiB";
+               << "MiB | compute=" << (compute_buf >> 20) << "MiB (KQ "
+               << (kq_buf >> 20) << ")";
       return params;
     }
 
     // ── OOM: apply the first reduction still possible ─────────────
-    if (n_ubatch > 2048) { // 1
+    if (n_ubatch > ubatch_floor_1) { // 1
       const uint32_t old = n_ubatch;
-      n_ubatch = std::max(n_ubatch / 2, 2048U);
+      n_ubatch = std::max(n_ubatch / 2, ubatch_floor_1);
       LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OOM → n_ubatch" << old << "→"
                << n_ubatch;
     } else if (type_kv == GGML_TYPE_F16) { // 2
@@ -1226,6 +1243,8 @@ LocalBackend::loadModelWithDevices(const QString &path,
            << "n_gpu_layers=" << params.n_gpu_layers
            << "n_ctx=" << params.n_ctx << "n_ubatch=" << params.n_ubatch;
 
+  InferenceEngine::logGpuMemory(QStringLiteral("before model load"),
+                                /*setBaseline=*/true);
   common_init_result_ptr result = createInitResult(params);
   if (!result) {
     qCritical() << "[LocalBackend] GPU load failed, trying CPU fallback";
@@ -1549,6 +1568,7 @@ std::expected<void, QString> LocalBackend::loadMmproj() {
 
   qDebug() << "[LocalBackend] mmproj loaded on"
            << (mtmdParams.use_gpu ? "GPU" : "CPU");
+  InferenceEngine::logGpuMemory(QStringLiteral("after mmproj load"));
   return {};
 }
 

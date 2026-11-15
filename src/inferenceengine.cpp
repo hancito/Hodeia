@@ -3,6 +3,7 @@
 #include "common/chat.h"
 #include "common/common.h"
 #include "common/sampling.h"
+#include "ggml-backend.h"
 #include "llama.h"
 #include "localbackend.h"
 #include "mtmd-helper.h"
@@ -10,6 +11,8 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QHash>
+#include <QMutex>
 #include <algorithm>
 #include <memory>
 #include <vector>
@@ -171,6 +174,36 @@ InferenceEngine::countMultimodalTokens(mtmd_context *mctx,
   return static_cast<int32_t>(mtmd_helper_get_n_tokens(chunks.get()));
 }
 
+void InferenceEngine::logGpuMemory(const QString &stage, bool setBaseline) {
+  static QMutex mutex;
+  static QHash<QString, size_t> baseline; // device name -> free bytes
+  QMutexLocker lock(&mutex);
+  for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+    ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+    const auto type = ggml_backend_dev_type(dev);
+    if (type != GGML_BACKEND_DEVICE_TYPE_GPU &&
+        type != GGML_BACKEND_DEVICE_TYPE_IGPU)
+      continue;
+    size_t free = 0, total = 0;
+    ggml_backend_dev_memory(dev, &free, &total);
+    const QString name = QString::fromUtf8(ggml_backend_dev_name(dev));
+    if (setBaseline)
+      baseline[name] = free;
+    const auto it = baseline.constFind(name);
+    const qint64 used =
+        it != baseline.cend()
+            ? (static_cast<qint64>(*it) - static_cast<qint64>(free)) >> 20
+            : -1;
+    qDebug().noquote() << QStringLiteral(
+                              "[GPU-MEM] %1 | %2: free %3 / %4 MiB | used "
+                              "since baseline: %5 MiB")
+                              .arg(stage, name)
+                              .arg(free >> 20)
+                              .arg(total >> 20)
+                              .arg(used);
+  }
+}
+
 // samplingParams is taken by value: common_sampler_init may mutate it.
 InferenceEngine::InferenceEngine(struct llama_context *ctx,
                                  struct llama_model *model,
@@ -289,6 +322,7 @@ QString InferenceEngine::inferMultimodal(const common_chat_prompt &prompt,
 
   llama_pos nPast = 0;
   mtmd::batch_ptr mbatch; // lazily created for runs of consecutive media chunks
+  logGpuMemory(QStringLiteral("before prompt decode"));
 
   for (size_t i = 0; i < nChunks; ++i) {
     auto chunk = mtmd_input_chunks_get(chunks.get(), i);
@@ -332,6 +366,9 @@ QString InferenceEngine::inferMultimodal(const common_chat_prompt &prompt,
         return QString();
       }
       embd = mtmd_batch_get_output_embd(mbatch.get(), chunk);
+      logGpuMemory(QStringLiteral("chunk %1: image encoded (%2 tokens)")
+                       .arg(i)
+                       .arg(mtmd_input_chunk_get_n_tokens(chunk)));
     }
     if (!embd) {
       qCritical() << "[InferenceEngine] no embeddings for media chunk" << i;
@@ -348,9 +385,13 @@ QString InferenceEngine::inferMultimodal(const common_chat_prompt &prompt,
       return QString();
     }
     nPast = newNpast;
+    logGpuMemory(QStringLiteral("chunk %1: image decoded, n_past %2")
+                     .arg(i)
+                     .arg(nPast));
   }
 
   qDebug() << "[InferenceEngine] Multimodal prompt decoded, n_past=" << nPast;
+  logGpuMemory(QStringLiteral("after prompt decode"));
   // Pass the mtmd-computed n_past through: for M-RoPE models it advances by
   // the image's n_pos, fewer than its tokens.  The KV cells actually used
   // are the token count, which is what bounds the generation budget.
@@ -445,6 +486,7 @@ QString InferenceEngine::generate(llama_pos nPast, int32_t nCells) {
 
   // Any trailing incomplete sequence (generation cut mid-character) becomes
   // a single U+FFFD here rather than corrupting every split character.
+  logGpuMemory(QStringLiteral("after generation"));
   return QString::fromUtf8(output.data(), static_cast<qsizetype>(output.size()));
 }
 

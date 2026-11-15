@@ -46,6 +46,25 @@ Autres approximations :
   à ~6, augmenté à 8 pour les buffers SWA de Gemma) ;
 - +5 % sur le total.
 
+## 2 bis. Sans flash attention, la matrice KQ n'était pas comptée (corrigé)
+
+Mesuré le 2026-11-15 (RTX 5070 Ti 16 Go, Qwen3.5-9B Q4_K_M, hybride →
+flash attention désactivée, n_ctx 43264, n_ubatch 2048) : 12 120 Mio
+consommés au chargement du modèle contre 8 860 Mio estimés, puis CUDA OOM
+pendant le décodage des images (mmproj chargé par-dessus).
+
+Cause : sans flash attention, llama.cpp matérialise les scores d'attention
+d'une couche, en F32 : `n_ctx × n_ubatch × n_head × 4` octets, soit 5408 Mio
+ici (≈ 5360 mesurés). L'ancienne formule du buffer de calcul ignorait `n_ctx`.
+
+Correction dans `lb_fit_params()` : ce terme est ajouté quand la flash
+attention est désactivée, et la réduction 1 (`n_ubatch`) descend alors
+jusqu'à 512 au lieu de 2048. Le relevé `[GPU-MEM]` (`InferenceEngine::
+logGpuMemory`) reste en place pour les mesures suivantes.
+
+À tester : activer la flash attention pour les modèles hybrides récents
+(Qwen3.5) avec une version récente de llama.cpp ; la matrice KQ disparaîtrait.
+
 ## 3. Plan de test / étapes proposées
 
 1. **Mesurer avant de modifier.** Journaliser, pour chaque chargement :

@@ -63,6 +63,12 @@ public:
                                        const common_chat_prompt &prompt,
                                        const std::vector<PageImage> &images);
 
+  /// VRAM fitting debug aid (docs/NOTES-VRAM-FITTING.md): log the free
+  /// memory of every GPU device at @p stage. With @p setBaseline, the values
+  /// become the reference later calls report "used since baseline" against
+  /// (set just before the model load).
+  static void logGpuMemory(const QString &stage, bool setBaseline = false);
+
   /// Optional cooperative-cancellation flag. When the pointed-to value is
   /// true, generation stops at the next token boundary and the partial
   /// output is returned. The flag is owned and cleared by the caller
