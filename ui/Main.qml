@@ -357,7 +357,7 @@ ThemedWindow {
             { name: "SQLite", url: "https://sqlite.org", license: qsTr("Public domain") },
             { name: "sqlite-vec", url: "https://github.com/asg017/sqlite-vec", license: "MIT / Apache-2.0" },
             { name: "Vulkan Loader", url: "https://github.com/KhronosGroup/Vulkan-Loader", license: "Apache-2.0" },
-            { name: "Google Sans, Lato, Outfit…", url: "https://fonts.google.com", license: "SIL OFL 1.1" }
+            { name: "Google Sans, Google Sans Code…", url: "https://fonts.google.com", license: "SIL OFL 1.1" }
         ]
 
         ColumnLayout {

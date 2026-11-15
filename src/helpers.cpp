@@ -11,6 +11,11 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QRegularExpression>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTextList>
 #include <QThreadPool>
 #include <QUrl>
 
@@ -33,6 +38,46 @@ Helpers::~Helpers() = default;
 
 QString Helpers::summaryToHtml(const QString &json) const {
   return SummaryFormat::toHtml(SummaryFormat::parseJson(json));
+}
+
+QString Helpers::markdownToHtml(const QString &markdown) const {
+  QTextDocument doc;
+  doc.setMarkdown(markdown);
+
+  // Spacing in px.  Paragraph/heading margins collapse with the next block's
+  // top margin, so each block only needs one side set.
+  constexpr qreal paragraphGap = 10;
+  constexpr qreal headingTop = 18;
+  constexpr qreal headingBottom = 6;
+  constexpr qreal listItemGap = 4;
+  constexpr qreal lineHeight = 120; // percent
+
+  QTextCursor cursor(&doc);
+  for (QTextBlock block = doc.begin(); block.isValid(); block = block.next()) {
+    QTextBlockFormat fmt = block.blockFormat();
+    const bool inList = block.textList() != nullptr;
+    const bool nextInList =
+        block.next().isValid() && block.next().textList() != nullptr;
+    if (fmt.headingLevel() > 0) {
+      fmt.setTopMargin(headingTop);
+      fmt.setBottomMargin(headingBottom);
+    } else if (inList) {
+      fmt.setBottomMargin(nextInList ? listItemGap : paragraphGap);
+    } else if (!fmt.hasProperty(QTextFormat::BlockCodeFence)) {
+      fmt.setBottomMargin(paragraphGap);
+    }
+    fmt.setLineHeight(lineHeight, QTextBlockFormat::ProportionalHeight);
+    cursor.setPosition(block.position());
+    cursor.setBlockFormat(fmt);
+  }
+
+  // toHtml() writes the document's default font on <body>, which would
+  // override the view's own font: drop it so the TextEdit's font applies.
+  QString html = doc.toHtml();
+  static const QRegularExpression bodyStyle(
+      QStringLiteral("<body style=\"[^\"]*\">"));
+  html.replace(bodyStyle, QStringLiteral("<body>"));
+  return html;
 }
 
 QString Helpers::exportPdf(const QStringList &jsonList,

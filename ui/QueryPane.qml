@@ -9,8 +9,42 @@ Rectangle {
     property string lastResponse: ""
     property bool querying: false
 
+    // Bumped on every model change: the lookups below loop over rowCount(),
+    // which QML can't track, so they depend on this to re-evaluate (e.g.
+    // after the active query was deleted).
+    property int modelRevision: 0
+
+    function activeQueryExists() {
+        for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++)
+            if (databaseManager.queryProxyModel.get(i, "id") === activeQueryId)
+                return true;
+        return false;
+    }
+
+    Connections {
+        target: databaseManager.queryProxyModel
+        function onRowsInserted() {
+            queryPane.modelRevision++;
+        }
+        function onRowsRemoved() {
+            queryPane.modelRevision++;
+            // The shown answer belonged to a deleted query: drop it too.
+            if (queryPane.activeQueryId !== 0 && !queryPane.activeQueryExists())
+                queryPane.lastResponse = "";
+        }
+        function onModelReset() {
+            queryPane.modelRevision++;
+            if (!queryPane.activeQueryExists())
+                queryPane.lastResponse = "";
+        }
+        function onDataChanged() {
+            queryPane.modelRevision++;
+        }
+    }
+
     // Live lookup of the active query from the proxy model.
     readonly property string activeQueryText: {
+        modelRevision;
         if (activeQueryId === 0)
             return "";
         for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
@@ -21,6 +55,7 @@ Rectangle {
         return "";
     }
     readonly property string activeQueryResponse: {
+        modelRevision;
         if (activeQueryId === 0)
             return "";
         for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++) {
@@ -121,10 +156,13 @@ Rectangle {
                     readOnly: true
                     font.family: Fonts.text
                     font.pixelSize: Style.fontReading
-                    textFormat: TextEdit.MarkdownText
+                    // Markdown converted to spaced-out HTML (MarkdownText has
+                    // no paragraph spacing); unhinted, see the summary tab.
+                    textFormat: TextEdit.RichText
+                    font.hintingPreference: Font.PreferNoHinting
                     wrapMode: TextEdit.WordWrap
                     // Prefer the active query response; fall back to lastResponse from a live query.
-                    text: queryPane.activeQueryResponse !== "" ? queryPane.activeQueryResponse : queryPane.lastResponse !== "" ? queryPane.lastResponse : qsTr("Ask a question about your paper library...")
+                    text: helpers.markdownToHtml(queryPane.activeQueryResponse !== "" ? queryPane.activeQueryResponse : queryPane.lastResponse !== "" ? queryPane.lastResponse : qsTr("Ask a question about your paper library..."))
                 }
             }
 
@@ -177,14 +215,6 @@ Rectangle {
 
                 Item {
                     Layout.fillWidth: true
-                }
-
-                StyledButton {
-                    text: qsTr("Export")
-                    icon.width: 24
-                    icon.height: 24
-                    icon.source: "qrc:/Resources/share-square.svg"
-                    onClicked: console.log("Export Text")
                 }
             }
         }

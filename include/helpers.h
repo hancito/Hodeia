@@ -25,6 +25,11 @@ public:
   /// Convert a JSON summary string to HTML (same source used for PDF export).
   Q_INVOKABLE QString summaryToHtml(const QString &json) const;
 
+  /// Render Markdown (RAG answers) as HTML with paragraph, heading and list
+  /// spacing.  Qt's MarkdownText lays blocks out with no margins at all, so
+  /// a long answer reads as one dense wall of text.
+  Q_INVOKABLE QString markdownToHtml(const QString &markdown) const;
+
   /// Export a list of JSON summaries as a PDF (a single summary is a
   /// one-paper report). Returns the saved path on success, or an empty
   /// string on failure.

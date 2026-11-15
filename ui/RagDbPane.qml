@@ -35,8 +35,16 @@ Rectangle {
             return;
         }
         console.log("Deleting", selectedQueryIds.length, "queries");
+        const activeDeleted = selectedQueryIds.includes(activeQueryId);
         databaseManager.removeQueriesByIds(selectedQueryIds);
         selectedQueryIds = [];
+        // The active query is gone: follow the list's new current row (its
+        // index may not change, so onCurrentIndexChanged won't fire), or
+        // clear the selection when the list is empty.
+        if (activeDeleted) {
+            const i = queryView.currentIndex;
+            activeQueryId = i >= 0 && i < databaseManager.queryProxyModel.rowCount() ? databaseManager.queryProxyModel.get(i, "id") : 0;
+        }
     }
 
     border.width: 1
