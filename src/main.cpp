@@ -26,6 +26,7 @@
 #endif
 
 #include <cstdio>
+#include <cstring>
 
 // ── Crash / diagnostics log ────────────────────────────────────────────────
 // In a GUI-subsystem build (WIN32_EXECUTABLE) there is no console, so qDebug()
@@ -177,9 +178,19 @@ static void llamaLogCallback(enum ggml_log_level level, const char *text,
   // INFO metadata dump or mtmd's per-chunk DEBUG trace (which prints the
   // whole prompt text). GGML_LOG_LEVEL_CONT continues the previous message:
   // keep it only if that message was kept.
+  // Also keep the INFO lines giving the real size of each buffer (weights,
+  // KV cache, recurrent state, compute) and the resolved flash attention
+  // mode: they are what lb_fit_params's estimate is checked against
+  // (docs/NOTES-VRAM-FITTING.md).
   static thread_local bool s_lastKept = false;
-  if (level != GGML_LOG_LEVEL_CONT)
-    s_lastKept = level >= GGML_LOG_LEVEL_WARN;
+  if (level != GGML_LOG_LEVEL_CONT) {
+    const char *t = text ? text : "";
+    s_lastKept = level >= GGML_LOG_LEVEL_WARN ||
+                 (level == GGML_LOG_LEVEL_INFO &&
+                  (std::strstr(t, "buffer size") ||
+                   std::strstr(t, "llama_kv_cache: size") ||
+                   std::strstr(t, "flash_attn")));
+  }
   if (!s_lastKept)
     return;
   const char *tag = "INFO";

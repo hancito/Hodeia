@@ -6,6 +6,7 @@
 #include "common/common.h"
 #include "ggml-backend.h"
 #include "ggml.h"
+#include "gguf.h"
 #include "llama.h"
 #include "mtmd.h"
 
@@ -218,20 +219,39 @@ static const char *lb_kv_name(int type) {
   return ggml_type_name(static_cast<ggml_type>(type));
 }
 
-/// Estimate KV cache size in bytes for the given configuration.
-static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
-                                     int32_t n_layers, uint32_t n_ctx,
+/// KV cache shape of one model layer.  k_dim / v_dim = n_head_kv × head
+/// size; 0 for a layer without its own cache (recurrent layer of a hybrid
+/// model, or a layer reusing another layer's KV).
+struct kv_layer {
+  uint32_t k_dim = 0;
+  uint32_t v_dim = 0;
+  bool swa = false; ///< sliding-window layer: holds at most n_swa tokens
+};
+
+/// Exact KV cache size, in bytes, of the LAST `n_layers_on_dev` layers
+/// (llama.cpp offloads the last n_gpu_layers layers to the GPU; pass the
+/// layer count for the whole model).  Full-attention layers hold n_ctx
+/// cells, sliding-window ones min(n_ctx, n_swa + n_ubatch) (llama.cpp's
+/// non-"swa_full" layout), both padded to 256.
+static uint64_t lb_estimate_kv_cache(const std::vector<kv_layer> &layers,
+                                     uint32_t n_swa, int n_layers_on_dev,
+                                     uint32_t n_ctx, uint32_t n_ubatch,
                                      int type_k, int type_v) {
-  uint32_t padded_ctx = lb_pad256(n_ctx);
-  uint64_t k_bytes = lb_row_size(type_k, n_embd_k_gqa) * padded_ctx;
-  uint64_t v_bytes = lb_row_size(type_v, n_embd_v_gqa) * padded_ctx;
-  uint64_t raw = (k_bytes + v_bytes) * static_cast<uint64_t>(std::max(n_layers, 0));
-  // Empirical correction: the naive row-size formula overestimates the
-  // actual CUDA allocation by ~3.8x (measured on RTX 5070 Ti / gemma-4-12B).
-  // llama.cpp uses a far more compact internal layout (shared K/V buffers,
-  // stride optimisations, GQA-aware packing, and only the active portion of
-  // the cache is backed by GPU memory).
-  return raw * 26 / 100;
+  const uint32_t cells_full = lb_pad256(n_ctx);
+  const uint32_t cells_swa =
+      std::min(cells_full, lb_pad256(n_swa + std::max(n_ubatch, 1U)));
+  const int n = static_cast<int>(layers.size());
+  const int first = std::clamp(n - n_layers_on_dev, 0, n);
+  uint64_t total = 0;
+  for (int il = first; il < n; ++il) {
+    const kv_layer &l = layers[il];
+    if (l.k_dim == 0 && l.v_dim == 0)
+      continue;
+    const uint64_t cells = l.swa ? cells_swa : cells_full;
+    total += (lb_row_size(type_k, l.k_dim) + lb_row_size(type_v, l.v_dim)) *
+             cells;
+  }
+  return total;
 }
 
 /// Flash attention for hybrid models (recurrent + attention).  They used to
@@ -262,8 +282,8 @@ struct probe_info {
   int32_t n_layers = 0;
   int32_t n_embd = 0;
   int32_t n_head = 0;
-  int32_t n_embd_k_gqa = 0;
-  int32_t n_embd_v_gqa = 0;
+  std::vector<kv_layer> kv_layers; // one per model layer
+  uint32_t n_swa = 0;              // sliding window size (0: none)
   int32_t n_ctx_train = 0;
   uint64_t model_size = 0;
   uint64_t mmproj_size = 0;   // mmproj weights + compute, all devices
@@ -399,6 +419,141 @@ static common_chat_prompt lb_apply_chat_template(const common_chat_templates *tm
   return common_chat_templates_apply(tmpls, inputs).prompt;
 }
 
+/* ── KV layout from the GGUF metadata ──
+   llama_model_meta_val_str() does not return arrays (per-layer head counts,
+   sliding-window patterns), so the header is read with the gguf API (no
+   tensor data).  Keys follow llama.cpp's naming: "<arch>.<key>". */
+
+namespace {
+struct GgufReader {
+  gguf_context *ctx = nullptr;
+  std::string arch;
+  explicit GgufReader(const QString &path) {
+    gguf_init_params params{/*no_alloc=*/true, /*ctx=*/nullptr};
+    ctx = gguf_init_from_file(path.toUtf8().constData(), params);
+    if (ctx) {
+      const int64_t k = gguf_find_key(ctx, "general.architecture");
+      if (k >= 0 && gguf_get_kv_type(ctx, k) == GGUF_TYPE_STRING)
+        arch = gguf_get_val_str(ctx, k);
+    }
+  }
+  ~GgufReader() {
+    if (ctx)
+      gguf_free(ctx);
+  }
+  GgufReader(const GgufReader &) = delete;
+  GgufReader &operator=(const GgufReader &) = delete;
+
+  int64_t key(const char *suffix) const {
+    return ctx ? gguf_find_key(ctx, (arch + "." + suffix).c_str()) : -1;
+  }
+  /// Integer scalar (any integer width), or `def` if absent, an array or a
+  /// string.  The type is checked first: gguf_get_val_data() asserts on
+  /// arrays (e.g. Gemma 4's per-layer sliding_window_pattern).
+  int64_t integer(const char *suffix, int64_t def) const {
+    const int64_t k = key(suffix);
+    if (k < 0)
+      return def;
+    const gguf_type t = gguf_get_kv_type(ctx, k);
+    if (t == GGUF_TYPE_ARRAY || t == GGUF_TYPE_STRING)
+      return def;
+    return scalarAt(t, gguf_get_val_data(ctx, k), 0, def);
+  }
+  /// Per-layer integer array (bools as 0/1); empty if absent or a scalar.
+  std::vector<int64_t> array(const char *suffix) const {
+    std::vector<int64_t> out;
+    const int64_t k = key(suffix);
+    if (k < 0 || gguf_get_kv_type(ctx, k) != GGUF_TYPE_ARRAY)
+      return out;
+    const gguf_type t = gguf_get_arr_type(ctx, k);
+    if (t == GGUF_TYPE_STRING || t == GGUF_TYPE_ARRAY)
+      return out; // gguf_get_arr_data() asserts on these
+    const void *data = gguf_get_arr_data(ctx, k);
+    const size_t n = gguf_get_arr_n(ctx, k);
+    for (size_t i = 0; i < n; ++i)
+      out.push_back(scalarAt(t, data, i, 0));
+    return out;
+  }
+
+private:
+  static int64_t scalarAt(gguf_type t, const void *data, size_t i,
+                          int64_t def) {
+    switch (t) {
+    case GGUF_TYPE_UINT8:
+    case GGUF_TYPE_BOOL: // stored as int8
+      return static_cast<const uint8_t *>(data)[i];
+    case GGUF_TYPE_INT8:
+      return static_cast<const int8_t *>(data)[i];
+    case GGUF_TYPE_UINT16:
+      return static_cast<const uint16_t *>(data)[i];
+    case GGUF_TYPE_INT16:
+      return static_cast<const int16_t *>(data)[i];
+    case GGUF_TYPE_UINT32:
+      return static_cast<const uint32_t *>(data)[i];
+    case GGUF_TYPE_INT32:
+      return static_cast<const int32_t *>(data)[i];
+    case GGUF_TYPE_UINT64:
+      return static_cast<int64_t>(static_cast<const uint64_t *>(data)[i]);
+    case GGUF_TYPE_INT64:
+      return static_cast<const int64_t *>(data)[i];
+    default:
+      return def;
+    }
+  }
+};
+} // namespace
+
+/// Per-layer KV cache shape, as llama.cpp builds it:
+///   - n_head_kv: scalar or per-layer array (0 = no KV: recurrent layer);
+///   - hybrid models with "full_attention_interval" (Qwen3.5/Qwen3-Next):
+///     only every interval-th layer has attention;
+///   - "sliding_window_pattern": per-layer bools (true = sliding window), or
+///     an integer period p (layer il is SWA unless il % p == p - 1);
+///   - "shared_kv_layers": the last N layers reuse earlier layers' KV;
+///   - head sizes "key_length" / "value_length" and their "_swa" variants.
+/// Unknown layouts fall back to full attention on every layer with
+/// n_embd / n_head sized heads: an overestimate, never an underestimate
+/// (a sliding window without a pattern in the metadata counts as full).
+static std::vector<kv_layer> lb_read_kv_layout(const QString &modelPath,
+                                               int n_layers, int n_embd,
+                                               int n_head, int n_head_kv,
+                                               uint32_t n_swa) {
+  const GgufReader g(modelPath);
+  const int64_t head_k = g.integer("attention.key_length", n_embd / n_head);
+  const int64_t head_v = g.integer("attention.value_length", head_k);
+  const int64_t head_k_swa = g.integer("attention.key_length_swa", head_k);
+  const int64_t head_v_swa = g.integer("attention.value_length_swa", head_v);
+  const std::vector<int64_t> kv_heads = g.array("attention.head_count_kv");
+  const int64_t full_interval = g.integer("full_attention_interval", 0);
+  const std::vector<int64_t> swa_pattern =
+      g.array("attention.sliding_window_pattern");
+  const int64_t swa_period = g.integer("attention.sliding_window_pattern", 0);
+  const int64_t shared = g.integer("attention.shared_kv_layers", 0);
+
+  std::vector<kv_layer> layers(static_cast<size_t>(std::max(n_layers, 0)));
+  for (int il = 0; il < n_layers; ++il) {
+    int64_t heads =
+        il < static_cast<int>(kv_heads.size()) ? kv_heads[il] : n_head_kv;
+    if (full_interval > 0 && (il + 1) % full_interval != 0)
+      heads = 0; // recurrent layer
+    if (shared > 0 && il >= n_layers - shared)
+      heads = 0; // reuses an earlier layer's KV
+    bool swa = false;
+    if (n_swa > 0) {
+      if (il < static_cast<int>(swa_pattern.size()))
+        swa = swa_pattern[il] != 0;
+      else if (swa_period > 0)
+        swa = il % swa_period < swa_period - 1;
+    }
+    layers[il].swa = swa;
+    layers[il].k_dim =
+        static_cast<uint32_t>(heads * (swa ? head_k_swa : head_k));
+    layers[il].v_dim =
+        static_cast<uint32_t>(heads * (swa ? head_v_swa : head_v));
+  }
+  return layers;
+}
+
 /// Probe model metadata (no GPU allocation) and optionally measure mmproj.
 /// Uses no_alloc=true with mmap disabled to avoid the GGML_ASSERT in
 /// llama-model.cpp:1534 which fires when both are enabled simultaneously.
@@ -428,8 +583,16 @@ static probe_info lb_probe_model(const QString &modelPath,
     int n_head = std::max(llama_model_n_head(model), 1);
     int n_head_kv = std::max(llama_model_n_head_kv(model), 1);
     info.n_head = n_head;
-    info.n_embd_k_gqa = info.n_embd / n_head * n_head_kv;
-    info.n_embd_v_gqa = info.n_embd_k_gqa;
+    info.n_swa = static_cast<uint32_t>(std::max(llama_model_n_swa(model), 0));
+    info.kv_layers = lb_read_kv_layout(modelPath, info.n_layers, info.n_embd,
+                                       n_head, n_head_kv, info.n_swa);
+    int full = 0, swa = 0;
+    for (const kv_layer &l : info.kv_layers)
+      if (l.k_dim || l.v_dim)
+        ++(l.swa ? swa : full);
+    qDebug() << "[LocalBackend] lb_probe: KV layout:" << full
+             << "full-attention +" << swa << "sliding-window (n_swa"
+             << info.n_swa << ") of" << info.n_layers << "layers";
   }
   info.model_size = llama_model_size(model);
   info.is_hybrid = llama_model_is_hybrid(model);
@@ -739,23 +902,25 @@ static common_params lb_fit_params(const probe_info &probe,
     int type_k = GGML_TYPE_F16;
     int type_v = GGML_TYPE_F16;
 
-    uint64_t kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                                       probe.n_layers, n_ctx, type_k, type_v);
+    uint64_t kv = lb_estimate_kv_cache(probe.kv_layers, probe.n_swa,
+                                       probe.n_layers, n_ctx, params.n_ubatch,
+                                       type_k, type_v);
     while (persistentWeights + kv > cpuAvailable) {
       // First try quantizing KV (cheap, ~a quarter of the cache for K only).
       if (type_k == GGML_TYPE_F16) {
         type_k = GGML_TYPE_Q8_0;
         type_v = lb_v_type(type_k, /*flash_attn=*/false);
-        kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                                  probe.n_layers, n_ctx, type_k, type_v);
+        kv = lb_estimate_kv_cache(probe.kv_layers, probe.n_swa,
+                                  probe.n_layers, n_ctx, params.n_ubatch,
+                                  type_k, type_v);
         continue;
       }
       // Then shrink the context.
       if (n_ctx <= floor_ctx)
         break; // cannot fit even at the floor — accept the risk
       n_ctx = lb_pad256(n_ctx - 1024U);
-      kv = lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                                probe.n_layers, n_ctx, type_k, type_v);
+      kv = lb_estimate_kv_cache(probe.kv_layers, probe.n_swa, probe.n_layers,
+                                n_ctx, params.n_ubatch, type_k, type_v);
     }
 
     params.n_ctx = n_ctx;
@@ -776,14 +941,18 @@ static common_params lb_fit_params(const probe_info &probe,
   // The model is loaded on exactly one GPU (params.devices = {bottleneck}).
   const device_mem *bottleneck = lb_pick_gpu(gpuDevs);
 
-  // 512 MiB safety margin for iGPUs, 2 GiB for discrete GPUs.
-  // The CUDA runtime + driver + CUDA graph reserves need significant
-  // headroom beyond our weight+KV+compute estimate.  512 MiB was too
-  // tight and caused hard GPU OOM crashes during model load.
+  // Safety margin kept free on the GPU: 512 MiB for iGPUs; for discrete
+  // GPUs max(1 GiB, 6 % of the VRAM) — the driver, fragmentation and other
+  // applications (llama.cpp's own fitter uses 1 GiB).  It was 2 GiB while
+  // the KV estimate was a heuristic; now that KV is computed per layer and
+  // the totals measured above the real peak on every tested model
+  // (docs/NOTES-VRAM-FITTING.md), the margin no longer hides estimation
+  // errors.  The CUDA context is already excluded from memory_free.
   bool integrated = bottleneck->is_integrated;
+  constexpr uint64_t kMiB = 1024ULL * 1024;
   uint64_t effective_margin =
-      integrated ? 512UL * 1024 * 1024       // 512 MiB for iGPU
-                 : 2UL * 1024 * 1024 * 1024; // 2 GiB for discrete
+      integrated ? 512 * kMiB
+                 : std::max(1024 * kMiB, bottleneck->memory_total * 6 / 100);
   if (bottleneck->memory_free <= effective_margin) {
     params.n_gpu_layers = 0;
     LB_FIT_LOG(qWarning) << "[LocalBackend] lb_fit: GPU" << bottleneck->name
@@ -791,11 +960,12 @@ static common_params lb_fit_params(const probe_info &probe,
     return params;
   }
   uint64_t available = bottleneck->memory_free - effective_margin;
-  if (integrated) {
-    LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: integrated GPU detected ("
-             << bottleneck->name << "), margin=" << (effective_margin >> 20)
-             << "MiB, available=" << (available >> 20) << "MiB";
-  }
+  LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit:"
+                     << (integrated ? "integrated" : "discrete") << "GPU"
+                     << bottleneck->name << "| free"
+                     << (bottleneck->memory_free >> 20) << "MiB | margin"
+                     << (effective_margin >> 20) << "MiB | available"
+                     << (available >> 20) << "MiB";
 
   // Per-layer weight estimate
   uint64_t per_layer = probe.model_size / std::max(probe.n_layers, 1);
@@ -846,8 +1016,8 @@ static common_params lb_fit_params(const probe_info &probe,
 
     // Persistent GPU estimate: model weights + KV cache (quantized)
     uint64_t kv_size = lb_estimate_kv_cache(
-        probe.n_embd_k_gqa, probe.n_embd_v_gqa, probe.n_layers, desiredCtx,
-        iGPU_type_k, iGPU_type_v);
+        probe.kv_layers, probe.n_swa, probe.n_layers, desiredCtx,
+        params.n_ubatch, iGPU_type_k, iGPU_type_v);
     uint64_t persistent = probe.model_size + kv_size;
 
     if (persistent <= available) {
@@ -872,9 +1042,10 @@ static common_params lb_fit_params(const probe_info &probe,
     uint32_t floor_ctx = std::max(minCtx, 4096U);
 
     while (fit_ctx > lb_pad256(floor_ctx)) {
-      uint64_t fit_kv = lb_estimate_kv_cache(probe.n_embd_k_gqa,
-                                             probe.n_embd_v_gqa, probe.n_layers,
-                                             fit_ctx, iGPU_type_k, iGPU_type_v);
+      uint64_t fit_kv = lb_estimate_kv_cache(probe.kv_layers, probe.n_swa,
+                                             probe.n_layers, fit_ctx,
+                                             params.n_ubatch, iGPU_type_k,
+                                             iGPU_type_v);
       if (probe.model_size + fit_kv <= available) {
         params.n_ctx = fit_ctx;
         params.n_batch = fit_ctx;
@@ -933,8 +1104,8 @@ static common_params lb_fit_params(const probe_info &probe,
     // GPU-side demand only: layers on the CPU keep their weights and KV in
     // system RAM (offload_kqv), so they cost nothing here.
     const uint64_t kv_size =
-        lb_estimate_kv_cache(probe.n_embd_k_gqa, probe.n_embd_v_gqa,
-                             n_gpu_layers, n_ctx, type_kv, type_v);
+        lb_estimate_kv_cache(probe.kv_layers, probe.n_swa, n_gpu_layers,
+                             n_ctx, n_ubatch, type_kv, type_v);
     const uint64_t gpu_weight = static_cast<uint64_t>(n_gpu_layers) * per_layer;
     const uint64_t mmproj_mem = mmproj_on_gpu ? probe.mmproj_size : 0;
     // CUDA graph reserve allocates per-layer activations.  Calibrated: 8433
@@ -958,7 +1129,12 @@ static common_params lb_fit_params(const probe_info &probe,
         (gpu_weight + mmproj_mem + kv_size + compute_buf) * 105 / 100;
 
     if (gpu_total <= available) {
-      params.n_gpu_layers = n_gpu_layers;
+      // llama.cpp counts the output layer in n_gpu_layers: the repeating
+      // layers on the GPU start at n_layer + 1 - n_gpu_layers.  Passing the
+      // bare layer count left layer 0 (weights + KV) on the CPU.  +1 puts
+      // exactly the last n_gpu_layers layers, as estimated, plus the output
+      // layer on the GPU.
+      params.n_gpu_layers = n_gpu_layers > 0 ? n_gpu_layers + 1 : 0;
       params.n_ctx = n_ctx;
       params.n_batch = 8192; // fixed: keeps Vulkan/CUDA command buffers manageable
       params.n_ubatch = n_ubatch;
@@ -969,7 +1145,7 @@ static common_params lb_fit_params(const probe_info &probe,
         params.mmproj.path = mmprojPath.toStdString();
         params.mmproj_use_gpu = mmproj_on_gpu;
       }
-      // llama.cpp puts the first n_gpu_layers on the GPU device and the rest
+      // llama.cpp puts the last n_gpu_layers on the GPU device and the rest
       // on the CPU backend — no need to pass the CPU device explicitly.
       LB_FIT_LOG(qDebug) << "[LocalBackend] lb_fit: OK"
                << (n_gpu_layers == total_layers ? "(GPU only)"
@@ -1314,8 +1490,9 @@ LocalBackend::estimateContext(const QString &modelPath, int promptTokens,
       where = Placement::Cpu;
       p = lb_fit_params(probe, {}, mmprojPath, desired, Ubatch, MinCtx);
     } else {
-      where = p.n_gpu_layers >= probe.n_layers ? Placement::Gpu
-                                               : Placement::Split;
+      // n_gpu_layers includes the output layer (see lb_fit_params).
+      where = p.n_gpu_layers > probe.n_layers ? Placement::Gpu
+                                              : Placement::Split;
     }
     // The fitter shrinks n_ctx as a last resort; the prompt is then cut.
     const auto nCtx = static_cast<uint32_t>(std::max(p.n_ctx, 0));

@@ -87,6 +87,41 @@ Attention : en `AUTO`, llama.cpp peut désactiver la FA sans le signaler
 alors trop basse. Le signe : `[GPU-MEM] after model load` bien au-dessus de
 l'estimation poids + KV + calcul.
 
+## 2 quater. KV calculé couche par couche, marge ramenée à 1 Gio (fait)
+
+Le facteur 0,26 est supprimé. `lb_read_kv_layout()` lit l'en-tête GGUF
+(API `gguf.h`, les tableaux ne passent pas par `llama_model_meta_val_str`) :
+têtes KV par couche, `full_attention_interval` (hybrides), motif et taille
+de fenêtre glissante, `shared_kv_layers`, tailles de tête (et `_swa`).
+Couche pleine : n_ctx cellules ; couche à fenêtre : min(n_ctx, n_swa +
+n_ubatch), arrondis à 256. Structure inconnue → pleine attention partout
+(surestimation).
+
+Mesuré le 2026-11-15 (RTX 5070 Ti, même document de 24 pages, mode FULL),
+tailles réelles lues dans les logs llama.cpp (`kv_cache: size`, `compute
+buffer size`) et `[GPU-MEM]` :
+
+| Modèle | KV estimé / réel | Calcul estimé / réel | Total estimé (hors +5 %) | Pic réel |
+|---|---|---|---|---|
+| Gemma 4 12B (SWA) | 1440 / 1440 | 2880 / 2188 | 11 064 | 10 319 |
+| Qwen3-VL-8B (dense) | 3232 / 3232 | 2304 / 1763 | 10 325 | 9 272 |
+| Qwen3.5-9B (hybride) | 1352 / 1352 | 2048 / 2173 | 9 958 | 9 342 |
+
+L'ancien facteur aurait estimé le KV de Qwen3-VL à ~840 Mio (×3,8 trop
+peu) et celui de Gemma 4 12B à 3954 Mio (×2,7 trop).
+
+En conséquence, la marge dGPU passe de 2 Gio à `max(1 Gio, 6 % de la VRAM)`
+(1 Gio aussi dans l'ajustement de llama.cpp). Avec 2 Gio, Qwen3-VL avait
+dû passer le mmproj sur le CPU (76 s au lieu d'environ 20 s).
+
+Corrigé au passage : `n_gpu_layers` compte aussi la couche de sortie dans
+llama.cpp (couches GPU à partir de `n_layer + 1 - n_gpu_layers`). Passer le
+nombre de couches laissait la couche 0 sur le CPU (KV de 24 Mio sur le CPU
+pour Gemma, 90 Mio pour Qwen3-VL). On passe maintenant `n_gpu_layers + 1`.
+
+Les lignes INFO de llama.cpp sur les tailles de buffers et la flash
+attention sont désormais conservées dans `Hodeia.log` (`src/main.cpp`).
+
 ## 3. Plan de test / étapes proposées
 
 1. **Mesurer avant de modifier.** Journaliser, pour chaque chargement :
