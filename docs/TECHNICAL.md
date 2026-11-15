@@ -142,7 +142,8 @@ Hodeia/
 │   ├── citationsmodel.cpp          # CitationsModel over the Citations table (APA format)
 │   ├── openalex.cpp                # OpenAlexClient: references / citing works
 │   ├── thememanager.cpp            # JSON-based theme loading
-│   ├── helpers.cpp                 # ModelHelper, summary parsing, HTML formatting, PDF export entry point
+│   ├── helpers.cpp                 # QML helpers: summary display / PDF export, local models, remote backend models
+│   ├── summaryformat.cpp           # PaperSummary: LLM JSON parsing (with repairs) and HTML rendering
 │   ├── pdfexport.cpp               # HTML → PDF rendering with MuPDF (fz_story, footer, ToUnicode fix)
 │   ├── textformat.cpp              # LLM output cleanup: LaTeX → Unicode, Markdown escaping
 │   └── hodeia.rc                   # Windows only: embeds the app icon in Hodeia.exe
@@ -765,7 +766,7 @@ The `LocalBackend` wraps llama.cpp's `common` library. Token-level work (tokeniz
 
 ## Text Post-Processing
 
-`TextFormat` (`textformat.h/.cpp`) cleans LLM output for display. It is shared by `QueryWorker` (RAG answers) and `Helpers::parseSummaryJson` (summaries).
+`TextFormat` (`textformat.h/.cpp`) cleans LLM output for display. It is shared by `QueryWorker` (RAG answers) and `SummaryFormat::parseJson` (summaries).
 
 - **`latexToUnicode(text, target)`** — models often emit LaTeX despite being told not to, and neither Qt's `MarkdownText` nor the HTML views can render it. Math spans (`$$…$$`, `\[…\]`, `\(…\)`, `$…$`) are rewritten as readable Unicode (`εᵢₙ`, `x²`, `≠`, `a/b`…). Inline `$…$` must hug its content, so currency (`$5 and $10`) is kept. With `Target::Markdown`, code spans are left untouched and `*` / `_` inside formulas are escaped.
 - **`escapeMarkdown(text)`** — escapes Markdown syntax so a label (e.g. a paper title in a citation) renders verbatim.

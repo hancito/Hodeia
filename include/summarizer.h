@@ -4,7 +4,7 @@
 #include <QStringList>
 #include <QVariantMap>
 
-#include "helpers.h"
+#include "summaryformat.h"
 #include "localbackend.h"
 
 class ConfigManager;

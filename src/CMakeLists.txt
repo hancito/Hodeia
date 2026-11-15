@@ -35,6 +35,7 @@ add_library(HodeiaEngine STATIC
     ../include/openalex.h
     ../include/helpers.h
     ../include/pdfexport.h
+    ../include/summaryformat.h
     ../include/textformat.h
 
     # --- sources ---
@@ -60,6 +61,7 @@ add_library(HodeiaEngine STATIC
     querycontroller.cpp
     helpers.cpp
     pdfexport.cpp
+    summaryformat.cpp
     textformat.cpp
 
     # --- third-party C source (SQLite amalgamation, kept as C, not C++) ---

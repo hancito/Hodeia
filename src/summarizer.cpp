@@ -146,7 +146,7 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
       emit paperFinished(hash, false, msg);
       qDebug() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
     } else {
-      PaperSummary summary = Helpers::parseSummaryJson(result);
+      PaperSummary summary = SummaryFormat::parseJson(result);
       saveSummary(hash, summary, result, backend.modelName);
 
       successCount++;

@@ -3,7 +3,7 @@
 #include <QString>
 
 /// Post-processing helpers for LLM output, shared by QueryWorker (RAG
-/// answers) and Helpers::parseSummaryJson (paper summaries).
+/// answers) and SummaryFormat::parseJson (paper summaries).
 namespace TextFormat {
 
 /// Target of the converted text: Markdown output also escapes the characters

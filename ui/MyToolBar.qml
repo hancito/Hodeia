@@ -109,21 +109,27 @@ ToolBar {
     Connections {
         target: helpers
         function onModelsChecked(success, models, error) {
+            if (!success)
+                return;
+            if (models.length === 0) {
+                // e.g. the last local model was deleted
+                modelComboBox.model = [];
+                configManager.activeModel = "";
+                return;
+            }
             // Read activeModel BEFORE assigning the model to avoid the
             // ComboBox resetting to index 0 and overwriting it via
             // onCurrentTextChanged.
             var savedModel = configManager.activeModel;
-            if (success && models.length > 0) {
-                var idx = models.indexOf(savedModel);
-                if (idx < 0) {
-                    idx = 0;
-                    savedModel = models[0];
-                }
-                modelComboBox.model = models;
-                modelComboBox.currentIndex = idx;
-                // Restore after ComboBox has swallowed the reset
-                configManager.activeModel = savedModel;
+            var idx = models.indexOf(savedModel);
+            if (idx < 0) {
+                idx = 0;
+                savedModel = models[0];
             }
+            modelComboBox.model = models;
+            modelComboBox.currentIndex = idx;
+            // Restore after ComboBox has swallowed the reset
+            configManager.activeModel = savedModel;
         }
     }
 

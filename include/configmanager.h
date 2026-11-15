@@ -122,17 +122,6 @@ signals:
   void openAlexApiKeyChanged();
   void backendListChanged();
 
-  /// Progress for model file copy (0–100).
-  /// Emitted by Helpers but forwarded here for QML convenience.
-  void modelCopyProgress(int percentage, const QString &fileName);
-
-  /// Model file copy finished (emitted by Helpers, forwarded here).
-  void modelCopyFinished(bool success, const QString &destPath,
-                         const QString &error);
-
-  /// Emitted when a model file was successfully copied.
-  void modelCopied();
-
   void visualModeChanged();
   void languageChanged();
   void queryContextTokensChanged();

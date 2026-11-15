@@ -100,7 +100,6 @@ ThemedWindow {
         }
     }
 
-
     GridLayout {
         anchors.fill: parent
         anchors.margins: Style.paneMargin
@@ -389,7 +388,7 @@ ThemedWindow {
                 }
             }
 
-            // ── MMProj GGUF (optional) ──
+            // ── MMProj GGUF ──
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 6
@@ -400,7 +399,7 @@ ThemedWindow {
                 StyledTextField {
                     id: mmprojPathField
                     Layout.fillWidth: true
-                    placeholderText: qsTr("Optional — select a .gguf mmproj file...")
+                    placeholderText: qsTr("Select a .gguf mmproj file...")
                     readOnly: true
                 }
                 StyledButton {
@@ -409,11 +408,6 @@ ThemedWindow {
                 }
             }
 
-            Label {
-                text: qsTr("The mmproj file is optional. Leave empty to skip.")
-                font.italic: true
-                opacity: 0.6
-            }
             Item {
                 Layout.fillWidth: true
             }
@@ -424,7 +418,7 @@ ThemedWindow {
             if (modelPath === "") {
                 return;
             }
-            helpers.addLocalSummarizerWithMmproj(modelPath, mmprojPath);
+            helpers.addLocalSummarizer(modelPath, mmprojPath);
         }
         onClosed: {
             modelPathField.clear();
@@ -439,7 +433,7 @@ ThemedWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
         onAccepted: {
-            modelPathField.text = selectedFile.toString().replace("file://", "");
+            modelPathField.text = selectedFile.toString();
         }
     }
 
@@ -450,13 +444,13 @@ ThemedWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: ["GGUF files (*.gguf)", "All files (*)"]
         onAccepted: {
-            mmprojPathField.text = selectedFile.toString().replace("file://", "");
+            mmprojPathField.text = selectedFile.toString();
         }
     }
 
     // Model copy progress in footer
     Connections {
-        target: configManager
+        target: helpers
         function onModelCopyProgress(percentage, fileName) {
             footerLabel.text = qsTr("Copying model: %1 — %2%").arg(fileName).arg(percentage);
         }
