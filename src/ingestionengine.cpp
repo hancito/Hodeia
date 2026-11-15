@@ -808,9 +808,16 @@ PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
 //    3. Walk the block tree (DFS) to extract text in reading order.
 //    4. If the page yields < 100 chars, re-render at 300 DPI grayscale
 //       and run Tesseract OCR as a fallback.
-//    5. Render a 150 DPI thumbnail for the UI.
+//    5. Render the page image (kPageImageDpi) for the UI and visual mode.
 //    6. Accumulate full-text and a pageMap for cross-page chunking.
 // ============================================================================
+
+/// Resolution of the stored page PNGs (IMG/<hash>_page_NNN.png), shown in
+/// the PDF tab.  200 DPI keeps body text sharp up to ~fit-to-width on large
+/// screens (the tab caps zoom at one PNG pixel per screen pixel).  Vision
+/// models never see this resolution: PageImage::forModel() scales pages down
+/// to PageImage::kModelMaxPixels.  ~650 KB per page (150 DPI: ~370 KB).
+static constexpr float kPageImageDpi = 200.0f;
 
 ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                                         const QString &imgPath) const {
@@ -846,7 +853,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   }
 
   int pageCount = 0;
-  float zoom = 150.0f / 72.0f; // thumbnail resolution
+  float zoom = kPageImageDpi / 72.0f;
   fz_matrix ctm = fz_scale(zoom, zoom);
 
   fz_try(ctx) { pageCount = fz_count_pages(ctx, doc); }
@@ -954,7 +961,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       }
 
       // ------------------------------------------------------------------
-      // 2. Thumbnail (150 DPI RGB)
+      // 2. Page image (kPageImageDpi, RGB)
       // ------------------------------------------------------------------
       pix = fz_new_pixmap_from_page_number(ctx, doc, i, ctm, fz_device_rgb(ctx),
                                            0);

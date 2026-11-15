@@ -139,7 +139,7 @@ At runtime Hodeia automatically picks the best available backend (CUDA, then Vul
 
 ## Projects & Data Layout
 
-Hodeia keeps everything in one data folder, organized by **project**. Each project is an isolated workspace with its own summaries and records — create as many as you like (one per research topic, course, or grant). Your PDFs are read **in place**: Hodeia references them from their original location and only stores the page thumbnails, so your files are never moved or duplicated.
+Hodeia keeps everything in one data folder, organized by **project**. Each project is an isolated workspace with its own summaries and records — create as many as you like (one per research topic, course, or grant). Your PDFs are only read at import: Hodeia stores their text and an image of each page, never the PDF itself, so your files are never moved, copied or modified.
 
 ```
 ~/.local/share/Hodeia/
@@ -147,7 +147,7 @@ Hodeia keeps everything in one data folder, organized by **project**. Each proje
 ├── Projects/
 │   └── <project_name>/
 │       ├── <project_name>.db   # the project's data (summaries, etc.)
-│       └── IMG/                # page thumbnails
+│       └── IMG/                # page images (PNG)
 └── Models/
     ├── Summarizers/           # chat models you use (GGUF files)
     └── Embedders/             # the embedding model (bundled)

@@ -571,7 +571,7 @@ external/lib/
 1. **File hashing** — MD5 computed per file for deduplication (parallelized via `QtConcurrent`).
 2. **Text extraction** — MuPDF's structured-text engine performs DFS traversal with column segmentation, paragraph breaks, dehyphenation, and clip preservation.
 3. **OCR fallback** — if a page yields < 100 characters, Tesseract runs at 300 DPI grayscale. APIs are cached per-thread to minimize initialization overhead.
-4. **Thumbnail generation** — 150 DPI page images rendered as PNGs.
+4. **Page images** — each page rendered as a 200 DPI PNG (`kPageImageDpi`), shown in the PDF tab; vision models receive them scaled down to `PageImage::kModelMaxPixels`.
 5. **Chunking** — words broken by line-wrap hyphens are rejoined, the text is split into sentences, and sentences are packed into ~1500-character chunks with a 200-character overlap. A per-character page map is kept aligned with the normalized text, so each chunk gets the exact page of its first *new* sentence (not of the overlap carried over from the previous chunk).
 6. **Embedding** — batches of 64 chunks sent through the E5 model; 384-dim vectors stored in the `chunks` (`vec0`) virtual table.
 7. **Batch processing** — 10 PDFs per batch, with incremental progress reporting and memory cleanup.
@@ -696,7 +696,7 @@ Setters save to disk automatically on every change.
 
 ### Directory layout
 
-PDFs are ingested **in place** (referenced from their original location, not copied into the project); only page thumbnails are stored under the project's `IMG/`.
+PDFs are only read at import, from their original location: they are neither copied into the project nor referenced afterwards. The project keeps their text (database) and one PNG per page under `IMG/`.
 
 ```
 ~/.local/share/Hodeia/
@@ -704,7 +704,7 @@ PDFs are ingested **in place** (referenced from their original location, not cop
 ├── Projects/
 │   └── <project_name>/
 │       ├── <project_name>.db        # SQLite database (WAL mode)
-│       └── IMG/                     # page thumbnails (PDFs referenced in place)
+│       └── IMG/                     # page images (<hash>_page_NNN.png)
 └── Models/
     ├── Summarizers/
     │   └── <model_name>/
