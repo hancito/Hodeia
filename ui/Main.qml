@@ -66,6 +66,7 @@ ThemedWindow {
         onRequestClearProject: clearProjectDialog.open()
         onRequestDeleteModels: deleteModelDialog.open()
         onRequestOpenAlexApiKey: openAlexKeyDialog.open()
+        onRequestAbout: aboutDialog.open()
     }
 
     header: MyToolBar {
@@ -335,6 +336,141 @@ ThemedWindow {
         }
         onAccepted: {
             configManager.openAlexApiKey = openAlexKeyField.text.trim();
+        }
+    }
+
+    // About dialog: app identity (from the README), license, and the
+    // third-party components with their licenses (keep in sync with NOTICE).
+    StyledDialog {
+        id: aboutDialog
+        anchors.centerIn: parent
+        width: 520
+        title: qsTr("About Hodeia")
+        standardButtons: Dialog.Ok
+
+        readonly property var components: [
+            { name: "Qt 6", url: "https://www.qt.io", license: "LGPL-3.0" },
+            { name: "llama.cpp / ggml", url: "https://github.com/ggml-org/llama.cpp", license: "MIT" },
+            { name: "MuPDF", url: "https://mupdf.com", license: "AGPL-3.0" },
+            { name: "Tesseract OCR", url: "https://github.com/tesseract-ocr/tesseract", license: "Apache-2.0" },
+            { name: "Leptonica", url: "https://github.com/DanBloomberg/leptonica", license: "BSD-2-Clause" },
+            { name: "SQLite", url: "https://sqlite.org", license: qsTr("Public domain") },
+            { name: "sqlite-vec", url: "https://github.com/asg017/sqlite-vec", license: "MIT / Apache-2.0" },
+            { name: "Vulkan Loader", url: "https://github.com/KhronosGroup/Vulkan-Loader", license: "Apache-2.0" },
+            { name: "Google Sans, Lato, Outfit…", url: "https://fonts.google.com", license: "SIL OFL 1.1" }
+        ]
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 16
+                Image {
+                    Layout.alignment: Qt.AlignTop
+                    source: "qrc:/Resources/hodeia.png"
+                    sourceSize.width: 64
+                    sourceSize.height: 64
+                    fillMode: Image.PreserveAspectFit
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+                    Label {
+                        text: Qt.application.displayName
+                        font.pixelSize: 20
+                        font.weight: Font.Bold
+                    }
+                    Label {
+                        text: qsTr("Version %1").arg(Qt.application.version)
+                        color: Colors.overlay1
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Your personal research assistant — powered by AI.")
+                        font.italic: true
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Manage, summarize and search your collection of academic papers: import PDFs, get structured AI summaries, pull their references from OpenAlex, and ask questions across your entire library.")
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("“Hodeia” — from the Ancient Greek ὁδός (hodós), meaning “path”.")
+                color: Colors.overlay1
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Free and open source software, licensed under the <a href=\"%1\">GNU AGPL-3.0</a>.<br>Source code: <a href=\"%2\">%2</a>")
+                      .arg("https://www.gnu.org/licenses/agpl-3.0.html")
+                      .arg("https://github.com/hancito/Hodeia")
+                textFormat: Text.StyledText
+                linkColor: Colors.primary
+                wrapMode: Text.WordWrap
+                onLinkActivated: link => Qt.openUrlExternally(link)
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 1
+                color: Colors.surface1
+            }
+
+            Label {
+                text: qsTr("Third-Party Components")
+                font.weight: Font.Bold
+            }
+
+            // Two Repeaters (name / license) pinned to explicit rows, so the
+            // license column lines up.
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: 24
+                rowSpacing: 4
+                Repeater {
+                    model: aboutDialog.components
+                    delegate: Label {
+                        required property var modelData
+                        required property int index
+                        Layout.row: index
+                        Layout.column: 0
+                        text: "<a href=\"%1\">%2</a>".arg(modelData.url).arg(modelData.name)
+                        textFormat: Text.StyledText
+                        linkColor: Colors.primary
+                        onLinkActivated: link => Qt.openUrlExternally(link)
+                    }
+                }
+                Repeater {
+                    model: aboutDialog.components
+                    delegate: Label {
+                        required property var modelData
+                        required property int index
+                        Layout.row: index
+                        Layout.column: 1
+                        Layout.fillWidth: true
+                        text: modelData.license
+                        color: Colors.overlay1
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Each component remains under its own license; see the NOTICE file shipped with Hodeia for the full notices.")
+                font.pixelSize: 11
+                color: Colors.overlay1
+                wrapMode: Text.WordWrap
+            }
         }
     }
 

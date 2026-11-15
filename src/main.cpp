@@ -277,6 +277,7 @@ int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
   app.setApplicationName("Hodeia");
   app.setApplicationDisplayName("Hodeia");
+  app.setApplicationVersion(QStringLiteral(HODEIA_VERSION));
   app.setWindowIcon(QIcon(":/Resources/hodeia.png"));
 
   // Force Fusion style to avoid platform-dependent styles (e.g. Breeze on KDE)

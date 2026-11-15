@@ -11,6 +11,7 @@ MenuBar {
     signal requestClearProject
     signal requestDeleteModels
     signal requestOpenAlexApiKey
+    signal requestAbout
 
     // ── Bar ──────────────────────────────────────────────────────────────
 
@@ -203,6 +204,14 @@ MenuBar {
         StyledMenuItem {
             text: qsTr("OpenAlex API Key...")
             onTriggered: menuBar.requestOpenAlexApiKey()
+        }
+    }
+
+    StyledMenu {
+        title: qsTr("Help")
+        StyledMenuItem {
+            text: qsTr("About Hodeia...")
+            onTriggered: menuBar.requestAbout()
         }
     }
 }

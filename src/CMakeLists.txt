@@ -147,6 +147,7 @@ endif()
 # Hodeia — main executable + QML module
 # ===========================================================================
 qt_add_executable(Hodeia main.cpp)
+target_compile_definitions(Hodeia PRIVATE HODEIA_VERSION="${PROJECT_VERSION}")
 
 # Windows: embed the application icon in Hodeia.exe (used by Explorer, the
 # taskbar and every shortcut, including the installer's desktop icon).

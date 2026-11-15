@@ -406,6 +406,51 @@
 <context>
     <name>Main</name>
     <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Public domain</source>
+        <translation>Domaine public</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Your personal research assistant — powered by AI.</source>
+        <translation>Votre assistant de recherche personnel — propulsé par l’IA.</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Manage, summarize and search your collection of academic papers: import PDFs, get structured AI summaries, pull their references from OpenAlex, and ask questions across your entire library.</source>
+        <translation>Gérez, résumez et explorez votre collection d’articles scientifiques : importez des PDF, obtenez des résumés structurés par l’IA, récupérez leurs références depuis OpenAlex et posez des questions sur toute votre bibliothèque.</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>“Hodeia” — from the Ancient Greek ὁδός (hodós), meaning “path”.</source>
+        <translation>« Hodeia » — du grec ancien ὁδός (hodós), qui signifie « chemin ».</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Free and open source software, licensed under the &lt;a href=&quot;%1&quot;&gt;GNU AGPL-3.0&lt;/a&gt;.&lt;br&gt;Source code: &lt;a href=&quot;%2&quot;&gt;%2&lt;/a&gt;</source>
+        <translation>Logiciel libre et open source, sous licence &lt;a href=&quot;%1&quot;&gt;GNU AGPL-3.0&lt;/a&gt;.&lt;br&gt;Code source : &lt;a href=&quot;%2&quot;&gt;%2&lt;/a&gt;</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Third-Party Components</source>
+        <translation>Composants tiers</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Each component remains under its own license; see the NOTICE file shipped with Hodeia for the full notices.</source>
+        <translation>Chaque composant reste sous sa propre licence ; consultez le fichier NOTICE fourni avec Hodeia pour les mentions complètes.</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>About Hodeia</source>
+        <translation>À propos de Hodeia</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml"/>
+        <source>Version %1</source>
+        <translation>Version %1</translation>
+    </message>
+    <message>
         <location filename="../ui/Main.qml" line="20"/>
         <source>Hodeia - %1</source>
         <translation>Hodeia - %1</translation>
@@ -595,6 +640,16 @@
 </context>
 <context>
     <name>MyMenuBar</name>
+    <message>
+        <location filename="../ui/MyMenuBar.qml"/>
+        <source>Help</source>
+        <translation>Aide</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml"/>
+        <source>About Hodeia...</source>
+        <translation>À propos de Hodeia...</translation>
+    </message>
     <message>
         <source>File</source>
         <translation type="vanished">Fichier</translation>
