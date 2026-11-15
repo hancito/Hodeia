@@ -379,7 +379,7 @@ ThemedWindow {
                     spacing: 4
                     Label {
                         text: Qt.application.displayName
-                        font.pixelSize: 20
+                        font.pixelSize: Style.fontTitle
                         font.weight: Font.Bold
                     }
                     Label {
@@ -467,7 +467,7 @@ ThemedWindow {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Each component remains under its own license; see the NOTICE file shipped with Hodeia for the full notices.")
-                font.pixelSize: 11
+                font.pixelSize: Style.fontSmall
                 color: Colors.overlay1
                 wrapMode: Text.WordWrap
             }

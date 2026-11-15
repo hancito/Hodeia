@@ -7,6 +7,11 @@ import QtQuick.Controls.Basic
 
 ApplicationWindow {
     font.family: Fonts.ui
+    // Fixed base size: otherwise the system default applies (9 pt = 12 px on
+    // Windows, often 10 pt on Linux), which looks small in the menu bar and
+    // differs between platforms.  Inherited by every control and Popup.Item
+    // popup (menus, dialogs, combo boxes) that does not set its own size.
+    font.pixelSize: Style.fontBody
 
     background: Rectangle {
         color: Colors.base

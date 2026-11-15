@@ -19,7 +19,7 @@ QtObject {
 
     // Font sizes (pixels)
     readonly property int fontSmall: 12   // metadata, mono details, status bar
-    readonly property int fontBody: 14    // empty-state messages
+    readonly property int fontBody: 14    // default UI text (window font), empty states
     readonly property int fontHeading: 16 // dialog titles
     readonly property int fontReading: 16 // summaries, answers, references
     readonly property int fontTitle: 21  // pane titles
