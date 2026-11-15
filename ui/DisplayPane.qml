@@ -197,7 +197,18 @@ Rectangle {
                         Layout.fillHeight: true
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                        // The Basic style overlays the scroll bar on the
+                        // content: reserve its width so it never covers text.
+                        // Always reserved (not only when visible) to avoid a
+                        // rewrap → height change → bar toggling loop.
+                        rightPadding: summaryScrollBar.width
+                        // Without this the content width defaults to the
+                        // TextEdit's *unwrapped* implicit width (thousands of
+                        // px): the view then scrolls sideways (wheel, touchpad,
+                        // selection drag) and pushes the text under the bar.
+                        contentWidth: availableWidth
                         ScrollBar.vertical: StyledScrollBar {
+                            id: summaryScrollBar
                             parent: scrollView
                             x: scrollView.width - width
                             y: scrollView.topPadding
@@ -206,11 +217,16 @@ Rectangle {
 
                         TextEdit {
                             id: textEditor
-                            width: scrollView.availableWidth
+                            width: scrollView.availableWidth-10
                             textFormat: TextEdit.RichText
                             color: Colors.text
                             font.family: Fonts.text
                             font.pixelSize: Style.fontReading
+                            // Hinted glyphs render wider than the metrics the
+                            // rich-text layout wraps with: lines then spill past
+                            // the TextEdit's right edge (clipped / under the
+                            // scroll bar).  Unhinted, layout and render agree.
+                            font.hintingPreference: Font.PreferNoHinting
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
                             text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : qsTr("Please make a summary of this paper")
@@ -261,7 +277,12 @@ Rectangle {
                             id: refScroll
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            // Keep the text clear of the overlaid scroll bar
+                            // (see the summary tab).
+                            rightPadding: refScrollBar.width + 4
+                            contentWidth: availableWidth // no sideways scroll
                             ScrollBar.vertical: StyledScrollBar {
+                                id: refScrollBar
                                 parent: refScroll
                                 x: refScroll.width - width
                                 y: refScroll.topPadding
@@ -273,6 +294,7 @@ Rectangle {
                                 hoverEnabled: true
                                 selectByMouse: true
                                 font.pixelSize: Style.fontReading
+                                font.hintingPreference: Font.PreferNoHinting // see summary tab
                                 wrapMode: TextEdit.WordWrap
                                 MouseArea {
                                     anchors.fill: parent
