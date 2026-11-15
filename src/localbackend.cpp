@@ -21,6 +21,7 @@
 #include <QRegularExpression>
 #include <QThread>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <optional>
 #include <tuple>
@@ -259,10 +260,10 @@ struct probe_info {
 
 /// Fallback tokens per image when the probe cannot count them exactly
 /// (projector failed to load on the CPU).  The real count depends on the
-/// model and image size (Gemma 4: 70-1120, Qwen-VL: ~2200 for a rendered
-/// page).  Capped at the projector's maximum when it reports one.  If the
-/// real total is higher, summarize() counts exactly and truncates the last
-/// pages.
+/// model and image size; for a page capped at PageImage::kModelMaxPixels:
+/// Qwen3.5 ≈ 870, Gemma 4 ≈ 390.  Capped at the projector's maximum when it
+/// reports one.  If the real total is higher, summarize() counts exactly and
+/// truncates the last pages.
 static constexpr int32_t kImageTokenEstimate = 800;
 
 /// Images a payload carries, in prompt order (one per marker).
@@ -449,7 +450,7 @@ static probe_info lb_probe_model(const QString &modelPath,
   }
 
   // Exact image cost: an image's token count depends on the model and the
-  // image size (Qwen-VL: ~2200 for a rendered page, Gemma 4: up to 1120),
+  // image size (Qwen3.5: ~1 token per 1000 px, Gemma 4: ~0.43),
   // and only an mtmd context can compute it.  Load the projector on the CPU
   // (no VRAM, so the fit below is undisturbed), tokenize the full prompt —
   // image preprocessing only, the encoder never runs — and free it.  The
@@ -1647,6 +1648,18 @@ QString LocalBackend::resolveMmprojPath(const QString &modelPath) {
 
   qDebug() << "[LocalBackend] No mmproj found for model:" << modelPath;
   return QString();
+}
+
+PageImage PageImage::forModel(const QImage &img) {
+  const qint64 pixels = static_cast<qint64>(img.width()) * img.height();
+  if (pixels <= kModelMaxPixels)
+    return fromQImage(img);
+  const double scale = std::sqrt(static_cast<double>(kModelMaxPixels) /
+                                 static_cast<double>(pixels));
+  return fromQImage(img.scaled(static_cast<int>(img.width() * scale),
+                               static_cast<int>(img.height() * scale),
+                               Qt::IgnoreAspectRatio,
+                               Qt::SmoothTransformation));
 }
 
 PageImage PageImage::fromQImage(const QImage &img) {

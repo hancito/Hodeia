@@ -35,6 +35,16 @@ struct PageImage {
   /// is self-contained and does not alias the (possibly temporary) source
   /// image's buffer.
   static PageImage fromQImage(const QImage &img);
+
+  /// Largest page image sent to a vision model (~120 DPI for a letter/A4
+  /// page). Image tokens grow with pixels (measured on a 150 DPI page:
+  /// Qwen3.5 ≈ 1 token / 1000 px, Gemma 4 ≈ 0.43), so the cap keeps the
+  /// prompt independent of the resolution the page PNGs are stored at.
+  static constexpr int kModelMaxPixels = 900'000;
+
+  /// fromQImage() after scaling @p img down (never up, aspect ratio kept) to
+  /// at most kModelMaxPixels.
+  static PageImage forModel(const QImage &img);
 };
 
 /// One page: OCR text paired with an optional rendered page image.

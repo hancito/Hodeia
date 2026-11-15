@@ -374,7 +374,7 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
                                .arg(page0 + 1, 3, 10, QChar('0'));
         QImage img(imgDir.absoluteFilePath(fileName));
         if (!img.isNull())
-          pageImages[page0] = img.convertToFormat(QImage::Format_RGB888);
+          pageImages[page0] = img;
       }
     }
   }
@@ -389,7 +389,7 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     pb.text = pageTextMap[page0];
     auto it = pageImages.find(page0);
     if (it != pageImages.end())
-      pb.visualContext = PageImage::fromQImage(it.value());
+      pb.visualContext = PageImage::forModel(it.value());
     payload.pageBlocks.push_back(std::move(pb));
   }
 

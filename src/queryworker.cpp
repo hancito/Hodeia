@@ -699,7 +699,7 @@ PromptPayload QueryWorker::buildPrompt(const QList<PageContext> &pages,
     if (useVisual && pc.withImage) {
       QImage img(pc.imageFile);
       if (!img.isNull()) {
-        pb.visualContext = PageImage::fromQImage(img);
+        pb.visualContext = PageImage::forModel(img);
         // Legacy (non-interleaved) multimodal path: reuse the decoded pixels
         // instead of decoding the PNG a second time.
         payload.visualContext.push_back(pb.visualContext);
