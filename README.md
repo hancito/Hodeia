@@ -64,7 +64,7 @@ Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the 
 | [Qwen3.5-9B](https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/tree/main)     | ~5 GB     | ~8 GB          | High-quality summaries, dedicated GPU                  |
 | [Gemma4-12B](https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/tree/main) | ~7 GB     | ~12 GB         | Best quality, 12 GB+ VRAM                              |
 
-> **Higher quantization = better quality, more memory.** Q4 is the sweet spot; if you have extra VRAM, Q5/Q6/Q8 of the same model will be more accurate. A CPU-only machine can run the 2B/4B models (slower). When in doubt, start with the bundled 2B and step up as your hardware allows.
+> **Higher quantization = better quality, more memory.** Q4 is the sweet spot; if you have extra VRAM, Q5/Q6/Q8 of the same model will be more accurate. A CPU-only machine can run the 2B/4B models (slower). When in doubt, start with the bundled 0.8B model and step up as your hardware allows.
 
 ### Optional: OpenAlex API key
 
@@ -78,8 +78,6 @@ The easiest way to get started is to grab a precompiled build from the [GitHub R
 
 | Platform              | Asset                | How to install                                |
 | --------------------- | -------------------- | --------------------------------------------- |
-| Linux (Debian/Ubuntu) | `hodeia_*.deb`       | `sudo dpkg -i hodeia_*.deb` (or double-click) |
-| Linux (Fedora/RPM)    | `hodeia-*.rpm`       | `sudo rpm -i hodeia-*.rpm` (or double-click)  |
 | Linux (Arch)          | `PKGBUILD`           | Use the PKGBUILD or an aur helper             |
 | Windows               | `Hodeia-Setup-*.exe` | Run the installer                             |
 

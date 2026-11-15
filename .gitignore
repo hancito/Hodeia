@@ -35,7 +35,8 @@ Thumbs.db
 /.qmake.cache
 /.qmake.stash
 **/.qmlls.ini
-.qwen/tmp
+# Local AI-assistant state (paths, logs)
+.qwen/
 
 # qtcreator generated files
 *.pro.user*
