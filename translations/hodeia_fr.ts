@@ -299,29 +299,51 @@
 <context>
     <name>Helpers</name>
     <message>
-        <location filename="../src/helpers.cpp" line="587"/>
         <source>Invalid parameters</source>
-        <translation>Paramètres invalides</translation>
+        <translation type="vanished">Paramètres invalides</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="606"/>
+        <location filename="../src/helpers.cpp" line="224"/>
         <source>URL is empty</source>
         <translation>L&apos;URL est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="637"/>
+        <location filename="../src/helpers.cpp" line="293"/>
         <source>Invalid JSON</source>
         <translation>JSON invalide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="692"/>
+        <location filename="../src/helpers.cpp" line="181"/>
         <source>Model file does not exist: %1</source>
         <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="697"/>
+        <location filename="../src/helpers.cpp" line="133"/>
+        <location filename="../src/helpers.cpp" line="151"/>
+        <source>Cannot read %1: %2</source>
+        <translation>Impossible de lire %1 : %2</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="136"/>
+        <source>%1 is empty</source>
+        <translation>%1 est vide</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="141"/>
+        <location filename="../src/helpers.cpp" line="153"/>
+        <location filename="../src/helpers.cpp" line="168"/>
+        <source>Cannot write %1: %2</source>
+        <translation>Impossible d&apos;écrire %1 : %2</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="186"/>
         <source>MMProj file does not exist: %1</source>
         <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="194"/>
+        <source>Cannot create folder %1</source>
+        <translation>Impossible de créer le dossier %1</translation>
     </message>
 </context>
 <context>
@@ -365,27 +387,27 @@
         <translation>Hodeia - %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="133"/>
+        <location filename="../ui/Main.qml" line="132"/>
         <source>New Project</source>
         <translation>Nouveau projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="149"/>
+        <location filename="../ui/Main.qml" line="148"/>
         <source>Enter the Project Name</source>
         <translation>Saisir le nom du projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="154"/>
+        <location filename="../ui/Main.qml" line="153"/>
         <source>Type here...</source>
         <translation>Tapez ici...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="165"/>
+        <location filename="../ui/Main.qml" line="164"/>
         <source>Please enter a name or cancel</source>
         <translation>Veuillez saisir un nom ou annuler</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="137"/>
+        <location filename="../ui/Main.qml" line="136"/>
         <source>Create</source>
         <translation>Créer</translation>
     </message>
@@ -394,17 +416,17 @@
         <translation type="vanished">Annuler</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="198"/>
+        <location filename="../ui/Main.qml" line="197"/>
         <source>Project Already Exists</source>
         <translation>Le projet existe déjà</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="215"/>
+        <location filename="../ui/Main.qml" line="214"/>
         <source>Project &quot;%1&quot; already exists. Switch to it?</source>
         <translation>Le projet « %1 » existe déjà. Voulez-vous y basculer ?</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="200"/>
+        <location filename="../ui/Main.qml" line="199"/>
         <source>Switch</source>
         <translation>Basculer</translation>
     </message>
@@ -414,124 +436,135 @@
         <translation>Impossible d&apos;ouvrir la fenêtre de requêtes</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="226"/>
         <source>Clean Project</source>
-        <translation>Nettoyer le projet</translation>
+        <translation type="vanished">Nettoyer le projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="230"/>
         <source>Clean project &quot;%1&quot;? All files and data will be permanently removed.</source>
-        <translation>Nettoyer le projet « %1 » ? Tous les fichiers et les données seront définitivement supprimés.</translation>
+        <translation type="vanished">Nettoyer le projet « %1 » ? Tous les fichiers et les données seront définitivement supprimés.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="248"/>
+        <location filename="../ui/Main.qml" line="225"/>
+        <source>Clear Project Data</source>
+        <translation>Vider le projet</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="229"/>
+        <source>Clear all data of project &quot;%1&quot;? Its papers, summaries and queries will be permanently removed; the empty project is kept.</source>
+        <translation>Vider toutes les données du projet « %1 » ? Ses articles, résumés et requêtes seront définitivement supprimés ; le projet vide est conservé.</translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="247"/>
         <source>Delete Projects</source>
         <translation>Supprimer les projets</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="255"/>
+        <location filename="../ui/Main.qml" line="254"/>
         <source>Delete the selected project(s)? This cannot be undone.</source>
         <translation>Supprimer le(s) projet(s) sélectionné(s) ? Cette action est irréversible.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="272"/>
+        <location filename="../ui/Main.qml" line="271"/>
         <source>Project Deletion Failed</source>
         <translation>Échec de la suppression du projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="286"/>
+        <location filename="../ui/Main.qml" line="285"/>
         <source>Delete Models</source>
         <translation>Supprimer les modèles</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="293"/>
+        <location filename="../ui/Main.qml" line="292"/>
         <source>Delete the selected model(s)? This cannot be undone.</source>
         <translation>Supprimer le(s) modèle(s) sélectionné(s) ? Cette action est irréversible.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="319"/>
+        <location filename="../ui/Main.qml" line="318"/>
         <source>OpenAlex API Key</source>
         <translation>Clé API OpenAlex</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="325"/>
+        <location filename="../ui/Main.qml" line="324"/>
         <source>Enter your OpenAlex API key:</source>
         <translation>Saisissez votre clé API OpenAlex :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="331"/>
+        <location filename="../ui/Main.qml" line="330"/>
         <source>Paste your API key...</source>
         <translation>Collez votre clé API...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="352"/>
+        <location filename="../ui/Main.qml" line="351"/>
         <source>Indexing Failed</source>
         <translation>Échec de l&apos;indexation</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="365"/>
+        <location filename="../ui/Main.qml" line="364"/>
         <source>Add Local Model</source>
         <translation>Ajouter un modèle local</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="377"/>
+        <location filename="../ui/Main.qml" line="376"/>
         <source>Model:</source>
         <translation>Modèle :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="383"/>
+        <location filename="../ui/Main.qml" line="382"/>
         <source>Select a .gguf model file...</source>
         <translation>Sélectionnez un fichier de modèle .gguf...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="387"/>
-        <location filename="../ui/Main.qml" line="407"/>
+        <location filename="../ui/Main.qml" line="386"/>
+        <location filename="../ui/Main.qml" line="406"/>
         <source>Browse...</source>
         <translation>Parcourir...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="397"/>
+        <location filename="../ui/Main.qml" line="396"/>
         <source>MMProj:</source>
         <translation>MMProj :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="403"/>
+        <location filename="../ui/Main.qml" line="402"/>
+        <source>Select a .gguf mmproj file...</source>
+        <translation>Sélectionnez un fichier mmproj .gguf...</translation>
+    </message>
+    <message>
         <source>Optional — select a .gguf mmproj file...</source>
-        <translation>Facultatif — sélectionnez un fichier mmproj .gguf...</translation>
+        <translation type="vanished">Facultatif — sélectionnez un fichier mmproj .gguf...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="413"/>
         <source>The mmproj file is optional. Leave empty to skip.</source>
-        <translation>Le fichier mmproj est facultatif. Laisser vide pour passer.</translation>
+        <translation type="vanished">Le fichier mmproj est facultatif. Laisser vide pour passer.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="438"/>
+        <location filename="../ui/Main.qml" line="432"/>
         <source>Select GGUF Model File</source>
         <translation>Sélectionner le fichier de modèle GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="449"/>
+        <location filename="../ui/Main.qml" line="443"/>
         <source>Select MMProj GGUF File</source>
         <translation>Sélectionner le fichier MMProj GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="461"/>
+        <location filename="../ui/Main.qml" line="455"/>
         <source>Copying model: %1 — %2%</source>
         <translation>Copie du modèle : %1 — %2 %</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="465"/>
+        <location filename="../ui/Main.qml" line="459"/>
         <source>Model copied: %1</source>
         <translation>Modèle copié : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="467"/>
+        <location filename="../ui/Main.qml" line="461"/>
         <source>Copy failed: %1</source>
         <translation>Échec de la copie : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="475"/>
-        <location filename="../ui/Main.qml" line="476"/>
+        <location filename="../ui/Main.qml" line="469"/>
+        <location filename="../ui/Main.qml" line="470"/>
         <source>%1 -- Ready</source>
         <translation>%1 -- Prêt</translation>
     </message>
@@ -539,95 +572,147 @@
 <context>
     <name>MyMenuBar</name>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="56"/>
         <source>File</source>
-        <translation>Fichier</translation>
+        <translation type="vanished">Fichier</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="58"/>
         <source>New Project</source>
-        <translation>Nouveau projet</translation>
+        <translation type="vanished">Nouveau projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="62"/>
         <source>Open Project...</source>
-        <translation>Ouvrir un projet...</translation>
+        <translation type="vanished">Ouvrir un projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="77"/>
         <source>Delete Project...</source>
-        <translation>Supprimer un projet...</translation>
+        <translation type="vanished">Supprimer un projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="94"/>
-        <location filename="../ui/MyMenuBar.qml" line="191"/>
+        <location filename="../ui/MyMenuBar.qml" line="103"/>
+        <location filename="../ui/MyMenuBar.qml" line="160"/>
         <source>Delete Selected</source>
         <translation>Supprimer la sélection</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="101"/>
         <source>Clean Project</source>
-        <translation>Nettoyer le projet</translation>
+        <translation type="vanished">Nettoyer le projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="106"/>
         <source>Exit</source>
-        <translation>Quitter</translation>
+        <translation type="vanished">Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="112"/>
+        <location filename="../ui/MyMenuBar.qml" line="169"/>
         <source>Settings</source>
         <translation>Paramètres</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="114"/>
         <source>Themes</source>
-        <translation>Thèmes</translation>
+        <translation type="vanished">Thèmes</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="131"/>
         <source>Languages</source>
-        <translation>Langues</translation>
+        <translation type="vanished">Langues</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="133"/>
+        <location filename="../ui/MyMenuBar.qml" line="59"/>
+        <source>Project</source>
+        <translation>Projet</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="61"/>
+        <source>New Project...</source>
+        <translation>Nouveau projet...</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="65"/>
+        <source>Open Project</source>
+        <translation>Ouvrir un projet</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="81"/>
+        <source>Clear Project Data...</source>
+        <translation>Vider le projet...</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="86"/>
+        <source>Delete Projects</source>
+        <translation>Supprimer des projets</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="111"/>
+        <source>Quit</source>
+        <translation>Quitter</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="117"/>
+        <source>Models</source>
+        <translation>Modèles</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="134"/>
+        <source>Manage Backends...</source>
+        <translation>Gérer les backends...</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="139"/>
+        <source>Add Local Model...</source>
+        <translation>Ajouter un modèle local...</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="143"/>
+        <source>Delete Local Models</source>
+        <translation>Supprimer des modèles locaux</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="171"/>
+        <source>Theme</source>
+        <translation>Thème</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="188"/>
+        <source>Language</source>
+        <translation>Langue</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="190"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="139"/>
+        <location filename="../ui/MyMenuBar.qml" line="196"/>
         <source>Français</source>
         <translation>Français</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="146"/>
+        <location filename="../ui/MyMenuBar.qml" line="204"/>
+        <source>OpenAlex API Key...</source>
+        <translation>Clé API OpenAlex...</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="119"/>
         <source>Backend</source>
         <translation>Backend</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="148"/>
         <source>Add Backend...</source>
-        <translation>Ajouter un backend...</translation>
+        <translation type="vanished">Ajouter un backend...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="153"/>
         <source>Change Backend</source>
-        <translation>Changer de backend</translation>
+        <translation type="vanished">Changer de backend</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="169"/>
         <source>Local Models</source>
-        <translation>Modèles locaux</translation>
+        <translation type="vanished">Modèles locaux</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="171"/>
         <source>Add Model...</source>
-        <translation>Ajouter un modèle...</translation>
+        <translation type="vanished">Ajouter un modèle...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="198"/>
         <source>OpenAlex API key</source>
-        <translation>Clé API OpenAlex</translation>
+        <translation type="vanished">Clé API OpenAlex</translation>
     </message>
 </context>
 <context>
@@ -643,42 +728,42 @@
         <translation>Sélectionner un dossier contenant des PDF</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="151"/>
+        <location filename="../ui/MyToolBar.qml" line="157"/>
         <source>Add a file</source>
         <translation>Ajouter un fichier</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="165"/>
+        <location filename="../ui/MyToolBar.qml" line="171"/>
         <source>Add a folder</source>
         <translation>Ajouter un dossier</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="193"/>
+        <location filename="../ui/MyToolBar.qml" line="199"/>
         <source>Ingesting...</source>
         <translation>Importation...</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="205"/>
+        <location filename="../ui/MyToolBar.qml" line="211"/>
         <source>Elapsed Time: %1h %2m</source>
         <translation>Temps écoulé : %1h %2m</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="209"/>
+        <location filename="../ui/MyToolBar.qml" line="215"/>
         <source>Elapsed Time: %1m %2s</source>
         <translation>Temps écoulé : %1m %2s</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="211"/>
+        <location filename="../ui/MyToolBar.qml" line="217"/>
         <source>Elapsed Time: %1s</source>
         <translation>Temps écoulé : %1s</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="219"/>
+        <location filename="../ui/MyToolBar.qml" line="225"/>
         <source>Active Model</source>
         <translation>Modèle actif</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="254"/>
+        <location filename="../ui/MyToolBar.qml" line="260"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>

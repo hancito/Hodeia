@@ -63,7 +63,7 @@ ThemedWindow {
             });
         }
         onRequestDeleteProject: deleteConfirmDialog.open()
-        onRequestCleanProject: cleanProjectDialog.open()
+        onRequestClearProject: clearProjectDialog.open()
         onRequestDeleteModels: deleteModelDialog.open()
         onRequestOpenAlexApiKey: openAlexKeyDialog.open()
     }
@@ -216,17 +216,17 @@ ThemedWindow {
         }
     }
 
-    // Clean project confirmation dialog
+    // Clear project data confirmation dialog
     StyledDialog {
-        id: cleanProjectDialog
+        id: clearProjectDialog
         anchors.centerIn: parent
         destructive: true
         width: 420
-        title: qsTr("Clean Project")
+        title: qsTr("Clear Project Data")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Label {
-            width: cleanProjectDialog.availableWidth
-            text: qsTr("Clean project \"%1\"? All files and data will be permanently removed.").arg(activeProject)
+            width: clearProjectDialog.availableWidth
+            text: qsTr("Clear all data of project \"%1\"? Its papers, summaries and queries will be permanently removed; the empty project is kept.").arg(activeProject)
             wrapMode: Text.WordWrap
         }
         onAccepted: {

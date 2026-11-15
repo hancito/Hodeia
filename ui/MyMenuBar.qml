@@ -8,7 +8,7 @@ MenuBar {
     signal requestNewProject
     signal requestSwitchProject(string projectName)
     signal requestDeleteProject
-    signal requestCleanProject
+    signal requestClearProject
     signal requestDeleteModels
     signal requestOpenAlexApiKey
 
@@ -51,15 +51,18 @@ MenuBar {
     }
 
     // ── Menus ────────────────────────────────────────────────────────────
+    // One menu per domain: Project (data), Models (inference), Settings
+    // (preferences and external services). "..." only on items opening a
+    // dialog; destructive items close their group.
 
     StyledMenu {
-        title: qsTr("File")
+        title: qsTr("Project")
         StyledMenuItem {
-            text: qsTr("New Project")
+            text: qsTr("New Project...")
             onTriggered: menuBar.requestNewProject()
         }
         StyledMenu {
-            title: qsTr("Open Project...")
+            title: qsTr("Open Project")
             Repeater {
                 model: configManager.projectList
                 delegate: StyledMenuItem {
@@ -73,8 +76,14 @@ MenuBar {
                 }
             }
         }
+        StyledMenuSeparator {}
+        StyledMenuItem {
+            text: qsTr("Clear Project Data...")
+            destructive: true
+            onTriggered: menuBar.requestClearProject()
+        }
         StyledMenu {
-            title: qsTr("Delete Project...")
+            title: qsTr("Delete Projects")
             Repeater {
                 model: configManager.projectList
                 delegate: MenuCheckRow {
@@ -97,81 +106,41 @@ MenuBar {
                 onTriggered: menuBar.requestDeleteProject()
             }
         }
-        StyledMenuItem {
-            text: qsTr("Clean Project")
-            onTriggered: menuBar.requestCleanProject()
-        }
         StyledMenuSeparator {}
         StyledMenuItem {
-            text: qsTr("Exit")
+            text: qsTr("Quit")
             onTriggered: Qt.quit()
         }
     }
 
     StyledMenu {
-        title: qsTr("Settings")
+        title: qsTr("Models")
         StyledMenu {
-            title: qsTr("Themes")
+            title: qsTr("Backend")
             Repeater {
-                model: themeManager.themes
+                model: configManager.backendList
                 delegate: StyledMenuItem {
-                    required property int index
                     required property var modelData
                     text: modelData.name
                     checkable: true
-                    checked: themeManager.activeTheme.name === modelData.name
+                    checked: configManager.activeBackend === modelData.name
                     onTriggered: {
-                        themeManager.setThemeIndex(index);
-                        configManager.activeThemeIndex = index;
+                        configManager.setActiveBackend(modelData.name);
                     }
                 }
             }
         }
-        StyledMenu {
-            title: qsTr("Languages")
-            StyledMenuItem {
-                text: qsTr("English")
-                checkable: true
-                checked: configManager.language === "en"
-                onTriggered: configManager.language = "en"
-            }
-            StyledMenuItem {
-                text: qsTr("Français")
-                checkable: true
-                checked: configManager.language === "fr"
-                onTriggered: configManager.language = "fr"
-            }
+        StyledMenuItem {
+            text: qsTr("Manage Backends...")
+            onTriggered: backendDialog.open()
+        }
+        StyledMenuSeparator {}
+        StyledMenuItem {
+            text: qsTr("Add Local Model...")
+            onTriggered: localModelDialog.open()
         }
         StyledMenu {
-            title: qsTr("Backend")
-            StyledMenuItem {
-                text: qsTr("Add Backend...")
-                onTriggered: backendDialog.open()
-            }
-            StyledMenuSeparator {}
-            StyledMenu {
-                title: qsTr("Change Backend")
-                Repeater {
-                    model: configManager.backendList
-                    delegate: StyledMenuItem {
-                        required property var modelData
-                        text: modelData.name
-                        checkable: true
-                        checked: configManager.activeBackend === modelData.name
-                        onTriggered: {
-                            configManager.setActiveBackend(modelData.name);
-                        }
-                    }
-                }
-            }
-        }
-        StyledMenu {
-            title: qsTr("Local Models")
-            StyledMenuItem {
-                text: qsTr("Add Model...")
-                onTriggered: localModelDialog.open()
-            }
-            StyledMenuSeparator {}
+            title: qsTr("Delete Local Models")
             Repeater {
                 model: helpers.localModelList
                 delegate: MenuCheckRow {
@@ -194,8 +163,45 @@ MenuBar {
                 onTriggered: menuBar.requestDeleteModels()
             }
         }
+    }
+
+    StyledMenu {
+        title: qsTr("Settings")
+        StyledMenu {
+            title: qsTr("Theme")
+            Repeater {
+                model: themeManager.themes
+                delegate: StyledMenuItem {
+                    required property int index
+                    required property var modelData
+                    text: modelData.name
+                    checkable: true
+                    checked: themeManager.activeTheme.name === modelData.name
+                    onTriggered: {
+                        themeManager.setThemeIndex(index);
+                        configManager.activeThemeIndex = index;
+                    }
+                }
+            }
+        }
+        StyledMenu {
+            title: qsTr("Language")
+            StyledMenuItem {
+                text: qsTr("English")
+                checkable: true
+                checked: configManager.language === "en"
+                onTriggered: configManager.language = "en"
+            }
+            StyledMenuItem {
+                text: qsTr("Français")
+                checkable: true
+                checked: configManager.language === "fr"
+                onTriggered: configManager.language = "fr"
+            }
+        }
+        StyledMenuSeparator {}
         StyledMenuItem {
-            text: qsTr("OpenAlex API key")
+            text: qsTr("OpenAlex API Key...")
             onTriggered: menuBar.requestOpenAlexApiKey()
         }
     }
