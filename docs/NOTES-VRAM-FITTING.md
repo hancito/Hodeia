@@ -62,8 +62,30 @@ attention est désactivée, et la réduction 1 (`n_ubatch`) descend alors
 jusqu'à 512 au lieu de 2048. Le relevé `[GPU-MEM]` (`InferenceEngine::
 logGpuMemory`) reste en place pour les mesures suivantes.
 
-À tester : activer la flash attention pour les modèles hybrides récents
-(Qwen3.5) avec une version récente de llama.cpp ; la matrice KQ disparaîtrait.
+## 2 ter. Flash attention activée pour les modèles hybrides (validé)
+
+La flash attention était désactivée pour tous les modèles hybrides
+(héritage de Jamba/Granite avec un ancien llama.cpp). Elle est maintenant
+demandée (`AUTO`) pour eux aussi ; interrupteur : `kHybridFlashAttn` dans
+`src/localbackend.cpp`.
+
+Mesuré le 2026-11-15, même document (24 pages, 41 194 tokens, n_ctx 43264),
+Qwen3.5-9B, RTX 5070 Ti :
+
+| | Sans FA, ubatch 2048 | Sans FA, ubatch 512 | Avec FA, ubatch 2048 |
+|---|---|---|---|
+| Après chargement du modèle | 12 120 Mio | 7 735 Mio | 8 258 Mio |
+| Pic pendant les images | OOM | ~9 040 Mio | 9 412 Mio |
+| Estimation lb_fit (hors +5 %) | 10 013 Mio | 9 828 Mio | 10 513 Mio |
+
+Résumé correct, mémoire stable d'image en image (+250 Mio au premier
+encodage, puis plat). Avec FA, le cache V peut aussi être quantifié, donc
+la réduction « KV en Q8_0 » est pleinement efficace pour ces modèles.
+
+Attention : en `AUTO`, llama.cpp peut désactiver la FA sans le signaler
+(logs INFO non transmis) si un backend ne la gère pas ; l'estimation serait
+alors trop basse. Le signe : `[GPU-MEM] after model load` bien au-dessus de
+l'estimation poids + KV + calcul.
 
 ## 3. Plan de test / étapes proposées
 

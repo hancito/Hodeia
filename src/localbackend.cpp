@@ -234,6 +234,19 @@ static uint64_t lb_estimate_kv_cache(int32_t n_embd_k_gqa, int32_t n_embd_v_gqa,
   return raw * 26 / 100;
 }
 
+/// Flash attention for hybrid models (recurrent + attention).  They used to
+/// be kept off it (older llama.cpp, Jamba/Granite); validated on Qwen3.5-9B
+/// with a recent llama.cpp: correct output, and without FA the KQ matrix
+/// costs n_ctx × n_ubatch × n_head × 4 bytes of VRAM (5.4 GiB at 43k ctx,
+/// docs/NOTES-VRAM-FITTING.md).  Set to false if a hybrid model misbehaves.
+static constexpr bool kHybridFlashAttn = true;
+
+/// Flash attention requested for a model (AUTO lets llama.cpp turn it off
+/// on a backend that does not support it).
+static bool lb_uses_flash_attn(bool is_hybrid) {
+  return !is_hybrid || kHybridFlashAttn;
+}
+
 /// V cache type actually used for a requested KV type: llama.cpp rejects a
 /// quantized V cache without flash attention, so it stays F16 then (see
 /// LocalBackend::createInitResult).  A quantized K cache is always allowed.
@@ -823,7 +836,8 @@ static common_params lb_fit_params(const probe_info &probe,
     // backend cannot execute SET_ROWS on Q4_K view tensors.  Hybrid models
     // run without flash attention, so their V cache stays F16.
     int iGPU_type_k = GGML_TYPE_Q8_0;
-    int iGPU_type_v = lb_v_type(iGPU_type_k, !probe.is_hybrid);
+    int iGPU_type_v =
+        lb_v_type(iGPU_type_k, lb_uses_flash_attn(probe.is_hybrid));
     const QString iGPU_kv_name = QString("K=%1 V=%2")
                                      .arg(lb_kv_name(iGPU_type_k))
                                      .arg(lb_kv_name(iGPU_type_v));
@@ -908,8 +922,9 @@ static common_params lb_fit_params(const probe_info &probe,
   uint32_t n_ubatch = desiredUbatch;
   int type_kv = GGML_TYPE_F16; // K type; V follows unless flash attn is off
   bool mmproj_on_gpu = probe.has_mmproj;
-  // Hybrid models run without flash attention (V cache stays F16).
-  const bool flash_attn = !probe.is_hybrid;
+  // Without flash attention (hybrid models unless kHybridFlashAttn) the V
+  // cache stays F16 and the KQ matrix is counted below.
+  const bool flash_attn = lb_uses_flash_attn(probe.is_hybrid);
   const uint32_t ubatch_floor_1 = flash_attn ? 2048U : 512U;
 
   for (int attempts = 0; attempts < 500; ++attempts) {
@@ -1114,7 +1129,7 @@ common_init_result_ptr LocalBackend::createInitResult(common_params &params) {
     // flash attention.  Only reload when FA could actually be on — the
     // fitted loader already disables it up front, this is a safety net for
     // callers that did not probe the model.
-    if (llama_model_is_hybrid(result->model()) &&
+    if (!kHybridFlashAttn && llama_model_is_hybrid(result->model()) &&
         params.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_DISABLED) {
       result.reset();
       params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
@@ -1228,10 +1243,11 @@ LocalBackend::loadModelWithDevices(const QString &path,
   // available via ggml_backend_load_all() for host ops and hybrid offload
   // on its own, so an explicit CPU entry is not needed.
   applyCommon(params);
-  // Hybrid models run without flash attention; deciding it here (the fitter
-  // sized the V cache accordingly) avoids createInitResult's reload.
-  params.flash_attn_type = probe.is_hybrid ? LLAMA_FLASH_ATTN_TYPE_DISABLED
-                                           : LLAMA_FLASH_ATTN_TYPE_AUTO;
+  // Decided here, as the fitter assumed (V cache type, KQ matrix), so
+  // createInitResult never has to reload.
+  params.flash_attn_type = lb_uses_flash_attn(probe.is_hybrid)
+                               ? LLAMA_FLASH_ATTN_TYPE_AUTO
+                               : LLAMA_FLASH_ATTN_TYPE_DISABLED;
   if (!mmprojPath.isEmpty() && !probe.has_mmproj) {
     // lb_fit_params only sets mmproj if probe confirmed it exists
     params.mmproj.path = mmprojPath.toStdString();
