@@ -5,14 +5,18 @@
 ; i18n, bundled models) into a single Hodeia-Setup-<version>-x64.exe.
 ;
 ; Normally built by scripts\Windows\package-app.ps1, which passes:
-;   /DAppVersion=<x.y.z>        from project(VERSION) in CMakeLists.txt
+;   /DAppVersion=<x.y[suffix]>  full version, e.g. 0.99rc (CMakeLists.txt)
+;   /DAppVersionNumeric=<x.y>   numeric part only (project(VERSION))
 ;   /DBuildDir=<path>           deployed build folder (default build\Release)
 ;   /DVCRedistBuild=<n>         build number of the bundled vc_redist.x64.exe
 ; Manual build from the repo root:
 ;   iscc package\windows\hodeia.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.1"
+  #define AppVersion "0.99rc"
+#endif
+#ifndef AppVersionNumeric
+  #define AppVersionNumeric "0.99"
 #endif
 #ifndef BuildDir
   #define BuildDir "..\..\build\Release"
@@ -41,7 +45,8 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppName}
-VersionInfoVersion={#AppVersion}
+; Windows file version resources accept digits only.
+VersionInfoVersion={#AppVersionNumeric}
 LicenseFile=..\..\LICENSE
 SetupIconFile=..\..\Resources\hodeia.ico
 UninstallDisplayIcon={app}\{#AppExe}
@@ -60,7 +65,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 
 OutputDir=..\..\dist
-OutputBaseFilename=Hodeia-Setup-{#AppVersion}-x64
+OutputBaseFilename=Hodeia-{#AppVersion}-x64
 
 ; ~2.3 GB payload, mostly already-compressed .gguf models and CUDA DLLs:
 ; non-solid LZMA2 keeps compile time and memory reasonable.  A single
@@ -147,11 +152,27 @@ begin
     Version := '';
 end;
 
-// Numeric dotted-version compare ("0.10" > "0.9"): < 0, 0 or > 0.
+// Splits "0.99rc" into its numeric part "0.99" and suffix "rc".
+procedure SplitVersion(V: String; var Num, Suffix: String);
+var
+  I: Integer;
+begin
+  I := 1;
+  while (I <= Length(V)) and (((V[I] >= '0') and (V[I] <= '9')) or (V[I] = '.')) do
+    I := I + 1;
+  Num := Copy(V, 1, I - 1);
+  Suffix := Copy(V, I, Length(V));
+end;
+
+// Dotted-version compare ("0.10" > "0.9"), with an optional pre-release
+// suffix ranking below the final release ("0.99rc" < "0.99"): < 0, 0 or > 0.
 function CompareVersions(A, B: String): Integer;
 var
   PA, PB: Integer;
+  SA, SB: String;
 begin
+  SplitVersion(A, A, SA);
+  SplitVersion(B, B, SB);
   Result := 0;
   while (Result = 0) and ((A <> '') or (B <> '')) do
   begin
@@ -160,6 +181,12 @@ begin
     Result := StrToIntDef(Copy(A, 1, PA - 1), 0) - StrToIntDef(Copy(B, 1, PB - 1), 0);
     Delete(A, 1, PA);
     Delete(B, 1, PB);
+  end;
+  if Result = 0 then
+  begin
+    if (SA = '') and (SB <> '') then Result := 1
+    else if (SA <> '') and (SB = '') then Result := -1
+    else Result := CompareText(SA, SB);
   end;
 end;
 

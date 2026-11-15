@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(Hodeia VERSION 0.1 LANGUAGES CXX C)
+project(Hodeia VERSION 0.99 LANGUAGES CXX C)
+
+# Release version = numeric project(VERSION) + optional pre-release suffix
+# ("rc", "beta"...; empty for a final release).  project(VERSION) only accepts
+# digits, and the Windows installer needs the numeric part on its own.
+# Shown in the app (About), the installer name and the Arch pkgver/git tag.
+set(HODEIA_VERSION_SUFFIX "rc")
+set(HODEIA_VERSION_STRING "${PROJECT_VERSION}${HODEIA_VERSION_SUFFIX}")
 
 # ---------------------------------------------------------------------------
 # 1. Parallel build — use all cores by default (override: -DCMAKE_BUILD_PARALLEL_LEVEL=4)

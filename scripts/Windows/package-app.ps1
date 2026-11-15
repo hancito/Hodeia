@@ -46,12 +46,15 @@ if (-not $iscc) {
 }
 if (-not $iscc) { throw "Inno Setup (ISCC.exe) not found. Install it: winget install JRSoftware.InnoSetup" }
 
-# --- Version from CMakeLists.txt project(... VERSION x.y.z ...) ----------------
+# --- Version from CMakeLists.txt: project(... VERSION x.y ...) + suffix --------
 $cmakeLists = Get-Content (Join-Path $repoRoot "CMakeLists.txt") -Raw
 if ($cmakeLists -notmatch 'project\s*\(\s*Hodeia\s+VERSION\s+([0-9.]+)') {
     throw "Could not read the project version from CMakeLists.txt"
 }
-$version = $Matches[1]
+$numericVersion = $Matches[1]
+$suffix = ""
+if ($cmakeLists -match 'set\s*\(\s*HODEIA_VERSION_SUFFIX\s+"([^"]*)"') { $suffix = $Matches[1] }
+$version = "$numericVersion$suffix"
 
 # --- Build number of the bundled VC++ redistributable -------------------------
 $redist = Join-Path $BuildDir "vc_redist.x64.exe"
@@ -61,7 +64,7 @@ $redistBuild = (Get-Item $redist).VersionInfo.FileBuildPart
 # --- Compile -------------------------------------------------------------------
 $iss = Join-Path $repoRoot "package\windows\hodeia.iss"
 Write-Host ">> Inno Setup: Hodeia $version (VC++ runtime build $redistBuild)"
-& $iscc "/DAppVersion=$version" "/DBuildDir=$((Resolve-Path $BuildDir).Path)" "/DVCRedistBuild=$redistBuild" $iss
+& $iscc "/DAppVersion=$version" "/DAppVersionNumeric=$numericVersion" "/DBuildDir=$((Resolve-Path $BuildDir).Path)" "/DVCRedistBuild=$redistBuild" $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
 # --- GitHub release assets are capped at 2 GiB per file --------------------------

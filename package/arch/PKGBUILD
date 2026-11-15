@@ -13,7 +13,7 @@
 # a file so build() can read it.
 
 pkgname=hodeia
-pkgver=0.1
+pkgver=0.99rc
 pkgrel=1
 pkgdesc="Local-AI research assistant for academic papers (Qt6 + llama.cpp)"
 arch=(x86_64)

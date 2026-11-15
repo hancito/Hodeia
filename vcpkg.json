@@ -1,6 +1,6 @@
 {
   "name": "hodeia",
-  "version": "0.1.0",
+  "version-string": "0.99rc",
   "description": "Hodeia — Windows dependency manifest (vcpkg). MuPDF/Tesseract/Leptonica/Vulkan for the native MSVC build.",
   "dependencies": [
     "libmupdf",
