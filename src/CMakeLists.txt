@@ -26,6 +26,8 @@ add_library(HodeiaEngine STATIC
     ../include/sqlitedb.h
     ../include/sqlitevec.h
     ../include/localbackend.h
+    ../include/localprompt.h
+    ../include/vramfit.h
     ../include/inferenceengine.h
     ../include/remotebackend.h
     ../include/summarizer.h
@@ -52,6 +54,8 @@ add_library(HodeiaEngine STATIC
     sqlitedb.cpp
     sqlitevec.cpp
     localbackend.cpp
+    localprompt.cpp
+    vramfit.cpp
     inferenceengine.cpp
     remotebackend.cpp
     summarizer.cpp

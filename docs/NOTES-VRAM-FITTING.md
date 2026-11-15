@@ -4,8 +4,12 @@ Statut : **ouvert**, rien de modifié dans le calcul pour l'instant.
 À vérifier sur une machine avec un GPU dédié (idéalement NVIDIA/CUDA, et si
 possible un modèle *sans* attention à fenêtre glissante, ex. Llama/Qwen/Mistral).
 
-Code concerné : `src/localbackend.cpp` — `lb_fit_params()`,
-`lb_estimate_kv_cache()`, `lb_pick_gpu()`.
+Code concerné : `src/vramfit.cpp` (namespace `VramFit`), sorti de
+`src/localbackend.cpp` le 2026-11-15. Correspondance des anciens noms cités
+plus bas : `lb_fit_params()` → `VramFit::fitParams()`, `lb_probe_model()` →
+`VramFit::probeModel()`, `lb_pick_gpu()` → `VramFit::pickGpu()` ;
+`lb_estimate_kv_cache()`, `lb_read_kv_layout()`, `lb_is_integrated_gpu()` et
+`lb_name_looks_integrated()` gardent leur nom, internes à `vramfit.cpp`.
 
 ---
 
@@ -66,8 +70,8 @@ logGpuMemory`) reste en place pour les mesures suivantes.
 
 La flash attention était désactivée pour tous les modèles hybrides
 (héritage de Jamba/Granite avec un ancien llama.cpp). Elle est maintenant
-demandée (`AUTO`) pour eux aussi ; interrupteur : `kHybridFlashAttn` dans
-`src/localbackend.cpp`.
+demandée (`AUTO`) pour eux aussi ; interrupteur : `VramFit::kHybridFlashAttn`
+dans `include/vramfit.h`.
 
 Mesuré le 2026-11-15, même document (24 pages, 41 194 tokens, n_ctx 43264),
 Qwen3.5-9B, RTX 5070 Ti :

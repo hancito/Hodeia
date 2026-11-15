@@ -115,7 +115,7 @@ Hodeia/
 │   ├── thememanager.h  configmanager.h  database.h  summary.h  query.h
 │   ├── citationsmodel.h  summaryproxymodel.h  queryproxymodel.h
 │   ├── ingestionengine.h  enginemanager.h  sqlitedb.h  sqlitevec.h
-│   ├── localbackend.h  inferenceengine.h  remotebackend.h  summarizer.h
+│   ├── localbackend.h  vramfit.h  localprompt.h  inferenceengine.h  remotebackend.h  summarizer.h
 │   ├── summarythreadmanager.h  queryworker.h  querycontroller.h
 │   └── openalex.h  helpers.h  textformat.h
 │
@@ -128,7 +128,9 @@ Hodeia/
 │   ├── sqlitevec.cpp               # Vector embeddings (E5 via llama.cpp), vec0 CRUD/search
 │   ├── ingestionengine.cpp         # PDF extraction (MuPDF + Tesseract), chunking
 │   ├── enginemanager.cpp           # Thread controller for the PDF ingestion pipeline
-│   ├── localbackend.cpp            # Local llama.cpp backend (model loading, GPU fitting)
+│   ├── localbackend.cpp            # Local llama.cpp backend (model loading, inference, mmproj)
+│   ├── vramfit.cpp                 # GPU memory fitting: model probe, per-layer KV estimate, fit loop
+│   ├── localprompt.cpp             # PromptPayload / PageImage, prompt assembly shared by probe and inference
 │   ├── inferenceengine.cpp         # Token-level inference (text + multimodal)
 │   ├── remotebackend.cpp           # HTTP client for OpenAI-compatible APIs
 │   ├── summarizer.cpp              # Paper summarization orchestrator
