@@ -65,7 +65,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 
 OutputDir=..\..\dist
-OutputBaseFilename=Hodeia-{#AppVersion}-x64
+OutputBaseFilename=Hodeia-Setup-{#AppVersion}-x64
 
 ; ~2.3 GB payload, mostly already-compressed .gguf models and CUDA DLLs:
 ; non-solid LZMA2 keeps compile time and memory reasonable.  A single
