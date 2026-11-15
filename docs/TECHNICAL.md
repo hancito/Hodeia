@@ -502,7 +502,7 @@ The application icon is embedded in `Hodeia.exe` through `src/hodeia.rc`, so Exp
 .\scripts\Windows\package-app.ps1 -Build   # build Release first
 ```
 
-Requires Inno Setup 6.5.2+ or 7 (`winget install JRSoftware.InnoSetup`). The script refuses non-Release builds, reads the version from `project(Hodeia VERSION …)` in `CMakeLists.txt`, and compiles `package/windows/hodeia.iss` into `dist\Hodeia-Setup-<version>-x64.exe`. Also available as the Zed task "Windows: Package Installer (Inno Setup)". See [PACKAGING.md](PACKAGING.md) for what the installer does.
+Requires Inno Setup 6.5.2+ or 7 (`winget install JRSoftware.InnoSetup`). The script refuses non-Release builds, reads the version from `project(Hodeia VERSION …)` in `CMakeLists.txt`, and compiles `package/windows/hodeia.iss` into `dist\Hodeia-<version>-x64.exe`. Also available as the Zed task "Windows: Package Installer (Inno Setup)". See [PACKAGING.md](PACKAGING.md) for what the installer does.
 
 ---
 

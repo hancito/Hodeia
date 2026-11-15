@@ -1,5 +1,5 @@
 # package-app.ps1
-# Builds the Windows installer (dist\Hodeia-Setup-<version>-x64.exe) from the
+# Builds the Windows installer (dist\Hodeia-<version>-x64.exe) from the
 # deployed Release build with Inno Setup (package\windows\hodeia.iss).
 #
 # Usage (from the repo root):
@@ -68,7 +68,7 @@ Write-Host ">> Inno Setup: Hodeia $version (VC++ runtime build $redistBuild)"
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
 # --- GitHub release assets are capped at 2 GiB per file --------------------------
-$installer = Join-Path $repoRoot "dist\Hodeia-Setup-$version-x64.exe"
+$installer = Join-Path $repoRoot "dist\Hodeia-$version-x64.exe"
 $sizeBytes = (Get-Item $installer).Length
 $sizeGiB = [math]::Round($sizeBytes / 1GB, 2)
 if ($sizeBytes -ge 2GB) {

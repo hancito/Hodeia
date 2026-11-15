@@ -304,13 +304,13 @@ optional "add to PATH".
   - `Setup icon` + `AppId` GUID (stable across versions so upgrades work).
   - `ArchitecturesInstallIn64BitMode=x64`.
   - Optionally install the VC++ Redist silently as a pre-install step.
-- Build: `iscc hodeia.iss` → `Hodeia-Setup-<version>.exe`.
+- Build: `iscc hodeia.iss` → `Hodeia-<version>.exe`.
 - **Implemented:** `package/windows/hodeia.iss`, driven by
   `scripts/Windows/package-app.ps1` (Zed task "Windows: Package Installer
   (Inno Setup)"; `-Build` builds Release first). Requires Inno Setup
   6.5.2+ or 7 (`winget install JRSoftware.InnoSetup`).
   - Packages `build/Release` (minus CMake/Ninja artefacts, `.lib`/`.pdb`/…)
-    into `dist/Hodeia-Setup-<version>-x64.exe`. Refuses non-Release builds
+    into `dist/Hodeia-<version>-x64.exe`. Refuses non-Release builds
     (debug CRT/Qt DLLs are not redistributable). Version comes from
     `project(VERSION)` in `CMakeLists.txt`.
   - Per-user install by default (no admin, `%LOCALAPPDATA%\Programs`);
@@ -380,7 +380,7 @@ A single job (no matrix needed — x64-only for now):
    an unexpected CRT is referenced.
 4. **Package**
    - Tier 1: `Compress-Archive build/Release Hodeia-<ver>-win64-portable.zip`.
-   - Tier 2: `pwsh scripts/Windows/package-app.ps1` → `dist/Hodeia-Setup-<ver>-x64.exe`
+   - Tier 2: `pwsh scripts/Windows/package-app.ps1` → `dist/Hodeia-<ver>-x64.exe`
      (it passes the `AppVersion` / `BuildDir` / `VCRedistBuild` defines that
      `hodeia.iss` requires — do not call `iscc` on the `.iss` directly).
 5. **Sign** (if using SignPath): `signpath/github-action` with the secret
@@ -417,14 +417,14 @@ windows:
     - name: Sign (optional)
       uses: signpath/github-action@v1
       with:
-        artifacts: "dist/Hodeia-Setup-*.exe"
+        artifacts: "dist/Hodeia-*.exe"
         # ... SignPath config
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: hodeia-windows
         path: |
-          dist/Hodeia-Setup-*.exe
+          dist/Hodeia-*.exe
           Hodeia-*-win64-portable.zip
 ```
 

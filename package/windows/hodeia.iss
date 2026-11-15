@@ -2,7 +2,7 @@
 ;
 ; Packages the deployed Release build (build\Release: Hodeia.exe, Qt runtime
 ; from windeployqt, llama.cpp/CUDA/Vulkan/OCR DLLs, themes, fonts, tessdata,
-; i18n, bundled models) into a single Hodeia-Setup-<version>-x64.exe.
+; i18n, bundled models) into a single Hodeia-<version>-x64.exe.
 ;
 ; Normally built by scripts\Windows\package-app.ps1, which passes:
 ;   /DAppVersion=<x.y[suffix]>  full version, e.g. 0.99rc (CMakeLists.txt)
@@ -65,7 +65,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 
 OutputDir=..\..\dist
-OutputBaseFilename=Hodeia-Setup-{#AppVersion}-x64
+OutputBaseFilename=Hodeia-{#AppVersion}-x64
 
 ; ~2.3 GB payload, mostly already-compressed .gguf models and CUDA DLLs:
 ; non-solid LZMA2 keeps compile time and memory reasonable.  A single

@@ -79,7 +79,7 @@ The easiest way to get started is to grab a precompiled build from the [GitHub R
 | Platform              | Asset                | How to install                                |
 | --------------------- | -------------------- | --------------------------------------------- |
 | Linux (Arch)          | `PKGBUILD`           | Use the PKGBUILD or an aur helper             |
-| Windows               | `Hodeia-Setup-*.exe` | Run the installer                             |
+| Windows               | `Hodeia-*-x64.exe`   | Run the installer                             |
 
 After installing, launch **Hodeia** from your applications menu. The app seeds its models and settings on first run — see [Getting models](#getting-models) to pick a model.
 
