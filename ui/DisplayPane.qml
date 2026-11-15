@@ -37,6 +37,36 @@ Rectangle {
         }
     }
 
+    // Give the PDF tab the keyboard focus when it is shown, so its
+    // navigation keys work without clicking the page first.
+    Connections {
+        target: tabBar
+        function onCurrentIndexChanged() {
+            if (tabBar.currentIndex === 3)
+                pdfTab.forceActiveFocus();
+        }
+    }
+
+    // Zoom shortcuts (standard sequences follow the keyboard layout: Ctrl+=
+    // / Ctrl++ / Ctrl+- on QWERTY and AZERTY alike).  Active only while the
+    // PDF tab is shown.
+    Shortcut {
+        sequences: [StandardKey.ZoomIn]
+        enabled: tabBar.currentIndex === 3 && displayPane.pageImages.length > 0
+        onActivated: pdfTab.setZoom(pdfTab.pdfZoomLevel + 0.25)
+    }
+    Shortcut {
+        sequences: [StandardKey.ZoomOut]
+        enabled: tabBar.currentIndex === 3 && displayPane.pageImages.length > 0
+        onActivated: pdfTab.setZoom(pdfTab.pdfZoomLevel - 0.25)
+    }
+    Shortcut {
+        // "Ctrl+à": the 0 key on an AZERTY keyboard.
+        sequences: ["Ctrl+0", "Ctrl+à"]
+        enabled: tabBar.currentIndex === 3 && displayPane.pageImages.length > 0
+        onActivated: pdfTab.setZoom(1)
+    }
+
     // Resolve image paths for the active paper
     readonly property list<string> pageImages: {
         if (activePaperHash === "")
@@ -67,91 +97,85 @@ Rectangle {
             }
         }
 
-        // Page navigation row (visible only on PDF tab)
-        RowLayout {
+        // Page navigation bar (visible only on PDF tab): page counter
+        // centred, zoom controls on the right.
+        Item {
             visible: tabBar.currentIndex === 3
             Layout.fillWidth: true
-            spacing: 8
+            implicitHeight: Math.max(pageCounter.implicitHeight, zoomControls.implicitHeight)
             opacity: displayPane.pageImages.length > 0 ? 1 : 0
 
-            Label {
-                text: qsTr("Page")
-                opacity: 0.7
-            }
-            StyledButton {
-                flat: true
-                display: AbstractButton.IconOnly
-                icon.source: "qrc:/Resources/arrow-circle-left.svg"
-                icon.width: 20
-                icon.height: 20
-                enabled: pageSpinner.value > pageSpinner.from
-                onClicked: pageSpinner.value -= 1
-            }
-            StyledSpinBox {
-                id: pageSpinner
-                from: 1
-                to: Math.max(displayPane.pageImages.length, 1)
-                value: 1
-                editable: true
+            RowLayout {
+                id: pageCounter
+                anchors.centerIn: parent
+                spacing: 8
+
+                StyledSpinBox {
+                    id: pageSpinner
+                    from: 1
+                    to: Math.max(displayPane.pageImages.length, 1)
+                    value: 1
+                    editable: true
+                    // A new page opens at its top, whatever the previous page's
+                    // scroll position (it used to open where the last one was).
+                    onValueChanged: pdfFlickable.contentY = 0
+                }
+                Label {
+                    text: "/" + displayPane.pageImages.length + " pages"
+                    opacity: 0.7
+                }
             }
 
-            Label {
-                text: "/" + displayPane.pageImages.length
-                opacity: 0.7
-            }
-            StyledButton {
-                flat: true
-                display: AbstractButton.IconOnly
-                icon.source: "qrc:/Resources/arrow-circle-right.svg"
-                icon.width: 20
-                icon.height: 20
-                enabled: pageSpinner.value < pageSpinner.to
-                onClicked: pageSpinner.value += 1
-            }
+            RowLayout {
+                id: zoomControls
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
 
-            Item {
-                Layout.fillWidth: true
-            }
-
-            // Zoom controls
-            Label {
-                text: qsTr("Zoom")
-                opacity: 0.7
-            }
-            StyledButton {
-                flat: true
-                display: AbstractButton.IconOnly
-                icon.source: "qrc:/Resources/magnifying-glass-minus.svg"
-                icon.width: 20
-                icon.height: 20
-                enabled: pdfTab.pdfZoomLevel > 0.25
-                onClicked: pdfTab.pdfZoomLevel = Math.max(0.25, pdfTab.pdfZoomLevel - 0.25)
-            }
-            Label {
-                id: zoomLabel
-                text: Math.round(pdfTab.pdfZoomLevel * 100) + "%"
-                font.family: Fonts.mono
-                font.pixelSize: Style.fontSmall
-                opacity: 0.7
-            }
-            StyledButton {
-                flat: true
-                display: AbstractButton.IconOnly
-                id: zoomInBtn
-                icon.source: "qrc:/Resources/magnifying-glass-plus.svg"
-                icon.width: 20
-                icon.height: 20
-                enabled: pdfTab.pdfZoomLevel < 5
-                onClicked: pdfTab.pdfZoomLevel = Math.min(5, pdfTab.pdfZoomLevel + 0.25)
-            }
-            StyledButton {
-                flat: true
-                display: AbstractButton.IconOnly
-                icon.source: "qrc:/Resources/arrow-rotate-back.svg"
-                icon.width: 20
-                icon.height: 20
-                toolTip: qsTr("Reset zoom")
-                onClicked: pdfTab.pdfZoomLevel = 1
+                Label {
+                    text: qsTr("Zoom")
+                    opacity: 0.7
+                }
+                StyledButton {
+                    flat: true
+                    display: AbstractButton.IconOnly
+                    icon.source: "qrc:/Resources/magnifying-glass-minus.svg"
+                    icon.width: 20
+                    icon.height: 20
+                    focusPolicy: Qt.NoFocus
+                    toolTip: qsTr("Zoom out (Ctrl+-)")
+                    enabled: pdfTab.pdfZoomLevel > 0.25
+                    onClicked: pdfTab.setZoom(pdfTab.pdfZoomLevel - 0.25)
+                }
+                Label {
+                    id: zoomLabel
+                    text: Math.round(pdfTab.pdfZoomLevel * 100) + "%"
+                    font.family: Fonts.mono
+                    font.pixelSize: Style.fontSmall
+                    opacity: 0.7
+                }
+                StyledButton {
+                    id: zoomInBtn
+                    flat: true
+                    display: AbstractButton.IconOnly
+                    icon.source: "qrc:/Resources/magnifying-glass-plus.svg"
+                    icon.width: 20
+                    icon.height: 20
+                    focusPolicy: Qt.NoFocus
+                    toolTip: qsTr("Zoom in (Ctrl++)")
+                    enabled: pdfTab.pdfZoomLevel < pdfTab.maxZoom
+                    onClicked: pdfTab.setZoom(pdfTab.pdfZoomLevel + 0.25)
+                }
+                StyledButton {
+                    flat: true
+                    display: AbstractButton.IconOnly
+                    icon.source: "qrc:/Resources/arrow-rotate-back.svg"
+                    icon.width: 20
+                    icon.height: 20
+                    focusPolicy: Qt.NoFocus
+                    toolTip: qsTr("Reset zoom (Ctrl+0)")
+                    onClicked: pdfTab.setZoom(1)
+                }
             }
         }
 
@@ -288,22 +312,74 @@ Rectangle {
                 id: pdfTab
                 property real pdfZoomLevel: 1
                 clip: true
+                activeFocusOnTab: true
 
-                // fitW/fitH: the image's size after PreserveAspectFit into the
-                // viewport (zoom 1). Derived from nativeWidth/Height (not the
-                // bound width/height, which would be circular). Falls back to
-                // the viewport size before the image loads, because
-                // nativeWidth is undefined (not 0) and undefined <= 0 is false
-                // in JS, which would otherwise produce NaN.
-                readonly property real fitW: {
-                    if (!pdfImageItem.nativeWidth || !pdfImageItem.nativeHeight)
-                        return pdfTab.width;
-                    return pdfImageItem.nativeWidth * Math.min(pdfTab.width / pdfImageItem.nativeWidth, pdfTab.height / pdfImageItem.nativeHeight);
+                function goToPage(n) {
+                    pageSpinner.value = Math.max(pageSpinner.from, Math.min(pageSpinner.to, n));
                 }
-                readonly property real fitH: {
-                    if (!pdfImageItem.nativeWidth || !pdfImageItem.nativeHeight)
-                        return pdfTab.height;
-                    return pdfImageItem.nativeHeight * Math.min(pdfTab.width / pdfImageItem.nativeWidth, pdfTab.height / pdfImageItem.nativeHeight);
+                function setZoom(z) {
+                    pdfZoomLevel = Math.max(0.25, Math.min(maxZoom, z));
+                }
+                // Vertical scroll by dy pixels, kept within the page.
+                function scrollBy(dy) {
+                    const maxY = Math.max(0, pdfFlickable.contentHeight - pdfFlickable.height);
+                    pdfFlickable.contentY = Math.max(0, Math.min(maxY, pdfFlickable.contentY + dy));
+                }
+
+                // Page navigation.  Handled here (not as window shortcuts) so
+                // the arrow keys keep working in text fields elsewhere.
+                Keys.onPressed: event => {
+                    if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier))
+                        return;
+                    const step = pdfFlickable.height * 0.15;
+                    switch (event.key) {
+                    case Qt.Key_Left:
+                    case Qt.Key_PageUp:
+                        goToPage(pageSpinner.value - 1);
+                        break;
+                    case Qt.Key_Right:
+                    case Qt.Key_PageDown:
+                        goToPage(pageSpinner.value + 1);
+                        break;
+                    case Qt.Key_Home:
+                        goToPage(pageSpinner.from);
+                        break;
+                    case Qt.Key_End:
+                        goToPage(pageSpinner.to);
+                        break;
+                    case Qt.Key_Up:
+                        scrollBy(-step);
+                        break;
+                    case Qt.Key_Down:
+                        scrollBy(step);
+                        break;
+                    default:
+                        return;
+                    }
+                    event.accepted = true;
+                }
+
+                // Natural size of the page PNG (0 while nothing is loaded).
+                // sourceSize, not implicitWidth/Height: with PreserveAspectFit
+                // Image recomputes its implicit size from the width/height
+                // bound below, which depend on these values (binding loop).
+                readonly property real imageW: pdfImageItem.sourceSize.width
+                readonly property real imageH: pdfImageItem.sourceSize.height
+                // fitW/fitH: the page's size after PreserveAspectFit into the
+                // viewport (zoom 1).  Falls back to the viewport size before
+                // the image loads.
+                readonly property real fitScale: (imageW > 0 && imageH > 0) ? Math.min(pdfFlickable.width / imageW, pdfFlickable.height / imageH) : 0
+                readonly property real fitW: fitScale > 0 ? imageW * fitScale : pdfFlickable.width
+                readonly property real fitH: fitScale > 0 ? imageH * fitScale : pdfFlickable.height
+                // Zoom cap: one PNG pixel per physical screen pixel — beyond
+                // that the page only gets blurrier.  Never below 1 (a small
+                // or low-resolution PNG still fills the viewport).  Uncapped
+                // (5) while a page is loading, so switching pages keeps the
+                // zoom level.
+                readonly property real maxZoom: (pdfImageItem.status === Image.Ready && fitScale > 0) ? Math.max(1, 1 / (fitScale * Screen.devicePixelRatio)) : 5
+                onMaxZoomChanged: {
+                    if (pdfZoomLevel > maxZoom)
+                        pdfZoomLevel = maxZoom;
                 }
                 readonly property real zoomedWidth: pdfTab.fitW * pdfTab.pdfZoomLevel
                 readonly property real zoomedHeight: pdfTab.fitH * pdfTab.pdfZoomLevel
@@ -313,9 +389,32 @@ Rectangle {
                 readonly property real effContentW: Math.max(pdfTab.zoomedWidth, pdfFlickable.width)
                 readonly property real effContentH: Math.max(pdfTab.zoomedHeight, pdfFlickable.height)
 
+                // Page arrows on either side of the page, in their own
+                // columns so they never cover it when zoomed in.
+                StyledButton {
+                    id: prevPageButton
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    opacity: displayPane.pageImages.length > 0 ? 1 : 0
+                    flat: true
+                    display: AbstractButton.IconOnly
+                    icon.source: "qrc:/Resources/arrow-circle-left.svg"
+                    icon.width: 24
+                    icon.height: 24
+                    focusPolicy: Qt.NoFocus // keep the keyboard focus on the page
+                    toolTip: qsTr("Previous page (←, Page Up)")
+                    enabled: pageSpinner.value > pageSpinner.from
+                    onClicked: pdfTab.goToPage(pageSpinner.value - 1)
+                }
+
                 Flickable {
                     id: pdfFlickable
-                    anchors.fill: parent
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.left: prevPageButton.right
+                    anchors.right: nextPageButton.left
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 4
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     contentWidth: pdfTab.effContentW
@@ -323,6 +422,12 @@ Rectangle {
 
                     ScrollBar.vertical: StyledScrollBar {}
                     ScrollBar.horizontal: StyledScrollBar {}
+
+                    // A click on the page (e.g. after typing a page number)
+                    // gives the keyboard back to the page navigation.
+                    TapHandler {
+                        onTapped: pdfTab.forceActiveFocus()
+                    }
 
                     Image {
                         id: pdfImageItem
@@ -345,6 +450,22 @@ Rectangle {
                             return helpers.localFileUrl(displayPane.pageImages[Math.max(pageSpinner.value - 1, 0)]);
                         }
                     }
+                }
+
+                StyledButton {
+                    id: nextPageButton
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    opacity: displayPane.pageImages.length > 0 ? 1 : 0
+                    flat: true
+                    display: AbstractButton.IconOnly
+                    icon.source: "qrc:/Resources/arrow-circle-right.svg"
+                    icon.width: 24
+                    icon.height: 24
+                    focusPolicy: Qt.NoFocus // keep the keyboard focus on the page
+                    toolTip: qsTr("Next page (→, Page Down)")
+                    enabled: pageSpinner.value < pageSpinner.to
+                    onClicked: pdfTab.goToPage(pageSpinner.value + 1)
                 }
 
                 // Empty state

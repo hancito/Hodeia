@@ -203,95 +203,119 @@
 <context>
     <name>DisplayPane</name>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="57"/>
+        <location filename="../ui/DisplayPane.qml" line="87"/>
         <source>Summary</source>
         <translation>Résumé</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="60"/>
+        <location filename="../ui/DisplayPane.qml" line="90"/>
         <source>References (Cited)</source>
         <translation>Références (citées)</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="63"/>
+        <location filename="../ui/DisplayPane.qml" line="93"/>
         <source>Cited by</source>
         <translation>Cité par</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="66"/>
-        <location filename="../ui/DisplayPane.qml" line="205"/>
+        <location filename="../ui/DisplayPane.qml" line="96"/>
+        <location filename="../ui/DisplayPane.qml" line="247"/>
         <source>PDF</source>
         <translation>PDF</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="78"/>
+        <location filename="../ui/DisplayPane.qml" line="108"/>
         <source>Page</source>
         <translation>Page</translation>
     </message>
     <message>
         <location filename="../ui/DisplayPane.qml" line="118"/>
+        <source>Previous page (←, Page Up)</source>
+        <translation>Page précédente (←, Page préc.)</translation>
+    </message>
+    <message>
+        <location filename="../ui/DisplayPane.qml" line="144"/>
+        <source>Next page (→, Page Down)</source>
+        <translation>Page suivante (→, Page suiv.)</translation>
+    </message>
+    <message>
+        <location filename="../ui/DisplayPane.qml" line="155"/>
         <source>Zoom</source>
         <translation>Zoom</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="153"/>
         <source>Reset zoom</source>
-        <translation>Réinitialiser le zoom</translation>
+        <translation type="vanished">Réinitialiser le zoom</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="192"/>
+        <location filename="../ui/DisplayPane.qml" line="165"/>
+        <source>Zoom out (Ctrl+-)</source>
+        <translation>Zoom arrière (Ctrl+-)</translation>
+    </message>
+    <message>
+        <location filename="../ui/DisplayPane.qml" line="184"/>
+        <source>Zoom in (Ctrl++)</source>
+        <translation>Zoom avant (Ctrl++)</translation>
+    </message>
+    <message>
+        <location filename="../ui/DisplayPane.qml" line="195"/>
+        <source>Reset zoom (Ctrl+0)</source>
+        <translation>Réinitialiser le zoom (Ctrl+0)</translation>
+    </message>
+    <message>
+        <location filename="../ui/DisplayPane.qml" line="234"/>
         <source>Please make a summary of this paper</source>
         <translation>Veuillez créer un résumé de cet article</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="211"/>
+        <location filename="../ui/DisplayPane.qml" line="253"/>
         <source>No Summary</source>
         <translation>Aucun résumé</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="211"/>
+        <location filename="../ui/DisplayPane.qml" line="253"/>
         <source>This paper has no summary to export yet. Summarize it first.</source>
         <translation>Cet article n&apos;a pas encore de résumé à exporter. Résumez-le d&apos;abord.</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="265"/>
+        <location filename="../ui/DisplayPane.qml" line="307"/>
         <source>No references found for this paper</source>
         <translation>Aucune référence trouvée pour cet article</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="354"/>
+        <location filename="../ui/DisplayPane.qml" line="453"/>
         <source>Select a paper to view its pages</source>
         <translation>Sélectionnez un article pour voir ses pages</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="354"/>
+        <location filename="../ui/DisplayPane.qml" line="453"/>
         <source>No page images found</source>
         <translation>Aucune image de page trouvée</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="364"/>
+        <location filename="../ui/DisplayPane.qml" line="463"/>
         <source>Save Summary as PDF</source>
         <translation>Enregistrer le résumé en PDF</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="370"/>
+        <location filename="../ui/DisplayPane.qml" line="469"/>
         <source>PDF Saved</source>
         <translation>PDF enregistré</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="370"/>
+        <location filename="../ui/DisplayPane.qml" line="469"/>
         <source>The summary was saved to:
 %1</source>
         <translation>Le résumé a été enregistré dans :
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="372"/>
+        <location filename="../ui/DisplayPane.qml" line="471"/>
         <source>PDF Export Failed</source>
         <translation>Échec de l&apos;export PDF</translation>
     </message>
     <message>
-        <location filename="../ui/DisplayPane.qml" line="372"/>
+        <location filename="../ui/DisplayPane.qml" line="471"/>
         <source>The summary could not be saved. See the log for details.</source>
         <translation>Le résumé n&apos;a pas pu être enregistré. Consultez le journal pour plus de détails.</translation>
     </message>
@@ -349,32 +373,32 @@
 <context>
     <name>LocalBackend</name>
     <message>
-        <location filename="../src/localbackend.cpp" line="140"/>
+        <location filename="../src/localbackend.cpp" line="137"/>
         <source>Loading model: %1</source>
         <translation>Chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/localbackend.cpp" line="172"/>
+        <location filename="../src/localbackend.cpp" line="169"/>
         <source>Invalid chat template in model: %1</source>
         <translation>Template de chat invalide dans le modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/localbackend.cpp" line="189"/>
+        <location filename="../src/localbackend.cpp" line="187"/>
         <source>Model loaded: %1</source>
         <translation>Modèle chargé : %1</translation>
     </message>
     <message>
-        <location filename="../src/localbackend.cpp" line="1514"/>
+        <location filename="../src/localbackend.cpp" line="703"/>
         <source>Loading multimodal projector: %1</source>
         <translation>Chargement du projecteur multimodal : %1</translation>
     </message>
     <message>
-        <location filename="../src/localbackend.cpp" line="1541"/>
+        <location filename="../src/localbackend.cpp" line="730"/>
         <source>Failed to load mmproj: %1</source>
         <translation>Échec du chargement du mmproj : %1</translation>
     </message>
     <message>
-        <location filename="../src/localbackend.cpp" line="1545"/>
+        <location filename="../src/localbackend.cpp" line="734"/>
         <source>mmproj has no vision encoder: %1</source>
         <translation>Le mmproj n&apos;a pas d&apos;encodeur de vision : %1</translation>
     </message>
