@@ -142,7 +142,8 @@ Hodeia/
 │   ├── citationsmodel.cpp          # CitationsModel over the Citations table (APA format)
 │   ├── openalex.cpp                # OpenAlexClient: references / citing works
 │   ├── thememanager.cpp            # JSON-based theme loading
-│   ├── helpers.cpp                 # ModelHelper, summary parsing, export (MD/LaTeX)
+│   ├── helpers.cpp                 # ModelHelper, summary parsing, HTML formatting, PDF export entry point
+│   ├── pdfexport.cpp               # HTML → PDF rendering with MuPDF (fz_story, footer, ToUnicode fix)
 │   ├── textformat.cpp              # LLM output cleanup: LaTeX → Unicode, Markdown escaping
 │   └── hodeia.rc                   # Windows only: embeds the app icon in Hodeia.exe
 │

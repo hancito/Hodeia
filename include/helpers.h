@@ -42,26 +42,16 @@ public:
   /// Convert a PaperSummary to HTML (used for both the QML display and PDF).
   static QString toHtml(const PaperSummary &summary);
 
-  /// Convert a PaperSummary to a LaTeX snippet.
-  static QString toLatex(const PaperSummary &summary);
-
   // ── QML-invokable ──────────────────────────────────────────────
 
   /// Convert a JSON summary string to HTML (same source used for PDF export).
   Q_INVOKABLE QString summaryToHtml(const QString &json) const;
 
-  /// Convert a JSON summary string to LaTeX.
-  Q_INVOKABLE QString summaryToLatex(const QString &json) const;
-
-  /// Export the JSON summary as a PDF file. Returns the saved path on
-  /// success, or an empty string on failure.
-  Q_INVOKABLE QString exportSummaryToPdf(const QString &json,
-                                         const QString &destPath) const;
-
-  /// Generate a PDF report from a list of summary JSON strings.
-  /// Returns the saved path or an empty string on failure.
-  Q_INVOKABLE QString generateReport(const QStringList &jsonList,
-                                     const QString &destPath) const;
+  /// Export a list of JSON summaries as a PDF, one paper per page (a single
+  /// summary is a one-paper report). Returns the saved path on success, or an
+  /// empty string on failure.
+  Q_INVOKABLE QString exportPdf(const QStringList &jsonList,
+                                const QString &destPath) const;
 
   /// List folder names of local summarizer models.
   QStringList localModelList();

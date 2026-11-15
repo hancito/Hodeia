@@ -498,7 +498,7 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF Files (*.pdf)"]
         onAccepted: {
-            var result = helpers.generateReport(summaryDbPane.reportJsons, selectedFile.toString());
+            var result = helpers.exportPdf(summaryDbPane.reportJsons, selectedFile.toString());
             if (result)
                 messageBox.showInfo(qsTr("Report Saved"), qsTr("The report was saved to:\n%1").arg(result));
             else

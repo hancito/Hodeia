@@ -365,7 +365,7 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF Files (*.pdf)"]
         onAccepted: {
-            var result = helpers.exportSummaryToPdf(displayPane.activeSummaryJson, selectedFile.toString());
+            var result = helpers.exportPdf([displayPane.activeSummaryJson], selectedFile.toString());
             if (result)
                 messageBox.showInfo(qsTr("PDF Saved"), qsTr("The summary was saved to:\n%1").arg(result));
             else
