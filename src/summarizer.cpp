@@ -124,37 +124,53 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
     const QString &hash = hashes[i];
     qDebug() << "[Summarizer] Processing paper" << i + 1 << "/" << hashes.size()
              << "—" << hash;
+    const QString title = paperTitle(hash);
+
+    if (!m_database || !m_database->isOpen()) {
+      emit paperFinished(hash, title, false,
+                         tr("The project database is not open"));
+      qWarning() << "[Summarizer] ✗ Paper" << hash << ": database not open";
+      continue;
+    }
 
     PromptPayload payload = buildPrompt(hash);
 
-    QString result;
-    if (backend.isLocal)
-      result = summarizeLocal(payload, backend);
-    else
-      result = summarizeRemote(payload, backend);
+    std::expected<QString, QString> result =
+        backend.isLocal ? summarizeLocal(payload, backend)
+                        : summarizeRemote(payload, backend);
 
     if (m_cancelled) {
       // stop() fired mid-inference. Do NOT persist a partial summary and stop
       // processing further papers.
-      emit paperFinished(hash, false, tr("Cancelled"));
+      emit paperFinished(hash, title, false, tr("Cancelled"));
       qDebug() << "[Summarizer] ✗ Paper" << hash << "cancelled — no DB write";
       break;
     }
 
-    if (result.isEmpty()) {
-      QString msg = tr("Empty response");
-      emit paperFinished(hash, false, msg);
-      qDebug() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
+    if (!result) {
+      emit paperFinished(hash, title, false, result.error());
+      qWarning() << "[Summarizer] ✗ Paper" << hash
+                 << "failed:" << result.error();
+    } else if (result->trimmed().isEmpty()) {
+      QString msg = tr("The model returned an empty response");
+      emit paperFinished(hash, title, false, msg);
+      qWarning() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
     } else {
-      PaperSummary summary = SummaryFormat::parseJson(result);
-      saveSummary(hash, summary, result, backend.modelName);
+      PaperSummary summary = SummaryFormat::parseJson(*result);
+      auto saved = saveSummary(hash, summary, *result, backend.modelName);
+      if (!saved) {
+        emit paperFinished(hash, title, false,
+                           tr("The summary could not be saved: %1")
+                               .arg(saved.error()));
+        continue;
+      }
 
       successCount++;
       emit paperFinished(
-          hash, true,
-          tr("Summary generated and saved (%1 chars)").arg(result.length()));
+          hash, summary.title.isEmpty() ? title : summary.title, true,
+          tr("Summary generated and saved (%1 chars)").arg(result->length()));
       qDebug() << "[Summarizer] ✓ Paper" << hash << "summarized and saved"
-               << "(" << result.length() << "chars)";
+               << "(" << result->length() << "chars)";
     }
   }
 
@@ -222,8 +238,14 @@ void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
 
 /* ── Local summarization ────────────────────────────────────────── */
 
-QString Summarizer::summarizeLocal(const PromptPayload &payload,
-                                   const BackendInfo &backend) {
+std::expected<QString, QString>
+Summarizer::summarizeLocal(const PromptPayload &payload,
+                           const BackendInfo &backend) {
+  if (backend.modelPath.isEmpty())
+    return std::unexpected(
+        tr("No model file found for \"%1\". Check the selected model.")
+            .arg(backend.modelName));
+
   // The backend counts the exact prompt tokens during its no-alloc probe and
   // sizes the KV cache as prompt_tokens + headroom, so no char heuristic here.
   qDebug() << "[Summarizer] Loading local model:" << backend.modelPath;
@@ -234,7 +256,8 @@ QString Summarizer::summarizeLocal(const PromptPayload &payload,
       m_chatBackend->loadModel(backend.modelPath, payload, m_headroom);
   if (!loadResult) {
     qWarning() << "[Summarizer] Failed to load model:" << loadResult.error();
-    return QString();
+    return std::unexpected(
+        tr("The model could not be loaded: %1").arg(loadResult.error()));
   }
   qDebug() << "[Summarizer] Model loaded in" << loadTimer.elapsed() << "ms";
 
@@ -252,8 +275,9 @@ QString Summarizer::summarizeLocal(const PromptPayload &payload,
 
 /* ── Remote summarization ───────────────────────────────────────── */
 
-QString Summarizer::summarizeRemote(const PromptPayload &payload,
-                                    const BackendInfo &backend) {
+std::expected<QString, QString>
+Summarizer::summarizeRemote(const PromptPayload &payload,
+                            const BackendInfo &backend) {
 
   QString apiUrl = backend.config.value("url").toString();
   QString apiKey = backend.config.value("api_key").toString();
@@ -307,8 +331,8 @@ QString Summarizer::summarizeRemote(const PromptPayload &payload,
            << genTimer.elapsed() << "ms"
            << "(" << result.length() << "chars)";
 
-  if (!error.isEmpty())
-    return QString();
+  if (!error.isEmpty() && !m_cancelled)
+    return std::unexpected(tr("Remote request failed: %1").arg(error));
   return result;
 }
 
@@ -438,11 +462,12 @@ void Summarizer::stop() {
 
 /* ── Database persistence ───────────────────────────────────────── */
 
-void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
-                             const QString &rawJson, const QString &modelName) {
+std::expected<void, QString>
+Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
+                        const QString &rawJson, const QString &modelName) {
   if (!m_database || !m_database->isOpen()) {
     qWarning() << "[Summarizer] Database not open — cannot save summary";
-    return;
+    return std::unexpected(tr("the project database is not open"));
   }
 
   auto &db = m_database->db();
@@ -463,7 +488,7 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
                  "date = excluded.date");
   if (!stmt.isValid()) {
     qCritical() << "[Summarizer] Failed to prepare summary upsert";
-    return;
+    return std::unexpected(tr("database error (prepare failed)"));
   }
 
   (void)stmt.bind(1, hash);
@@ -480,7 +505,7 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
   if (!execResult) {
     qCritical() << "[Summarizer] Failed to save summary for" << hash << ":"
                 << execResult.error();
-    return;
+    return std::unexpected(execResult.error());
   }
 
   // Do NOT reload SummaryModel here: this runs on the Summarizer thread and the
@@ -527,4 +552,22 @@ void Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
 
   qDebug() << "[Summarizer] Saved summary for" << hash
            << "— title:" << summary.title;
+  return {};
+}
+
+QString Summarizer::paperTitle(const QString &hash) const {
+  if (m_database && m_database->isOpen()) {
+    SqliteStatement stmt = m_database->db().prepare(
+        "SELECT title FROM Summaries WHERE paper_hash = ?");
+    if (stmt.isValid()) {
+      (void)stmt.bind(1, hash);
+      auto step = stmt.step();
+      if (step && *step) {
+        const QString title = stmt.columnText(0).trimmed();
+        if (!title.isEmpty())
+          return title;
+      }
+    }
+  }
+  return hash;
 }

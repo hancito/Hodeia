@@ -18,6 +18,10 @@ Rectangle {
     property bool summarizing: false
     property bool ingesting: false
     property var reportJsons: []
+    // Summary run report: failures ("title — cause") collected from
+    // paperFinished, shown in one window when the run ends.
+    property var summaryFailures: []
+    property bool summaryWasStopped: false
 
     // Wall-clock duration since summaryStartMs, as "1h 02m", "3m 05s" or "42s".
     function summaryDuration() {
@@ -92,15 +96,20 @@ Rectangle {
     Connections {
         target: summaryController
         function onSummaryStarted() {
+            summaryDbPane.summaryFailures = [];
+            summaryDbPane.summaryWasStopped = false;
             if (summaryDbPane.statusBarLabel)
                 summaryDbPane.statusBarLabel.text = qsTr("Summarizing...");
         }
-        function onPaperFinished(hash, success, message) {
+        function onPaperFinished(hash, title, success, message) {
             summaryDbPane.paperProgress += 1;
             if (success)
                 databaseManager.summaryModel.loadAll();
+            // The paper interrupted by Stop is not a failure.
+            else if (!summaryDbPane.summaryWasStopped)
+                summaryDbPane.summaryFailures = summaryDbPane.summaryFailures.concat([title + " — " + message]);
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + message;
+                summaryDbPane.statusBarLabel.text = (success ? "✓ " : "✗ ") + title + " — " + message;
         }
         function onAllFinished(successCount, total) {
             summarizeTimer.stop();
@@ -110,10 +119,29 @@ Rectangle {
             summaryDbPane.elapsedTime = 0;
             databaseManager.summaryModel.loadAll();
             numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
+            // After Stop, allFinished still fires: keep the "stopped" status
+            // and only report papers that failed before the stop.
+            if (summaryDbPane.summaryWasStopped) {
+                if (summaryDbPane.summaryFailures.length > 0)
+                    messageBox.showError(qsTr("Summarization Stopped"), qsTr("%n paper(s) failed before the stop:", "", summaryDbPane.summaryFailures.length) + "\n\n• " + summaryDbPane.summaryFailures.join("\n• "));
+                summaryDbPane.summaryFailures = [];
+                return;
+            }
+            const duration = summaryDbPane.summaryDuration();
             if (summaryDbPane.statusBarLabel)
-                summaryDbPane.statusBarLabel.text = qsTr("Summarize done: %1/%2 in %3").arg(successCount).arg(total).arg(summaryDbPane.summaryDuration());
+                summaryDbPane.statusBarLabel.text = qsTr("Summarize done: %1/%2 in %3").arg(successCount).arg(total).arg(duration);
+            const failures = summaryDbPane.summaryFailures;
+            summaryDbPane.summaryFailures = [];
+            if (failures.length === 0) {
+                messageBox.showInfo(qsTr("Summarization Complete"), qsTr("%n paper(s) summarized in %1.", "", successCount).arg(duration));
+            } else {
+                let text = qsTr("%1 of %2 paper(s) summarized in %3.").arg(successCount).arg(total).arg(duration);
+                text += "\n\n" + qsTr("%n paper(s) failed:", "", failures.length) + "\n\n• " + failures.join("\n• ");
+                messageBox.showError(successCount === 0 ? qsTr("Summarization Failed") : qsTr("Summarization Partly Failed"), text);
+            }
         }
         function onSummaryStopped() {
+            summaryDbPane.summaryWasStopped = true;
             summarizeTimer.stop();
             summaryDbPane.summarizing = false;
             summaryDbPane.totalPapers = 0;

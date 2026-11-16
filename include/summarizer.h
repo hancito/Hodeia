@@ -25,7 +25,10 @@ public slots:
   void stop();
 
 signals:
-  void paperFinished(const QString &hash, bool success, const QString &message);
+  /// @p title is the paper's title (for user-facing messages); @p message
+  /// says what happened, including the cause on failure.
+  void paperFinished(const QString &hash, const QString &title, bool success,
+                     const QString &message);
   void allFinished(int successCount, int total);
   void started();
   void stopped();
@@ -46,17 +49,22 @@ private:
   void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
 
   /* inference */
-  QString summarizeLocal(const PromptPayload &payload,
-                         const BackendInfo &backend);
-  QString summarizeRemote(const PromptPayload &payload,
-                          const BackendInfo &backend);
+  /// The generated text (empty if cancelled), or a user-facing error.
+  std::expected<QString, QString> summarizeLocal(const PromptPayload &payload,
+                                                 const BackendInfo &backend);
+  std::expected<QString, QString> summarizeRemote(const PromptPayload &payload,
+                                                  const BackendInfo &backend);
 
   /* prompt building */
   PromptPayload buildPrompt(const QString &paperHash) const;
 
   /* result handling */
-  void saveSummary(const QString &hash, const PaperSummary &summary,
-                   const QString &rawJson, const QString &modelName);
+  std::expected<void, QString> saveSummary(const QString &hash,
+                                           const PaperSummary &summary,
+                                           const QString &rawJson,
+                                           const QString &modelName);
+  /// Title stored at ingestion, or the hash if it cannot be read.
+  QString paperTitle(const QString &hash) const;
 
   static const QString &systemPrompt();
   static const QString &userPrompt();
