@@ -176,7 +176,7 @@ Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
         <location filename="../src/configmanager.cpp" line="235"/>
         <location filename="../src/configmanager.cpp" line="240"/>
         <source>Reduced (figures/tables)</source>
-        <translation>Reduced (figures/tables)</translation>
+        <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
         <location filename="../src/configmanager.cpp" line="364"/>

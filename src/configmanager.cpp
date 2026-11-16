@@ -109,7 +109,7 @@ void ConfigManager::loadConfig() {
         else
           m_visualModeIndex = 1;
       } else {
-        m_visualModeIndex = v.toInt(1);
+        m_visualModeIndex = v.toInt(0);
       }
     } else if (obj.contains("useVisualContext")) {
       m_visualModeIndex = obj.value("useVisualContext").toBool(true) ? 1 : 0;

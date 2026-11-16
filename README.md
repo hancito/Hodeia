@@ -47,11 +47,11 @@ Hodeia can run models **locally** or against a **remote** endpoint — and you c
 | **Local (llama.cpp)** | Run GGUF models directly on your GPU (CUDA / Vulkan) or CPU     |
 | **Remote API**        | Connect to Ollama, LM Studio, or any OpenAI-compatible endpoint |
 
-Everything is managed in **Settings**: pick a local model that you downloaded folder, or add a remote endpoint by entering a name, URL, and (optionally) an API key.
+Everything is managed in the **Models** menu: add a GGUF model you downloaded with **Models → Add Local Model...**, or add a remote endpoint in **Models → Manage Backends...** by entering a name, URL, and (optionally) an API key, then select it in **Models → Backend**. The model in use is picked in the **Active Model** list of the toolbar.
 
 ### Getting models
 
-Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the box. For larger models, download a GGUF + MMPROJ files and add it in **Settings → Local Models** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
+Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the box. For larger models, download a GGUF file (plus its optional MMPROJ file for image support) and add it with **Models → Add Local Model...** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
 
 **Recommended models** (Q4_K_XL quantization — the best quality-to-size balance). Pick the largest model your memory can hold; VRAM needs are for the model weights plus a small context. These models were tested and known to works fine with Hodeia.
 
@@ -68,7 +68,7 @@ Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the 
 
 ### Optional: OpenAlex API key
 
-Citations are pulled from OpenAlex, which is free without a key. You can optionally set an API key in **Settings** to raise rate limits.
+Citations are pulled from OpenAlex, which is free without a key. You can optionally set an API key in **Settings → OpenAlex API Key...** to raise rate limits.
 
 ---
 

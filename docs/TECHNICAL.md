@@ -678,7 +678,7 @@ Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.
   "activeBackend": "Llama.cpp",
   "activeModel": "qwq32b",
   "openAlexApiKey": "",
-  "visualMode": 1,
+  "visualMode": 0,
   "language": "en",
   "backendList": [
     { "name": "Llama.cpp", "url": "", "api_key": "" },
@@ -687,7 +687,7 @@ Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.
 }
 ```
 
-- **`visualMode`** — `0` = Text only, `1` = some visual context, `2` = Full (all pages). (Legacy: an old `useVisualContext` boolean is still read and mapped to `0`/`1`.)
+- **`visualMode`** — `0` = Text only (default), `1` = Reduced (only pages with figures, vector graphics or tables), `2` = Full (all pages). (Legacy: an old `useVisualContext` boolean is still read and mapped to `0`/`1`.)
 - **`language`** — `"en"` (default) or `"fr"`. Changing it reloads the translator and re-loads the QML engine.
 - **`backendList`** — one object per backend; `Llama.cpp` is the local backend (empty `url`), the rest are remote (OpenAI-compatible) endpoints.
 - RAG tuning (`topK`, `maxPages`) and the model temperature are also persisted by the config manager.
