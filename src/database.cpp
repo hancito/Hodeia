@@ -1,5 +1,6 @@
 #include "database.h"
 #include "configmanager.h"
+#include "notifier.h"
 #include "openalex.h"
 #include "sqlitevec.h"
 #include <QDir>
@@ -28,6 +29,9 @@ DatabaseManager::~DatabaseManager() = default;
 bool DatabaseManager::initDatabase() {
   if (!m_config || m_config->lastProject().isEmpty()) {
     qCritical() << "No active project set for database initialization";
+    Notifier::post("db-init", tr("No Project Database"),
+                   tr("No active project could be opened. Create a project "
+                      "from the Project menu."));
     return false;
   }
 
@@ -37,6 +41,12 @@ bool DatabaseManager::initDatabase() {
   auto openResult = m_db.open(m_dbPath);
   if (!openResult) {
     qCritical() << "Failed to open database:" << m_dbPath << openResult.error();
+    Notifier::post(
+        "db-init", tr("Project Database Unavailable"),
+        tr("The database of project \"%1\" could not be opened, so the "
+           "library is empty.\n\n%2\n\n%3\n\nCheck that the file exists and is "
+           "not used by another program, or switch to another project.")
+            .arg(m_config->lastProject(), m_dbPath, openResult.error()));
     return false;
   }
 
@@ -95,6 +105,13 @@ void DatabaseManager::createTables() {
                       "lookup_at DATETIME)");
   if (!r3)
     qCritical() << "[Database] Citations table failed:" << r3.error();
+  if (!r1 || !r2 || !r3) {
+    const QString err = !r1 ? r1.error() : !r2 ? r2.error() : r3.error();
+    Notifier::post("db-schema:" + m_dbPath, tr("Project Database Error"),
+                   tr("The project database could not be prepared; some "
+                      "features may not work.\n\n%1\n\n%2")
+                       .arg(m_dbPath, err));
+  }
   else
     qInfo() << "[Database] Citations table OK";
 

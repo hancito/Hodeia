@@ -36,6 +36,7 @@ add_library(HodeiaEngine STATIC
     ../include/querycontroller.h
     ../include/openalex.h
     ../include/helpers.h
+    ../include/notifier.h
     ../include/pdfexport.h
     ../include/summaryformat.h
     ../include/textformat.h
@@ -64,6 +65,7 @@ add_library(HodeiaEngine STATIC
     queryworker.cpp
     querycontroller.cpp
     helpers.cpp
+    notifier.cpp
     pdfexport.cpp
     summaryformat.cpp
     textformat.cpp

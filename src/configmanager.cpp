@@ -1,4 +1,5 @@
 #include "configmanager.h"
+#include "notifier.h"
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -6,6 +7,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QUrl>
 #include <functional>
@@ -34,6 +37,12 @@ ConfigManager::ConfigManager(QObject *parent) : QObject(parent) {
   seedBundledModels();
   selectDefaultModel();
   refreshProjectList();
+
+  // The remembered project may be gone (deleted by hand, or settings reset):
+  // open an existing one rather than starting without a database.
+  if (!m_projectList.isEmpty() && !m_projectList.contains(m_lastProject))
+    setLastProject(m_projectList.contains("Default") ? QStringLiteral("Default")
+                                                     : m_projectList.first());
 }
 
 ConfigManager::~ConfigManager() { saveConfig(); }
@@ -51,8 +60,33 @@ void ConfigManager::loadConfig() {
   if (!file.open(QIODevice::ReadOnly))
     return; // Use hardcoded defaults if file missing
 
-  QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-  if (doc.isObject()) {
+  QJsonParseError parseError;
+  QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+  if (!doc.isObject()) {
+    // Keep a copy of the damaged file, then start from defaults: saving them
+    // over the original would silently erase the user's backends and key.
+    file.close();
+    const QString backup = getFilePath() + ".damaged";
+    QFile::remove(backup);
+    const bool kept = QFile::copy(getFilePath(), backup);
+    if (!kept)
+      m_configUnreadable = true; // no copy: don't overwrite the original
+    qWarning() << "[Config] Settings file unreadable:"
+               << parseError.errorString() << "| backup:" << kept;
+    Notifier::post(
+        "config-load", tr("Settings Reset"),
+        kept ? tr("The settings file was damaged and could not be read, so "
+                  "default settings are used. Backends and the OpenAlex API "
+                  "key may need to be entered again.\n\nA copy of the damaged "
+                  "file was kept:\n%1")
+                   .arg(QDir::toNativeSeparators(backup))
+             : tr("The settings file was damaged and could not be read, so "
+                  "default settings are used for this session. Changes will "
+                  "not be saved, to keep the original file:\n%1")
+                   .arg(QDir::toNativeSeparators(getFilePath())));
+    return;
+  }
+  {
     QJsonObject obj = doc.object();
     m_activeThemeIndex = obj.value("activeThemeIndex").toInt(0);
     m_lastProject = obj.value("lastProject").toString("");
@@ -94,9 +128,18 @@ void ConfigManager::loadConfig() {
 }
 
 void ConfigManager::saveConfig() {
-  QFile file(getFilePath());
-  if (!file.open(QIODevice::WriteOnly))
+  // Never overwrite a settings file we could not read: the user's backends
+  // and API key would be lost (see loadConfig()).
+  if (m_configUnreadable)
     return;
+
+  // Write to a temporary file then swap it in, so a full disk or a crash
+  // cannot leave a truncated settings file behind.
+  QSaveFile file(getFilePath());
+  if (!file.open(QIODevice::WriteOnly)) {
+    reportSaveFailure(file.errorString());
+    return;
+  }
 
   QJsonObject obj;
   obj["activeThemeIndex"] = m_activeThemeIndex;
@@ -122,6 +165,20 @@ void ConfigManager::saveConfig() {
 
   QJsonDocument doc(obj);
   file.write(doc.toJson());
+  if (!file.commit())
+    reportSaveFailure(file.errorString());
+}
+
+void ConfigManager::reportSaveFailure(const QString &error) const {
+  qWarning() << "[Config] Cannot save settings to" << getFilePath() << ":"
+             << error;
+  Notifier::post(
+      "config-save", tr("Settings Not Saved"),
+      tr("Your settings could not be saved, so changes (backends, API key, "
+         "theme, active project...) will be lost when Hodeia closes.\n\n"
+         "%1\n%2\n\nCheck the free disk space and the permissions of this "
+         "folder.")
+          .arg(QDir::toNativeSeparators(getFilePath()), error));
 }
 
 // Setters save automatically to disk whenever a value changes
@@ -160,6 +217,9 @@ void ConfigManager::setActiveModel(const QString &model) {
 void ConfigManager::setOpenAlexApiKey(const QString &key) {
   if (m_openAlexApiKey != key) {
     m_openAlexApiKey = key;
+    // A new key deserves a new warning if it is refused too.
+    Notifier::forget("openalex-auth");
+    Notifier::forget("openalex-limit");
     emit openAlexApiKeyChanged();
     saveConfig();
   }
@@ -497,6 +557,7 @@ void ConfigManager::seedBundledModels() {
 
   // Recursively copy files from `src` into `dest`, creating directories as
   // needed and skipping files that already exist at the destination.
+  QStringList failed;
   std::function<void(const QString &, const QString &)> copyMissing;
   copyMissing = [&](const QString &src, const QString &dest) {
     QDir srcDir(src);
@@ -514,12 +575,22 @@ void ConfigManager::seedBundledModels() {
         } else {
           qWarning() << "[Config] Failed to copy bundled model from"
                      << entry.absoluteFilePath() << "to" << destEntry;
+          QFile::remove(destEntry); // don't keep a truncated model
+          failed << entry.fileName();
         }
       }
     }
   };
 
   copyMissing(srcRoot, destRoot);
+
+  if (!failed.isEmpty())
+    Notifier::post(
+        "seed-models", tr("Bundled Models Not Installed"),
+        tr("Some models shipped with Hodeia could not be copied to:\n%1\n\n"
+           "• %2\n\nIndexing or summarizing may not work until they are. "
+           "Check the free disk space, then restart Hodeia.")
+            .arg(QDir::toNativeSeparators(destRoot), failed.join("\n• ")));
 }
 
 void ConfigManager::selectDefaultModel() {

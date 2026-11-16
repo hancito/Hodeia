@@ -4,6 +4,7 @@
 #include "helpers.h"
 #include "llama.h"
 #include "mtmd-helper.h"
+#include "notifier.h"
 #include "openalex.h"
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
@@ -347,6 +348,7 @@ int main(int argc, char *argv[]) {
                                            &summaryController);
   engine.rootContext()->setContextProperty("queryController", &queryController);
   engine.rootContext()->setContextProperty("helpers", &helpers);
+  engine.rootContext()->setContextProperty("notifier", Notifier::instance());
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

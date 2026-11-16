@@ -1,4 +1,5 @@
 #include "ingestionengine.h"
+#include "notifier.h"
 #include "sqlitedb.h"
 #include "sqlitevec.h"
 
@@ -121,6 +122,14 @@ static tesseract::TessBaseAPI *ensureOcrApi() {
     if (rc != 0) {
       qCritical() << "[OCR] Tesseract Init failed (rc=" << rc << ")"
                   << "tessdata:" << tessdata;
+      Notifier::post(
+          "ocr-init", PdfWorker::tr("Text Recognition Unavailable"),
+          PdfWorker::tr("The OCR engine could not start, so scanned pages "
+                        "(images without text) cannot be read. Papers with "
+                        "selectable text are not affected.\n\nThe language "
+                        "data may be missing from:\n%1\n\nReinstalling "
+                        "Hodeia should fix it.")
+              .arg(QDir::toNativeSeparators(tessdata)));
       delete api;
       return nullptr;
     }

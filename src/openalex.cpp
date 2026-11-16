@@ -1,6 +1,7 @@
 #include "openalex.h"
 #include "configmanager.h"
 #include "database.h"
+#include "notifier.h"
 #include "sqlitedb.h"
 
 #include <QDateTime>
@@ -351,6 +352,24 @@ void OpenAlexClient::sendRequest(const QUrl &url, const QString &label,
 
             qWarning() << "[OpenAlex] ──" << label << "── ERROR:"
                        << reply->errorString() << "| HTTP:" << http;
+            // Other failures (offline, timeouts) are retried on the next
+            // scan and don't need the user; these two do.
+            if (http == 401 || http == 403) {
+              Notifier::post(
+                  "openalex-auth", tr("OpenAlex Access Refused"),
+                  tr("OpenAlex refused the request (HTTP %1), so citations "
+                     "cannot be fetched. The API key is probably invalid or "
+                     "expired: check it in the OpenAlex API Key menu.")
+                      .arg(http));
+            } else if (http == 429) {
+              Notifier::post(
+                  "openalex-limit", tr("OpenAlex Limit Reached"),
+                  tr("OpenAlex limits the number of requests and the limit "
+                     "is reached, so some citations could not be fetched. "
+                     "They will be fetched again at a later start. An "
+                     "OpenAlex API key raises the limit."),
+                  false);
+            }
             handler(false, QByteArray());
           });
 }

@@ -20,6 +20,11 @@ ThemedWindow {
     title: qsTr("Hodeia - %1").arg(activeProject)
 
     Component.onCompleted: {
+        // Problems raised during startup, before this window existed.
+        const pending = notifier.takePending();
+        for (let i = 0; i < pending.length; i++)
+            messageBox.show(pending[i].title, pending[i].message, pending[i].isError);
+
         // Load the QML file as a component
         windowComponent = Qt.createComponent("RagWindow.qml");
 
@@ -484,6 +489,14 @@ ThemedWindow {
         id: messageBox
     }
 
+    // Problems raised outside a user action: at startup (kept until the
+    // window exists) or by background work (OCR, OpenAlex, settings).
+    Connections {
+        target: notifier
+        function onNotification(title, message, isError) {
+            messageBox.show(title, message, isError);
+        }
+    }
     // End-of-import summary: papers added, skipped, and what failed and why.
     Connections {
         target: engineController

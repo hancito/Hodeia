@@ -141,6 +141,10 @@ private:
   /// local model from Models/Summarizers/ so the app works out of the box.
   void selectDefaultModel();
   QString getFilePath() const;
+  void reportSaveFailure(const QString &error) const;
+  // The settings file exists but could not be parsed nor backed up: never
+  // overwrite it during this session.
+  bool m_configUnreadable = false;
   QString projectsRoot() const;
   QString modelsRoot() const;
 
