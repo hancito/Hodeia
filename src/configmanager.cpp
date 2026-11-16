@@ -175,7 +175,7 @@ void ConfigManager::reportSaveFailure(const QString &error) const {
   Notifier::post(
       "config-save", tr("Settings Not Saved"),
       tr("Your settings could not be saved, so changes (backends, API key, "
-         "theme, active project...) will be lost when Hodeia closes.\n\n"
+         "theme, active project...) will be lost when HodeIA closes.\n\n"
          "%1\n%2\n\nCheck the free disk space and the permissions of this "
          "folder.")
           .arg(QDir::toNativeSeparators(getFilePath()), error));
@@ -587,9 +587,9 @@ void ConfigManager::seedBundledModels() {
   if (!failed.isEmpty())
     Notifier::post(
         "seed-models", tr("Bundled Models Not Installed"),
-        tr("Some models shipped with Hodeia could not be copied to:\n%1\n\n"
+        tr("Some models shipped with HodeIA could not be copied to:\n%1\n\n"
            "• %2\n\nIndexing or summarizing may not work until they are. "
-           "Check the free disk space, then restart Hodeia.")
+           "Check the free disk space, then restart HodeIA.")
             .arg(QDir::toNativeSeparators(destRoot), failed.join("\n• ")));
 }
 

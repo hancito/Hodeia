@@ -17,7 +17,7 @@ ThemedWindow {
     property var selectedModels: []
 
     readonly property var activeProject: configManager.lastProject || {}
-    title: qsTr("Hodeia - %1").arg(activeProject)
+    title: qsTr("HodeIA - %1").arg(activeProject)
 
     Component.onCompleted: {
         // Problems raised during startup, before this window existed.
@@ -355,7 +355,7 @@ ThemedWindow {
         id: aboutDialog
         anchors.centerIn: parent
         width: 520
-        title: qsTr("About Hodeia")
+        title: qsTr("About HodeIA")
         standardButtons: Dialog.Ok
 
         readonly property var components: [
@@ -413,7 +413,7 @@ ThemedWindow {
 
             Label {
                 Layout.fillWidth: true
-                text: qsTr("“Hodeia” — from the Ancient Greek ὁδός (hodós), meaning “path”.")
+                text: qsTr("“HodeIA” — from the Ancient Greek ὁδός (hodós), meaning “path”.")
                 color: Colors.overlay1
                 wrapMode: Text.WordWrap
             }
@@ -476,7 +476,7 @@ ThemedWindow {
 
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Each component remains under its own license; see the NOTICE file shipped with Hodeia for the full notices.")
+                text: qsTr("Each component remains under its own license; see the NOTICE file shipped with HodeIA for the full notices.")
                 font.pixelSize: Style.fontSmall
                 color: Colors.overlay1
                 wrapMode: Text.WordWrap

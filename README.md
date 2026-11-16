@@ -1,30 +1,30 @@
-# Hodeia
+# HodeIA
 
 **Your personal research assistant — powered by AI.**
 
-Hodeia helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated structured summaries, pull their reference lists, and ask questions across your entire library.
+HodeIA helps you manage, summarize, and search through your collection of academic papers. Import PDFs, get AI-generated structured summaries, pull their reference lists, and ask questions across your entire library.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://opensource.org/licenses/AGPL-3.0)
 [![C++23](https://img.shields.io/badge/C++-23-blue.svg)]
 [![Platform: Linux · Windows](https://img.shields.io/badge/Platform-Linux%20%C2%B7%20Windows-green.svg)]
 
-> _"Hodeia" — from the Ancient Greek ὁδός (hodós), meaning "path." A fitting name for a tool that guides you through your library and answers your questions._
+> _"HodeIA" — from the Ancient Greek ὁδός (hodós), meaning "path." A fitting name for a tool that guides you through your library and answers your questions._
 
 ---
 
 ## Features
 
-- **Local AI first**: Hodeia is built around a local-AI-first strategy, a performance-focused stack (C++, llama.cpp, Qt, SQLite) keeps it fast and lightweight. If you prefer, you can also point it at a model server (Ollama, LM Studio, or any OpenAI-compatible API) for faster inference.
-- **Import PDF papers**: Add individual files or whole folders. Hodeia extracts the text automatically, and falls back to OCR for scanned documents.
+- **Local AI first**: HodeIA is built around a local-AI-first strategy, a performance-focused stack (C++, llama.cpp, Qt, SQLite) keeps it fast and lightweight. If you prefer, you can also point it at a model server (Ollama, LM Studio, or any OpenAI-compatible API) for faster inference.
+- **Import PDF papers**: Add individual files or whole folders. HodeIA extracts the text automatically, and falls back to OCR for scanned documents.
 - **Summarize your papers**: Get a structured summary per paper — title, authors, journal, year, topics, research objective, methodology, key findings, limitations, and a citable abstract.
-- **References & citations**: After a paper is summarized, Hodeia pulls the works it cites and the works that cite it from [OpenAlex](https://openalex.org), formatted as APA-style bibliographies.
+- **References & citations**: After a paper is summarized, HodeIA pulls the works it cites and the works that cite it from [OpenAlex](https://openalex.org), formatted as APA-style bibliographies.
 - **Ask questions across your library**: Query all your papers in plain language and get a synthesized, academic-style answer with inline citations. The more papers you add, the better the answers.
 - **View papers visually**: Browse page-by-page thumbnails alongside the extracted text, the generated summary, and the references.
 - **Export summaries**: Export any summary — or a whole batch of them — to PDF.
 - **20+ themes**: Catppuccin, Dracula, Gruvbox, Nord, Monokai, GitHub, and more.
 - **Localized UI**: English and French.
 
-Hodeia organizes your research into **projects**. Each project is an isolated workspace with its own database and summaries, so you can keep a separate project per research topic, course, or grant.
+HodeIA organizes your research into **projects**. Each project is an isolated workspace with its own database and summaries, so you can keep a separate project per research topic, course, or grant.
 
 Full architecture, pipeline detail, database schema, and per-platform build instructions live in [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
@@ -32,7 +32,7 @@ Full architecture, pipeline detail, database schema, and per-platform build inst
 
 ## Tech Stack
 
-Hodeia prioritizes performance, so it is built on a fast, low-memory native stack written in C++. It runs models directly with [llama.cpp](https://github.com/ggml-org/llama.cpp) (no server), parses PDFs with MuPDF, and stores everything in a local SQLite database. It automatically uses your best available hardware (GPU or CPU).
+HodeIA prioritizes performance, so it is built on a fast, low-memory native stack written in C++. It runs models directly with [llama.cpp](https://github.com/ggml-org/llama.cpp) (no server), parses PDFs with MuPDF, and stores everything in a local SQLite database. It automatically uses your best available hardware (GPU or CPU).
 
 For the full component-by-component breakdown, see [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
@@ -40,7 +40,7 @@ For the full component-by-component breakdown, see [docs/TECHNICAL.md](docs/TECH
 
 ## Supported Backends
 
-Hodeia can run models **locally** or against a **remote** endpoint — and you can mix both.
+HodeIA can run models **locally** or against a **remote** endpoint — and you can mix both.
 
 | Backend               | Description                                                     |
 | --------------------- | --------------------------------------------------------------- |
@@ -51,9 +51,9 @@ Everything is managed in the **Models** menu: add a GGUF model you downloaded wi
 
 ### Getting models
 
-Hodeia ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the box. For larger models, download a GGUF file (plus its optional MMPROJ file for image support) and add it with **Models → Add Local Model...** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
+HodeIA ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the box. For larger models, download a GGUF file (plus its optional MMPROJ file for image support) and add it with **Models → Add Local Model...** — any GGUF works. A good source is [Hugging Face](https://huggingface.co), where [Unsloth](https://huggingface.co/unsloth) publishes GGUF versions of the [Qwen3.5](https://huggingface.co/collections/unsloth/qwen35) and [Gemma4](https://huggingface.co/collections/unsloth/gemma-4) families.
 
-**Recommended models** (Q4_K_XL quantization — the best quality-to-size balance). Pick the largest model your memory can hold; VRAM needs are for the model weights plus a small context. These models were tested and known to works fine with Hodeia.
+**Recommended models** (Q4_K_XL quantization — the best quality-to-size balance). Pick the largest model your memory can hold; VRAM needs are for the model weights plus a small context. These models were tested and known to works fine with HodeIA.
 
 | Model                                                                      | Size (Q4) | Min VRAM / RAM | Best for                                               |
 | -------------------------------------------------------------------------- | --------- | -------------- | ------------------------------------------------------ |
@@ -81,7 +81,7 @@ The easiest way to get started is to grab a precompiled build from the [GitHub R
 | Linux (Arch)          | `PKGBUILD`           | Use the PKGBUILD or an aur helper             |
 | Windows               | `Hodeia-*-x64.exe`   | Run the installer                             |
 
-After installing, launch **Hodeia** from your applications menu. The app seeds its models and settings on first run — see [Getting models](#getting-models) to pick a model.
+After installing, launch **HodeIA** from your applications menu. The app seeds its models and settings on first run — see [Getting models](#getting-models) to pick a model.
 
 > Want to compile from source instead? See [Building from Source](#building-from-source).
 
@@ -89,9 +89,9 @@ After installing, launch **Hodeia** from your applications menu. The app seeds i
 
 ## Building from Source
 
-> **Just want to use Hodeia?** Skip to [Projects & Data Layout](#projects--data-layout) — you don't need to build anything. The rest of this section is for developers who want to compile from source.
+> **Just want to use HodeIA?** Skip to [Projects & Data Layout](#projects--data-layout) — you don't need to build anything. The rest of this section is for developers who want to compile from source.
 
-Hodeia is a C++/Qt application with a modular build: a top-level `CMakeLists.txt` detects your platform and routes to `cmake/Platform<OS>.cmake`, which sets up the third-party libraries, GPU-backend discovery, and post-build deployment.
+HodeIA is a C++/Qt application with a modular build: a top-level `CMakeLists.txt` detects your platform and routes to `cmake/Platform<OS>.cmake`, which sets up the third-party libraries, GPU-backend discovery, and post-build deployment.
 
 ### Prerequisites (all platforms)
 
@@ -121,7 +121,7 @@ Third-party libraries are staged into `external/` per platform:
 
 ### GPU backend selection
 
-At runtime Hodeia automatically picks the best available backend (CUDA, then Vulkan, then CPU) — no configuration needed.
+At runtime HodeIA automatically picks the best available backend (CUDA, then Vulkan, then CPU) — no configuration needed.
 
 ---
 
@@ -137,7 +137,7 @@ At runtime Hodeia automatically picks the best available backend (CUDA, then Vul
 
 ## Projects & Data Layout
 
-Hodeia keeps everything in one data folder, organized by **project**. Each project is an isolated workspace with its own summaries and records — create as many as you like (one per research topic, course, or grant). Your PDFs are only read at import: Hodeia stores their text and an image of each page, never the PDF itself, so your files are never moved, copied or modified.
+HodeIA keeps everything in one data folder, organized by **project**. Each project is an isolated workspace with its own summaries and records — create as many as you like (one per research topic, course, or grant). Your PDFs are only read at import: HodeIA stores their text and an image of each page, never the PDF itself, so your files are never moved, copied or modified.
 
 ```
 ~/.local/share/Hodeia/
@@ -151,7 +151,7 @@ Hodeia keeps everything in one data folder, organized by **project**. Each proje
     └── Embedders/             # the embedding model (bundled)
 ```
 
-> On Windows the data folder is `%APPDATA%\Hodeia` instead. Uninstalling Hodeia never touches it.
+> On Windows the data folder is `%APPDATA%\Hodeia` instead. Uninstalling HodeIA never touches it.
 
 See [docs/TECHNICAL.md](docs/TECHNICAL.md#configuration) for the full configuration schema.
 
@@ -175,9 +175,9 @@ See [docs/TECHNICAL.md](docs/TECHNICAL.md) for the architecture, pipeline detail
 
 **GNU Affero General Public License v3.0** — see [LICENSE](LICENSE).
 
-Hodeia is free and open source. You are free to use, modify, and share it under the terms of the AGPL-3.0.
+HodeIA is free and open source. You are free to use, modify, and share it under the terms of the AGPL-3.0.
 
-Hodeia is built with **Qt** (LGPL 3.0) and includes other third-party open-source components. The required citation, acknowledgments, and licensing notices for those are in [NOTICE](NOTICE).
+HodeIA is built with **Qt** (LGPL 3.0) and includes other third-party open-source components. The required citation, acknowledgments, and licensing notices for those are in [NOTICE](NOTICE).
 
 ---
 

@@ -1,413 +1,536 @@
 <!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>
-    try { var t = localStorage.getItem("hodeia-theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
-  </script>
-  <title>Hodeia — Votre assistant de recherche personnel, propulsé par l'IA locale</title>
-  <meta name="description" content="Hodeia est une application de bureau libre et gratuite pour importer, résumer, citer et interroger vos articles scientifiques grâce à l'IA locale (llama.cpp) ou à tout serveur compatible OpenAI.">
-  <link rel="canonical" href="https://hancito.github.io/Hodeia/fr/">
-  <link rel="alternate" hreflang="en" href="https://hancito.github.io/Hodeia/">
-  <link rel="alternate" hreflang="fr" href="https://hancito.github.io/Hodeia/fr/">
-  <link rel="alternate" hreflang="x-default" href="https://hancito.github.io/Hodeia/">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script>
+            try {
+                var t = localStorage.getItem("hodeia-theme");
+                if (t) document.documentElement.setAttribute("data-theme", t);
+            } catch (e) {}
+        </script>
+        <title>HodeIA — Votre assistant de recherche personnel, propulsé par l'IA locale</title>
+        <meta
+            name="description"
+            content="HodeIA est une application de bureau libre et gratuite pour importer, résumer, citer et interroger vos articles scientifiques grâce à l'IA locale (llama.cpp) ou à tout serveur compatible OpenAI."
+        />
+        <link rel="canonical" href="https://hancito.github.io/Hodeia/fr/" />
+        <link rel="alternate" hreflang="en" href="https://hancito.github.io/Hodeia/" />
+        <link rel="alternate" hreflang="fr" href="https://hancito.github.io/Hodeia/fr/" />
+        <link rel="alternate" hreflang="x-default" href="https://hancito.github.io/Hodeia/" />
 
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Hodeia">
-  <meta property="og:url" content="https://hancito.github.io/Hodeia/fr/">
-  <meta property="og:title" content="Hodeia — Votre assistant de recherche personnel">
-  <meta property="og:description" content="Importez, résumez, citez et interrogez vos articles scientifiques grâce à l'IA locale. Libre et gratuit.">
-  <meta property="og:image" content="https://hancito.github.io/Hodeia/assets/og-image.jpg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Logo et slogan de Hodeia">
-  <meta property="og:locale" content="fr_FR">
-  <meta property="og:locale:alternate" content="en_US">
-  <meta name="twitter:card" content="summary_large_image">
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="HodeIA" />
+        <meta property="og:url" content="https://hancito.github.io/Hodeia/fr/" />
+        <meta property="og:title" content="HodeIA — Votre assistant de recherche personnel" />
+        <meta property="og:description" content="Importez, résumez, citez et interrogez vos articles scientifiques grâce à l'IA locale. Libre et gratuit." />
+        <meta property="og:image" content="https://hancito.github.io/Hodeia/assets/og-image.jpg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Logo et slogan de HodeIA" />
+        <meta property="og:locale" content="fr_FR" />
+        <meta property="og:locale:alternate" content="en_US" />
+        <meta name="twitter:card" content="summary_large_image" />
 
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#1e1e2e" media="(prefers-color-scheme: dark)">
-  <link rel="icon" type="image/png" sizes="64x64" href="../assets/favicon-64.png">
-  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-  <link rel="stylesheet" href="../style.css">
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#1e1e2e" media="(prefers-color-scheme: dark)" />
+        <link rel="icon" type="image/png" sizes="64x64" href="../assets/favicon-64.png" />
+        <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+        <link rel="stylesheet" href="../style.css" />
 
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Hodeia",
-    "description": "Assistant de recherche de bureau pour importer, résumer, citer et interroger des articles scientifiques grâce à l'IA locale.",
-    "url": "https://hancito.github.io/Hodeia/fr/",
-    "image": "https://hancito.github.io/Hodeia/assets/og-image.jpg",
-    "applicationCategory": "EducationalApplication",
-    "operatingSystem": "Windows, Linux",
-    "license": "https://www.gnu.org/licenses/agpl-3.0.html",
-    "isAccessibleForFree": true,
-    "inLanguage": ["fr", "en"],
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
-    "downloadUrl": "https://github.com/hancito/Hodeia/releases",
-    "codeRepository": "https://github.com/hancito/Hodeia"
-  }
-  </script>
-</head>
-<body>
-  <a class="skip" href="#features">Aller au contenu</a>
-  <header class="nav">
-    <div class="container nav-inner">
-      <a class="brand" href="#top">
-        <img src="../assets/favicon-64.png" alt="" width="32" height="32">
-        <span>Hodeia</span>
-      </a>
-      <nav>
-        <a href="#features">Fonctionnalités</a>
-        <a href="#getting-started">Bien commencer</a>
-        <a href="#models">Modèles</a>
-        <a href="#download">Téléchargement</a>
-        <a href="#faq">FAQ</a>
-        <a href="https://github.com/hancito/Hodeia" class="gh">GitHub</a>
-        <a href="../" class="lang" hreflang="en" lang="en" title="English version">EN</a>
-        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Basculer entre thème clair et sombre" title="Basculer entre thème clair et sombre">
-          <span class="sun" aria-hidden="true">☀</span><span class="moon" aria-hidden="true">☾</span>
-        </button>
-      </nav>
-    </div>
-  </header>
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": "HodeIA",
+                "description": "Assistant de recherche de bureau pour importer, résumer, citer et interroger des articles scientifiques grâce à l'IA locale.",
+                "url": "https://hancito.github.io/Hodeia/fr/",
+                "image": "https://hancito.github.io/Hodeia/assets/og-image.jpg",
+                "applicationCategory": "EducationalApplication",
+                "operatingSystem": "Windows, Linux",
+                "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+                "isAccessibleForFree": true,
+                "inLanguage": ["fr", "en"],
+                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+                "downloadUrl": "https://github.com/hancito/Hodeia/releases",
+                "codeRepository": "https://github.com/hancito/Hodeia"
+            }
+        </script>
+    </head>
+    <body>
+        <a class="skip" href="#features">Aller au contenu</a>
+        <header class="nav">
+            <div class="container nav-inner">
+                <a class="brand" href="#top">
+                    <img src="../assets/favicon-64.png" alt="" width="32" height="32" />
+                    <span>HodeIA</span>
+                </a>
+                <nav>
+                    <a href="#features">Fonctionnalités</a>
+                    <a href="#getting-started">Bien commencer</a>
+                    <a href="#models">Modèles</a>
+                    <a href="#download">Téléchargement</a>
+                    <a href="#faq">FAQ</a>
+                    <a href="https://github.com/hancito/Hodeia" class="gh">GitHub</a>
+                    <a href="../" class="lang" hreflang="en" lang="en" title="English version">EN</a>
+                    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Basculer entre thème clair et sombre" title="Basculer entre thème clair et sombre">
+                        <span class="sun" aria-hidden="true">☀</span><span class="moon" aria-hidden="true">☾</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
 
-  <main id="top">
-    <!-- Hero -->
-    <section class="hero">
-      <div class="container hero-inner">
-        <div class="hero-text">
-          <h1>Votre assistant de recherche personnel,<br><span class="accent">propulsé par l'IA locale.</span></h1>
-          <p class="lead">
-            Hodeia vous aide à gérer, résumer et explorer votre collection d'articles scientifiques.
-            Importez vos PDF, obtenez des résumés structurés générés par l'IA, récupérez leurs références
-            et posez des questions à l'ensemble de votre bibliothèque — le tout sur votre propre machine.
-          </p>
-          <div class="cta">
-            <a id="hero-download" class="btn primary" href="#download">Télécharger</a>
-            <a class="btn" href="https://github.com/hancito/Hodeia">Voir sur GitHub</a>
-          </div>
-          <p class="meta">
-            Libre et gratuit · AGPL-3.0 · Linux et Windows · Français et anglais
-            <span class="version" data-release-version hidden></span>
-          </p>
-        </div>
-        <div class="hero-logo">
-          <picture>
-            <source srcset="../assets/hodeia.webp" type="image/webp">
-            <img src="../assets/hodeia-512.png" alt="Logo de Hodeia" width="320" height="320">
-          </picture>
-        </div>
-      </div>
-      <!-- Capture d'écran : ajouter ici la fenêtre principale, par exemple
-      <figure class="container shot"><img src="../assets/screenshots/main-fr.webp" alt="Fenêtre principale de Hodeia" width="1600" height="1000" loading="lazy"></figure>
-      -->
-      <p class="container etymology">
-        <em>« Hodeia » — du grec ancien ὁδός (hodós), qui signifie « chemin ». Un outil qui vous guide à travers votre bibliothèque.</em>
-      </p>
-    </section>
+        <main id="top">
+            <!-- Hero -->
+            <section class="hero">
+                <div class="container hero-inner">
+                    <div class="hero-text">
+                        <h1>Votre assistant de recherche personnel,<br /><span class="accent">propulsé par l'IA locale.</span></h1>
+                        <p class="lead">
+                            HodeIA vous aide à explorer votre collection d'articles scientifiques grâce à des résumés individuels et multi-articles. Importez vos PDF, obtenez des résumés structurés
+                            générés par l'IA, récupérez leurs références et posez des questions à l'ensemble de votre bibliothèque.
+                        </p>
+                        <div class="cta">
+                            <a id="hero-download" class="btn primary" href="#download">Télécharger</a>
+                            <a class="btn" href="https://github.com/hancito/Hodeia">Voir sur GitHub</a>
+                        </div>
+                        <p class="meta">
+                            Libre et gratuit · AGPL-3.0 · Linux et Windows · Français et anglais
+                            <span class="version" data-release-version hidden></span>
+                        </p>
+                    </div>
+                    <div class="hero-logo">
+                        <picture>
+                            <source srcset="../assets/hodeia.webp" type="image/webp" />
+                            <img src="../assets/hodeia-512.png" alt="Logo de HodeIA" width="320" height="320" />
+                        </picture>
+                    </div>
+                </div>
+                <figure class="container shot">
+                    <a href="../assets/screenshots/main_screenshot.webp"
+                        ><img
+                            src="../assets/screenshots/main_screenshot-960.webp"
+                            srcset="../assets/screenshots/main_screenshot-960.webp 960w, ../assets/screenshots/main_screenshot.webp 1920w"
+                            sizes="(max-width: 1100px) 100vw, 1050px"
+                            alt="Fenêtre principale de HodeIA : la liste des articles et un résumé structuré"
+                            width="1920"
+                            height="1080"
+                    /></a>
+                </figure>
+                <p class="container etymology">
+                    <em>« HodeIA » — du grec ancien ὁδός (hodós), qui signifie « chemin ». Un outil qui vous guide à travers votre bibliothèque.</em>
+                </p>
+            </section>
 
-    <!-- Fonctionnalités -->
-    <section id="features" class="section">
-      <div class="container">
-        <h2>Fonctionnalités</h2>
-        <div class="grid">
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/ai-svgrepo-com.svg)" aria-hidden="true"></span>
-            <h3>L'IA locale d'abord</h3>
-            <p>Exécute les modèles GGUF directement avec llama.cpp, sans serveur. Vous préférez un serveur ? Connectez Ollama, LM Studio ou toute API compatible OpenAI.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/file-pdf-regular-full.svg)" aria-hidden="true"></span>
-            <h3>Import de PDF</h3>
-            <p>Ajoutez des fichiers isolés ou des dossiers entiers. Le texte est extrait automatiquement, avec repli sur l'OCR pour les documents numérisés. Vos PDF ne sont jamais déplacés ni modifiés.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/align-justify.svg)" aria-hidden="true"></span>
-            <h3>Résumés structurés</h3>
-            <p>Titre, auteurs, revue, année, thèmes, objectif, méthodologie, résultats clés, limites et un résumé citable — pour chaque article.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/share-square.svg)" aria-hidden="true"></span>
-            <h3>Références et citations</h3>
-            <p>Récupère les travaux cités par un article et ceux qui le citent depuis <a href="https://openalex.org">OpenAlex</a>, sous forme de bibliographies au format APA.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/ai-svgrepo-com.svg)" aria-hidden="true"></span>
-            <h3>Interrogez votre bibliothèque</h3>
-            <p>Posez vos questions en langage naturel sur tous vos articles et obtenez une réponse synthétique, de style académique, avec citations dans le texte.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/magnifying-glass-plus.svg)" aria-hidden="true"></span>
-            <h3>Visionneuse d'articles</h3>
-            <p>Parcourez les miniatures des pages à côté du texte extrait, du résumé généré et des références.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/file-export.svg)" aria-hidden="true"></span>
-            <h3>Export en PDF</h3>
-            <p>Exportez un résumé — ou tout un lot — en PDF.</p>
-          </article>
-          <article class="card">
-            <span class="icon" style="--icon: url(../assets/icons/folder-open.svg)" aria-hidden="true"></span>
-            <h3>Projets et thèmes</h3>
-            <p>Un espace de travail isolé par sujet, cours ou financement. 28 thèmes (Catppuccin, Dracula, Gruvbox, Nord…), interface en français et en anglais.</p>
-          </article>
-        </div>
-      </div>
-    </section>
+            <!-- Fonctionnalités -->
+            <section id="features" class="section">
+                <div class="container">
+                    <h2>Fonctionnalités</h2>
+                    <div class="grid">
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/ai-svgrepo-com.svg)" aria-hidden="true"></span>
+                            <h3>L'IA locale d'abord</h3>
+                            <p>
+                                Réalise des inférences en local directement avec llama.cpp, sans passer par un serveur. Si vous avez accès à une API compatible OpenAI, vous pouvez aussi la connecter.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/file-pdf-regular-full.svg)" aria-hidden="true"></span>
+                            <h3>Import de PDF</h3>
+                            <p>Ajoutez des fichiers isolés ou des dossiers entiers. Le texte est extrait automatiquement, avec repli sur l'OCR pour les documents numérisés.</p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/align-justify.svg)" aria-hidden="true"></span>
+                            <h3>Résumés structurés</h3>
+                            <p>
+                                HodeIA produit des résumés structurés spécifiant des informations comme le titre, l'objectif, la méthodologie, les résultats clés, ainsi que les limites pour chaque
+                                article.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/share-square.svg)" aria-hidden="true"></span>
+                            <h3>Références et citations</h3>
+                            <p>
+                                Récupère les travaux cités par un article et ceux qui le citent depuis <a href="https://openalex.org">OpenAlex</a>. Les liens sont cliquables afin de vous permettre
+                                d'enrichir rapidement votre bibliothèque.
+                            </p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/ai-svgrepo-com.svg)" aria-hidden="true"></span>
+                            <h3>Interrogez votre bibliothèque</h3>
+                            <p>Posez vos questions en langage naturel sur tous vos articles et obtenez une réponse synthétique, de style académique, avec citations dans le texte.</p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/gear.svg)" aria-hidden="true"></span>
+                            <h3>Plusieurs thèmes</h3>
+                            <p>HodeIA offre 28 thèmes (Catppuccin, Dracula, Gruvbox, Nord…) afin de couvrir à peu près tous les goûts.</p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/file-export.svg)" aria-hidden="true"></span>
+                            <h3>Export en PDF</h3>
+                            <p>Exportez un ou plusieurs résumés en PDF.</p>
+                        </article>
+                        <article class="card">
+                            <span class="icon" style="--icon: url(../assets/icons/folder-open.svg)" aria-hidden="true"></span>
+                            <h3>Projets</h3>
+                            <p>HodeIA vous offre la possibilité de travailler avec des espaces dédiés par sujet de recherche.</p>
+                        </article>
+                    </div>
+                </div>
+            </section>
 
-    <!-- Confidentialité -->
-    <section id="privacy" class="section alt">
-      <div class="container">
-        <h2>Confidentiel par conception</h2>
-        <p class="section-lead">
-          Avec un modèle local, vos articles ne quittent jamais votre ordinateur. Pas de compte, pas de télémétrie, pas de cloud.
-        </p>
-        <div class="grid">
-          <article class="card">
-            <h3>Tout reste chez vous</h3>
-            <p>Extraction du texte, OCR, résumés, recherche et réponses s'exécutent en local. Votre bibliothèque est
-            une base SQLite dans votre propre dossier de données.</p>
-          </article>
-          <article class="card">
-            <h3>Seul le nécessaire sort</h3>
-            <p>Pour trouver les références, Hodeia envoie le <strong>titre et les auteurs</strong> d'un article à
-            OpenAlex — jamais son contenu. Si vous choisissez un serveur de modèles distant, le texte est envoyé à
-            <em>ce</em> serveur uniquement.</p>
-          </article>
-          <article class="card">
-            <h3>Vos fichiers restent intacts</h3>
-            <p>Les PDF ne sont lus qu'à l'import. Hodeia conserve leur texte et l'image des pages, sans jamais
-            déplacer, copier ni modifier les originaux.</p>
-          </article>
-        </div>
-        <h3 class="sub">Rapide et natif</h3>
-        <p class="section-lead">
-          Développé en C++23 avec Qt, llama.cpp, MuPDF, Tesseract et SQLite. Hodeia utilise automatiquement
-          le meilleur matériel disponible — CUDA, puis Vulkan, puis le CPU — sans aucune configuration.
-        </p>
-        <ul class="pills">
-          <li>C++23</li><li>Qt 6</li><li>llama.cpp</li><li>MuPDF</li><li>Tesseract</li><li>SQLite + sqlite-vec</li><li>CUDA · Vulkan · CPU</li>
-        </ul>
-      </div>
-    </section>
+            <!-- Screenshots -->
+            <section id="screenshots" class="section alt">
+                <div class="container">
+                    <h2>Aperçu</h2>
+                    <p class="section-lead">Cliquez sur une capture pour l'agrandir. Les captures montrent l'interface en anglais.</p>
+                    <div class="gallery">
+                        <figure class="shot-card">
+                            <a href="../assets/screenshots/pdf_ingestion.webp"
+                                ><img
+                                    src="../assets/screenshots/pdf_ingestion-960.webp"
+                                    srcset="../assets/screenshots/pdf_ingestion-960.webp 960w, ../assets/screenshots/pdf_ingestion.webp 1920w"
+                                    sizes="(max-width: 760px) 100vw, 50vw"
+                                    alt="Fenêtre d'import avec la progression de chaque étape"
+                                    width="1920"
+                                    height="1080"
+                                    loading="lazy"
+                            /></a>
+                            <figcaption>Import des PDF : progression de chaque étape, avec annulation.</figcaption>
+                        </figure>
+                        <figure class="shot-card">
+                            <a href="../assets/screenshots/after_a_summary.webp"
+                                ><img
+                                    src="../assets/screenshots/after_a_summary-960.webp"
+                                    srcset="../assets/screenshots/after_a_summary-960.webp 960w, ../assets/screenshots/after_a_summary.webp 1920w"
+                                    sizes="(max-width: 760px) 100vw, 50vw"
+                                    alt="Résumés en cours de génération, avec progression et temps écoulé"
+                                    width="1920"
+                                    height="1080"
+                                    loading="lazy"
+                            /></a>
+                            <figcaption>Résumés : chaque article reçoit un résumé structuré.</figcaption>
+                        </figure>
+                        <figure class="shot-card">
+                            <a href="../assets/screenshots/references_clickable_links.webp"
+                                ><img
+                                    src="../assets/screenshots/references_clickable_links-960.webp"
+                                    srcset="../assets/screenshots/references_clickable_links-960.webp 960w, ../assets/screenshots/references_clickable_links.webp 1920w"
+                                    sizes="(max-width: 760px) 100vw, 50vw"
+                                    alt="Onglet des références avec liens DOI"
+                                    width="1920"
+                                    height="1080"
+                                    loading="lazy"
+                            /></a>
+                            <figcaption>Références issues d’OpenAlex, avec liens DOI cliquables.</figcaption>
+                        </figure>
+                        <figure class="shot-card">
+                            <a href="../assets/screenshots/query_window.webp"
+                                ><img
+                                    src="../assets/screenshots/query_window-960.webp"
+                                    srcset="../assets/screenshots/query_window-960.webp 960w, ../assets/screenshots/query_window.webp 1920w"
+                                    sizes="(max-width: 760px) 100vw, 50vw"
+                                    alt="Fenêtre de questions avec une réponse citant les articles"
+                                    width="1920"
+                                    height="1080"
+                                    loading="lazy"
+                            /></a>
+                            <figcaption>Interrogez votre bibliothèque : les réponses citent les articles et les pages.</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
 
-    <!-- Bien commencer -->
-    <section id="getting-started" class="section">
-      <div class="container">
-        <h2>Bien commencer</h2>
-        <p class="section-lead">
-          De votre premier PDF à votre première question en quelques minutes. Les noms des menus et des boutons
-          sont ceux de l'interface en français.
-        </p>
-        <ol class="steps">
-          <li class="card">
-            <h3>Choisir ou créer un projet</h3>
-            <p>Un projet <strong>Default</strong> est créé au premier lancement : vous pouvez commencer tout de suite.
-            Pour séparer vos sujets, utilisez <strong>Projet → Nouveau projet...</strong>, et passez de l'un à l'autre
-            avec <strong>Projet → Ouvrir un projet</strong>.</p>
-          </li>
-          <li class="card">
-            <h3>Ajouter vos articles</h3>
-            <p>Cliquez sur <strong>Ajouter un fichier</strong> ou <strong>Ajouter un dossier</strong> dans la barre
-            d'outils et sélectionnez vos PDF. Une fenêtre affiche la progression de l'import et permet de l'annuler.
-            Les articles déjà présents dans le projet sont ignorés, et les PDF numérisés passent par la
-            reconnaissance de texte (plus lente).</p>
-          </li>
-          <li class="card">
-            <h3>Choisir un modèle</h3>
-            <p>Sélectionnez le modèle dans la liste <strong>Modèle actif</strong> de la barre d'outils. La liste
-            voisine règle la quantité d'images de pages transmises au modèle : <em>Texte uniquement</em> (par défaut),
-            <em>Réduit (figures/tableaux)</em> ou <em>Complet (toutes les pages)</em>. Avec un modèle local, les images
-            nécessitent son fichier MMProj. Ajoutez d'autres modèles avec
-            <strong>Modèles → Ajouter un modèle local...</strong> (voir <a href="#models">Modèles</a>).</p>
-          </li>
-          <li class="card">
-            <h3>Résumer</h3>
-            <p>Cochez les articles dans la liste (ou <strong>Tout sélectionner</strong>), puis cliquez sur le bouton
-            <strong>Résumer</strong> au-dessus de la liste. La progression et le temps écoulé s'affichent, et vous
-            pouvez arrêter à tout moment. Une fois un article résumé, ses références sont récupérées depuis OpenAlex.</p>
-          </li>
-          <li class="card">
-            <h3>Lire et exporter</h3>
-            <p>Cliquez sur un article pour l'ouvrir. Les onglets affichent le <strong>Résumé</strong>, les
-            <strong>Références (citées)</strong>, la liste <strong>Cité par</strong> et les pages du <strong>PDF</strong>.
-            Exportez un résumé en PDF depuis son onglet, ou cochez plusieurs articles et utilisez
-            <strong>Générer un rapport à partir de la sélection</strong>.</p>
-          </li>
-          <li class="card">
-            <h3>Interroger votre bibliothèque</h3>
-            <p>Cliquez sur <strong>Interroger votre bibliothèque</strong> en haut à droite. Tapez votre question et
-            appuyez sur <strong>Interroger</strong> : la réponse cite les articles dont elle s'inspire. Vos questions
-            passées sont conservées dans l'<strong>Historique des requêtes</strong>.</p>
-          </li>
-          <li class="card">
-            <h3>Personnaliser</h3>
-            <p>Changez l'apparence avec <strong>Paramètres → Thème</strong> (28 thèmes, clairs et sombres) et la langue
-            de l'interface avec <strong>Paramètres → Langue</strong>. Une clé OpenAlex optionnelle se règle dans
-            <strong>Paramètres → Clé API OpenAlex...</strong>.</p>
-          </li>
-          <li class="card">
-            <h3>Utiliser un serveur de modèles (optionnel)</h3>
-            <p>Pour utiliser Ollama, LM Studio ou un autre serveur compatible OpenAI, ajoutez-le dans
-            <strong>Modèles → Gérer les backends...</strong> (nom, URL, clé API optionnelle, puis
-            <strong>Vérifier la connexion</strong>), et sélectionnez-le dans <strong>Modèles → Backend</strong>.</p>
-          </li>
-        </ol>
-      </div>
-    </section>
+            <!-- Confidentialité -->
+            <section id="privacy" class="section">
+                <div class="container">
+                    <h2>Confidentiel par conception</h2>
+                    <p class="section-lead">
+                        Avec un modèle local, vos articles ne quittent jamais votre ordinateur. Pas de compte, pas de télémétrie, pas de cloud et surtout pas de limites sur le nombre d'articles.
+                    </p>
+                    <div class="grid">
+                        <article class="card">
+                            <h3>Tout reste chez vous</h3>
+                            <p>Extraction du texte, OCR, résumés, recherche et réponses s'exécutent en local. Votre bibliothèque est une base SQLite dans votre propre dossier de données.</p>
+                        </article>
+                        <article class="card">
+                            <h3>Seul le nécessaire sort</h3>
+                            <p>Pour trouver les références, HodeIA envoie le <strong>titre et les auteurs</strong> d'un article à OpenAlex, jamais son contenu.</p>
+                        </article>
+                        <article class="card">
+                            <h3>Plus de limites</h3>
+                            <p>HodeIA peut ingérer toute votre bibliothèque, vous n'êtes pas limité à un nombre d'articles. Vos seules limites sont votre stockage disponible et votre RAM.</p>
+                        </article>
+                    </div>
+                    <h3 class="sub">Rapide et natif</h3>
+                    <p class="section-lead">
+                        Développé en C++ en s'appuyant sur Qt, llama.cpp, MuPDF, Tesseract et SQLite. HodeIA utilise une pile logicielle qui priorise la performance et une faible empreinte mémoire.
+                        HodeIA utilisera automatiquement le meilleur matériel disponible sans aucune configuration.
+                    </p>
+                    <ul class="pills">
+                        <li>C++</li>
+                        <li>Qt 6</li>
+                        <li>llama.cpp</li>
+                        <li>MuPDF</li>
+                        <li>Tesseract</li>
+                        <li>SQLite + sqlite-vec</li>
+                    </ul>
+                </div>
+            </section>
 
-    <!-- Modèles -->
-    <section id="models" class="section alt">
-      <div class="container">
-        <h2>Modèles</h2>
-        <p class="section-lead">
-          Hodeia est livré avec un petit modèle <strong>Qwen3.5-0.8B</strong> pour fonctionner dès l'installation.
-          Pour de meilleurs résultats, téléchargez n'importe quel modèle GGUF (par exemple chez
-          <a href="https://huggingface.co/unsloth">Unsloth sur Hugging Face</a>) et ajoutez-le avec
-          <strong>Modèles → Ajouter un modèle local...</strong> (un fichier GGUF, plus son fichier MMProj optionnel pour
-          la prise en charge des images). Recommandations testées (Q4_K_XL) :
-        </p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Modèle</th><th>Taille (Q4)</th><th>VRAM / RAM min.</th><th>Idéal pour</th></tr>
-            </thead>
-            <tbody>
-              <tr><td><a href="https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/tree/main">Qwen3.5-2B</a></td><td>~1,4 Go</td><td>~6 Go</td><td>Matériel modeste, GPU intégré</td></tr>
-              <tr><td><a href="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/tree/main">Gemma4-2B</a></td><td>~3 Go</td><td>~6 Go</td><td>GPU intégré, meilleur que le 0.8B</td></tr>
-              <tr><td><a href="https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/main">Qwen3.5-4B</a></td><td>~2,5 Go</td><td>~6 Go</td><td>Résumés au quotidien</td></tr>
-              <tr><td><a href="https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/tree/main">Gemma4-4B</a></td><td>~6 Go</td><td>~8 Go</td><td>Bon raisonnement polyvalent</td></tr>
-              <tr><td><a href="https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/tree/main">Qwen3.5-9B</a></td><td>~5 Go</td><td>~8 Go</td><td>Haute qualité, GPU dédié</td></tr>
-              <tr><td><a href="https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/tree/main">Gemma4-12B</a></td><td>~7 Go</td><td>~12 Go</td><td>Meilleure qualité, 12 Go de VRAM ou plus</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
+            <!-- Bien commencer -->
+            <section id="getting-started" class="section alt">
+                <div class="container">
+                    <h2>Bien commencer</h2>
+                    <p class="section-lead">De votre premier PDF à votre première question en quelques minutes. Les noms des menus et des boutons sont ceux de l'interface en français.</p>
+                    <ol class="steps">
+                        <li class="card">
+                            <h3>Choisir ou créer un projet</h3>
+                            <p>
+                                Un projet <strong>Default</strong> est créé au premier lancement : vous pouvez commencer tout de suite. Pour séparer vos sujets, utilisez
+                                <strong>Projet → Nouveau projet...</strong>, et passez de l'un à l'autre avec <strong>Projet → Ouvrir un projet</strong>.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Ajouter vos articles</h3>
+                            <p>
+                                Cliquez sur <strong>Ajouter un fichier</strong> ou <strong>Ajouter un dossier</strong> dans la barre d'outils et sélectionnez vos PDF. Une fenêtre affiche la
+                                progression de l'import et permet de l'annuler. Les articles déjà présents dans le projet sont ignorés, et les PDF numérisés passent par la reconnaissance de texte
+                                (plus lente).
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Choisir un modèle</h3>
+                            <p>
+                                Sélectionnez le modèle dans la liste <strong>Modèle actif</strong> de la barre d'outils. La liste voisine règle la quantité d'images de pages transmises au modèle :
+                                <em>Texte uniquement</em> (par défaut), <em>Réduit (figures/tableaux)</em> ou <em>Complet (toutes les pages)</em>. Avec un modèle local, les images nécessitent son
+                                fichier MMProj. Ajoutez d'autres modèles avec <strong>Modèles → Ajouter un modèle local...</strong> (voir <a href="#models">Modèles</a>).
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Résumer</h3>
+                            <p>
+                                Cochez les articles dans la liste (ou <strong>Tout sélectionner</strong>), puis cliquez sur le bouton <strong>Résumer</strong> au-dessus de la liste. Une fois un
+                                article résumé, ses références sont récupérées depuis OpenAlex.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Lire et exporter</h3>
+                            <p>
+                                Cliquez sur un article pour l'ouvrir. Les onglets affichent le <strong>Résumé</strong>, les <strong>Références (citées)</strong>, la liste <strong>Cité par</strong> et
+                                les pages du <strong>PDF</strong>. Exportez un résumé en PDF depuis son onglet, ou cochez plusieurs articles et utilisez
+                                <strong>Générer un rapport à partir de la sélection</strong>.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Interroger votre bibliothèque</h3>
+                            <p>
+                                Cliquez sur <strong>Interroger votre bibliothèque</strong> en haut à droite. Tapez votre question et appuyez sur <strong>Interroger</strong> : la réponse cite les
+                                articles dont elle s'inspire. Vos questions passées sont conservées dans l'<strong>Historique des requêtes</strong>.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Personnaliser</h3>
+                            <p>
+                                Changez l'apparence avec <strong>Paramètres → Thème</strong> (28 thèmes, clairs et sombres) et la langue de l'interface avec <strong>Paramètres → Langue</strong>. Une
+                                clé OpenAlex optionnelle se règle dans <strong>Paramètres → Clé API OpenAlex...</strong>.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Utiliser un serveur de modèles (optionnel)</h3>
+                            <p>
+                                Pour utiliser Ollama, LM Studio ou un autre serveur compatible OpenAI, ajoutez-le dans <strong>Modèles → Gérer les backends...</strong> (nom, URL, clé API optionnelle,
+                                puis <strong>Vérifier la connexion</strong>), et sélectionnez-le dans <strong>Modèles → Backend</strong>.
+                            </p>
+                        </li>
+                    </ol>
+                </div>
+            </section>
 
-    <!-- Téléchargement -->
-    <section id="download" class="section">
-      <div class="container">
-        <h2>Téléchargement <span class="version" data-release-version hidden></span></h2>
-        <div class="grid two">
-          <article class="card">
-            <h3>Windows</h3>
-            <p>Téléchargez l'installateur (<code>Hodeia-*-x64.exe</code>) et lancez-le.</p>
-            <a id="windows-download" class="btn primary" href="https://github.com/hancito/Hodeia/releases">Dernière version</a>
-          </article>
-          <article class="card">
-            <h3>Linux (Arch)</h3>
-            <p>Compilez et installez le paquet à partir du <code>PKGBUILD</code> fourni :</p>
-            <pre><code>git clone https://github.com/hancito/Hodeia.git
+            <!-- Modèles -->
+            <section id="models" class="section">
+                <div class="container">
+                    <h2>Modèles</h2>
+                    <p class="section-lead">
+                        HodeIA est livré avec un petit modèle <strong>Qwen3.5-0.8B</strong> pour fonctionner dès l'installation. Ce modèle est fourni pour débuter ; il n'est pas vraiment recommandé.
+                        Pour des résumés corrects sur une machine modeste, utilisez les modèles 2B indiqués dans le tableau ci-dessous. Les modèles ouverts sont téléchargeables au format
+                        <strong>GGUF</strong> depuis <a href="https://huggingface.co">Hugging Face</a>. <a href="https://huggingface.co/unsloth">Unsloth AI</a> est un bon fournisseur. Ensuite,
+                        ajoutez-le avec <strong>Modèles → Ajouter un modèle local...</strong> (un fichier GGUF, plus son fichier MMProj optionnel pour la prise en charge des images). Quelques
+                        recommandations :
+                    </p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Modèle</th>
+                                    <th>Taille (Q4)</th>
+                                    <th>VRAM / RAM min.</th>
+                                    <th>Idéal pour</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/tree/main">Qwen3.5-2B</a></td>
+                                    <td>~1,4 Go</td>
+                                    <td>~6 Go</td>
+                                    <td>Matériel modeste, GPU intégré</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/tree/main">Gemma4-2B</a></td>
+                                    <td>~3 Go</td>
+                                    <td>~6 Go</td>
+                                    <td>GPU intégré, meilleur que le 0.8B</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/tree/main">Qwen3.5-4B</a></td>
+                                    <td>~2,5 Go</td>
+                                    <td>~6 Go</td>
+                                    <td>Résumés au quotidien</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/tree/main">Gemma4-4B</a></td>
+                                    <td>~6 Go</td>
+                                    <td>~8 Go</td>
+                                    <td>Bon raisonnement polyvalent</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/tree/main">Qwen3.5-9B</a></td>
+                                    <td>~5 Go</td>
+                                    <td>~8 Go</td>
+                                    <td>Haute qualité, GPU dédié</td>
+                                </tr>
+                                <tr>
+                                    <td><a href="https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/tree/main">Gemma4-12B</a></td>
+                                    <td>~7 Go</td>
+                                    <td>~12 Go</td>
+                                    <td>Meilleure qualité, 12 Go de VRAM ou plus</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Téléchargement -->
+            <section id="download" class="section alt">
+                <div class="container">
+                    <h2>Téléchargement <span class="version" data-release-version hidden></span></h2>
+                    <div class="grid two">
+                        <article class="card">
+                            <h3>Windows</h3>
+                            <p>Téléchargez l'installateur (<code>Hodeia-*-x64.exe</code>) et lancez-le.</p>
+                            <a id="windows-download" class="btn primary" href="https://github.com/hancito/Hodeia/releases">Dernière version</a>
+                        </article>
+                        <article class="card">
+                            <h3>Linux (Arch)</h3>
+                            <p>Compilez et installez le paquet à partir du <code>PKGBUILD</code> fourni :</p>
+                            <pre><code>git clone https://github.com/hancito/Hodeia.git
 cd Hodeia/package/arch
 makepkg -si</code></pre>
-          </article>
-        </div>
-        <p class="note">
-          macOS (Apple Silicon) n'est pas encore disponible. Vous voulez compiler depuis les sources sur une autre
-          distribution ? Consultez les
-          <a href="https://github.com/hancito/Hodeia#building-from-source">instructions de compilation</a> et la
-          <a href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">documentation technique</a> (en anglais).
-        </p>
-      </div>
-    </section>
+                            <p>Carte NVIDIA ? Vulkan fonctionne directement ; pour des résumés plus rapides, installez aussi le backend CUDA (nécessite le paquet <code>cuda</code>) :</p>
+                            <pre><code>cd ../arch-cuda
+makepkg -si</code></pre>
+                        </article>
+                    </div>
+                    <p class="note">
+                        macOS (Apple Silicon) n'est pas encore disponible. Vous voulez compiler depuis les sources sur une autre distribution ? Consultez les
+                        <a href="https://github.com/hancito/Hodeia#building-from-source">instructions de compilation</a> et la
+                        <a href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">documentation technique</a> (en anglais).
+                    </p>
+                </div>
+            </section>
 
-    <!-- FAQ -->
-    <section id="faq" class="section alt">
-      <div class="container narrow">
-        <h2>Questions fréquentes</h2>
-        <details>
-          <summary>Mes articles quittent-ils mon ordinateur ?</summary>
-          <p>Pas avec un modèle local : tout s'exécute sur votre machine. Seuls le titre et les auteurs d'un article
-          sont envoyés à OpenAlex pour trouver ses références. Si vous configurez un serveur de modèles distant, le
-          texte des articles est envoyé à ce serveur — choisissez-en un de confiance, ou hébergez-le vous-même
-          (Ollama, LM Studio).</p>
-        </details>
-        <details>
-          <summary>Ai-je besoin d'une carte graphique ?</summary>
-          <p>Non. Hodeia choisit automatiquement CUDA, puis Vulkan, puis le CPU. Sur CPU seul, restez sur les petits
-          modèles (0.8B à 4B) : ils fonctionnent, simplement plus lentement.</p>
-        </details>
-        <details>
-          <summary>Quel modèle choisir ?</summary>
-          <p>Le plus gros que votre VRAM (ou votre RAM) peut contenir — voir le tableau des <a href="#models">Modèles</a>.
-          Commencez avec le Qwen3.5-0.8B fourni et montez en gamme selon votre matériel. Le Q4 offre le meilleur
-          compromis taille/qualité ; les Q5 à Q8 sont plus précis si vous avez de la mémoire en réserve.</p>
-        </details>
-        <details>
-          <summary>Est-ce que ça fonctionne avec des PDF numérisés ?</summary>
-          <p>Oui. Quand un PDF n'a pas de couche de texte, Hodeia lance la reconnaissance de caractères (Tesseract).
-          C'est plus lent qu'une extraction classique.</p>
-        </details>
-        <details>
-          <summary>Où sont stockées mes données ?</summary>
-          <p>Dans <code>~/.local/share/Hodeia/</code> sous Linux et <code>%APPDATA%\Hodeia</code> sous Windows : un
-          dossier par projet, avec sa base de données et les images des pages. La désinstallation de Hodeia ne les
-          supprime jamais.</p>
-        </details>
-        <details>
-          <summary>Faut-il un compte ou une clé OpenAlex ?</summary>
-          <p>Non. OpenAlex est gratuit sans clé. Une clé optionnelle (<strong>Paramètres → Clé API OpenAlex...</strong>)
-          augmente les limites de requêtes si vous importez beaucoup d'articles.</p>
-        </details>
-        <details>
-          <summary>Existe-t-il une version macOS ?</summary>
-          <p>Pas encore. La compilation est préparée pour Apple Silicon (Metal) mais n'a été ni testée ni publiée.</p>
-        </details>
-      </div>
-    </section>
+            <!-- FAQ -->
+            <section id="faq" class="section">
+                <div class="container narrow">
+                    <h2>Questions fréquentes</h2>
+                    <details>
+                        <summary>Mes articles quittent-ils mon ordinateur ?</summary>
+                        <p>
+                            Pas avec un modèle local : tout s'exécute sur votre machine. Seuls le titre et les auteurs d'un article sont envoyés à OpenAlex pour trouver ses références. Si vous
+                            configurez un serveur de modèles distant, le texte des articles est envoyé à ce serveur — choisissez-en un de confiance, ou hébergez-le vous-même (Ollama, LM Studio).
+                        </p>
+                    </details>
+                    <details>
+                        <summary>Ai-je besoin d'une carte graphique ?</summary>
+                        <p>Pas nécessairement, même si vos résumés seront plus rapides avec une carte graphique. Grâce à llama.cpp, HodeIA fonctionne sur CPU. Sur CPU seul, restez sur les petits modèles (2B à 4B).</p>
+                    </details>
+                    <details>
+                        <summary>Quel modèle choisir ?</summary>
+                        <p>
+                            Le plus gros que votre VRAM (ou votre RAM) peut contenir — voir le tableau des <a href="#models">Modèles</a>. Commencez avec un modèle 2B et montez en gamme selon
+                            votre matériel. Le Q4 offre le meilleur compromis taille/qualité ; les Q5 à Q8 sont plus précis si vous avez de la mémoire en réserve.
+                        </p>
+                    </details>
+                    <details>
+                        <summary>Est-ce que ça fonctionne avec des PDF numérisés ?</summary>
+                        <p>Oui. Quand un PDF n'a pas de couche de texte, HodeIA lance la reconnaissance de caractères (Tesseract). Toutefois, l'extraction se fera plus lentement.</p>
+                    </details>
+                    <details>
+                        <summary>Où sont stockées mes données ?</summary>
+                        <p>
+                            Dans <code>~/.local/share/Hodeia/</code> sous Linux et <code>%APPDATA%\Hodeia</code> sous Windows : un dossier par projet, avec sa base de données et les images des pages.
+                            La désinstallation de HodeIA ne les supprime jamais.
+                        </p>
+                    </details>
+                    <details>
+                        <summary>Faut-il un compte ou une clé OpenAlex ?</summary>
+                        <p>
+                            Non. OpenAlex est gratuit sans clé. Une clé optionnelle (<strong>Paramètres → Clé API OpenAlex...</strong>) augmente les limites de requêtes si vous importez beaucoup
+                            d'articles.
+                        </p>
+                    </details>
+                    <details>
+                        <summary>Existe-t-il une version macOS ?</summary>
+                        <p>Pas encore. La compilation est préparée pour Apple Silicon (Metal) mais n'a été ni testée ni publiée.</p>
+                    </details>
+                </div>
+            </section>
 
-    <!-- Contribuer -->
-    <section id="contribute" class="section">
-      <div class="container">
-        <h2>Contribuer</h2>
-        <p class="section-lead">Hodeia est un logiciel libre et les contributions sont les bienvenues.</p>
-        <div class="grid">
-          <article class="card">
-            <h3>Signaler un bug ou une idée</h3>
-            <p>Ouvrez une issue sur GitHub en décrivant ce que vous avez fait, ce que vous attendiez et, si possible,
-            le journal.</p>
-            <a class="btn" href="https://github.com/hancito/Hodeia/issues">Issues</a>
-          </article>
-          <article class="card">
-            <h3>Traduire</h3>
-            <p>Les traductions sont des fichiers Qt Linguist dans <code>translations/</code>. Améliorez la traduction
-            française ou commencez une nouvelle langue.</p>
-            <a class="btn" href="https://github.com/hancito/Hodeia/tree/master/translations">Traductions</a>
-          </article>
-          <article class="card">
-            <h3>Écrire du code</h3>
-            <p>C++23 et Qt Quick, avec une compilation CMake modulaire. L'architecture et les pipelines sont décrits
-            dans TECHNICAL.md.</p>
-            <a class="btn" href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">Documentation technique</a>
-          </article>
-        </div>
-      </div>
-    </section>
-  </main>
+            <!-- Contribuer -->
+            <section id="contribute" class="section alt">
+                <div class="container">
+                    <h2>Contribuer</h2>
+                    <p class="section-lead">HodeIA est un logiciel libre et les contributions sont les bienvenues.</p>
+                    <div class="grid">
+                        <article class="card">
+                            <h3>Signaler un bug ou une idée</h3>
+                            <p>Ouvrez une issue sur GitHub en décrivant ce que vous avez fait, ce que vous attendiez et, si possible, le journal.</p>
+                            <a class="btn" href="https://github.com/hancito/Hodeia/issues">Issues</a>
+                        </article>
+                        <article class="card">
+                            <h3>Traduire</h3>
+                            <p>Les traductions sont des fichiers Qt Linguist dans <code>translations/</code>. Améliorez la traduction française ou commencez une nouvelle langue.</p>
+                            <a class="btn" href="https://github.com/hancito/Hodeia/tree/master/translations">Traductions</a>
+                        </article>
+                        <article class="card">
+                            <h3>Écrire du code</h3>
+                            <p>C++23 et Qt Quick, avec une compilation CMake modulaire. L'architecture et les pipelines sont décrits dans TECHNICAL.md.</p>
+                            <a class="btn" href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">Documentation technique</a>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </main>
 
-  <footer class="footer">
-    <div class="container">
-      <p>
-        Hodeia est un logiciel libre distribué sous licence
-        <a href="https://github.com/hancito/Hodeia/blob/master/LICENSE">GNU AGPL-3.0</a>.
-        Mentions des composants tiers : <a href="https://github.com/hancito/Hodeia/blob/master/NOTICE">NOTICE</a>.
-        Icônes : <a href="https://fontawesome.com">Font Awesome</a> (CC BY 4.0) et <a href="https://www.svgrepo.com">SVG Repo</a>.
-      </p>
-      <p>
-        <a href="https://github.com/hancito/Hodeia">GitHub</a> ·
-        <a href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">Documentation technique</a> ·
-        <a href="https://github.com/hancito/Hodeia/issues">Signaler un problème</a>
-      </p>
-    </div>
-  </footer>
+        <footer class="footer">
+            <div class="container">
+                <p>
+                    HodeIA est un logiciel libre distribué sous licence
+                    <a href="https://github.com/hancito/Hodeia/blob/master/LICENSE">GNU AGPL-3.0</a>. Mentions des composants tiers :
+                    <a href="https://github.com/hancito/Hodeia/blob/master/NOTICE">NOTICE</a>. Icônes : <a href="https://fontawesome.com">Font Awesome</a> (CC BY 4.0) et
+                    <a href="https://www.svgrepo.com">SVG Repo</a>.
+                </p>
+                <p>
+                    <a href="https://github.com/hancito/Hodeia">GitHub</a> · <a href="https://github.com/hancito/Hodeia/blob/master/docs/TECHNICAL.md">Documentation technique</a> ·
+                    <a href="https://github.com/hancito/Hodeia/issues">Signaler un problème</a>
+                </p>
+            </div>
+        </footer>
 
-  <script>
-    window.HODEIA_I18N = { downloadWindows: "Télécharger pour Windows", downloadLinux: "Télécharger pour Linux", preview: "préversion" };
-  </script>
-  <script src="../site.js" defer></script>
-</body>
+        <script>
+            window.HODEIA_I18N = { downloadWindows: "Télécharger pour Windows", downloadLinux: "Télécharger pour Linux", preview: "préversion" };
+        </script>
+        <script src="../site.js" defer></script>
+    </body>
 </html>

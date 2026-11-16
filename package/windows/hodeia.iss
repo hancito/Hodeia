@@ -25,8 +25,11 @@
   #define VCRedistBuild "0"
 #endif
 
-#define AppName "Hodeia"
-#define AppExe  "Hodeia.exe"
+; Display name (Start menu, desktop shortcut, Apps list).  The install folder
+; keeps the technical name so updates land in the same place.
+#define AppName    "HodeIA"
+#define AppDirName "Hodeia"
+#define AppExe     "Hodeia.exe"
 
 [Setup]
 ; AppId must NEVER change: it is how upgrades and the uninstaller find a
@@ -55,7 +58,7 @@ UninstallDisplayIcon={app}\{#AppExe}
 ; the user may pick an all-users install (Program Files) in a dialog.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-DefaultDirName={autopf}\{#AppName}
+DefaultDirName={autopf}\{#AppDirName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 
@@ -86,8 +89,8 @@ Name: "french";  MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-french.DowngradeWarning=Hodeia %1 est déjà installé, ce qui est plus récent que la version %2 de cet installeur.%n%nInstaller quand même l'ancienne version ?
-english.DowngradeWarning=Hodeia %1 is already installed, which is newer than this installer's version %2.%n%nInstall the older version anyway?
+french.DowngradeWarning={#AppName} %1 est déjà installé, ce qui est plus récent que la version %2 de cet installeur.%n%nInstaller quand même l'ancienne version ?
+english.DowngradeWarning={#AppName} %1 is already installed, which is newer than this installer's version %2.%n%nInstall the older version anyway?
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

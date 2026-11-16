@@ -128,7 +128,7 @@ static tesseract::TessBaseAPI *ensureOcrApi() {
                         "(images without text) cannot be read. Papers with "
                         "selectable text are not affected.\n\nThe language "
                         "data may be missing from:\n%1\n\nReinstalling "
-                        "Hodeia should fix it.")
+                        "HodeIA should fix it.")
               .arg(QDir::toNativeSeparators(tessdata)));
       delete api;
       return nullptr;

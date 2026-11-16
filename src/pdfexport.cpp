@@ -45,7 +45,7 @@ static const char kPdfCss[] =
     ".center { text-align: center; }";
 
 // Attribution printed centered at the bottom of every page.
-static const char kPdfFooterNote[] = "Made with Hodeia";
+static const char kPdfFooterNote[] = "Made with HodeIA";
 
 // A4 in points, and the content area inside the margins.
 static constexpr fz_rect kPdfPage = {0.0f, 0.0f, 595.28f, 841.89f};
@@ -338,8 +338,8 @@ QString writeHtml(const QString &html, const QString &destPath) {
     // ToUnicode maps can be fixed and the fonts subset before saving: whole
     // EB Garamond faces weigh ~700 KB per PDF, subsets a few dozen.
     pdf = pdf_create_document(ctx);
-    fz_set_metadata(ctx, &pdf->super, FZ_META_INFO_CREATOR, "Hodeia");
-    fz_set_metadata(ctx, &pdf->super, FZ_META_INFO_PRODUCER, "Hodeia (MuPDF)");
+    fz_set_metadata(ctx, &pdf->super, FZ_META_INFO_CREATOR, "HodeIA");
+    fz_set_metadata(ctx, &pdf->super, FZ_META_INFO_PRODUCER, "HodeIA (MuPDF)");
 
     const fz_rect area = {kPdfMarginX, kPdfMarginTop,
                           kPdfPage.x1 - kPdfMarginX,

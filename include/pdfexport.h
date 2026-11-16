@@ -3,7 +3,7 @@
 #include <QString>
 
 /// HTML → PDF rendering with MuPDF's HTML/CSS engine (fz_story): A4 pages,
-/// EB Garamond, page numbers and a "Made with Hodeia" note on every page.
+/// EB Garamond, page numbers and a "Made with HodeIA" note on every page.
 namespace PdfExport {
 
 /// Lay out the HTML body fragment @p html and save it to @p destPath (a local

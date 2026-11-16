@@ -210,7 +210,7 @@ MenuBar {
     StyledMenu {
         title: qsTr("Help")
         StyledMenuItem {
-            text: qsTr("About Hodeia...")
+            text: qsTr("About HodeIA...")
             onTriggered: menuBar.requestAbout()
         }
     }

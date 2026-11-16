@@ -145,13 +145,13 @@ Une copie du fichier endommagé a été conservée :
     </message>
     <message>
         <location filename="../src/configmanager.cpp" line="177"/>
-        <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when Hodeia closes.
+        <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
 %2
 
 Check the free disk space and the permissions of this folder.</source>
-        <translation>Vos réglages n&apos;ont pas pu être enregistrés : les modifications (backends, clé API, thème, projet actif...) seront perdues à la fermeture de Hodeia.
+        <translation>Vos réglages n&apos;ont pas pu être enregistrés : les modifications (backends, clé API, thème, projet actif...) seront perdues à la fermeture de HodeIA.
 
 %1
 %2
@@ -241,18 +241,18 @@ Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
         <location filename="../src/configmanager.cpp" line="590"/>
-        <source>Some models shipped with Hodeia could not be copied to:
+        <source>Some models shipped with HodeIA could not be copied to:
 %1
 
 • %2
 
-Indexing or summarizing may not work until they are. Check the free disk space, then restart Hodeia.</source>
-        <translation>Certains modèles fournis avec Hodeia n&apos;ont pas pu être copiés dans :
+Indexing or summarizing may not work until they are. Check the free disk space, then restart HodeIA.</source>
+        <translation>Certains modèles fournis avec HodeIA n&apos;ont pas pu être copiés dans :
 %1
 
 • %2
 
-L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez Hodeia.</translation>
+L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
         <location filename="../src/configmanager.cpp" line="686"/>
@@ -704,8 +704,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../ui/Main.qml" line="416"/>
-        <source>“Hodeia” — from the Ancient Greek ὁδός (hodós), meaning “path”.</source>
-        <translation>« Hodeia » — du grec ancien ὁδός (hodós), qui signifie « chemin ».</translation>
+        <source>“HodeIA” — from the Ancient Greek ὁδός (hodós), meaning “path”.</source>
+        <translation>« HodeIA » — du grec ancien ὁδός (hodós), qui signifie « chemin ».</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="423"/>
@@ -719,13 +719,13 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../ui/Main.qml" line="479"/>
-        <source>Each component remains under its own license; see the NOTICE file shipped with Hodeia for the full notices.</source>
-        <translation>Chaque composant reste sous sa propre licence ; consultez le fichier NOTICE fourni avec Hodeia pour les mentions complètes.</translation>
+        <source>Each component remains under its own license; see the NOTICE file shipped with HodeIA for the full notices.</source>
+        <translation>Chaque composant reste sous sa propre licence ; consultez le fichier NOTICE fourni avec HodeIA pour les mentions complètes.</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="358"/>
-        <source>About Hodeia</source>
-        <translation>À propos de Hodeia</translation>
+        <source>About HodeIA</source>
+        <translation>À propos de HodeIA</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="201"/>
@@ -739,8 +739,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../ui/Main.qml" line="20"/>
-        <source>Hodeia - %1</source>
-        <translation>Hodeia - %1</translation>
+        <source>HodeIA - %1</source>
+        <translation>HodeIA - %1</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="72"/>
@@ -995,8 +995,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../ui/MyMenuBar.qml" line="213"/>
-        <source>About Hodeia...</source>
-        <translation>À propos de Hodeia...</translation>
+        <source>About HodeIA...</source>
+        <translation>À propos de HodeIA...</translation>
     </message>
     <message>
         <source>File</source>
@@ -1228,13 +1228,13 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 The language data may be missing from:
 %1
 
-Reinstalling Hodeia should fix it.</source>
+Reinstalling HodeIA should fix it.</source>
         <translation>Le moteur OCR n&apos;a pas pu démarrer : les pages numérisées (images sans texte) ne peuvent pas être lues. Les articles dont le texte est sélectionnable ne sont pas concernés.
 
 Les données de langue manquent peut-être dans :
 %1
 
-Réinstaller Hodeia devrait corriger le problème.</translation>
+Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
     <message>
         <location filename="../src/ingestionengine.cpp" line="458"/>
@@ -1624,8 +1624,8 @@ Réinstaller Hodeia devrait corriger le problème.</translation>
     <name>RagWindow</name>
     <message>
         <location filename="../ui/RagWindow.qml" line="10"/>
-        <source>Hodeia</source>
-        <translation>Hodeia</translation>
+        <source>HodeIA</source>
+        <translation>HodeIA</translation>
     </message>
     <message>
         <location filename="../ui/RagWindow.qml" line="52"/>

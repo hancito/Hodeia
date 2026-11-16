@@ -7,7 +7,7 @@ ThemedWindow {
     id: ragwindow
     preferredWidth: 1200
     preferredHeight: 800
-    title: qsTr("Hodeia")
+    title: qsTr("HodeIA")
     visible: true
     //icon.source: "qrc:/Resources/hodeia.png"
     // Signal to notify the main app that this window is closing

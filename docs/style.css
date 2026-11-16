@@ -369,3 +369,23 @@ summary::-webkit-details-marker { display: none; }
 summary::after { content: "+"; color: var(--accent); font-weight: 700; }
 details[open] summary::after { content: "−"; }
 details p { margin: 0; color: var(--muted); }
+
+/* Screenshot gallery */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1.5rem;
+}
+.shot-card { margin: 0; }
+.shot-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s ease;
+}
+.shot-card a:hover img { transform: translateY(-2px); }
+.shot-card figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.6rem; }
+.shot img { display: block; }
