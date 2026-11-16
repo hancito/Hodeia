@@ -1,0 +1,105 @@
+# Maintainer: hancito
+# hodeia-cuda — CUDA backend for Hodeia (NVIDIA GPUs).
+#
+# Builds only llama.cpp's CUDA backend (libggml-cuda.so) and installs it next
+# to the Hodeia binary in /opt/hodeia.  Hodeia loads it at startup when it is
+# present (ggml backends are loaded dynamically) and prefers it over Vulkan.
+# Removing this package falls back to Vulkan/CPU.
+#
+# llama.cpp MUST be the exact version the `hodeia` package was built with:
+# keep _llama_ver in sync with package/arch/PKGBUILD.
+#
+# GPU architectures: by default the kernels are compiled only for the NVIDIA
+# GPU(s) present in this machine (CUDA arch "native", detected through the
+# driver) — much faster to build and smaller.  Rebuild after changing GPU.
+#  - CUDAARCHS=89 makepkg -si      force a list of architectures
+#  - HODEIA_PORTABLE=1 makepkg -si every architecture llama.cpp supports
+# If no GPU is visible at build time (chroot, CI), all architectures are built.
+#
+# Usage:  makepkg -si   (from this directory, after installing `hodeia`)
+
+pkgname=hodeia-cuda
+pkgver=0.99rc
+pkgrel=1
+pkgdesc="CUDA backend for Hodeia, the local-AI research assistant (NVIDIA GPUs)"
+arch=(x86_64)
+url="https://github.com/hancito/Hodeia"
+license=('MIT')   # the package only contains llama.cpp code
+
+_llama_ver=v0.9.0   # must match package/arch/PKGBUILD
+
+depends=(
+  "hodeia=${pkgver}"
+  'cuda'            # libcudart / libcublas at runtime
+  'gcc-libs'
+)
+makedepends=(
+  'cmake'
+  'ninja'
+  'git'
+  'patchelf'
+)
+options=(!lto !debug)
+
+source=("llama.cpp::git+https://github.com/ggml-org/llama.cpp.git#tag=${_llama_ver}")
+sha256sums=('SKIP')
+
+build() {
+  # The Arch `cuda` package sets PATH, CUDA_PATH and NVCC_CCBIN (the host
+  # compiler nvcc supports) in a profile script that makepkg does not source.
+  [ -f /etc/profile.d/cuda.sh ] && source /etc/profile.d/cuda.sh
+  local cuda="${CUDA_PATH:-/opt/cuda}"
+  if [ ! -x "$cuda/bin/nvcc" ]; then
+    echo "ERROR: nvcc not found in $cuda/bin — install the 'cuda' package first." >&2
+    return 1
+  fi
+
+  # Keep build paths out of the binary (host code and nvcc host passes).
+  export CFLAGS+=" -ffile-prefix-map=${srcdir}=."
+  export CXXFLAGS+=" -ffile-prefix-map=${srcdir}=."
+  export CUDAFLAGS+=" -Xcompiler=-ffile-prefix-map=${srcdir}=."
+
+  local host_cc=()
+  [ -n "${NVCC_CCBIN:-}" ] && host_cc=(-DCMAKE_CUDA_HOST_COMPILER="$NVCC_CCBIN")
+
+  # CUDAARCHS (read by CMake itself) > native GPU(s) > every architecture.
+  local cuda_arch=()
+  if [ -n "${CUDAARCHS:-}" ]; then
+    echo ">> CUDA architectures from CUDAARCHS: $CUDAARCHS"
+  elif [ "${HODEIA_PORTABLE:-0}" != 1 ] && nvidia-smi -L >/dev/null 2>&1; then
+    echo ">> CUDA architectures: native ($(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader | paste -sd ';'))"
+    cuda_arch=(-DCMAKE_CUDA_ARCHITECTURES=native)
+  else
+    # Leave CMAKE_CUDA_ARCHITECTURES unset: llama.cpp then uses its own list
+    # of every supported architecture (GGML_NATIVE is OFF below).
+    echo ">> No NVIDIA GPU visible (or HODEIA_PORTABLE=1): building every CUDA architecture"
+  fi
+
+  # Same backend-DL layout as the hodeia package, CUDA only.
+  cmake -S llama.cpp -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CUDA_COMPILER="$cuda/bin/nvcc" \
+    "${host_cc[@]}" \
+    "${cuda_arch[@]}" \
+    -DBUILD_SHARED_LIBS=ON \
+    -DLLAMA_BUILD_COMMON=OFF \
+    -DLLAMA_BUILD_TESTS=OFF \
+    -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DLLAMA_BUILD_SERVER=OFF \
+    -DLLAMA_CURL=OFF \
+    -DGGML_BACKEND_DL=ON \
+    -DGGML_NATIVE=OFF \
+    -DGGML_CPU_ALL_VARIANTS=OFF \
+    -DGGML_VULKAN=OFF \
+    -DGGML_CUDA=ON
+  cmake --build build --target ggml-cuda
+}
+
+package() {
+  # libggml-base.so.0 (its only ggml dependency) is shipped by `hodeia` in the
+  # same folder; the CUDA runtime is found through ld.so.conf.d (cuda package).
+  install -Dm755 build/bin/libggml-cuda.so "${pkgdir}/opt/hodeia/libggml-cuda.so"
+  patchelf --set-rpath '$ORIGIN' "${pkgdir}/opt/hodeia/libggml-cuda.so"
+
+  install -Dm644 llama.cpp/LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

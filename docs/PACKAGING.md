@@ -59,22 +59,66 @@ fonts, tessdata, the embedder model, translations.
 The Arch package uses the **self-contained `/opt` layout (Option B below)**
 and builds **everything from source**:
 
-- Hodeia is `git clone`d (not a tarball), because the bundled `.gguf` models
-  are stored with **git-lfs** — a tarball would only contain the LFS pointers.
-  The clone is checked out at tag `v${pkgver}`.
-- `prepare()` clones the dependencies at pinned versions (llama.cpp `v0.6.0`,
-  MuPDF `1.28.5` with its submodules, Tesseract `5.5.3`, Leptonica `1.87.0`,
-  sqlite-vec `v0.1.10-alpha.4`) and detects the GPU backend: **CUDA** if
-  `nvcc` is found, otherwise **Vulkan** (CPU is always included).
+- Every source is a `git+https` source pinned with `#tag=`: Hodeia at
+  `v${pkgver}`, llama.cpp `v0.9.0`, MuPDF `1.28.6`, Tesseract `5.5.4`,
+  Leptonica `1.87.0`, sqlite-vec `v0.1.10-alpha.4` (keep them in sync with
+  `scripts/Linux/get_depedencies.sh`).
+- Hodeia is a git source (not a tarball) because the bundled `.gguf` models are
+  **git-lfs** objects. makepkg checks out from a local mirror without LFS data,
+  so the PKGBUILD exports `GIT_LFS_SKIP_SMUDGE=1` and `prepare()` runs
+  `git lfs pull` against GitHub, then fails if any file is still a pointer.
+- `prepare()` also initializes MuPDF's submodules (network access).
 - `build()` builds Leptonica → Tesseract → MuPDF (static) → sqlite-vec →
-  llama.cpp (flat `.so` set) → Hodeia.
-- `package()` copies the deploy folder to `/opt/hodeia` (minus build
-  artefacts), symlinks `/usr/bin/hodeia`, and installs `hodeia.desktop`
-  (`Categories=Office;Science;`) and the icon.
+  llama.cpp (flat `.so` set) → Hodeia (clang, with LTO for Hodeia only via
+  `HODEIA_ENABLE_LTO`; makepkg's global `lto` stays off because GCC LTO bytecode
+  in the static deps could not be linked by clang). llama.cpp gets the CPU
+  backend and **Vulkan** only — CUDA is the separate `hodeia-cuda` package
+  (below); the backend is picked at runtime.
+- **Native CPU build (default):** one `libggml-cpu.so` built with exactly the
+  x86 features of the build machine (`GGML_AVX2`, `GGML_AVX512`, `GGML_AMX_*`…
+  set from `/proc/cpuinfo`), instead of the 14 `ggml-cpu-<microarch>` variants
+  (~19 MB). `GGML_NATIVE`/`-march=native` cannot be used: llama.cpp rejects it
+  with `GGML_BACKEND_DL`. The package then needs the build machine's CPU
+  features. `HODEIA_PORTABLE=1 makepkg` restores the portable
+  build (`GGML_CPU_ALL_VARIANTS=ON`, best variant picked at runtime) — use it
+  for CI or to share the `.pkg.tar.zst`.
+- `package()` installs the runtime files of the deploy folder into
+  `/opt/hodeia` (not the build-tree `qt.conf`), symlinks `/usr/bin/hodeia`, and
+  installs `hodeia.desktop` (`Categories=Office;Science;`), the icon, `LICENSE`
+  and `NOTICE`.
 
-Build with `makepkg -s` from `package/arch/`. Runtime `depends`: `qt6-base`,
-`qt6-declarative`, `qt6-shadertools`, `libpng`, `libjpeg-turbo`, `libtiff`,
-`zlib`, `libomp`. Makedepends include `git-lfs`.
+Build with `makepkg -si` from `package/arch/`. Runtime `depends`: `qt6-base`,
+`qt6-declarative`, `vulkan-icd-loader`, `libpng`, `libjpeg-turbo`, `libtiff`,
+`zlib`, `gcc-libs`, `openmp`. Makedepends include `git-lfs`, `qt6-tools`,
+`vulkan-headers`, `shaderc` and `spirv-headers`. `optdepends`: `hodeia-cuda`.
+An install script (`hodeia.install`) suggests `hodeia-cuda` when an NVIDIA GPU
+is found in `/sys/bus/pci/devices` (vendor `0x10de`, display class `0x03`) and
+the CUDA backend is not installed.
+
+### `hodeia-cuda` (`package/arch-cuda/PKGBUILD`)
+
+A separate package so that `hodeia` never pulls in the multi-GB CUDA toolkit
+and the build stays the same on every machine:
+
+- Builds **only** llama.cpp's `ggml-cuda` target (same `GGML_BACKEND_DL`
+  layout, same llama.cpp tag — keep `_llama_ver` in sync with
+  `package/arch/PKGBUILD`) and installs `libggml-cuda.so` into `/opt/hodeia`
+  with an `$ORIGIN` RPATH. Its ggml dependency, `libggml-base.so.0`, is the one
+  shipped by `hodeia`; the CUDA runtime is found via the `cuda` package's
+  `ld.so.conf.d` entry.
+- Hodeia loads `libggml-cuda.so` from its folder at startup when present, and
+  falls back to Vulkan/CPU if the package is removed.
+- `depends`: `hodeia=${pkgver}` (locks both packages to the same llama.cpp),
+  `cuda`. License `MIT` (llama.cpp code only).
+- `build()` sources `/etc/profile.d/cuda.sh` (sets `CUDA_PATH` and the
+  `NVCC_CCBIN` host compiler, which makepkg does not load).
+- **GPU architectures:** `CUDAARCHS` if set (e.g. `CUDAARCHS=89`), otherwise
+  `native` (only the GPUs visible through `nvidia-smi` at build time, much
+  faster to build), otherwise — no GPU visible, or `HODEIA_PORTABLE=1` —
+  llama.cpp's own list of every supported architecture.
+
+Build with `makepkg -si` from `package/arch-cuda/` after installing `hodeia`
+and `cuda`.
 
 ---
 

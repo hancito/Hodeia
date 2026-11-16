@@ -1,0 +1,23 @@
+# Suggest the CUDA backend when an NVIDIA GPU is present and it is not installed.
+_hodeia_cuda_hint() {
+  [ -e /opt/hodeia/libggml-cuda.so ] && return 0
+  local d
+  for d in /sys/bus/pci/devices/*; do
+    # vendor 0x10de = NVIDIA, class 0x03xxxx = display controller
+    if [ "$(cat "$d/vendor" 2>/dev/null)" = "0x10de" ] &&
+       [ "$(cut -c1-4 "$d/class" 2>/dev/null)" = "0x03" ]; then
+      echo ":: An NVIDIA GPU was detected. Hodeia will use it through Vulkan."
+      echo "   For faster summaries, also build and install the hodeia-cuda package"
+      echo "   (package/arch-cuda/ in the Hodeia repository)."
+      return 0
+    fi
+  done
+}
+
+post_install() {
+  _hodeia_cuda_hint
+}
+
+post_upgrade() {
+  _hodeia_cuda_hint
+}
