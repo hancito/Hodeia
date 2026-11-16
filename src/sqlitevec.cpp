@@ -281,7 +281,8 @@ int SqliteVecManager::maxChunkTokens() {
 /* ── Chunk insertion ─────────────────────────────────────────── */
 
 int SqliteVecManager::insertChunks(SqliteDb &db,
-                                   const QList<TextChunk> &chunks) {
+                                   const QList<TextChunk> &chunks,
+                                   const std::atomic<bool> *cancel) {
   if (chunks.isEmpty())
     return 0;
   if (!m_ready && !initialize())
@@ -301,6 +302,10 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
   }
 
   for (int start = 0; start < chunks.size(); start += BatchSize) {
+    if (cancel && cancel->load()) {
+      qInfo() << "[SqliteVec] insertChunks cancelled";
+      return -1;
+    }
     int end = qMin(start + BatchSize, chunks.size());
 
     QStringList batchTexts;

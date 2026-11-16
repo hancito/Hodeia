@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QString>
 #include <QVector>
+#include <atomic>
 #include <expected>
 
 struct ChunkSearchResult {
@@ -53,8 +54,10 @@ public:
   // safety margin.  0 if the model can't be loaded.
   int maxChunkTokens();
 
-  // Insert chunks into the vec0 table. Returns count of inserted rows.
-  int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks);
+  // Insert chunks into the vec0 table. Returns count of inserted rows, or -1
+  // on failure or when `cancel` becomes true (checked between batches).
+  int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks,
+                   const std::atomic<bool> *cancel = nullptr);
 
   // Search chunks by query text; returns top-k nearest neighbors
   QList<ChunkSearchResult> search(SqliteDb &db, const QString &query,

@@ -88,6 +88,10 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
           &EngineController::ingestionStarted);
   connect(thisWorker, &PdfWorker::status, this,
           &EngineController::ingestionStatus);
+  connect(thisWorker, &PdfWorker::stepProgress, this,
+          &EngineController::ingestionStepProgress);
+  connect(thisWorker, &PdfWorker::papersProgress, this,
+          &EngineController::ingestionPapersProgress);
   connect(thisWorker, &PdfWorker::report, this,
           &EngineController::ingestionReport);
 
@@ -115,6 +119,15 @@ void EngineController::stopEngine() {
   // The lambda above also nullifies these when the thread finishes naturally.
   m_worker = nullptr;
   m_thread = nullptr;
+}
+
+void EngineController::cancelEngine() {
+  // m_worker is deleted on this thread once its thread finishes, so it is
+  // valid while the thread runs; cancel() only touches atomics.
+  if (!m_worker || !m_thread || !m_thread->isRunning())
+    return;
+  qInfo() << "[EngineController] Cancel requested";
+  m_worker->cancel();
 }
 
 void EngineController::releaseAndReloadModel() {

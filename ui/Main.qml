@@ -497,6 +497,9 @@ ThemedWindow {
             messageBox.show(title, message, isError);
         }
     }
+    // Blocking window listing the import's operations and their progress.
+    IngestionDialog {}
+
     // End-of-import summary: papers added, skipped, and what failed and why.
     Connections {
         target: engineController

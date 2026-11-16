@@ -427,14 +427,23 @@ PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
                      QObject *parent)
     : QObject(parent), m_vecManager(vecManager), m_config(config) {
   if (m_vecManager) {
+    // Emitted from this worker's thread (ingestChunks): a direct call.
     connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
-            &PdfWorker::embeddingProgress);
+            [this](int current, int total) {
+              emit stepProgress(QStringLiteral("embed"), current, total,
+                                m_embedDetail);
+            });
   }
 }
 
 PdfWorker::~PdfWorker() = default;
 
 void PdfWorker::stop() { m_stopFlag.store(true); }
+
+void PdfWorker::cancel() {
+  m_userCancelled.store(true);
+  m_stopFlag.store(true);
+}
 
 // ============================================================================
 //  Main ingestion pipeline
@@ -443,16 +452,28 @@ void PdfWorker::stop() { m_stopFlag.store(true); }
 void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                            const QString &dbPath) {
   m_stopFlag.store(false);
+  m_userCancelled.store(false);
   emit started();
 
   QString message = tr("Started with %1 files").arg(filePath.size());
   emit status(message);
 
+  emit stepProgress(QStringLiteral("hash"), 0, filePath.size(), QString());
   QMap<QString, QUrl> hashesToProcess = parallelHasher(filePath);
+  if (m_stopFlag.load()) {
+    if (m_userCancelled.load())
+      emitCancelReport(0);
+    emit finished();
+    return;
+  }
+  emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
+                    tr("Checking which papers are already in the library..."));
   QList<QUrl> urlsToProcess = filterExistingHashes(hashesToProcess, dbPath);
   const int alreadyKnown = filePath.size() - urlsToProcess.size();
   message = tr("Skipped %1 papers").arg(alreadyKnown);
   emit status(message);
+  emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
+                    tr("%n paper(s) already in the library", "", alreadyKnown));
 
   // Process in small batches to bound memory and provide incremental progress.
   const int batchSize = 10;
@@ -463,10 +484,15 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   QString indexError;       // why indexing failed, when known
   bool cancelled = false;
   int total = urlsToProcess.size();
+  const int batchCount = (total + batchSize - 1) / batchSize;
+
+  m_extractDone = 0;
+  m_extractTotal = total;
+  emit papersProgress(0, total);
+  emit stepProgress(QStringLiteral("extract"), 0, total, QString());
 
   for (int i = 0; i < total; i += batchSize) {
     if (m_stopFlag.load()) {
-      emit status(tr("Ingestion cancelled"));
       cancelled = true;
       break;
     }
@@ -477,6 +503,12 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     emit status(message);
 
     QList<ExtractionResult> extractions = parallelExtract(batchUrls, imgPath);
+    // Stopped during the extraction: drop this batch, nothing is saved yet.
+    if (m_stopFlag.load()) {
+      cleanupOcrApi();
+      cancelled = true;
+      break;
+    }
 
     QList<SummaryRow> rows;
     QList<TextChunk> allChunks;
@@ -534,6 +566,10 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 
       QString statusMsg = tr("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
+      m_embedDetail =
+          tr("Batch %1/%2").arg(i / batchSize + 1).arg(batchCount);
+      emit stepProgress(QStringLiteral("embed"), 0, allChunks.size(),
+                        m_embedDetail);
 
       bool indexed = false;
       if (m_vecManager) {
@@ -541,6 +577,15 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       } else {
         qWarning() << "[PdfWorker] embedding model not loaded, skipping vector "
                       "storage";
+      }
+      // Stopped during the indexing: the chunks were rolled back, so remove
+      // this batch's papers too (a re-import would skip them otherwise).
+      if (!indexed && m_stopFlag.load()) {
+        removePapers(rows, dbPath);
+        savedCount -= rows.size();
+        cleanupOcrApi();
+        cancelled = true;
+        break;
       }
       if (!indexed) {
         if (indexError.isEmpty() && m_vecManager)
@@ -565,17 +610,35 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 
     message = tr("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
     emit status(message);
+    emit papersProgress(savedCount + errorCount, total);
   }
 
   if (errorCount > 0)
     qWarning() << "[PdfWorker] Total skipped due to errors:" << errorCount;
 
-  // Final report.  Not after a stop: that only happens when the app closes.
-  if (!cancelled && !m_stopFlag.load())
+  // No report when the app is closing (stop()), only for the user's cancel.
+  // A cancel that came after the last batch changed nothing: normal report.
+  if (cancelled) {
+    emit status(tr("Ingestion cancelled"));
+    if (m_userCancelled.load())
+      emitCancelReport(savedCount);
+  } else if (!m_stopFlag.load() || m_userCancelled.load()) {
     emitReport(filePath.size(), alreadyKnown, savedCount, unreadable,
                failedTitles, indexError);
+  }
 
   emit finished();
+}
+
+void PdfWorker::emitCancelReport(int added) {
+  QString message =
+      tr("%n paper(s) were added to the library before the import was "
+         "cancelled.",
+         nullptr, added);
+  message += "\n\n" + tr("To import the remaining files, add them again: "
+                          "the papers already in the library will be "
+                          "skipped.");
+  emit report(tr("Import Cancelled"), message, false);
 }
 
 void PdfWorker::emitReport(int selected, int alreadyKnown, int added,
@@ -642,7 +705,7 @@ bool PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
     return false;
   }
 
-  int inserted = m_vecManager->insertChunks(db, chunks);
+  int inserted = m_vecManager->insertChunks(db, chunks, &m_stopFlag);
 
   qDebug() << "[PdfWorker] insertChunks returned:" << inserted << "out of"
            << chunks.size() << "chunks";
@@ -826,12 +889,21 @@ QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
 }
 
 QMap<QString, QUrl>
-PdfWorker::parallelHasher(const QList<QUrl> &fileList) const {
+PdfWorker::parallelHasher(const QList<QUrl> &fileList) {
   QMap<QString, QUrl> hashToUrl;
 
-  QList<QPair<QString, QUrl>> hashUrlPairs =
-      QtConcurrent::blockingMapped(fileList, [this](const QUrl &url) {
-        return qMakePair(computeFileHash(url), url);
+  // Pool threads emit stepProgress: queued to the controller's thread.
+  std::atomic<int> hashed{0};
+  const int total = fileList.size();
+  QList<QPair<QString, QUrl>> hashUrlPairs = QtConcurrent::blockingMapped(
+      fileList, [this, &hashed, total](const QUrl &url) {
+        // Once stopped, skip the remaining files: the caller checks the flag.
+        if (m_stopFlag.load())
+          return qMakePair(QString(), url);
+        auto pair = qMakePair(computeFileHash(url), url);
+        emit stepProgress(QStringLiteral("hash"), ++hashed, total,
+                          QFileInfo(url.toLocalFile()).fileName());
+        return pair;
       });
 
   for (const auto &pair : hashUrlPairs) {
@@ -878,7 +950,7 @@ PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
 static constexpr float kPageImageDpi = 200.0f;
 
 ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
-                                        const QString &imgPath) const {
+                                        const QString &imgPath) {
   QString localPath = fileUrl.toLocalFile();
   ExtractionResult result;
   result.fileName = QFileInfo(localPath).fileName();
@@ -934,6 +1006,17 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   QVector<quint16> pageMap; // char offset → page number (compact: 2 bytes)
 
   for (int i = 0; i < pageCount; ++i) {
+    // The caller drops the whole batch once stopped: no need to finish.
+    if (m_stopFlag.load())
+      break;
+    // Scanned pages go through OCR and can take seconds each: report pages,
+    // not just files, so long documents visibly progress.
+    emit stepProgress(QStringLiteral("extract"), m_extractDone, m_extractTotal,
+                      tr("%1 — page %2/%3")
+                          .arg(result.fileName)
+                          .arg(i + 1)
+                          .arg(pageCount));
+
     fz_page *page = nullptr;
     fz_stext_page *textPage = nullptr;
     fz_device *dev = nullptr;
@@ -1123,12 +1206,17 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 
 QList<ExtractionResult>
 PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
-                           const QString &imgPath) const {
+                           const QString &imgPath) {
   QList<ExtractionResult> results;
   for (const auto &url : filePaths) {
     if (m_stopFlag.load())
       break;
     results.append(extractText(url, imgPath));
+    if (m_stopFlag.load())
+      break;
+    ++m_extractDone;
+    emit stepProgress(QStringLiteral("extract"), m_extractDone, m_extractTotal,
+                      results.last().fileName);
   }
   return results;
 }

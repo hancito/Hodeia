@@ -175,7 +175,8 @@ set(_QML_FILES
     StyledScrollBar.qml StyledDialog.qml StatusBar.qml SplitHandleBar.qml
     StyledMenu.qml StyledMenuItem.qml StyledMenuSeparator.qml MenuCheckRow.qml
     StyledTabBar.qml StyledTabButton.qml StyledProgressBar.qml StyledGroupBox.qml
-    StyledToolTip.qml StyledBusyIndicator.qml ThemedWindow.qml MessageBox.qml)
+    StyledToolTip.qml StyledBusyIndicator.qml ThemedWindow.qml MessageBox.qml
+    IngestionDialog.qml)
 foreach(_f ${_QML_FILES})
   set_source_files_properties(${CMAKE_SOURCE_DIR}/ui/${_f}
       PROPERTIES QT_RESOURCE_ALIAS "${_f}")
@@ -220,6 +221,7 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/StyledBusyIndicator.qml
         ${CMAKE_SOURCE_DIR}/ui/ThemedWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/MessageBox.qml
+        ${CMAKE_SOURCE_DIR}/ui/IngestionDialog.qml
 )
 
 # ---------------------------------------------------------------------------

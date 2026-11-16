@@ -21,7 +21,6 @@ ToolBar {
     }
 
     // ── Properties migrated from LeftPane ──
-    property int elapsedTime: 0
     signal openRagWindow
     property var statusBarLabel: null
     property bool busy: false
@@ -36,10 +35,6 @@ ToolBar {
         nameFilters: ["PDF files (*.pdf)"]
         fileMode: FileDialog.OpenFiles
         onAccepted: {
-            spinner.visible = true;
-            spinner.running = true;
-            executionTimer.running = true;
-            executionTimer.start();
             toolBar.busy = true;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
             var dbPath = configManager.projectDbPath(configManager.lastProject);
@@ -55,10 +50,6 @@ ToolBar {
         id: pdfFolderDialog
         title: qsTr("Select a folder containing PDFs")
         onAccepted: {
-            spinner.visible = true;
-            spinner.running = true;
-            executionTimer.running = true;
-            executionTimer.start();
             toolBar.busy = true;
             var imgPath = configManager.projectImgPath(configManager.lastProject);
             var dbPath = configManager.projectDbPath(configManager.lastProject);
@@ -70,24 +61,18 @@ ToolBar {
     Connections {
         target: engineController
         function onIngestionFinished() {
-            spinner.visible = false;
-            spinner.running = false;
-            executionTimer.stop();
             toolBar.busy = false;
-            if (toolBar.statusBarLabel) {
-                toolBar.statusBarLabel.text = statusLabel.text;
-            }
-            statusLabel.visible = false;
         }
 
         function onIngestionStarted() {
-            toolBar.elapsedTime = 0;
-            statusLabel.visible = true;
             toolBar.busy = true;
         }
 
+        // The progress itself is shown by IngestionDialog; the status bar
+        // keeps the latest step so it remains visible after the import.
         function onIngestionStatus(statusLog) {
-            statusLabel.text = statusLog;
+            if (toolBar.statusBarLabel)
+                toolBar.statusBarLabel.text = statusLog;
         }
     }
 
@@ -133,18 +118,6 @@ ToolBar {
         }
     }
 
-    // ── Elapsed-time timer ──
-    Timer {
-        id: executionTimer
-        interval: 100 // Updates every 100 milliseconds (0.1 seconds)
-        running: false
-        repeat: true
-
-        onTriggered: {
-            toolBar.elapsedTime += 1;
-        }
-    }
-
     // ── ToolBar content ──
     RowLayout {
         spacing: 10
@@ -175,48 +148,6 @@ ToolBar {
             icon.height: 32
             icon.source: "qrc:/Resources/folder-open.svg"
             onClicked: pdfFolderDialog.open()
-        }
-
-        ToolSeparator {}
-
-        // ── Progress section (inline in toolbar) ──
-        StyledBusyIndicator {
-            id: spinner
-            running: false
-            visible: false
-        }
-
-        Label {
-            id: statusLabel
-            visible: false
-            Layout.maximumWidth: 300
-            elide: Text.ElideMiddle
-        }
-
-        Label {
-            id: status2
-            visible: spinner.visible
-            text: qsTr("Ingesting...")
-        }
-
-        Text {
-            id: timerIndicator
-            font.family: Fonts.mono
-            visible: spinner.visible
-            text: {
-                var totalSec = Math.floor(toolBar.elapsedTime / 10);
-                if (totalSec >= 3600) {
-                    var h = Math.floor(totalSec / 3600);
-                    var m = Math.floor((totalSec % 3600) / 60);
-                    return qsTr("Elapsed Time: %1h %2m").arg(h).arg(m.toString().padStart(2, "0"));
-                } else if (totalSec >= 60) {
-                    var m = Math.floor(totalSec / 60);
-                    var s = totalSec % 60;
-                    return qsTr("Elapsed Time: %1m %2s").arg(m).arg(s.toString().padStart(2, "0"));
-                } else {
-                    return qsTr("Elapsed Time: %1s").arg(totalSec);
-                }
-            }
         }
 
         ToolSeparator {}
