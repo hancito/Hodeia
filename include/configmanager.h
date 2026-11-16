@@ -81,18 +81,20 @@ public:
   /// Remove a backend by name.
   Q_INVOKABLE void removeBackend(const QString &name);
 
-  // Project Operations
-  Q_INVOKABLE std::expected<void, QString>
-  createProject(const QString &projectName);
-  Q_INVOKABLE std::expected<void, QString>
-  switchToProject(const QString &projectName);
-  Q_INVOKABLE std::expected<void, QString>
-  deleteProjects(const QStringList &projectNames);
-  Q_INVOKABLE std::expected<void, QString> resetActiveProject();
+  // Project Operations (on disk + lastProject only).  QML goes through
+  // DatabaseManager, which also closes/reopens the project database and
+  // returns a user-facing error string (std::expected does not reach QML).
+  std::expected<void, QString> createProject(const QString &projectName);
+  std::expected<void, QString> switchToProject(const QString &projectName);
+  std::expected<void, QString> deleteProjects(const QStringList &projectNames);
+  // The project database must be closed first (its file is deleted).
+  std::expected<void, QString> resetActiveProject();
   Q_INVOKABLE QString projectPath(const QString &projectName) const;
   Q_INVOKABLE QString projectDbPath(const QString &projectName) const;
   Q_INVOKABLE QString projectImgPath(const QString &projectName) const;
-  Q_INVOKABLE void deleteImages(const QStringList &hashList,
+  /// Delete the page images of the given papers.  Returns an empty string,
+  /// or a user-facing message when some images could not be deleted.
+  Q_INVOKABLE QString deleteImages(const QStringList &hashList,
                                 const QString &imgPath) const;
 
   /// Return the list of absolute PNG paths for a given paper hash,

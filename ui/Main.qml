@@ -62,11 +62,9 @@ ThemedWindow {
             // close → SEGV in QQuickDeliveryAgentPrivate::setFocusInScope.
             // Qt.callLater lets the menu finish closing first.
             Qt.callLater(function () {
-                let ok = configManager.switchToProject(projectName);
-                if (ok) {
-                    let dbPath = configManager.projectDbPath(projectName);
-                    databaseManager.switchDatabase(dbPath);
-                }
+                let err = databaseManager.switchProject(projectName);
+                if (err !== "")
+                    messageBox.showError(qsTr("Cannot Switch Project"), err);
             });
         }
         onRequestDeleteProject: deleteConfirmDialog.open()
@@ -193,11 +191,9 @@ ThemedWindow {
             existingProjectDialog.open();
             return;
         }
-        let ok = configManager.createProject(name);
-        if (ok) {
-            let dbPath = configManager.projectDbPath(name);
-            databaseManager.switchDatabase(dbPath);
-        }
+        let err = databaseManager.createProject(name);
+        if (err !== "")
+            messageBox.showError(qsTr("Cannot Create Project"), err);
     }
 
     property string existingProjectName
@@ -214,11 +210,9 @@ ThemedWindow {
             // (see onRequestSwitchProject for the crash).
             let name = existingProjectName;
             Qt.callLater(function () {
-                let ok = configManager.switchToProject(name);
-                if (ok) {
-                    let dbPath = configManager.projectDbPath(name);
-                    databaseManager.switchDatabase(dbPath);
-                }
+                let err = databaseManager.switchProject(name);
+                if (err !== "")
+                    messageBox.showError(qsTr("Cannot Switch Project"), err);
             });
         }
         Label {
@@ -242,11 +236,9 @@ ThemedWindow {
             wrapMode: Text.WordWrap
         }
         onAccepted: {
-            let ok = configManager.resetActiveProject();
-            if (ok) {
-                let dbPath = configManager.projectDbPath(activeProject);
-                databaseManager.switchDatabase(dbPath);
-            }
+            let err = databaseManager.clearActiveProject();
+            if (err !== "")
+                messageBox.showError(qsTr("Cannot Clear Project"), err);
         }
     }
 
@@ -314,8 +306,10 @@ ThemedWindow {
             }
         }
         onAccepted: {
-            helpers.deleteLocalModels(root.selectedModels);
+            let err = helpers.deleteLocalModels(root.selectedModels);
             root.selectedModels = [];
+            if (err !== "")
+                messageBox.showError(qsTr("Model Deletion Failed"), err);
         }
         onRejected: {
             root.selectedModels = [];

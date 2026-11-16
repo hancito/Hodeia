@@ -438,13 +438,20 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
   // Remove all contents
   dir.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot);
   const QFileInfoList entries = dir.entryInfoList();
+  QStringList notRemoved;
   for (const QFileInfo &entry : entries) {
-    if (entry.isDir()) {
-      QDir(entry.absoluteFilePath()).removeRecursively();
-    } else {
-      QFile::remove(entry.absoluteFilePath());
+    const bool removed = entry.isDir()
+                             ? QDir(entry.absoluteFilePath()).removeRecursively()
+                             : QFile::remove(entry.absoluteFilePath());
+    if (!removed) {
+      qWarning() << "Could not remove" << entry.absoluteFilePath();
+      notRemoved << entry.fileName();
     }
   }
+  if (!notRemoved.isEmpty())
+    return std::unexpected{
+        tr("Some files could not be deleted (still in use?): %1")
+            .arg(notRemoved.join(", "))};
 
   // Recreate subdirectories
   dir.mkpath(projectDir + "/IMG");
@@ -578,14 +585,16 @@ QString ConfigManager::projectDbPath(const QString &projectName) const {
 QString ConfigManager::projectImgPath(const QString &projectName) const {
   return projectsRoot() + "/" + projectName + "/" + "IMG";
 }
-void ConfigManager::deleteImages(const QStringList &hashList,
-                                 const QString &imgPath) const {
+QString ConfigManager::deleteImages(const QStringList &hashList,
+                                    const QString &imgPath) const {
   QDir imgDir(imgPath);
   if (!imgDir.exists()) {
+    // Nothing to delete (e.g. papers imported without page images).
     qWarning() << "Image directory does not exist:" << imgPath;
-    return;
+    return {};
   }
 
+  int failed = 0;
   for (const QString &hash : hashList) {
     // Match files like: 4ad90c343ca0d5a05e67f80da33a724b_page_001.png
     imgDir.setNameFilters({hash + "_page_*.png"});
@@ -595,10 +604,16 @@ void ConfigManager::deleteImages(const QStringList &hashList,
         qDebug() << "Deleted image:" << fileInfo.absoluteFilePath();
       } else {
         qWarning() << "Failed to delete image:" << fileInfo.absoluteFilePath();
+        ++failed;
       }
     }
     if (matchingFiles.isEmpty()) {
       qDebug() << "No images found for hash:" << hash;
     }
   }
+  if (failed > 0)
+    return tr("%n page image(s) could not be deleted (still in use?). They "
+              "only take disk space.",
+              nullptr, failed);
+  return {};
 }

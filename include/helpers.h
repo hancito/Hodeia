@@ -59,7 +59,9 @@ public:
                                       const QString &mmprojPath);
 
   /// Delete one or more local model folders from the Summarizers directory.
-  Q_INVOKABLE void deleteLocalModels(const QStringList &folderNames);
+  /// Returns an empty string, or a user-facing message naming the models
+  /// that could not be fully deleted.
+  Q_INVOKABLE QString deleteLocalModels(const QStringList &folderNames);
 
   // ── Backends ───────────────────────────────────────────────────
 

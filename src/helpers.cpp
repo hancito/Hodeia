@@ -141,20 +141,28 @@ void Helpers::refreshLocalModelList() {
 
 QStringList Helpers::localModelList() const { return m_localModelList; }
 
-void Helpers::deleteLocalModels(const QStringList &folderNames) {
+QString Helpers::deleteLocalModels(const QStringList &folderNames) {
   if (!m_config)
-    return;
+    return tr("No configuration available");
+  QStringList failed;
   for (const QString &name : folderNames) {
     if (name.trimmed().isEmpty())
       continue;
     const QString folder = m_config->summarizersPath() + "/" + name.trimmed();
-    if (QDir(folder).removeRecursively())
+    if (QDir(folder).removeRecursively()) {
       qDebug() << "[Helpers] Local model removed:" << folder;
-    else
+    } else {
       qWarning() << "[Helpers] Could not fully remove" << folder;
+      failed << name.trimmed();
+    }
   }
   refreshLocalModelList(); // the active backend may be remote
   loadActiveBackendModels();
+  if (!failed.isEmpty())
+    return tr("These models could not be fully deleted (a file may still be "
+              "in use, e.g. by a running summary or query):") +
+           "\n\n• " + failed.join("\n• ");
+  return {};
 }
 
 // A path from QML may be a file: URL (FileDialog::selectedFile) or a native

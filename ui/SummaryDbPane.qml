@@ -65,10 +65,15 @@ Rectangle {
             return;
         }
         console.log("Deleting", selectedPapers.length, "papers");
-        databaseManager.removeByHashes(selectedPapers);
-        var imgPath = configManager.projectImgPath(configManager.lastProject);
-        configManager.deleteImages(selectedPapers, imgPath);
+        let err = databaseManager.removeByHashes(selectedPapers);
+        // Keep the page images of papers that may still be in the library.
+        if (err === "") {
+            var imgPath = configManager.projectImgPath(configManager.lastProject);
+            err = configManager.deleteImages(selectedPapers, imgPath);
+        }
         selectedPapers = [];
+        if (err !== "")
+            messageBox.showError(qsTr("Deletion Incomplete"), err);
         databaseManager.summaryModel.loadAll();
         numberPaper.text = qsTr("Paper Number: %1").arg(databaseManager.summaryProxyModel.rowCount());
     }

@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSet>
 #include <expected>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
@@ -120,15 +121,24 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
     qWarning() << "[Database] switchDatabase refused — a worker operation "
                   "is in flight. Retry when it completes.";
     return std::unexpected(
-        "Cannot switch project while an operation is in progress.");
+        tr("Cannot switch project while an operation (summary, query) is in "
+           "progress. Try again once it has finished."));
   }
 
+  const QString previousPath = m_dbPath;
   m_db.close();
 
   auto openResult = m_db.open(dbPath);
   if (!openResult) {
     qCritical() << "Failed to open database:" << dbPath << openResult.error();
-    return std::unexpected(openResult.error());
+    // Don't leave the app without a database: go back to the previous one.
+    if (!previousPath.isEmpty() && previousPath != dbPath &&
+        m_db.open(previousPath)) {
+      reloadModels();
+    }
+    return std::unexpected(
+        tr("The project database could not be opened: %1")
+            .arg(openResult.error()));
   }
 
   m_dbPath = dbPath;
@@ -187,6 +197,61 @@ QString DatabaseManager::deleteProjects(const QStringList &projectNames) {
   return result ? QString() : result.error();
 }
 
+QString DatabaseManager::activateProject(
+    const std::function<std::expected<void, QString>()> &action) {
+  if (!m_config)
+    return tr("No configuration available");
+  // Checked before touching the configuration, so a refused switch leaves
+  // the active project unchanged.
+  if (m_opsInFlight.loadRelaxed() > 0)
+    return tr("Cannot switch project while an operation (summary, query) is "
+              "in progress. Try again once it has finished.");
+
+  const QString previous = m_config->lastProject();
+  const auto result = action();
+  if (!result)
+    return result.error();
+
+  auto switchResult =
+      switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+  if (!switchResult) {
+    m_config->setLastProject(previous); // switchDatabase reopened it
+    return switchResult.error();
+  }
+  return {};
+}
+
+QString DatabaseManager::createProject(const QString &projectName) {
+  return activateProject(
+      [this, projectName] { return m_config->createProject(projectName); });
+}
+
+QString DatabaseManager::switchProject(const QString &projectName) {
+  return activateProject(
+      [this, projectName] { return m_config->switchToProject(projectName); });
+}
+
+QString DatabaseManager::clearActiveProject() {
+  if (!m_config)
+    return tr("No configuration available");
+  if (m_opsInFlight.loadRelaxed() > 0)
+    return tr("Cannot clear the project while an operation (summary, query) "
+              "is in progress. Try again once it has finished.");
+
+  // Release the .db (and its -wal/-shm files) so they can be deleted.
+  m_db.close();
+  const auto result = m_config->resetActiveProject();
+
+  // Reopen the (now empty, or untouched on failure) project database.
+  m_dbPath.clear(); // nothing to fall back to: the file was just recreated
+  auto switchResult =
+      switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+  if (!switchResult)
+    return result ? switchResult.error()
+                  : result.error() + "\n" + switchResult.error();
+  return result ? QString() : result.error();
+}
+
 void DatabaseManager::beginDbOperation() {
   m_opsInFlight.fetchAndAddOrdered(1);
 }
@@ -205,18 +270,27 @@ void DatabaseManager::setOpenAlexClient(OpenAlexClient *client) {
           &OpenAlexClient::onDatabaseSwitched);
 }
 
-void DatabaseManager::removeByHashes(const QStringList &hashes) {
+QString DatabaseManager::removeByHashes(const QStringList &hashes) {
   if (hashes.isEmpty())
-    return;
+    return {};
+  if (!m_db.isOpen())
+    return tr("The project database is not open.");
+
+  QSet<QString> failed; // papers with at least one failed delete
+  QString lastError;
 
   SqliteStatement stmt =
       m_db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
+  if (!stmt.isValid())
+    return tr("The papers could not be deleted (database error).");
   for (const QString &hash : hashes) {
     (void)stmt.bind(1, hash);
     auto execResult = stmt.exec();
     if (!execResult) {
-      qDebug() << "Delete by hash failed for" << hash << ":"
-               << execResult.error();
+      qWarning() << "Delete by hash failed for" << hash << ":"
+                 << execResult.error();
+      failed.insert(hash);
+      lastError = execResult.error();
     }
     stmt.resetAndClearBindings();
   }
@@ -225,11 +299,15 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
   SqliteStatement chunkStmt =
       m_db.prepare("DELETE FROM chunks WHERE paper_hash = ?");
   for (const QString &hash : hashes) {
+    if (!chunkStmt.isValid())
+      break;
     (void)chunkStmt.bind(1, hash);
     auto chunkExecResult = chunkStmt.exec();
     if (!chunkExecResult) {
-      qDebug() << "Delete chunks by hash failed for" << hash << ":"
-               << chunkExecResult.error();
+      qWarning() << "Delete chunks by hash failed for" << hash << ":"
+                 << chunkExecResult.error();
+      failed.insert(hash);
+      lastError = chunkExecResult.error();
     }
     chunkStmt.resetAndClearBindings();
   }
@@ -244,27 +322,43 @@ void DatabaseManager::removeByHashes(const QStringList &hashes) {
       refStmt.resetAndClearBindings();
     }
   }
+
+  if (!failed.isEmpty())
+    return tr("%n paper(s) could not be fully deleted: %1", nullptr,
+              int(failed.size()))
+        .arg(lastError);
+  return {};
 }
 
-void DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
+QString DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
   if (ids.isEmpty())
-    return;
+    return {};
+  if (!m_db.isOpen())
+    return tr("The project database is not open.");
 
   SqliteStatement stmt = m_db.prepare("DELETE FROM Queries WHERE id = ?");
   if (!stmt.isValid()) {
     qCritical() << "Failed to prepare query delete";
-    return;
+    return tr("The queries could not be deleted (database error).");
   }
 
+  int failed = 0;
+  QString lastError;
   for (const QVariant &id : ids) {
     (void)stmt.bind(1, id.toInt());
     auto execResult = stmt.exec();
     if (!execResult) {
-      qDebug() << "Delete query failed for id" << id.toInt() << ":"
-               << execResult.error();
+      qWarning() << "Delete query failed for id" << id.toInt() << ":"
+                 << execResult.error();
+      ++failed;
+      lastError = execResult.error();
     }
     stmt.resetAndClearBindings();
   }
 
   m_queryModel->loadAll();
+  if (failed > 0)
+    return tr("%n query(ies) could not be deleted: %1", nullptr, failed)
+        .arg(lastError);
+  return {};
 }

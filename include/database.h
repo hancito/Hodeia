@@ -9,6 +9,7 @@
 #include <QAtomicInt>
 #include <QObject>
 #include <expected>
+#include <functional>
 
 class ConfigManager;
 class OpenAlexClient;
@@ -37,9 +38,16 @@ public:
 
   Q_INVOKABLE bool isOpen() const;
   Q_INVOKABLE QString databasePath() const;
-  Q_INVOKABLE std::expected<void, QString>
-  switchDatabase(const QString &dbPath);
+  // Open another database.  On failure the previous one is reopened.
+  std::expected<void, QString> switchDatabase(const QString &dbPath);
   Q_INVOKABLE void reloadModels();
+  // Project operations for QML: update the configuration and (re)open the
+  // project database.  Each returns an empty string on success, otherwise a
+  // user-facing error message; on failure the previous project stays active.
+  Q_INVOKABLE QString createProject(const QString &projectName);
+  Q_INVOKABLE QString switchProject(const QString &projectName);
+  // Delete every paper, summary and query of the active project.
+  Q_INVOKABLE QString clearActiveProject();
   // Delete projects from disk.  Closes the shared connection first when the
   // active project is among them (an open SQLite file cannot be deleted on
   // Windows), then opens the new active project's database.  Returns an
@@ -48,8 +56,10 @@ public:
   // Wire up the OpenAlex client so a finished citation save refreshes all
   // models.  Called once from main() after the client is constructed.
   void setOpenAlexClient(OpenAlexClient *client);
-  Q_INVOKABLE void removeByHashes(const QStringList &hashes);
-  Q_INVOKABLE void removeQueriesByIds(const QVariantList &ids);
+  // Delete papers (summaries, chunks, citations) / queries.  Return an empty
+  // string on success, otherwise a user-facing error message.
+  Q_INVOKABLE QString removeByHashes(const QStringList &hashes);
+  Q_INVOKABLE QString removeQueriesByIds(const QVariantList &ids);
 
   // Begin/end a worker operation that uses the shared SQLite connection.
   // switchDatabase() refuses to close the connection while any operation is
@@ -64,6 +74,10 @@ signals:
 
 private:
   bool initDatabase();
+  // Make @p projectName the active project and open its database; restores
+  // the previous project on failure.  @p action changes the configuration.
+  QString activateProject(
+      const std::function<std::expected<void, QString>()> &action);
   void createTables();
 
   QString m_dbPath;

@@ -36,8 +36,10 @@ Rectangle {
         }
         console.log("Deleting", selectedQueryIds.length, "queries");
         const activeDeleted = selectedQueryIds.includes(activeQueryId);
-        databaseManager.removeQueriesByIds(selectedQueryIds);
+        const err = databaseManager.removeQueriesByIds(selectedQueryIds);
         selectedQueryIds = [];
+        if (err !== "")
+            messageBox.showError(qsTr("Deletion Incomplete"), err);
         // The active query is gone: follow the list's new current row (its
         // index may not change, so onCurrentIndexChanged won't fire), or
         // clear the selection when the list is empty.
