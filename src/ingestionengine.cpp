@@ -441,7 +441,8 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
 
   QMap<QString, QUrl> hashesToProcess = parallelHasher(filePath);
   QList<QUrl> urlsToProcess = filterExistingHashes(hashesToProcess, dbPath);
-  message = tr("Skipped %1 papers").arg(filePath.size() - urlsToProcess.size());
+  const int alreadyKnown = filePath.size() - urlsToProcess.size();
+  message = tr("Skipped %1 papers").arg(alreadyKnown);
   emit status(message);
 
   // Process in small batches to bound memory and provide incremental progress.
@@ -449,11 +450,15 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   int savedCount = 0;
   int errorCount = 0;
   QStringList failedTitles; // papers dropped because indexing failed
+  QStringList unreadable;   // "file — reason" for files that gave no text
+  QString indexError;       // why indexing failed, when known
+  bool cancelled = false;
   int total = urlsToProcess.size();
 
   for (int i = 0; i < total; i += batchSize) {
     if (m_stopFlag.load()) {
       emit status(tr("Ingestion cancelled"));
+      cancelled = true;
       break;
     }
     int end = qMin(i + batchSize, total);
@@ -468,8 +473,16 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     QList<TextChunk> allChunks;
 
     for (auto &extraction : extractions) {
-      if (extraction.title.isEmpty()) {
-        qCritical() << "[PdfWorker] Skipping file: empty extraction";
+      // A file that could not be opened, or gave no text at all (not even
+      // through OCR), can be neither summarized nor queried: don't add it.
+      if (!extraction.error.isEmpty() || extraction.paperHash.isEmpty() ||
+          extraction.title.isEmpty() || extraction.chunks.isEmpty()) {
+        const QString reason = !extraction.error.isEmpty()
+                                   ? extraction.error
+                                   : tr("no text could be extracted");
+        qCritical() << "[PdfWorker] Skipping file" << extraction.fileName
+                    << ":" << reason;
+        unreadable << extraction.fileName + " — " + reason;
         ++errorCount;
         continue;
       }
@@ -521,6 +534,8 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
                       "storage";
       }
       if (!indexed) {
+        if (indexError.isEmpty() && m_vecManager)
+          indexError = m_vecManager->lastError();
         // A paper without chunks can be neither summarized nor queried, and
         // a re-import would skip it (its hash is already known): remove it
         // so the user can add it again once the cause is fixed.
@@ -546,16 +561,50 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   if (errorCount > 0)
     qWarning() << "[PdfWorker] Total skipped due to errors:" << errorCount;
 
-  if (!failedTitles.isEmpty()) {
-    emit ingestionError(
-        tr("These papers could not be indexed for search and were not "
-           "added:") +
-        "\n\n• " + failedTitles.join("\n• ") + "\n\n" +
-        tr("The embedding model could not process their text. See the log "
-           "for details, then add the files again."));
-  }
+  // Final report.  Not after a stop: that only happens when the app closes.
+  if (!cancelled && !m_stopFlag.load())
+    emitReport(filePath.size(), alreadyKnown, savedCount, unreadable,
+               failedTitles, indexError);
 
   emit finished();
+}
+
+void PdfWorker::emitReport(int selected, int alreadyKnown, int added,
+                           const QStringList &unreadable,
+                           const QStringList &unindexed,
+                           const QString &indexError) {
+  if (selected == 0) {
+    emit report(tr("Nothing to Import"),
+                tr("No PDF file was found in the selection."), false);
+    return;
+  }
+
+  QStringList parts;
+  parts << tr("%n paper(s) added to the library.", nullptr, added);
+  if (alreadyKnown > 0)
+    parts << tr("%n file(s) skipped: already in the library.", nullptr,
+                alreadyKnown);
+  if (!unreadable.isEmpty())
+    parts << tr("%n file(s) could not be read:", nullptr,
+                int(unreadable.size())) +
+                 "\n• " + unreadable.join("\n• ");
+  if (!unindexed.isEmpty()) {
+    QString cause = indexError.isEmpty()
+                        ? tr("The embedding model could not process their "
+                             "text. See the log for details.")
+                        : indexError;
+    parts << tr("%n paper(s) could not be indexed for search and were not "
+                "added:",
+                nullptr, int(unindexed.size())) +
+                 "\n• " + unindexed.join("\n• ") + "\n\n" + cause + "\n" +
+                 tr("Add the files again once the problem is fixed.");
+  }
+
+  const bool failed = !unreadable.isEmpty() || !unindexed.isEmpty();
+  QString title = tr("Import Complete");
+  if (failed)
+    title = added > 0 ? tr("Import Partly Failed") : tr("Import Failed");
+  emit report(title, parts.join("\n\n"), failed);
 }
 
 // ============================================================================
@@ -823,9 +872,12 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                                         const QString &imgPath) const {
   QString localPath = fileUrl.toLocalFile();
   ExtractionResult result;
+  result.fileName = QFileInfo(localPath).fileName();
+  if (result.fileName.isEmpty())
+    result.fileName = fileUrl.toString();
 
   if (localPath.isEmpty()) {
-    result.title = "Error: Invalid path.";
+    result.error = tr("invalid path");
     return result;
   }
 
@@ -834,21 +886,21 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 
   ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
   if (!ctx) {
-    result.title = "Error: Cannot register MuPDF context.";
+    result.error = tr("PDF reader initialisation failed");
     return result;
   }
 
   fz_try(ctx) { fz_register_document_handlers(ctx); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
-    result.title = "Error: Failed to register document handlers.";
+    result.error = tr("PDF reader initialisation failed");
     return result;
   }
 
   fz_try(ctx) { doc = fz_open_document(ctx, localPath.toUtf8().constData()); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
-    result.title = "Error: Cannot open document " + localPath;
+    result.error = tr("the file cannot be opened (damaged or not a PDF?)");
     return result;
   }
 
@@ -860,7 +912,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   fz_catch(ctx) {
     fz_drop_document(ctx, doc);
     fz_drop_context(ctx);
-    result.title = "Error: Cannot count pages.";
+    result.error = tr("the pages cannot be read (damaged file?)");
     return result;
   }
 

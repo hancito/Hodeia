@@ -490,12 +490,11 @@ ThemedWindow {
         id: messageBox
     }
 
-    // Ingestion error: papers that could not be indexed (and were removed
-    // again so they can be re-added).
+    // End-of-import summary: papers added, skipped, and what failed and why.
     Connections {
         target: engineController
-        function onIngestionError(message) {
-            messageBox.showError(qsTr("Indexing Failed"), message);
+        function onIngestionReport(title, message, isError) {
+            messageBox.show(title, message, isError);
         }
     }
 

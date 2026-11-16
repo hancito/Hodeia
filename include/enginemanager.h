@@ -24,7 +24,9 @@ signals:
   void ingestionFinished();
   void ingestionStarted();
   void ingestionStatus(QString statusLog);
-  void ingestionError(QString message);
+  /// End-of-import summary for a message window (see PdfWorker::report).
+  void ingestionReport(const QString &title, const QString &message,
+                       bool isError);
 
 private:
   void releaseAndReloadModel();

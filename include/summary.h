@@ -49,6 +49,8 @@ struct ExtractionResult {
   QString title;
   QList<TextChunk> chunks;
   QVector<PageMetadata> pageMetadata; ///< Per-page figure/table/scanned flags
+  QString fileName; ///< Source file name, for user-facing messages
+  QString error;    ///< Why the file could not be read; empty on success
 };
 
 class SummaryModel : public QAbstractListModel {

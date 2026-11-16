@@ -29,9 +29,10 @@ signals:
   void started();
   void status(QString statusLog);
   void embeddingProgress(int current, int total);
-  /// Emitted once, before finished(), when some papers could not be
-  /// indexed (they were removed again so they can be re-added).
-  void ingestionError(QString message);
+  /// Emitted once, before finished(), with a user-facing summary of the
+  /// import: papers added, files skipped, and what failed and why.  Not
+  /// emitted when the import is stopped.
+  void report(const QString &title, const QString &message, bool isError);
 
 private:
   ExtractionResult extractText(const QUrl &fileUrl,
@@ -44,6 +45,9 @@ private:
                     const QString &paperHash,
                     const QVector<PageMetadata> &pageMeta) const;
   QString computeFileHash(const QUrl &fileUrl) const;
+  void emitReport(int selected, int alreadyKnown, int added,
+                  const QStringList &unreadable, const QStringList &unindexed,
+                  const QString &indexError);
 
   QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList) const;
   QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
