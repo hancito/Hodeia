@@ -5,8 +5,8 @@ import QtQuick.Layouts
 
 ThemedWindow {
     id: ragwindow
-    width: 1200
-    height: 800
+    preferredWidth: 1200
+    preferredHeight: 800
     title: qsTr("Hodeia")
     visible: true
     //icon.source: "qrc:/Resources/hodeia.png"
@@ -32,12 +32,15 @@ ThemedWindow {
 
             RagDbPane {
                 id: dbPaneItem
-                SplitView.minimumWidth: 500
+                // Proportional width so both panes fit with display scaling.
+                SplitView.preferredWidth: secondSplitView.width * 0.4
+                SplitView.minimumWidth: 260
             }
 
             QueryPane {
                 id: queryPaneItem
-                SplitView.minimumWidth: 600
+                SplitView.fillWidth: true
+                SplitView.minimumWidth: 360
                 activeQueryId: dbPaneItem.activeQueryId
             }
         }

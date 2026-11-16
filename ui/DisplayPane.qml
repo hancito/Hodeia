@@ -11,6 +11,8 @@ Rectangle {
     border.width: 1
     border.color: Colors.surface1
     radius: Style.radiusLarge
+    // Never draw over the neighbouring pane when dragged very narrow.
+    clip: true
 
     // Resolve the raw JSON summary for the active paper
     readonly property string activeSummaryJson: {
@@ -99,15 +101,26 @@ Rectangle {
 
         // Page navigation bar (visible only on PDF tab): page counter
         // centred, zoom controls on the right.
-        Item {
+        // A RowLayout rather than anchors: with anchors.centerIn the counter
+        // overlapped the zoom controls once the pane got narrow.  The left
+        // placeholder mirrors the zoom controls' width to keep the counter
+        // centred, and is the first thing to shrink when space runs out.
+        RowLayout {
             visible: tabBar.currentIndex === 3
             Layout.fillWidth: true
-            implicitHeight: Math.max(pageCounter.implicitHeight, zoomControls.implicitHeight)
             opacity: displayPane.pageImages.length > 0 ? 1 : 0
+            spacing: 0
+
+            Item {
+                Layout.preferredWidth: zoomControls.implicitWidth
+                Layout.minimumWidth: 0
+            }
+            Item {
+                Layout.fillWidth: true
+            }
 
             RowLayout {
                 id: pageCounter
-                anchors.centerIn: parent
                 spacing: 8
 
                 StyledSpinBox {
@@ -126,15 +139,19 @@ Rectangle {
                 }
             }
 
+            Item {
+                Layout.fillWidth: true
+            }
+
             RowLayout {
                 id: zoomControls
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
                 Label {
                     text: qsTr("Zoom")
                     opacity: 0.7
+                    // Optional label: dropped first when the pane is narrow.
+                    visible: displayPane.width > 480
                 }
                 StyledButton {
                     flat: true

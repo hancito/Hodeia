@@ -73,6 +73,8 @@ Rectangle {
     border.color: Colors.surface1
     radius: Style.radiusLarge
     color: Colors.surface0
+    // Never draw over the neighbouring pane when dragged very narrow.
+    clip: true
 
     Connections {
         target: engineController
@@ -233,6 +235,8 @@ Rectangle {
                 Label {
                     text: qsTr("Summarizing %1/%2 papers").arg(summaryDbPane.paperProgress).arg(summaryDbPane.totalPapers)
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    elide: Text.ElideRight
                 }
 
                 Label {
@@ -251,6 +255,8 @@ Rectangle {
                         }
                     }
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    elide: Text.ElideRight
                 }
 
                 StyledButton {
@@ -275,72 +281,90 @@ Rectangle {
             }
         }
 
-        // Controls
-        RowLayout {
-            spacing: 5
+        // Controls: selection/count and sorting side by side, stacked when the
+        // pane is too narrow (split handle dragged left, display scaling).
+        GridLayout {
             Layout.fillWidth: true
+            columns: summaryDbPane.width < 560 ? 1 : 2
+            columnSpacing: Style.spacing
+            rowSpacing: 5
 
-            StyledCheckBox {
-                id: selectAllCheckbox
-                enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
-                text: qsTr("Select All")
-                checked: false
-                onCheckedChanged: {
-                    if (checked) {
-                        for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
-                            var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
-                            summaryDbPane.addSelectedPaper(hash);
+            RowLayout {
+                spacing: 5
+                Layout.fillWidth: true
+
+                StyledCheckBox {
+                    id: selectAllCheckbox
+                    enabled: !summaryDbPane.summarizing && !summaryDbPane.ingesting
+                    text: qsTr("Select All")
+                    checked: false
+                    onCheckedChanged: {
+                        if (checked) {
+                            for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
+                                var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
+                                summaryDbPane.addSelectedPaper(hash);
+                            }
+                        } else {
+                            summaryDbPane.selectedPapers = [];
                         }
-                    } else {
-                        summaryDbPane.selectedPapers = [];
                     }
                 }
-            }
-            Item {
-                Layout.fillWidth: true
-            }
+                Item {
+                    Layout.fillWidth: true
+                }
 
-            Label {
-                id: numberPaper
-                text: qsTr("Documents: %1").arg(summaryDbPane.npapers)
-            }
+                Label {
+                    id: numberPaper
+                    text: qsTr("Documents: %1").arg(summaryDbPane.npapers)
+                    elide: Text.ElideRight
+                    Layout.minimumWidth: 0
+                }
 
-            Item {
-                Layout.fillWidth: true
-            }
-
-            Label {
-                text: qsTr("Sort by")
-            }
-
-            StyledComboBox {
-                id: sortComboBox
-                model: [qsTr("Title"), qsTr("Date"), qsTr("Pages"), qsTr("Model"), qsTr("Year"), qsTr("Citations")]
-                Layout.fillWidth: true
-                onCurrentIndexChanged: {
-                    // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265,
-                    // CitesCountRole=269
-                    var roleMap = {
-                        0: 259  // Title
-                        ,
-                        1: 267  // Date
-                        ,
-                        2: 261  // PagesNum
-                        ,
-                        3: 265   // LlmModel
-                        ,
-                        4: 263 // Year
-                        ,
-                        5: 269   // CitesCount (papers that cite this paper)
-                    };
-                    databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 259;
+                Item {
+                    Layout.fillWidth: true
                 }
             }
 
-            StyledCheckBox {
-                id: descendingCheckBox
-                text: qsTr("Descending")
-                onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
+            RowLayout {
+                spacing: 5
+                Layout.fillWidth: true
+
+                Label {
+                    text: qsTr("Sort by")
+                    elide: Text.ElideRight
+                    Layout.minimumWidth: 0
+                }
+
+                StyledComboBox {
+                    id: sortComboBox
+                    model: [qsTr("Title"), qsTr("Date"), qsTr("Pages"), qsTr("Model"), qsTr("Year"), qsTr("Citations")]
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 90
+                    onCurrentIndexChanged: {
+                        // TitleRole=259, DateRole=267, PagesNumRole=261, LlmModelRole=265,
+                        // CitesCountRole=269
+                        var roleMap = {
+                            0: 259  // Title
+                            ,
+                            1: 267  // Date
+                            ,
+                            2: 261  // PagesNum
+                            ,
+                            3: 265   // LlmModel
+                            ,
+                            4: 263 // Year
+                            ,
+                            5: 269   // CitesCount (papers that cite this paper)
+                        };
+                        databaseManager.summaryProxyModel.sortRole = roleMap[currentIndex] || 259;
+                    }
+                }
+
+                StyledCheckBox {
+                    id: descendingCheckBox
+                    text: qsTr("Descending")
+                    onCheckedChanged: databaseManager.summaryProxyModel.sortDescending = checked
+                }
             }
         }
         // Paper List
@@ -442,12 +466,16 @@ Rectangle {
                         opacity: 0.7
                     }
 
+                    // Labels may shrink (elided) so a narrow pane never pushes
+                    // text past the card border.
                     RowLayout {
                         Layout.fillWidth: true
                         Label {
                             font.pixelSize: Style.fontSmall
                             text: qsTr("Year: %1 · %2 pages ").arg(year).arg(pagesNum)
                             font.family: Fonts.mono
+                            elide: Text.ElideRight
+                            Layout.minimumWidth: 0
                         }
                         Label {
                             font.pixelSize: Style.fontSmall
@@ -456,6 +484,8 @@ Rectangle {
                             text: citesCount > 0 ? qsTr("· cited by %1").arg(citesCount) : ""
                             font.family: Fonts.mono
                             opacity: citesCount > 0 ? 0.8 : 0
+                            elide: Text.ElideRight
+                            Layout.minimumWidth: 0
                         }
                         Item {
                             Layout.fillWidth: true
@@ -464,6 +494,8 @@ Rectangle {
                             text: formattedDate
                             font.family: Fonts.mono
                             font.pixelSize: Style.fontSmall
+                            elide: Text.ElideLeft
+                            Layout.minimumWidth: 0
                         }
                     }
 
@@ -485,6 +517,8 @@ Rectangle {
                             text: llmodel
                             font.family: Fonts.mono
                             font.pixelSize: Style.fontSmall
+                            elide: Text.ElideMiddle
+                            Layout.minimumWidth: 0
                         }
                     }
                 }

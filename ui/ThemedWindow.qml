@@ -6,6 +6,28 @@ import QtQuick
 import QtQuick.Controls.Basic
 
 ApplicationWindow {
+    id: themedWindow
+
+    // Desired size in logical (device-independent) pixels.  The actual size is
+    // clamped to the available screen area so the window still fits with
+    // display scaling (e.g. 1920×1080 at 200 % only offers 960×~520 logical
+    // pixels on a 1080p screen).
+    property int preferredWidth: 1280
+    property int preferredHeight: 800
+    readonly property real screenFillRatio: 0.9
+
+    width: Math.min(preferredWidth, Math.round(Screen.desktopAvailableWidth * screenFillRatio))
+    height: Math.min(preferredHeight, Math.round(Screen.desktopAvailableHeight * screenFillRatio))
+    // Must stay ≥ the sum of the SplitView pane minimums (260 + 360) + handle/margins.
+    minimumWidth: Math.min(720, Screen.desktopAvailableWidth)
+    minimumHeight: Math.min(400, Screen.desktopAvailableHeight)
+
+    Component.onCompleted: {
+        // Center on the screen the window opens on (virtualX/Y handle multi-monitor).
+        x = Screen.virtualX + Math.max(0, (Screen.width - width) / 2);
+        y = Screen.virtualY + Math.max(0, (Screen.height - height) / 2);
+    }
+
     font.family: Fonts.ui
     // Fixed base size: otherwise the system default applies (9 pt = 12 px on
     // Windows, often 10 pt on Linux), which looks small in the menu bar and

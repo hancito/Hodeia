@@ -6,8 +6,8 @@ import QtQuick.Dialogs
 
 ThemedWindow {
     id: root
-    width: 1920
-    height: 1080
+    preferredWidth: 1920
+    preferredHeight: 1080
 
     visible: true
     //icon.source: "qrc:/Resources/hodeia.png"
@@ -113,13 +113,17 @@ ThemedWindow {
 
             SummaryDbPane {
                 id: summaryDbPaneItem
-                SplitView.minimumWidth: 600
+                // Proportional width: fixed pixel minimums (600 + 1000) overflowed
+                // the window with display scaling (200 % → ~960 logical px).
+                SplitView.preferredWidth: mainSplitView.width * 0.35
+                SplitView.minimumWidth: 260
                 statusBarLabel: footerLabel
             }
 
             DisplayPane {
                 id: displayPaneItem
-                SplitView.minimumWidth: 1000
+                SplitView.fillWidth: true
+                SplitView.minimumWidth: 360
                 activePaperHash: summaryDbPaneItem.activePaperHash
             }
         }

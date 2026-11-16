@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Controls.impl
 
 TabButton {
     id: control
@@ -8,23 +7,21 @@ TabButton {
     leftPadding: 14
     rightPadding: 14
     spacing: 6
-    icon.width: 20
-    icon.height: 20
     font.bold: checked
 
     readonly property color foreground: !enabled ? Colors.overlay0
                                       : checked ? Colors.primary
                                       : hovered ? Colors.text : Colors.overlay2
-    icon.color: foreground
 
-    contentItem: IconLabel {
-        spacing: control.spacing
-        mirrored: control.mirrored
-        display: control.display
-        icon: control.icon
+    // Text rather than IconLabel: IconLabel cannot elide, so labels spilled
+    // over neighbouring tabs when the bar got narrow.  (No tab uses an icon.)
+    contentItem: Text {
         text: control.text
         font: control.font
         color: control.foreground
+        elide: Text.ElideRight
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
     }
 
     background: Item {
