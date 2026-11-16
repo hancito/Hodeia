@@ -168,10 +168,13 @@ static QString normalizeLocalPath(const QString &in) {
 }
 
 // Copy @p srcPath into @p destDir. Runs on a worker thread: progress is
-// queued to the GUI thread, once per percent. Returns an error message, or an
-// empty string on success.
+// queued to the GUI thread, once per percent. Progress is reported over the
+// whole operation: @p doneBefore bytes were already copied out of
+// @p grandTotal (model + mmproj share one bar). Returns an error message, or
+// an empty string on success.
 static QString copyFileToDir(const QString &srcPath, const QString &destDir,
-                             Helpers *helper) {
+                             Helpers *helper, qint64 doneBefore,
+                             qint64 grandTotal) {
   const QString fileName = QFileInfo(srcPath).fileName();
   QFile src(srcPath);
   if (!src.open(QIODevice::ReadOnly))
@@ -198,7 +201,8 @@ static QString copyFileToDir(const QString &srcPath, const QString &destDir,
       return Helpers::tr("Cannot write %1: %2")
           .arg(destPath, dest.errorString());
     copied += n;
-    const int pct = static_cast<int>(copied * 100 / total);
+    const qint64 denom = grandTotal > 0 ? grandTotal : total;
+    const int pct = static_cast<int>((doneBefore + copied) * 100 / denom);
     if (pct != lastPct) {
       lastPct = pct;
       QMetaObject::invokeMethod(
@@ -243,9 +247,12 @@ void Helpers::addLocalSummarizer(const QString &modelPath,
   // One task, files copied one after the other (both go to the same disk:
   // copying them in parallel gains nothing).
   QThreadPool::globalInstance()->start([this, modelSrc, mmprojSrc, folder] {
-    QString error = copyFileToDir(modelSrc, folder, this);
+    const qint64 modelSize = QFileInfo(modelSrc).size();
+    const qint64 grandTotal =
+        modelSize + (mmprojSrc.isEmpty() ? 0 : QFileInfo(mmprojSrc).size());
+    QString error = copyFileToDir(modelSrc, folder, this, 0, grandTotal);
     if (error.isEmpty() && !mmprojSrc.isEmpty())
-      error = copyFileToDir(mmprojSrc, folder, this);
+      error = copyFileToDir(mmprojSrc, folder, this, modelSize, grandTotal);
     if (!error.isEmpty())
       QDir(folder).removeRecursively(); // don't leave a half-copied model
 

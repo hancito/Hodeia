@@ -34,7 +34,14 @@ ThemedWindow {
         //}
     }
 
-    onClosing: {
+    onClosing: function (close) {
+        // A model copy runs on a pool thread that still references `helpers`:
+        // quitting now would destroy it under the copy.  The copy window
+        // tells the user to wait.
+        if (modelCopyDialog.opened) {
+            close.accepted = false;
+            return;
+        }
         // Stop any in-flight operations before exiting
         if (root.secondaryWindow !== null) {
             root.secondaryWindow.close();
@@ -558,6 +565,9 @@ ThemedWindow {
             if (modelPath === "") {
                 return;
             }
+            // Open first: addLocalSummarizer() may report an invalid path
+            // synchronously, which closes the window again.
+            modelCopyDialog.start();
             helpers.addLocalSummarizer(modelPath, mmprojPath);
         }
         onClosed: {
@@ -588,17 +598,66 @@ ThemedWindow {
         }
     }
 
-    // Model copy progress in footer
+    // Blocking window shown while a local model is copied into the models
+    // folder: modal, no buttons, cannot be dismissed (Escape / click outside)
+    // until helpers reports the end of the copy.
+    StyledDialog {
+        id: modelCopyDialog
+        property int percentage: 0
+        property string fileName: ""
+
+        function start() {
+            percentage = 0;
+            fileName = "";
+            open();
+        }
+
+        anchors.centerIn: parent
+        width: 460
+        title: qsTr("Adding Model")
+        closePolicy: Popup.NoAutoClose
+        // Take keyboard focus away from the window behind.
+        focus: true
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 10
+            Label {
+                Layout.fillWidth: true
+                text: modelCopyDialog.fileName === "" ? qsTr("Preparing the copy...") : qsTr("Copying %1").arg(modelCopyDialog.fileName)
+                elide: Text.ElideMiddle
+            }
+            StyledProgressBar {
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                value: modelCopyDialog.percentage
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("%1% — please wait, large models can take a few minutes.").arg(modelCopyDialog.percentage)
+                wrapMode: Text.WordWrap
+                color: Colors.overlay2
+                font.pixelSize: Style.fontSmall
+            }
+        }
+    }
+
     Connections {
         target: helpers
         function onModelCopyProgress(percentage, fileName) {
+            modelCopyDialog.percentage = percentage;
+            modelCopyDialog.fileName = fileName;
             footerLabel.text = qsTr("Copying model: %1 — %2%").arg(fileName).arg(percentage);
         }
         function onModelCopyFinished(success, destPath, error) {
+            modelCopyDialog.close();
             if (success) {
                 footerLabel.text = qsTr("Model copied: %1").arg(destPath);
+                messageBox.showInfo(qsTr("Model Added"), qsTr("The model was added and can now be selected in the toolbar.\n\n%1").arg(destPath));
             } else {
                 footerLabel.text = qsTr("Copy failed: %1").arg(error);
+                messageBox.showError(qsTr("Model Copy Failed"), qsTr("The model could not be added:\n%1").arg(error));
             }
         }
     }
