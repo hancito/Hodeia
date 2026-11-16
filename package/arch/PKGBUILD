@@ -23,7 +23,7 @@
 # Usage:  makepkg -si   (from this directory)
 
 pkgname=hodeia
-pkgver=0.99rc
+pkgver=0.99rc1
 pkgrel=1
 pkgdesc="Local-AI research assistant for academic papers (Qt6 + llama.cpp)"
 arch=(x86_64)

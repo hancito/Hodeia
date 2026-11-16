@@ -5,7 +5,7 @@
 ; i18n, bundled models) into a single Hodeia-<version>-x64.exe.
 ;
 ; Normally built by scripts\Windows\package-app.ps1, which passes:
-;   /DAppVersion=<x.y[suffix]>  full version, e.g. 0.99rc (CMakeLists.txt)
+;   /DAppVersion=<x.y[suffix]>  full version, e.g. 0.99rc1 (CMakeLists.txt)
 ;   /DAppVersionNumeric=<x.y>   numeric part only (project(VERSION))
 ;   /DBuildDir=<path>           deployed build folder (default build\Release)
 ;   /DVCRedistBuild=<n>         build number of the bundled vc_redist.x64.exe
@@ -13,7 +13,7 @@
 ;   iscc package\windows\hodeia.iss
 
 #ifndef AppVersion
-  #define AppVersion "0.99rc"
+  #define AppVersion "0.99rc1"
 #endif
 #ifndef AppVersionNumeric
   #define AppVersionNumeric "0.99"

@@ -19,7 +19,7 @@
 # Usage:  makepkg -si   (from this directory, after installing `hodeia`)
 
 pkgname=hodeia-cuda
-pkgver=0.99rc
+pkgver=0.99rc1
 pkgrel=1
 pkgdesc="CUDA backend for Hodeia, the local-AI research assistant (NVIDIA GPUs)"
 arch=(x86_64)

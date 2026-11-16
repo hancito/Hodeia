@@ -6,7 +6,7 @@ project(Hodeia VERSION 0.99 LANGUAGES CXX C)
 # ("rc", "beta"...; empty for a final release).  project(VERSION) only accepts
 # digits, and the Windows installer needs the numeric part on its own.
 # Shown in the app (About), the installer name and the Arch pkgver/git tag.
-set(HODEIA_VERSION_SUFFIX "rc")
+set(HODEIA_VERSION_SUFFIX "rc1")
 set(HODEIA_VERSION_STRING "${PROJECT_VERSION}${HODEIA_VERSION_SUFFIX}")
 
 # ---------------------------------------------------------------------------
