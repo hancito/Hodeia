@@ -304,8 +304,15 @@ tr:last-child td { border-bottom: none; }
   height: 28px;
   margin-bottom: 0.8rem;
   background-color: var(--accent);
-  -webkit-mask: var(--icon) center / contain no-repeat;
-  mask: var(--icon) center / contain no-repeat;
+  /* The image itself is set inline (mask-image) on each icon: a url() in a
+     custom property would resolve against this stylesheet, not the page,
+     and break on /fr/. */
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 /* Sub-heading inside a section */
