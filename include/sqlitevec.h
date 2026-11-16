@@ -71,6 +71,10 @@ public:
   // Whether the embedding model is loaded and ready
   bool isReady() const;
 
+  // User-facing reason of the last failed initialize(); empty once the
+  // model loads.  Lets workers explain why nothing could be embedded.
+  QString lastError() const;
+
   // Release the embedding model and free GPU/CPU memory
   void shutdown();
 
@@ -92,4 +96,8 @@ private:
   // this, concurrent llama_encode on one context corrupts the KV cache and
   // llama_free under a live encode is a segfault.
   QMutex m_lock;
+
+  void setLastError(const QString &error);
+  QString m_lastError;
+  mutable QMutex m_errorLock; // guards m_lastError (read from any thread)
 };

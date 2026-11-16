@@ -56,6 +56,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
   if (!QFile::exists(resolvedPath)) {
     qCritical() << "[SqliteVec] Model file not found:" << resolvedPath;
+    setLastError(tr("Embedding model file not found: %1").arg(resolvedPath));
     emit statusUpdated(
         tr("Embedding model file not found: %1").arg(resolvedPath));
     return false;
@@ -84,6 +85,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   auto *model = llama_model_load_from_file(pathUtf8.constData(), mparams);
   if (!model) {
     qCritical() << "[SqliteVec] Failed to load model:" << resolvedPath;
+    setLastError(tr("Failed to load embedding model: %1").arg(resolvedPath));
     emit statusUpdated(
         tr("Failed to load embedding model: %1").arg(resolvedPath));
     return false;
@@ -108,6 +110,8 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   if (!ctx) {
     llama_model_free(model);
     qCritical() << "[SqliteVec] Failed to create context";
+    setLastError(tr("The embedding model could not be started (not enough "
+                    "memory?)"));
     emit statusUpdated(tr("Failed to create llama context"));
     return false;
   }
@@ -117,6 +121,7 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   m_dim = llama_model_n_embd(model);
   m_maxTokens = static_cast<int>(safeCtx);
   m_ready = true;
+  setLastError(QString());
 
   qInfo() << "[SqliteVec] E5 model loaded, dim=" << m_dim
           << "| maxTokens=" << m_maxTokens;
@@ -488,6 +493,16 @@ SqliteVecManager::getChunksByHash(SqliteDb &db, const QString &paperHash) {
 
 int SqliteVecManager::embeddingDim() const { return m_dim; }
 bool SqliteVecManager::isReady() const { return m_ready; }
+
+QString SqliteVecManager::lastError() const {
+  const QMutexLocker locker(&m_errorLock);
+  return m_lastError;
+}
+
+void SqliteVecManager::setLastError(const QString &error) {
+  const QMutexLocker locker(&m_errorLock);
+  m_lastError = error;
+}
 
 void SqliteVecManager::shutdown() {
   const QMutexLocker locker(&m_lock);

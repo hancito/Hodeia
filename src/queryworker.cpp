@@ -278,8 +278,16 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
   // 2. Retrieve & group pages from vector search
   QList<PageContext> pages = retrieveAndGroupPages(queryText, budget);
   if (pages.isEmpty()) {
-    emit queryFinished(QString(), false,
-                       tr("No relevant information found in the library."));
+    // Tell a real failure (no database, embedding model unusable) from a
+    // library that simply has nothing relevant.
+    QString why = tr("No relevant information found in the library.");
+    if (!m_database || !m_database->isOpen())
+      why = tr("The project database is not open.");
+    else if (!m_database->vecManager().isReady() &&
+             !m_database->vecManager().lastError().isEmpty())
+      why = tr("The library cannot be searched: %1")
+                .arg(m_database->vecManager().lastError());
+    emit queryFinished(QString(), false, why);
     if (m_database)
       m_database->endDbOperation();
     return;
@@ -326,8 +334,14 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
     // French, so stored history stays consistent across UI languages.
     if (!citations.isEmpty())
       result += "\n\n---\n\n**Sources**\n\n" + citations.join("\n");
-    saveQuery(queryText, result, backend.modelName);
-    emit queryFinished(result, true, QString());
+    // On success the error argument carries a warning when the answer could
+    // not be stored in the query history.
+    auto saved = saveQuery(queryText, result, backend.modelName);
+    emit queryFinished(result, true,
+                       saved ? QString()
+                             : tr("The answer could not be saved in the "
+                                  "history: %1")
+                                   .arg(saved.error()));
     qDebug() << "[QueryWorker] ✓ Query answered (" << result.length()
              << "chars) in" << totalTimer.elapsed() << "ms";
   }
@@ -739,11 +753,12 @@ void QueryWorker::stop() {
 
 /* ── Database persistence ───────────────────────────────────────── */
 
-void QueryWorker::saveQuery(const QString &queryText, const QString &response,
-                            const QString &modelName) {
+std::expected<void, QString>
+QueryWorker::saveQuery(const QString &queryText, const QString &response,
+                       const QString &modelName) {
   if (!m_database || !m_database->isOpen()) {
     qWarning() << "[QueryWorker] Database not open — cannot save query";
-    return;
+    return std::unexpected(tr("the project database is not open"));
   }
 
   auto &db = m_database->db();
@@ -753,7 +768,7 @@ void QueryWorker::saveQuery(const QString &queryText, const QString &response,
                  "VALUES (?, ?, ?, ?)");
   if (!stmt.isValid()) {
     qCritical() << "[QueryWorker] Failed to prepare query insert";
-    return;
+    return std::unexpected(tr("database error (prepare failed)"));
   }
 
   (void)stmt.bind(1, queryText);
@@ -764,7 +779,7 @@ void QueryWorker::saveQuery(const QString &queryText, const QString &response,
   auto execResult = stmt.exec();
   if (!execResult) {
     qCritical() << "[QueryWorker] Failed to save query:" << execResult.error();
-    return;
+    return std::unexpected(execResult.error());
   }
 
   if (m_database->queryModel())
@@ -772,4 +787,5 @@ void QueryWorker::saveQuery(const QString &queryText, const QString &response,
 
   qDebug() << "[QueryWorker] Saved query response (" << response.length()
            << "chars)";
+  return {};
 }

@@ -52,19 +52,36 @@ ThemedWindow {
         text: qsTr("Ready")
     }
 
-    // ── Status bar updates from query controller ──
+    // User-facing information and errors for the query window.
+    MessageBox {
+        id: messageBox
+    }
+
+    // Set by Stop: the "cancelled" failure that follows is not an error.
+    property bool queryWasStopped: false
+
+    // ── Status bar and message windows from the query controller ──
     Connections {
         target: queryController
         function onQueryStarted() {
+            ragwindow.queryWasStopped = false;
             footerLabel.text = qsTr("Querying...");
         }
         function onQueryFinished(response, success, error) {
-            if (success)
+            if (success) {
                 footerLabel.text = qsTr("Query completed");
-            else
+                // Answer shown, but not stored in the history.
+                if (error !== "")
+                    messageBox.showError(qsTr("Query Not Saved"), error);
+            } else if (ragwindow.queryWasStopped) {
+                footerLabel.text = qsTr("Query stopped");
+            } else {
                 footerLabel.text = qsTr("Query failed: %1").arg(error);
+                messageBox.showError(qsTr("Query Failed"), error);
+            }
         }
         function onQueryStopped() {
+            ragwindow.queryWasStopped = true;
             footerLabel.text = qsTr("Query stopped");
         }
     }

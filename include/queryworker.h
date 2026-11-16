@@ -64,6 +64,8 @@ public slots:
   void stop();
 
 signals:
+  /// On failure @p error is the cause; on success it is empty, or a warning
+  /// when the answer could not be saved in the history.
   void queryFinished(const QString &response, bool success,
                      const QString &error);
   void started();
@@ -94,8 +96,9 @@ private:
                                    const QSet<int> &cited) const;
 
   /* result handling */
-  void saveQuery(const QString &queryText, const QString &response,
-                 const QString &modelName);
+  std::expected<void, QString> saveQuery(const QString &queryText,
+                                         const QString &response,
+                                         const QString &modelName);
 
   static const QString &systemPrompt();
 

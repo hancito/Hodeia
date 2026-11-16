@@ -35,6 +35,8 @@ public slots:
 
 signals:
   void queryStarted();
+  /// On failure @p error is the cause; on success it is empty, or a warning
+  /// when the answer could not be saved in the history.
   void queryFinished(const QString &response, bool success,
                      const QString &error);
   void queryStopped();
