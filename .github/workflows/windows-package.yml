@@ -1,0 +1,241 @@
+# Windows installer (Inno Setup): Hodeia-<version>-x64.exe.
+#
+# Same chain as a local Windows build (scripts/Windows/*.ps1):
+#   MSVC + Ninja, Qt (aqtinstall, msvc2022_64), vcpkg manifest (MuPDF from the
+#   overlay port, Tesseract, Leptonica, Vulkan loader), llama.cpp built with
+#   build-llama.ps1 (every CPU variant + Vulkan, NO CUDA: the CUDA toolkit is
+#   a multi-GB install and cuBLAS would push the installer towards the 2 GiB
+#   release-asset limit), sqlite-vec with build-sqlitevec.ps1, then
+#   package-app.ps1 (windeployqt output + Inno Setup).
+#
+# Triggers: same as linux-packages.yml.
+
+name: Windows package
+
+on:
+  push:
+    tags: ['v*']
+    branches: ['packaging/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # attach the installer to the release
+
+env:
+  QT_VERSION: '6.12.0'
+  QT_DIR: C:\Qt
+  VULKAN_VERSION: '1.4.363.0'
+  # Pinned dependency versions — keep in sync with scripts/Linux/build_deps.sh.
+  LLAMA_VER: v0.9.0
+  MUPDF_VER: 1.28.6
+  SQLITEVEC_VER: v0.1.10-alpha.4
+  DEPS: C:\d          # short path: vcpkg / MuPDF hit MAX_PATH otherwise
+  VCPKG_BINARY_SOURCES: clear;files,C:\vcpkg-cache,readwrite
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  installer:
+    name: Installer (Windows x64)
+    runs-on: windows-2025
+    steps:
+      # ── Sources (the bundled .gguf models are Git LFS objects) ──────────
+      - uses: actions/checkout@v7
+        with:
+          lfs: false
+
+      - name: List LFS objects
+        run: git lfs ls-files --long | ForEach-Object { ($_ -split ' ')[0] } | Sort-Object | Set-Content .lfs-assets-id
+
+      - name: Cache LFS objects
+        uses: actions/cache@v6
+        with:
+          path: .git/lfs
+          key: lfs-win-${{ hashFiles('.lfs-assets-id') }}
+
+      - name: Fetch LFS objects
+        run: |
+          git lfs pull
+          if ($LASTEXITCODE -ne 0) { throw "git lfs pull failed" }
+          git lfs ls-files --name-only | ForEach-Object {
+            # Read only the first bytes: the models are hundreds of MB.
+            $fs = [System.IO.File]::OpenRead((Resolve-Path -LiteralPath $_).Path)
+            $buf = New-Object byte[] 24
+            $n = $fs.Read($buf, 0, 24)
+            $fs.Close()
+            if ([System.Text.Encoding]::ASCII.GetString($buf, 0, $n) -like 'version https://git-lfs*') {
+              throw "$_ is still a Git LFS pointer"
+            }
+          }
+
+      # ── MSVC developer environment, exported to the following steps ─────
+      - name: Set up MSVC (x64)
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+                  -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                  -property installationPath
+          if (-not $vs) { throw "Visual Studio with the C++ tools not found" }
+          Write-Host "Visual Studio: $vs"
+          $before = @{}
+          Get-ChildItem env: | ForEach-Object { $before[$_.Name] = $_.Value }
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation `
+            -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+          Get-ChildItem env: |
+            Where-Object { $before[$_.Name] -ne $_.Value } |
+            ForEach-Object { "$($_.Name)=$($_.Value)" } |
+            Add-Content $env:GITHUB_ENV
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y --no-progress
+          }
+
+      # ── Vulkan SDK (glslc for the ggml Vulkan shaders) ──────────────────
+      - name: Cache Vulkan SDK
+        id: vulkan
+        uses: actions/cache@v6
+        with:
+          path: C:\VulkanSDK\${{ env.VULKAN_VERSION }}
+          key: vulkan-sdk-${{ env.VULKAN_VERSION }}
+
+      - name: Install Vulkan SDK
+        if: steps.vulkan.outputs.cache-hit != 'true'
+        run: |
+          $exe = "$env:RUNNER_TEMP\vulkansdk.exe"
+          curl.exe -fsSL -o $exe "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & $exe --root "C:\VulkanSDK\$env:VULKAN_VERSION" --accept-licenses --default-answer --confirm-command install
+          if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK install failed" }
+
+      - name: Use Vulkan SDK
+        run: |
+          "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION" | Add-Content $env:GITHUB_ENV
+          "C:\VulkanSDK\$env:VULKAN_VERSION\Bin" | Add-Content $env:GITHUB_PATH
+
+      # ── Qt (MSVC build) ─────────────────────────────────────────────────
+      - name: Cache Qt
+        id: qt
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.QT_DIR }}
+          key: qt-${{ env.QT_VERSION }}-win64_msvc2022_64
+
+      - name: Install Qt
+        if: steps.qt.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --quiet aqtinstall
+          python -m aqt install-qt windows desktop $env:QT_VERSION win64_msvc2022_64 --outputdir $env:QT_DIR
+          if ($LASTEXITCODE -ne 0) { throw "aqt install-qt failed" }
+
+      # ── Third-party sources ─────────────────────────────────────────────
+      - name: Fetch dependency sources
+        run: |
+          New-Item -ItemType Directory -Force $env:DEPS | Out-Null
+          git clone -q --depth 1 --branch $env:LLAMA_VER https://github.com/ggml-org/llama.cpp.git "$env:DEPS\llama.cpp"
+          git clone -q --depth 1 --branch $env:SQLITEVEC_VER https://github.com/asg017/sqlite-vec.git "$env:DEPS\sqlite-vec"
+          git clone -q --depth 1 --branch $env:MUPDF_VER https://github.com/ArtifexSoftware/mupdf.git "$env:DEPS\mupdf"
+          git -C "$env:DEPS\mupdf" submodule update --init --depth 1
+          if ($LASTEXITCODE -ne 0) { throw "MuPDF submodules failed" }
+
+      # ── llama.cpp (every CPU variant + Vulkan) ──────────────────────────
+      - name: Cache llama.cpp
+        id: llama
+        uses: actions/cache@v6
+        with:
+          path: external/lib/windows/llamacpp
+          key: llama-win-${{ env.LLAMA_VER }}-vk${{ env.VULKAN_VERSION }}-${{ hashFiles('scripts/Windows/build-llama.ps1') }}
+
+      - name: Build llama.cpp
+        if: steps.llama.outputs.cache-hit != 'true'
+        run: |
+          ./scripts/Windows/build-llama.ps1 -SourceDir "$env:DEPS\llama.cpp" `
+            -Backends cpu,vulkan -VulkanSdk $env:VULKAN_SDK
+
+      # ── sqlite-vec (vec0.dll) ───────────────────────────────────────────
+      # The git tree only has sqlite-vec.h.tmpl; its Makefile fills it with
+      # envsubst.  Same substitution here, then build-sqlitevec.ps1.
+      - name: Build sqlite-vec
+        run: |
+          $src = "$env:DEPS\sqlite-vec"
+          $version = (Get-Content "$src\VERSION" -Raw).Trim()
+          $parts = $version.Split('.')
+          $values = [ordered]@{
+            '${VERSION_MAJOR}' = $parts[0]
+            '${VERSION_MINOR}' = $parts[1]
+            '${VERSION_PATCH}' = $parts[2].Split('-')[0]
+            '${VERSION}'       = $version
+            '${DATE}'          = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ')
+            '${SOURCE}'        = (git -C $src rev-parse HEAD)
+          }
+          $header = Get-Content "$src\sqlite-vec.h.tmpl" -Raw
+          foreach ($k in $values.Keys) { $header = $header.Replace($k, $values[$k]) }
+          Set-Content -Path "$src\sqlite-vec.h" -Value $header -NoNewline
+          ./scripts/Windows/build-sqlitevec.ps1 -SourceDir $src
+
+      # ── vcpkg (MuPDF overlay, Tesseract, Leptonica, Vulkan loader) ──────
+      # The stamp folds the MuPDF checkout into the libmupdf port ABI; the
+      # binary cache is keyed on the manifest, the overlay port (stamp
+      # included) and the vcpkg checkout of the runner image.
+      - name: Prepare vcpkg
+        id: vcpkg
+        run: |
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Add-Content $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force C:\vcpkg-cache | Out-Null
+          ./scripts/Windows/update-mupdf-stamp.ps1 -MupdfSourceDir "$env:DEPS\mupdf"
+          "commit=$(git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD)" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v6
+        with:
+          path: C:\vcpkg-cache
+          key: vcpkg-${{ steps.vcpkg.outputs.commit }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay/**') }}
+
+      - name: vcpkg install
+        run: |
+          $env:MUPDF_LOCAL_SOURCE = "$env:DEPS\mupdf"
+          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows `
+            --overlay-ports "$PWD\vcpkg-overlay\ports" --clean-after-build
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+
+      # ── Hodeia ──────────────────────────────────────────────────────────
+      - name: Configure
+        run: |
+          $env:MUPDF_LOCAL_SOURCE = "$env:DEPS\mupdf"
+          cmake -S . -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
+            "-DCMAKE_PREFIX_PATH=$env:QT_DIR\$env:QT_VERSION\msvc2022_64" `
+            "-DVCPKG_OVERLAY_PORTS=$PWD\vcpkg-overlay\ports" `
+            "-DVCPKG_INSTALLED_DIR=$PWD\vcpkg_installed" `
+            "-DMUPDF_LOCAL_SOURCE=$($env:DEPS -replace '\\','/')/mupdf"
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+
+      - name: Build
+        run: |
+          cmake --build build
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+
+      # ── Installer ───────────────────────────────────────────────────────
+      - name: Install Inno Setup
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue) -and
+              -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Package
+        run: ./scripts/Windows/package-app.ps1 -BuildDir build\src
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: hodeia-windows-x64
+          path: dist/*.exe
+          compression-level: 0   # already compressed
+
+      - name: Attach to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*.exe
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}
