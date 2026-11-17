@@ -1,8 +1,10 @@
-# Linux packages: one portable .deb (built on Ubuntu 24.04) and one .rpm
+# Linux packages: two .deb (built on Ubuntu 24.04 and 26.04) and one .rpm
 # (built on Fedora), Qt bundled in /opt/hodeia (HODEIA_BUNDLE_QT=ON).
 #
-# The .deb runs on every Debian/Ubuntu-based distro with glibc >= 2.39
-# (Ubuntu 24.04+, Debian 13+, Mint 22+...).  The .rpm targets Fedora: system
+# The 24.04 .deb runs on every Debian/Ubuntu-based distro with glibc >= 2.39
+# (Ubuntu 24.04+, Debian 13+, Mint 22+...); the 26.04 one has its Depends:
+# computed against Ubuntu 26.04's own packages.  Each .deb carries its distro
+# in the Debian revision (0.99~rc1-1~ubuntu26.04), so the file names differ.  The .rpm targets Fedora: system
 # library sonames differ between RPM distros (libjpeg.so.62 vs .so.8...), so it
 # is built on the oldest Fedora release we support.
 #
@@ -47,6 +49,14 @@ jobs:
             # (it reports __cpp_concepts < 202002L): build with GCC 14.
             cc: gcc-14
             cxx: g++-14
+            cc_pkgs: gcc-14 g++-14
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            format: DEB
+            ext: deb
+            cc: gcc
+            cxx: g++
+            cc_pkgs: ''
           - id: fedora44
             image: fedora:44
             format: RPM
@@ -65,7 +75,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y --no-install-recommends \
-            build-essential gcc-14 g++-14 cmake ninja-build pkg-config \
+            build-essential ${{ matrix.cc_pkgs }} cmake ninja-build pkg-config \
             patchelf git git-lfs ca-certificates python3 python3-venv file \
             xz-utils dpkg-dev unzip zip gettext-base \
             libpng-dev libjpeg-turbo8-dev libtiff-dev zlib1g-dev libsqlite3-dev \
@@ -165,7 +175,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_PREFIX_PATH="$QT_DIR/$QT_VERSION/gcc_64" \
-            -DHODEIA_BUNDLE_QT=ON
+            -DHODEIA_BUNDLE_QT=ON \
+            -DHODEIA_PKG_DISTRO=${{ matrix.format == 'DEB' && matrix.image || '' }}
 
       - name: Build
         run: cmake --build build

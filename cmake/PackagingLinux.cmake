@@ -130,8 +130,16 @@ if(NOT CPACK_GENERATOR)
 endif()
 
 # --- DEB ---
-set(CPACK_DEBIAN_FILE_NAME            DEB-DEFAULT)   # hodeia_0.99~rc1_amd64.deb
+# HODEIA_PKG_DISTRO (e.g. "ubuntu:26.04", set by the CI) is appended to the
+# Debian revision: 1~ubuntu26.04 — one file name per target distro, and "~"
+# keeps a distro build sorting before a plain "-1".
+set(HODEIA_PKG_DISTRO "" CACHE STRING "Target distro tag for the DEB revision (CI)")
 set(CPACK_DEBIAN_PACKAGE_RELEASE      1)
+if(HODEIA_PKG_DISTRO)
+  string(REPLACE ":" "" _HODEIA_DISTRO_TAG "${HODEIA_PKG_DISTRO}")
+  set(CPACK_DEBIAN_PACKAGE_RELEASE    "1~${_HODEIA_DISTRO_TAG}")
+endif()
+set(CPACK_DEBIAN_FILE_NAME            DEB-DEFAULT)   # hodeia_0.99~rc1-1~ubuntu26.04_amd64.deb
 set(CPACK_DEBIAN_PACKAGE_SECTION      "science")
 # Depends: computed by dpkg-shlibdeps.  The bundled libs (Qt, llama.cpp) are
 # resolved through the RUNPATHs ($ORIGIN, $ORIGIN/lib), which CPackDeb passes
