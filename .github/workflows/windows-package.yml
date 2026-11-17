@@ -22,6 +22,11 @@ on:
     branches: ['packaging/**']
   workflow_dispatch:
 
+# A new push to the same branch/tag cancels the run still going on it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write   # attach the installer to the release
 

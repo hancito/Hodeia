@@ -25,6 +25,11 @@ on:
     branches: ['packaging/**']
   workflow_dispatch:
 
+# A new push to the same branch/tag cancels the run still going on it.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write   # attach the packages to the release
 
@@ -186,6 +191,9 @@ jobs:
 
       - name: Use CUDA
         run: |
+          # The archives put the libraries in lib/; CMake's FindCUDAToolkit
+          # looks for libcudart in lib64/ (or targets/x86_64-linux/lib).
+          [ -e "$CUDA_DIR/lib64" ] || ln -s lib "$CUDA_DIR/lib64"
           echo "CUDA_PATH=$CUDA_DIR" >> "$GITHUB_ENV"
           echo "CUDACXX=$CUDA_DIR/bin/nvcc" >> "$GITHUB_ENV"
           # The distro GCC may be newer than this CUDA release lists.
