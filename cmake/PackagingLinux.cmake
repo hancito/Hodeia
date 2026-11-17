@@ -11,6 +11,13 @@
 #   /usr/bin/hodeia -> /opt/hodeia/Hodeia
 #   /usr/share/applications/hodeia.desktop, icon, doc (LICENSE, NOTICE)
 #
+# Two install components = two packages (like package/arch and arch-cuda):
+#   main -> hodeia       everything above, CPU + Vulkan backends
+#   cuda -> hodeia-cuda  libggml-cuda.so + the CUDA runtime it needs (cudart,
+#                        cuBLAS) in /opt/hodeia; only when llama.cpp was built
+#                        with CUDA.  The NVIDIA driver (libcuda.so.1) always
+#                        comes from the host.
+#
 # Install destinations are relative to a "/" prefix, so:
 #   cmake --install build --prefix /tmp/stage     -> /tmp/stage/opt/hodeia/...
 #   cd build && cpack -G "DEB;RPM"                -> hodeia_<ver>_amd64.deb ...
@@ -27,6 +34,13 @@
 option(HODEIA_BUNDLE_QT "Bundle Qt into /opt/hodeia (portable DEB/RPM)" OFF)
 
 set(HODEIA_INSTALL_DIR "opt/hodeia")
+set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME main)
+
+# CUDA backend present in the llama.cpp staging dir?
+set(HODEIA_HAS_CUDA OFF)
+if(EXISTS "${_LLAMA_LINK_DIR}/libggml-cuda.so")
+  set(HODEIA_HAS_CUDA ON)
+endif()
 
 # --- Executable ---------------------------------------------------------------
 # $ORIGIN: llama.cpp .so / vec0.so next to the binary; $ORIGIN/lib: bundled Qt.
@@ -40,12 +54,40 @@ install(TARGETS Hodeia RUNTIME DESTINATION ${HODEIA_INSTALL_DIR})
 # patched their RPATH to $ORIGIN.  Globbed at install time: the set of CPU
 # variants / GPU backends depends on how llama.cpp was built.  Symlinks
 # (libX.so -> libX.so.0) are installed as symlinks.
+# libggml-cuda.so goes to the cuda component.
 install(CODE "
   file(GLOB _hodeia_llama_so \"$<TARGET_FILE_DIR:Hodeia>/lib*.so*\")
+  list(FILTER _hodeia_llama_so EXCLUDE REGEX \"/libggml-cuda\\\\.so\")
   file(INSTALL \${_hodeia_llama_so}
        DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${HODEIA_INSTALL_DIR}\"
        USE_SOURCE_PERMISSIONS)
 ")
+
+# --- CUDA backend + runtime (component "cuda") ---------------------------------
+if(HODEIA_HAS_CUDA)
+  # The runtime libraries libggml-cuda.so is linked against, from the CUDA
+  # toolkit used to build it (CUDA_PATH in the CI, /opt/cuda on Arch).
+  find_path(HODEIA_CUDA_LIB_DIR NAMES libcudart.so
+      HINTS ENV CUDA_PATH ENV CUDAToolkit_ROOT /opt/cuda /usr/local/cuda
+      PATH_SUFFIXES lib64 lib targets/x86_64-linux/lib
+      NO_DEFAULT_PATH)
+  if(NOT HODEIA_CUDA_LIB_DIR)
+    message(WARNING "libggml-cuda.so found but not the CUDA runtime (libcudart.so): "
+                    "set CUDA_PATH — the hodeia-cuda package would not run.")
+  endif()
+  install(CODE "
+    file(INSTALL \"$<TARGET_FILE_DIR:Hodeia>/libggml-cuda.so\"
+         DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${HODEIA_INSTALL_DIR}\"
+         USE_SOURCE_PERMISSIONS)
+    file(GLOB _hodeia_cuda_rt
+         \"${HODEIA_CUDA_LIB_DIR}/libcudart.so*\"
+         \"${HODEIA_CUDA_LIB_DIR}/libcublas.so*\"
+         \"${HODEIA_CUDA_LIB_DIR}/libcublasLt.so*\")
+    file(INSTALL \${_hodeia_cuda_rt}
+         DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${HODEIA_INSTALL_DIR}\"
+         USE_SOURCE_PERMISSIONS)
+  " COMPONENT cuda)
+endif()
 
 # --- sqlite-vec extension -----------------------------------------------------
 install(PROGRAMS ${_SQLITEVEC_LIB} DESTINATION ${HODEIA_INSTALL_DIR} RENAME vec0.so)
@@ -129,6 +171,17 @@ if(NOT CPACK_GENERATOR)
   set(CPACK_GENERATOR "DEB;RPM")
 endif()
 
+# One package per component (hodeia, hodeia-cuda).
+set(CPACK_COMPONENTS_ALL main)
+if(HODEIA_HAS_CUDA)
+  list(APPEND CPACK_COMPONENTS_ALL cuda)
+endif()
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_RPM_COMPONENT_INSTALL ON)
+set(CPACK_COMPONENT_MAIN_DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION}")
+set(CPACK_COMPONENT_CUDA_DESCRIPTION
+    "CUDA backend for HodeIA: faster summaries on NVIDIA GPUs (bundles the CUDA runtime; needs the NVIDIA driver).")
+
 # --- DEB ---
 # HODEIA_PKG_DISTRO (e.g. "ubuntu:26.04", set by the CI) is appended to the
 # Debian revision: 1~ubuntu26.04 — one file name per target distro, and "~"
@@ -146,6 +199,15 @@ set(CPACK_DEBIAN_PACKAGE_SECTION      "science")
 # to dpkg-shlibdeps as private search dirs.
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS    ON)
 set(CPACK_DEBIAN_COMPRESSION_TYPE     "xz")          # readable by every dpkg
+set(CPACK_DEBIAN_MAIN_PACKAGE_NAME    "hodeia")
+set(CPACK_DEBIAN_MAIN_PACKAGE_SUGGESTS "hodeia-cuda")
+set(CPACK_DEBIAN_CUDA_PACKAGE_NAME    "hodeia-cuda")
+set(CPACK_DEBIAN_CUDA_PACKAGE_SECTION "science")
+# No dpkg-shlibdeps for hodeia-cuda: libcuda.so.1 belongs to the NVIDIA driver,
+# which is installed in many ways (distro packages, NVIDIA's .run installer).
+set(CPACK_DEBIAN_CUDA_PACKAGE_SHLIBDEPS OFF)
+set(CPACK_DEBIAN_CUDA_PACKAGE_DEPENDS
+    "hodeia (= ${CPACK_PACKAGE_VERSION}-${CPACK_DEBIAN_PACKAGE_RELEASE})")
 
 # --- RPM ---
 set(CPACK_RPM_FILE_NAME               RPM-DEFAULT)   # hodeia-0.99~rc1-1.x86_64.rpm
@@ -154,6 +216,11 @@ set(CPACK_RPM_PACKAGE_LICENSE         "AGPL-3.0-only")
 set(CPACK_RPM_PACKAGE_GROUP           "Applications/Science")
 set(CPACK_RPM_PACKAGE_URL             "${CPACK_PACKAGE_HOMEPAGE_URL}")
 set(CPACK_RPM_COMPRESSION_TYPE        "zstd")
+set(CPACK_RPM_MAIN_PACKAGE_NAME       "hodeia")
+set(CPACK_RPM_MAIN_PACKAGE_SUGGESTS   "hodeia-cuda")
+set(CPACK_RPM_CUDA_PACKAGE_NAME       "hodeia-cuda")
+set(CPACK_RPM_CUDA_PACKAGE_REQUIRES
+    "hodeia = ${CPACK_PACKAGE_VERSION}-${CPACK_RPM_PACKAGE_RELEASE}")
 # Do not own the system directories (conflicts with the filesystem package).
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /opt
@@ -163,12 +230,13 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /usr/share/icons/hicolor/512x512
     /usr/share/icons/hicolor/512x512/apps
     /usr/share/doc)
-# - Never advertise the bundled libraries (Qt, ICU, llama.cpp) as provided by
-#   this package, and do not require them from the system.
+# - Never advertise the bundled libraries (Qt, ICU, llama.cpp, CUDA runtime) as
+#   provided by these packages, and do not require them from the system; nor
+#   libcuda.so.1 (NVIDIA driver, installed in many ways).
 # - No debuginfo sub-package / build-id links (stripped, prebuilt payload).
 set(CPACK_RPM_SPEC_MORE_DEFINE
 "%global __provides_exclude_from ^/opt/hodeia/.*$
-%global __requires_exclude ^lib(Qt6|icu|llama|mtmd|ggml).*$
+%global __requires_exclude ^lib(Qt6|icu|llama|mtmd|ggml|cud|cublas).*$
 %global debug_package %{nil}
 %global _build_id_links none")
 

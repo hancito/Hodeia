@@ -4,7 +4,7 @@
 # versions, PORTABLE (no -march=native, every llama.cpp CPU variant), and
 # stages them into external/ — the layout cmake/PlatformLinux.cmake expects:
 #   external/lib/linux/{libleptonica,libtesseract,libmupdf*}.a
-#   external/lib/linux/llamacpp/*.so*      (CPU variants + Vulkan, no CUDA)
+#   external/lib/linux/llamacpp/*.so*      (CPU variants + Vulkan [+ CUDA])
 #   external/lib/linux/sqlitevec/vec0.so
 #   external/include/{leptonica,tesseract,mupdf,llamacpp,SqliteVec}/
 #
@@ -14,6 +14,9 @@
 # Usage:  scripts/Linux/build_deps.sh <work_dir> [hodeia_root]
 #   work_dir     where the sources are cloned and built (created if missing)
 #   hodeia_root  the Hodeia checkout (default: this script's repository)
+#
+# HODEIA_CUDA=1 also builds the llama.cpp CUDA backend (libggml-cuda.so, for
+# the hodeia-cuda package).  nvcc is taken from CUDACXX, else from PATH.
 
 set -euo pipefail
 
@@ -25,7 +28,7 @@ TESS_VER=5.5.4
 LEPTO_VER=1.87.0
 SQLITEVEC_VER=v0.1.10-alpha.4
 
-[ $# -ge 1 ] || { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+[ $# -ge 1 ] || { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 WORK="$(mkdir -p "$1" && cd "$1" && pwd)"
 HODEIA="$(cd "${2:-$(dirname "$0")/../..}" && pwd)"
 EXT_LIB="$HODEIA/external/lib/linux"
@@ -114,10 +117,19 @@ make -C "$WORK/sqlite-vec" loadable
 install -Dm755 "$WORK/sqlite-vec/dist/vec0.so" "$EXT_LIB/sqlitevec/vec0.so"
 install -Dm644 "$WORK/sqlite-vec/sqlite-vec.h" "$EXT_INC/SqliteVec/sqlite-vec.h"
 
-# ── 5. llama.cpp (every CPU variant + Vulkan; no CUDA) ───────────────────
+# ── 5. llama.cpp (every CPU variant + Vulkan [+ CUDA]) ───────────────────
 echo ">> Building llama.cpp"
 LLAMA_SRC="$WORK/llama.cpp"
 LLAMA_BUILD="$WORK/llama-build"
+CUDA_FLAGS=(-DGGML_CUDA=OFF)
+LLAMA_TARGETS=(--target llama --target mtmd --target llama-common --target ggml --target ggml-vulkan)
+if [ "${HODEIA_CUDA:-0}" = 1 ]; then
+  # GGML_NATIVE=OFF (below) = llama.cpp's full list of GPU architectures.
+  echo ">> CUDA backend enabled ($(${CUDACXX:-nvcc} --version | tail -1))"
+  CUDA_FLAGS=(-DGGML_CUDA=ON)
+  [ -n "${CUDACXX:-}" ] && CUDA_FLAGS+=(-DCMAKE_CUDA_COMPILER="$CUDACXX")
+  LLAMA_TARGETS+=(--target ggml-cuda)
+fi
 cmake -S "$LLAMA_SRC" -B "$LLAMA_BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=ON \
@@ -131,15 +143,17 @@ cmake -S "$LLAMA_SRC" -B "$LLAMA_BUILD" -G Ninja \
   -DGGML_NATIVE=OFF \
   -DGGML_CPU_ALL_VARIANTS=ON \
   -DGGML_VULKAN=ON \
-  -DGGML_CUDA=OFF
-cmake --build "$LLAMA_BUILD" -j"$JOBS" \
-  --target llama --target mtmd --target llama-common --target ggml --target ggml-vulkan
+  "${CUDA_FLAGS[@]}"
+cmake --build "$LLAMA_BUILD" -j"$JOBS" "${LLAMA_TARGETS[@]}"
 
 LLAMA_LIB="$EXT_LIB/llamacpp"
 mkdir -p "$LLAMA_LIB"
 cp "$LLAMA_BUILD"/bin/lib*.so.*         "$LLAMA_LIB/"   # versioned core libs
 cp "$LLAMA_BUILD"/bin/libggml-cpu-*.so  "$LLAMA_LIB/"   # every CPU variant
 cp "$LLAMA_BUILD"/bin/libggml-vulkan.so "$LLAMA_LIB/"
+if [ "${HODEIA_CUDA:-0}" = 1 ]; then
+  cp "$LLAMA_BUILD"/bin/libggml-cuda.so "$LLAMA_LIB/"
+fi
 find "$LLAMA_LIB" -maxdepth 1 -type l -delete
 
 LLAMA_INC="$EXT_INC/llamacpp"

@@ -8,6 +8,10 @@
 # library sonames differ between RPM distros (libjpeg.so.62 vs .so.8...), so it
 # is built on the oldest Fedora release we support.
 #
+# Each build produces two packages: hodeia (CPU + Vulkan) and hodeia-cuda
+# (CUDA backend + CUDA runtime), see cmake/PackagingLinux.cmake.  CUDA comes
+# from NVIDIA's redistributable archives (build-time only components).
+#
 # Triggers: a "v*" tag (packages attached to the GitHub release), a push to a
 # "packaging/*" branch, or manually from the Actions tab (packages kept as
 # workflow artifacts).
@@ -27,6 +31,10 @@ permissions:
 env:
   QT_VERSION: '6.12.0'
   QT_DIR: /opt/Qt
+  CUDA_VERSION: '13.4.3'
+  CUDA_DIR: /opt/cuda
+  # Components of redistrib_<CUDA_VERSION>.json needed to build ggml-cuda.
+  CUDA_COMPONENTS: cuda_nvcc cuda_crt libnvvm cuda_cudart libcublas cccl cuda_nvrtc cuda_profiler_api
 
 defaults:
   run:
@@ -95,7 +103,7 @@ jobs:
         run: |
           dnf install -y \
             gcc-c++ clang libomp-devel cmake ninja-build make pkgconf-pkg-config \
-            patchelf git git-lfs python3 file xz findutils rpm-build unzip zip \
+            patchelf git git-lfs python3 file xz tar findutils rpm-build unzip zip \
             /usr/bin/envsubst \
             libpng-devel libjpeg-turbo-devel libtiff-devel zlib-devel sqlite-devel \
             vulkan-loader-devel vulkan-headers glslc spirv-headers-devel \
@@ -150,6 +158,40 @@ jobs:
           "$RUNNER_TEMP/aqt/bin/aqt" install-qt linux desktop "$QT_VERSION" linux_gcc_64 \
             --outputdir "$QT_DIR"
 
+      # ── CUDA toolkit (redistributable archives, for hodeia-cuda) ────────
+      - name: Cache CUDA
+        id: cuda
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CUDA_DIR }}
+          key: cuda-linux-${{ env.CUDA_VERSION }}-${{ env.CUDA_COMPONENTS }}
+
+      - name: Install CUDA
+        if: steps.cuda.outputs.cache-hit != 'true'
+        run: |
+          base=https://developer.download.nvidia.com/compute/cuda/redist
+          curl -fsSL -o "$RUNNER_TEMP/cuda.json" "$base/redistrib_$CUDA_VERSION.json"
+          mkdir -p "$CUDA_DIR"
+          for c in $CUDA_COMPONENTS; do
+            rel=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]]["linux-x86_64"]["relative_path"])' \
+                  "$RUNNER_TEMP/cuda.json" "$c")
+            echo ">> $rel"
+            tmp="$RUNNER_TEMP/cuda-$c"
+            mkdir -p "$tmp"
+            curl -fsSL "$base/$rel" | tar -xJ -C "$tmp"
+            # Each archive holds one top folder with bin/, include/, lib/...
+            cp -a "$tmp"/*/. "$CUDA_DIR"/
+            rm -rf "$tmp"
+          done
+
+      - name: Use CUDA
+        run: |
+          echo "CUDA_PATH=$CUDA_DIR" >> "$GITHUB_ENV"
+          echo "CUDACXX=$CUDA_DIR/bin/nvcc" >> "$GITHUB_ENV"
+          # The distro GCC may be newer than this CUDA release lists.
+          echo "NVCC_APPEND_FLAGS=-allow-unsupported-compiler" >> "$GITHUB_ENV"
+          echo "$CUDA_DIR/bin" >> "$GITHUB_PATH"
+
       # ── Third-party dependencies (llama.cpp, MuPDF, Tesseract...) ──────
       - name: Cache third-party dependencies
         id: deps
@@ -162,11 +204,15 @@ jobs:
             external/include/mupdf
             external/include/llamacpp
             external/include/SqliteVec
-          key: deps-${{ matrix.id }}-${{ hashFiles('scripts/Linux/build_deps.sh') }}
+          key: deps-${{ matrix.id }}-cuda${{ env.CUDA_VERSION }}-${{ hashFiles('scripts/Linux/build_deps.sh') }}
 
       - name: Build third-party dependencies
         if: steps.deps.outputs.cache-hit != 'true'
-        run: scripts/Linux/build_deps.sh "$RUNNER_TEMP/deps"
+        run: |
+          HODEIA_CUDA=1 scripts/Linux/build_deps.sh "$RUNNER_TEMP/deps"
+          # Free the disk: the CUDA build tree alone takes several GB.
+          rm -rf "$RUNNER_TEMP/deps"
+          df -h .
 
       # ── Hodeia ──────────────────────────────────────────────────────────
       - name: Configure
@@ -190,7 +236,8 @@ jobs:
           status=0
           while IFS= read -r -d '' f; do
             file -b "$f" | grep -q '^ELF' || continue
-            missing=$(ldd "$f" 2>/dev/null | grep 'not found' || true)
+            # libcuda.so.1 = NVIDIA driver, provided by the user's system.
+            missing=$(ldd "$f" 2>/dev/null | grep 'not found' | grep -v 'libcuda\.so\.1' || true)
             if [ -n "$missing" ]; then
               echo "::error::${f#$stage}: missing libraries"
               echo "$missing"
