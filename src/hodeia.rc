@@ -1,0 +1,4 @@
+// Windows resources for Hodeia.exe.
+// IDI_ICON1 is the exe icon: Explorer, taskbar, and the Start-Menu / desktop
+// shortcuts created by the installer all take it from here.
+IDI_ICON1 ICON "../Resources/hodeia.ico"
