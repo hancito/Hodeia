@@ -90,7 +90,7 @@ jobs:
             libwayland-client libwayland-cursor libwayland-egl
 
       # ── Sources (the bundled .gguf models are Git LFS objects) ──────────
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: false
 
@@ -102,7 +102,7 @@ jobs:
         run: git lfs ls-files --long | cut -d' ' -f1 | sort > .lfs-assets-id
 
       - name: Cache LFS objects
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .git/lfs
           key: lfs-${{ hashFiles('.lfs-assets-id') }}
@@ -120,7 +120,7 @@ jobs:
       # ── Qt (bundled into the package) ───────────────────────────────────
       - name: Cache Qt
         id: qt
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.QT_DIR }}
           key: qt-${{ env.QT_VERSION }}-linux_gcc_64
@@ -136,7 +136,7 @@ jobs:
       # ── Third-party dependencies (llama.cpp, MuPDF, Tesseract...) ──────
       - name: Cache third-party dependencies
         id: deps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             external/lib/linux
@@ -188,7 +188,7 @@ jobs:
         run: cpack -G ${{ matrix.format }}
 
       - name: Upload the package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hodeia-${{ matrix.id }}
           path: build/*.${{ matrix.ext }}
@@ -196,7 +196,7 @@ jobs:
 
       - name: Attach to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: build/*.${{ matrix.ext }}
           prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}
