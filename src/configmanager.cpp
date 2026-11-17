@@ -159,6 +159,9 @@ void ConfigManager::saveConfig() {
     backendObj["name"] = map.value("name").toString();
     backendObj["url"] = map.value("url").toString();
     backendObj["api_key"] = map.value("api_key").toString();
+    // "openai" (OpenAI-compatible, the default) or "anthropic".
+    if (map.contains("api"))
+      backendObj["api"] = map.value("api").toString();
     backendArray.append(backendObj);
   }
   obj["backendList"] = backendArray;
@@ -317,13 +320,14 @@ QStringList ConfigManager::backendNames() const {
 }
 
 void ConfigManager::setBackend(const QString &name, const QString &url,
-                               const QString &apiKey) {
+                               const QString &apiKey, const QString &api) {
   // Update existing entry
   for (int i = 0; i < m_backendList.size(); ++i) {
     QVariantMap map = m_backendList[i].toMap();
     if (map.value("name").toString() == name) {
       map["url"] = url;
       map["api_key"] = apiKey;
+      map["api"] = api;
       m_backendList[i] = map;
       emit backendListChanged();
       saveConfig();
@@ -335,6 +339,7 @@ void ConfigManager::setBackend(const QString &name, const QString &url,
   newBackend["name"] = name;
   newBackend["url"] = url;
   newBackend["api_key"] = apiKey;
+  newBackend["api"] = api;
   m_backendList.append(newBackend);
   emit backendListChanged();
   saveConfig();

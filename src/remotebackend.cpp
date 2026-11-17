@@ -1,5 +1,6 @@
 #include "remotebackend.h"
 
+#include <utility>
 #include <QBuffer>
 #include <QDebug>
 #include <QImage>
@@ -278,11 +279,14 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
 }
 
 void RemoteBackend::cancel() {
-  if (m_currentReply) {
-    m_currentReply->abort();
-    m_currentReply->deleteLater();
-    m_currentReply = nullptr;
-  }
+  // abort() emits QNetworkReply::finished synchronously: the handler set in
+  // sendRequest() runs inside it, clears m_currentReply, deletes the reply
+  // (deleteLater) and emits finished(error) so the caller's wait loop exits.
+  // Take the pointer first and touch nothing afterwards: the previous code
+  // called m_currentReply->deleteLater() after abort(), on a pointer the
+  // handler had just set to null (crash when stopping a remote request).
+  if (QNetworkReply *reply = std::exchange(m_currentReply, nullptr))
+    reply->abort();
 }
 
 /* ── Response handling ──────────────────────────────────────────── */

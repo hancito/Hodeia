@@ -4,12 +4,13 @@
 #include <QSet>
 #include <QVariantMap>
 #include <expected>
+#include <memory>
 
-#include "localbackend.h"
+#include "chatbackend.h"
+#include "localprompt.h"
 
 class ConfigManager;
 class DatabaseManager;
-class RemoteBackend;
 
 /// One page worth of context aggregated from vector search results.
 struct PageContext {
@@ -45,15 +46,9 @@ public:
   static constexpr int RemoteAutoTokens = 16384;
   /// Upper bound offered for remote backends.
   static constexpr int RemoteMaxTokens = 262144;
-
-  struct BackendInfo {
-    bool isLocal;
-    QString modelName;
-    QString modelPath;
-    QVariantMap config;
-  };
-  /// The backend and model a query would use right now.
-  static BackendInfo resolveBackend(ConfigManager *config);
+  /// Abort a remote request with no answer after this long.  Generous: a
+  /// large multimodal prompt can take minutes to process.
+  static constexpr int RemoteTimeoutMs = 10 * 60 * 1000;
 
 public slots:
   /// Execute a RAG query.
@@ -76,11 +71,9 @@ private:
   bool prepareGpu(bool isLocal);
   void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
 
-  /* inference — return the generated text, or a user-facing error message */
-  std::expected<QString, QString> queryLocal(const PromptPayload &payload,
-                                             const BackendInfo &backend);
-  std::expected<QString, QString> queryRemote(const PromptPayload &payload,
-                                              const BackendInfo &backend);
+  /* inference — the generated text, or a user-facing error message */
+  std::expected<QString, QString> generate(const PromptPayload &payload,
+                                           const ActiveBackend &active);
 
   /* retrieval & grouping */
   /// Fill `budgetTokens` with the most relevant chunks, grouped by page.
@@ -112,6 +105,6 @@ private:
   bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
-  LocalBackend *m_chatBackend = nullptr;
-  RemoteBackend *m_remoteBackend = nullptr;
+  /// Backend of the running query (null between queries).
+  std::unique_ptr<ChatBackend> m_backend;
 };

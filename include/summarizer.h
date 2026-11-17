@@ -4,12 +4,14 @@
 #include <QStringList>
 #include <QVariantMap>
 
+#include "chatbackend.h"
+#include "localprompt.h"
 #include "summaryformat.h"
-#include "localbackend.h"
+
+#include <memory>
 
 class ConfigManager;
 class DatabaseManager;
-class RemoteBackend;
 
 /// Orchestrator for paper summarization.
 class Summarizer : public QObject {
@@ -34,26 +36,14 @@ signals:
   void stopped();
 
 private:
-  /* backend resolution */
-  struct BackendInfo {
-    bool isLocal;
-    QString modelName;
-    QString modelPath;
-    QVariantMap config;
-  };
-
-  BackendInfo resolveBackend();
-
   /* GPU lifecycle */
   bool prepareGpu(bool isLocal);
   void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
 
   /* inference */
   /// The generated text (empty if cancelled), or a user-facing error.
-  std::expected<QString, QString> summarizeLocal(const PromptPayload &payload,
-                                                 const BackendInfo &backend);
-  std::expected<QString, QString> summarizeRemote(const PromptPayload &payload,
-                                                  const BackendInfo &backend);
+  std::expected<QString, QString> generate(const PromptPayload &payload,
+                                           const ActiveBackend &active);
 
   /* prompt building */
   PromptPayload buildPrompt(const QString &paperHash) const;
@@ -81,6 +71,6 @@ private:
   bool m_cancelled = false;
   ConfigManager *m_config = nullptr;
   DatabaseManager *m_database = nullptr;
-  LocalBackend *m_chatBackend = nullptr;
-  RemoteBackend *m_remoteBackend = nullptr;
+  /// Backend of the running batch (null between batches).
+  std::unique_ptr<ChatBackend> m_backend;
 };

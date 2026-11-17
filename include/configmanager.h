@@ -74,9 +74,11 @@ public:
   /// Each entry is a QVariantMap with keys: "name", "url", "api_key".
   void setBackendList(const QVariantList &backends);
 
-  /// Add or update a single backend entry.
+  /// Add or update a single backend entry.  @p api is the protocol of a
+  /// remote backend: "openai" (OpenAI-compatible) or "anthropic".
   Q_INVOKABLE void setBackend(const QString &name, const QString &url,
-                              const QString &apiKey);
+                              const QString &apiKey,
+                              const QString &api = QStringLiteral("openai"));
 
   /// Remove a backend by name.
   Q_INVOKABLE void removeBackend(const QString &name);

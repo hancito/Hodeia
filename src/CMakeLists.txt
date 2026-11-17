@@ -30,6 +30,8 @@ add_library(HodeiaEngine STATIC
     ../include/vramfit.h
     ../include/inferenceengine.h
     ../include/remotebackend.h
+    ../include/chatbackend.h
+    ../include/anthropicapi.h
     ../include/summarizer.h
     ../include/summarythreadmanager.h
     ../include/queryworker.h
@@ -59,6 +61,8 @@ add_library(HodeiaEngine STATIC
     vramfit.cpp
     inferenceengine.cpp
     remotebackend.cpp
+    chatbackend.cpp
+    anthropicapi.cpp
     summarizer.cpp
     summarythreadmanager.cpp
     openalex.cpp

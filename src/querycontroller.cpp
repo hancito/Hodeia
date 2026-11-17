@@ -1,5 +1,7 @@
 #include "querycontroller.h"
+#include "chatbackend.h"
 #include "database.h"
+#include "localbackend.h"
 
 #include <QDebug>
 
@@ -10,8 +12,7 @@ QueryController::QueryController(ConfigManager *config,
 QueryController::~QueryController() { stopQuery(); }
 
 QVariantMap QueryController::contextInfo(int contextTokens) const {
-  const QueryWorker::BackendInfo backend =
-      QueryWorker::resolveBackend(m_config);
+  const ActiveBackend backend = resolveActiveBackend(m_config);
   if (!backend.isLocal) {
     return {{"remote", true},
             {"autoTokens", QueryWorker::RemoteAutoTokens},

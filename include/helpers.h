@@ -67,8 +67,10 @@ public:
 
   /// Check a remote backend and retrieve its available models; on success
   /// the backend is saved and made active. Emits modelsChecked().
+  /// @p api: "openai" (OpenAI-compatible) or "anthropic".
   Q_INVOKABLE void checkRemoteModels(const QString &name, const QString &apiUrl,
-                                     const QString &apiKey);
+                                     const QString &apiKey,
+                                     const QString &api = QStringLiteral("openai"));
 
   /// Load available models for the currently active backend (local or remote).
   /// Emits modelsChecked() with the result.
@@ -86,7 +88,7 @@ private:
   /// GET <apiUrl>/models. If @p saveAs is set, the backend is saved under
   /// that name and made active once the server answered.
   void fetchRemoteModels(const QString &apiUrl, const QString &apiKey,
-                         const QString &saveAs);
+                         const QString &api, const QString &saveAs);
   /// Emit modelsChecked() for a finished reply; true on success.
   bool handleModelsReply(QNetworkReply *reply);
   void cancelPendingReply();

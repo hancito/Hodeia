@@ -2,6 +2,29 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="fr-FR">
 <context>
+    <name>AnthropicApi</name>
+    <message>
+        <location filename="../src/anthropicapi.cpp" line="96"/>
+        <source>HTTP error %1</source>
+        <translation>Erreur HTTP %1</translation>
+    </message>
+    <message>
+        <location filename="../src/anthropicapi.cpp" line="98"/>
+        <source>JSON parse error: %1</source>
+        <translation>Erreur d’analyse JSON : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/anthropicapi.cpp" line="117"/>
+        <source>The model declined the request (%1)</source>
+        <translation>Le modèle a refusé la requête (%1)</translation>
+    </message>
+    <message>
+        <location filename="../src/anthropicapi.cpp" line="132"/>
+        <source>Empty response from server</source>
+        <translation>Réponse vide du serveur</translation>
+    </message>
+</context>
+<context>
     <name>BackendWindow</name>
     <message>
         <location filename="../ui/BackendWindow.qml" line="10"/>
@@ -9,78 +32,93 @@
         <translation>Gestion des backends</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="31"/>
+        <location filename="../ui/BackendWindow.qml" line="34"/>
         <source>Connected — %1 model(s) available</source>
         <translation>Connecté — %1 modèle(s) disponible(s)</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="35"/>
+        <location filename="../ui/BackendWindow.qml" line="38"/>
         <source>Connection failed: %1</source>
         <translation>Échec de la connexion : %1</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="50"/>
+        <location filename="../ui/BackendWindow.qml" line="53"/>
         <source>Backends</source>
         <translation>Backends</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="70"/>
+        <location filename="../ui/BackendWindow.qml" line="73"/>
         <source>Edit</source>
         <translation>Modifier</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="82"/>
+        <location filename="../ui/BackendWindow.qml" line="86"/>
         <source>Remove</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="100"/>
+        <location filename="../ui/BackendWindow.qml" line="104"/>
         <source>Edit Backend</source>
         <translation>Modifier le backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="100"/>
-        <location filename="../ui/BackendWindow.qml" line="173"/>
+        <location filename="../ui/BackendWindow.qml" line="104"/>
+        <location filename="../ui/BackendWindow.qml" line="193"/>
         <source>Add Backend</source>
         <translation>Ajouter un backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="109"/>
+        <location filename="../ui/BackendWindow.qml" line="113"/>
         <source>Name</source>
         <translation>Nom</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="116"/>
+        <location filename="../ui/BackendWindow.qml" line="120"/>
         <source>my-backend</source>
         <translation>mon-backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="123"/>
+        <location filename="../ui/BackendWindow.qml" line="127"/>
+        <source>API</source>
+        <translation>API</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="133"/>
+        <source>OpenAI-compatible</source>
+        <translation>Compatible OpenAI</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="133"/>
+        <source>Anthropic</source>
+        <translation>Anthropic</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="141"/>
         <source>URL</source>
         <translation>URL</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="136"/>
+        <location filename="../ui/BackendWindow.qml" line="156"/>
         <source>API Key</source>
         <translation>Clé API</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="143"/>
+        <location filename="../ui/BackendWindow.qml" line="163"/>
         <source>API Key (empty if not needed)</source>
         <translation>Clé API (vide si non nécessaire)</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="149"/>
+        <location filename="../ui/BackendWindow.qml" line="169"/>
         <source>Check Connection</source>
         <translation>Vérifier la connexion</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="156"/>
+        <location filename="../ui/BackendWindow.qml" line="176"/>
         <source>Please enter a URL</source>
         <translation>Veuillez saisir une URL</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="173"/>
+        <location filename="../ui/BackendWindow.qml" line="193"/>
         <source>Save Changes</source>
         <translation>Enregistrer les modifications</translation>
     </message>
@@ -139,12 +177,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="176"/>
+        <location filename="../src/configmanager.cpp" line="179"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="177"/>
+        <location filename="../src/configmanager.cpp" line="180"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -159,88 +197,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="231"/>
-        <location filename="../src/configmanager.cpp" line="240"/>
-        <location filename="../src/configmanager.cpp" line="246"/>
+        <location filename="../src/configmanager.cpp" line="234"/>
+        <location filename="../src/configmanager.cpp" line="243"/>
+        <location filename="../src/configmanager.cpp" line="249"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="233"/>
-        <location filename="../src/configmanager.cpp" line="241"/>
-        <location filename="../src/configmanager.cpp" line="248"/>
+        <location filename="../src/configmanager.cpp" line="236"/>
+        <location filename="../src/configmanager.cpp" line="244"/>
+        <location filename="../src/configmanager.cpp" line="251"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="235"/>
-        <location filename="../src/configmanager.cpp" line="240"/>
+        <location filename="../src/configmanager.cpp" line="238"/>
+        <location filename="../src/configmanager.cpp" line="243"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="364"/>
-        <location filename="../src/configmanager.cpp" line="401"/>
+        <location filename="../src/configmanager.cpp" line="369"/>
+        <location filename="../src/configmanager.cpp" line="406"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="372"/>
+        <location filename="../src/configmanager.cpp" line="377"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="385"/>
+        <location filename="../src/configmanager.cpp" line="390"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="407"/>
+        <location filename="../src/configmanager.cpp" line="412"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="417"/>
+        <location filename="../src/configmanager.cpp" line="422"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="473"/>
+        <location filename="../src/configmanager.cpp" line="478"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="478"/>
+        <location filename="../src/configmanager.cpp" line="483"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="487"/>
+        <location filename="../src/configmanager.cpp" line="492"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="495"/>
+        <location filename="../src/configmanager.cpp" line="500"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="513"/>
+        <location filename="../src/configmanager.cpp" line="518"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="525"/>
+        <location filename="../src/configmanager.cpp" line="530"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="589"/>
+        <location filename="../src/configmanager.cpp" line="594"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="590"/>
+        <location filename="../src/configmanager.cpp" line="595"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -255,7 +293,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="686"/>
+        <location filename="../src/configmanager.cpp" line="691"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -502,55 +540,55 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Paramètres invalides</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="284"/>
+        <location filename="../src/helpers.cpp" line="285"/>
         <source>URL is empty</source>
         <translation>L&apos;URL est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="353"/>
+        <location filename="../src/helpers.cpp" line="365"/>
         <source>Invalid JSON</source>
         <translation>JSON invalide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="238"/>
+        <location filename="../src/helpers.cpp" line="239"/>
         <source>Model file does not exist: %1</source>
         <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="146"/>
+        <location filename="../src/helpers.cpp" line="147"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="162"/>
+        <location filename="../src/helpers.cpp" line="163"/>
         <source>These models could not be fully deleted (a file may still be in use, e.g. by a running summary or query):</source>
         <translation>Ces modèles n&apos;ont pas pu être entièrement supprimés (un fichier est peut-être encore utilisé, par exemple par un résumé ou une requête en cours) :</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="189"/>
-        <location filename="../src/helpers.cpp" line="207"/>
+        <location filename="../src/helpers.cpp" line="190"/>
+        <location filename="../src/helpers.cpp" line="208"/>
         <source>Cannot read %1: %2</source>
         <translation>Impossible de lire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="192"/>
+        <location filename="../src/helpers.cpp" line="193"/>
         <source>%1 is empty</source>
         <translation>%1 est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="197"/>
-        <location filename="../src/helpers.cpp" line="209"/>
-        <location filename="../src/helpers.cpp" line="225"/>
+        <location filename="../src/helpers.cpp" line="198"/>
+        <location filename="../src/helpers.cpp" line="210"/>
+        <location filename="../src/helpers.cpp" line="226"/>
         <source>Cannot write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="243"/>
+        <location filename="../src/helpers.cpp" line="244"/>
         <source>MMProj file does not exist: %1</source>
         <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="251"/>
+        <location filename="../src/helpers.cpp" line="252"/>
         <source>Cannot create folder %1</source>
         <translation>Impossible de créer le dossier %1</translation>
     </message>
@@ -1479,67 +1517,67 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>QueryWorker</name>
     <message>
-        <location filename="../src/queryworker.cpp" line="243"/>
+        <location filename="../src/queryworker.cpp" line="239"/>
         <source>Empty query</source>
         <translation>Requête vide</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="283"/>
+        <location filename="../src/queryworker.cpp" line="279"/>
         <source>No relevant information found in the library.</source>
         <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="285"/>
+        <location filename="../src/queryworker.cpp" line="281"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="288"/>
+        <location filename="../src/queryworker.cpp" line="284"/>
         <source>The library cannot be searched: %1</source>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="312"/>
+        <location filename="../src/queryworker.cpp" line="307"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="318"/>
+        <location filename="../src/queryworker.cpp" line="313"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="342"/>
+        <location filename="../src/queryworker.cpp" line="337"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="409"/>
+        <location filename="../src/queryworker.cpp" line="389"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="422"/>
+        <location filename="../src/queryworker.cpp" line="391"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="511"/>
+        <location filename="../src/queryworker.cpp" line="393"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="516"/>
+        <location filename="../src/queryworker.cpp" line="398"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="761"/>
+        <location filename="../src/queryworker.cpp" line="642"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="771"/>
+        <location filename="../src/queryworker.cpp" line="652"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>
@@ -1667,39 +1705,39 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>RemoteBackend</name>
     <message>
-        <location filename="../src/remotebackend.cpp" line="22"/>
+        <location filename="../src/remotebackend.cpp" line="23"/>
         <source>SSL error: %1</source>
         <translation>Erreur SSL : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="64"/>
+        <location filename="../src/remotebackend.cpp" line="65"/>
         <source>Sending request to %1</source>
         <translation>Envoi de la requête vers %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="158"/>
-        <location filename="../src/remotebackend.cpp" line="178"/>
-        <location filename="../src/remotebackend.cpp" line="201"/>
+        <location filename="../src/remotebackend.cpp" line="159"/>
+        <location filename="../src/remotebackend.cpp" line="179"/>
+        <location filename="../src/remotebackend.cpp" line="202"/>
         <source>Backend not configured (URL or model missing)</source>
         <translation>Backend non configuré (URL ou modèle manquant)</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="310"/>
+        <location filename="../src/remotebackend.cpp" line="314"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d&apos;analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="320"/>
+        <location filename="../src/remotebackend.cpp" line="324"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="339"/>
+        <location filename="../src/remotebackend.cpp" line="343"/>
         <source>Empty content in response</source>
         <translation>Contenu vide dans la réponse</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="343"/>
+        <location filename="../src/remotebackend.cpp" line="347"/>
         <source>Response received (%1 chars)</source>
         <translation>Réponse reçue (%1 caractères)</translation>
     </message>
@@ -1742,47 +1780,47 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>Summarizer</name>
     <message>
-        <location filename="../src/summarizer.cpp" line="131"/>
+        <location filename="../src/summarizer.cpp" line="127"/>
         <source>The project database is not open</source>
         <translation>La base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="145"/>
+        <location filename="../src/summarizer.cpp" line="139"/>
         <source>Cancelled</source>
         <translation>Annulé</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="155"/>
+        <location filename="../src/summarizer.cpp" line="149"/>
         <source>The model returned an empty response</source>
         <translation>Le modèle a renvoyé une réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="163"/>
+        <location filename="../src/summarizer.cpp" line="157"/>
         <source>The summary could not be saved: %1</source>
         <translation>Le résumé n&apos;a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="246"/>
+        <location filename="../src/summarizer.cpp" line="225"/>
         <source>No model file found for &quot;%1&quot;. Check the selected model.</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 ». Vérifiez le modèle sélectionné.</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="260"/>
+        <location filename="../src/summarizer.cpp" line="229"/>
         <source>The model could not be loaded: %1</source>
         <translation>Le modèle n&apos;a pas pu être chargé : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="335"/>
+        <location filename="../src/summarizer.cpp" line="234"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="470"/>
+        <location filename="../src/summarizer.cpp" line="369"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="491"/>
+        <location filename="../src/summarizer.cpp" line="390"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>
@@ -1791,7 +1829,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="171"/>
+        <location filename="../src/summarizer.cpp" line="165"/>
         <source>Summary generated and saved (%1 chars)</source>
         <translation>Résumé généré et enregistré (%1 caractères)</translation>
     </message>

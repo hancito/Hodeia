@@ -1,8 +1,6 @@
 #include "summarizer.h"
 #include "configmanager.h"
 #include "database.h"
-#include "localbackend.h"
-#include "remotebackend.h"
 #include "sqlitevec.h"
 
 #include <QCoreApplication>
@@ -80,10 +78,7 @@ const QString &Summarizer::userPrompt() { return s_userPrompt; }
 
 Summarizer::Summarizer(ConfigManager *config, DatabaseManager *database,
                        QObject *parent)
-    : QObject(parent), m_config(config), m_database(database) {
-  m_chatBackend = new LocalBackend(this);
-  m_remoteBackend = new RemoteBackend(this);
-}
+    : QObject(parent), m_config(config), m_database(database) {}
 
 Summarizer::~Summarizer() = default;
 
@@ -108,7 +103,8 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
   QElapsedTimer totalTimer;
   totalTimer.start();
 
-  BackendInfo backend = resolveBackend();
+  const ActiveBackend backend = resolveActiveBackend(m_config);
+  m_backend = makeChatBackend(backend);
   qDebug() << "[Summarizer] Backend:" << (backend.isLocal ? "local" : "remote")
            << "| Model:" << backend.modelName;
 
@@ -135,9 +131,7 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
 
     PromptPayload payload = buildPrompt(hash);
 
-    std::expected<QString, QString> result =
-        backend.isLocal ? summarizeLocal(payload, backend)
-                        : summarizeRemote(payload, backend);
+    std::expected<QString, QString> result = generate(payload, backend);
 
     if (m_cancelled) {
       // stop() fired mid-inference. Do NOT persist a partial summary and stop
@@ -183,29 +177,6 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
     m_database->endDbOperation();
 }
 
-/* ── Backend resolution ─────────────────────────────────────────── */
-
-Summarizer::BackendInfo Summarizer::resolveBackend() {
-  BackendInfo info;
-  info.isLocal = (m_config->activeBackend() == "Llama.cpp");
-  info.modelName = m_config->activeModel();
-  info.config = m_config->backendConfig(m_config->activeBackend());
-
-  if (info.isLocal) {
-    QString folderPath = m_config->summarizersPath() + "/" + info.modelName;
-    QStringList ggufs =
-        QDir(folderPath)
-            .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
-    for (const QString &f : ggufs) {
-      if (!f.contains("mmproj", Qt::CaseInsensitive)) {
-        info.modelPath = folderPath + "/" + f;
-        break;
-      }
-    }
-  }
-  return info;
-}
-
 /* ── GPU preparation ────────────────────────────────────────────── */
 
 bool Summarizer::prepareGpu(bool isLocal) {
@@ -230,110 +201,37 @@ void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
     qDebug() << "[Summarizer] Embedding model reloaded in" << t.elapsed()
              << "ms";
   }
-  if (isLocal) {
-    m_chatBackend->unloadModel();
-    qDebug() << "[Summarizer] Chat model unloaded";
-  }
+  if (isLocal && m_backend)
+    m_backend->release();
+  m_backend.reset();
 }
 
-/* ── Local summarization ────────────────────────────────────────── */
+/* ── Inference ──────────────────────────────────────────────────── */
 
 std::expected<QString, QString>
-Summarizer::summarizeLocal(const PromptPayload &payload,
-                           const BackendInfo &backend) {
-  if (backend.modelPath.isEmpty())
+Summarizer::generate(const PromptPayload &payload,
+                     const ActiveBackend &active) {
+  GenerationOptions options;
+  options.responseHeadroom = m_headroom;
+  options.forceJson = true; // remote: the summary is a JSON document
+  auto result = m_backend->generate(payload, options, &m_cancelled);
+  if (result)
+    return *result;
+
+  const GenerationError &e = result.error();
+  switch (e.kind) {
+  case GenerationError::Kind::NoModelFile:
     return std::unexpected(
         tr("No model file found for \"%1\". Check the selected model.")
-            .arg(backend.modelName));
-
-  // The backend counts the exact prompt tokens during its no-alloc probe and
-  // sizes the KV cache as prompt_tokens + headroom, so no char heuristic here.
-  qDebug() << "[Summarizer] Loading local model:" << backend.modelPath;
-  QElapsedTimer loadTimer;
-  loadTimer.start();
-
-  auto loadResult =
-      m_chatBackend->loadModel(backend.modelPath, payload, m_headroom);
-  if (!loadResult) {
-    qWarning() << "[Summarizer] Failed to load model:" << loadResult.error();
+            .arg(active.modelName));
+  case GenerationError::Kind::LoadFailed:
     return std::unexpected(
-        tr("The model could not be loaded: %1").arg(loadResult.error()));
+        tr("The model could not be loaded: %1").arg(e.detail));
+  case GenerationError::Kind::Timeout: // no timeout requested
+  case GenerationError::Kind::RequestFailed:
+    break;
   }
-  qDebug() << "[Summarizer] Model loaded in" << loadTimer.elapsed() << "ms";
-
-  QElapsedTimer genTimer;
-  genTimer.start();
-  // Pass the cancel flag so a queued stop() can interrupt a long local
-  // generation at the next token boundary (see InferenceEngine::generate).
-  QString result = m_chatBackend->summarize(payload, &m_cancelled);
-  qDebug() << "[Summarizer] Generation completed in" << genTimer.elapsed()
-           << "ms"
-           << "(" << result.length() << "chars)"
-           << (m_cancelled ? "— CANCELLED" : "");
-  return result;
-}
-
-/* ── Remote summarization ───────────────────────────────────────── */
-
-std::expected<QString, QString>
-Summarizer::summarizeRemote(const PromptPayload &payload,
-                            const BackendInfo &backend) {
-
-  QString apiUrl = backend.config.value("url").toString();
-  QString apiKey = backend.config.value("api_key").toString();
-
-  m_remoteBackend->setApiUrl(apiUrl);
-  m_remoteBackend->setApiKey(apiKey);
-  m_remoteBackend->setModelName(backend.modelName);
-  m_remoteBackend->setForceJson(true);
-
-  // Count images across page blocks
-  int imageCount = 0;
-  for (const auto &pb : payload.pageBlocks)
-    if (!pb.visualContext.data.empty())
-      imageCount++;
-
-  qDebug() << "[Summarizer] Remote request — URL:" << apiUrl
-           << "| Model:" << backend.modelName << "| images:" << imageCount;
-
-  QElapsedTimer genTimer;
-  genTimer.start();
-
-  // Synchronous wait for the async remote call.
-  QString result, error;
-  QEventLoop loop;
-  QObject::connect(
-      m_remoteBackend, &RemoteBackend::finished, this,
-      [&result, &error, &loop](const QString &text, const QString &err) {
-        result = text;
-        error = err;
-        loop.quit();
-      },
-      Qt::SingleShotConnection);
-
-  if (!payload.pageBlocks.empty()) {
-    m_remoteBackend->generateInterleaved(payload.systemPrompt, payload,
-                                         imageCount > 0);
-  } else if (payload.visualContext.empty()) {
-    m_remoteBackend->generate(payload.systemPrompt, payload.userMessage +
-                                                        "\n\n" +
-                                                        payload.textContext);
-  } else {
-    m_remoteBackend->generate(payload.systemPrompt,
-                              payload.userMessage + "\n\n" +
-                                  payload.textContext,
-                              payload.visualContext);
-  }
-
-  loop.exec(QEventLoop::ExcludeUserInputEvents);
-
-  qDebug() << "[Summarizer] Remote generation completed in"
-           << genTimer.elapsed() << "ms"
-           << "(" << result.length() << "chars)";
-
-  if (!error.isEmpty() && !m_cancelled)
-    return std::unexpected(tr("Remote request failed: %1").arg(error));
-  return result;
+  return std::unexpected(tr("Remote request failed: %1").arg(e.detail));
 }
 
 /* ── Prompt building ────────────────────────────────────────────── */
@@ -449,7 +347,8 @@ void Summarizer::stop() {
   // current paper, and stops processing further papers.
   m_cancelled = true;
   // Cancel the in-flight remote request so its QEventLoop exits.
-  m_remoteBackend->cancel();
+  if (m_backend)
+    m_backend->cancel();
   // Do NOT unload/reload models here:
   //  - the chat model may be held mid-llama_decode; unloading now would free
   //    it under a live inference (use-after-free).

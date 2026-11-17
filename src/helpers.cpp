@@ -1,4 +1,5 @@
 #include "helpers.h"
+#include "anthropicapi.h"
 #include "configmanager.h"
 #include "pdfexport.h"
 #include "summaryformat.h"
@@ -279,12 +280,12 @@ void Helpers::addLocalSummarizer(const QString &modelPath,
 /* ── Backends ────────────────────────────────────────────────── */
 
 void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
-                                const QString &apiKey) {
+                                const QString &apiKey, const QString &api) {
   if (apiUrl.isEmpty()) {
     emit modelsChecked(false, {}, tr("URL is empty"));
     return;
   }
-  fetchRemoteModels(apiUrl, apiKey, name);
+  fetchRemoteModels(apiUrl, apiKey, api, name);
 }
 
 void Helpers::loadActiveBackendModels() {
@@ -293,7 +294,8 @@ void Helpers::loadActiveBackendModels() {
   const QVariantMap cfg = m_config->backendConfig(m_config->activeBackend());
   const QString url = cfg.value("url").toString();
   if (!url.isEmpty()) {
-    fetchRemoteModels(url, cfg.value("api_key").toString(), QString());
+    fetchRemoteModels(url, cfg.value("api_key").toString(),
+                      cfg.value("api").toString(), QString());
     return;
   }
   // Local backend: a pending remote request must not overwrite the list.
@@ -316,28 +318,38 @@ void Helpers::cancelPendingReply() {
 }
 
 void Helpers::fetchRemoteModels(const QString &apiUrl, const QString &apiKey,
-                                const QString &saveAs) {
+                                const QString &api, const QString &saveAs) {
   cancelPendingReply();
 
-  QUrl url(apiUrl);
-  QString path = url.path();
-  while (path.endsWith('/'))
-    path.chop(1);
-  url.setPath(path + "/models");
-  QNetworkRequest req(url);
-  if (!apiKey.isEmpty())
-    req.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+  QNetworkRequest req;
+  if (api == QLatin1String("anthropic")) {
+    // GET /v1/models: same {"data":[{"id":...}]} shape as OpenAI's list.
+    req.setUrl(AnthropicApi::endpointUrl(apiUrl, QStringLiteral("models")));
+    req.setRawHeader("x-api-key", apiKey.toUtf8());
+    req.setRawHeader("anthropic-version", AnthropicApi::kApiVersion);
+  } else {
+    QUrl url(apiUrl);
+    QString path = url.path();
+    while (path.endsWith('/'))
+      path.chop(1);
+    url.setPath(path + "/models");
+    req.setUrl(url);
+    if (!apiKey.isEmpty())
+      req.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+  }
 
   QNetworkReply *reply = m_networkManager->get(req);
   m_currentReply = reply;
   QObject::connect(reply, &QNetworkReply::finished, this,
-                   [this, reply, apiUrl, apiKey, saveAs] {
+                   [this, reply, apiUrl, apiKey, api, saveAs] {
                      if (m_currentReply == reply)
                        m_currentReply = nullptr;
                      reply->deleteLater();
                      if (handleModelsReply(reply) && !saveAs.isEmpty() &&
                          m_config) {
-                       m_config->setBackend(saveAs, apiUrl, apiKey);
+                       m_config->setBackend(saveAs, apiUrl, apiKey,
+                                            api.isEmpty() ? QStringLiteral("openai")
+                                                          : api);
                        m_config->setActiveBackend(saveAs);
                      }
                    });

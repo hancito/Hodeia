@@ -2,7 +2,6 @@
 #include "configmanager.h"
 #include "database.h"
 #include "localbackend.h"
-#include "remotebackend.h"
 #include "sqlitevec.h"
 #include "textformat.h"
 
@@ -225,10 +224,7 @@ static QString sourceLabel(const PageContext &pc) {
 
 QueryWorker::QueryWorker(ConfigManager *config, DatabaseManager *database,
                          QObject *parent)
-    : QObject(parent), m_config(config), m_database(database) {
-  m_chatBackend = new LocalBackend(this);
-  m_remoteBackend = new RemoteBackend(this);
-}
+    : QObject(parent), m_config(config), m_database(database) {}
 
 QueryWorker::~QueryWorker() = default;
 
@@ -253,7 +249,7 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
   totalTimer.start();
 
   // 1. Resolve the backend: it decides the default prompt budget.
-  BackendInfo backend = resolveBackend(m_config);
+  const ActiveBackend backend = resolveActiveBackend(m_config);
   qDebug() << "[QueryWorker] Backend:" << (backend.isLocal ? "local" : "remote")
            << "| Model:" << backend.modelName;
 
@@ -302,9 +298,8 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
            << "chars, visuals:" << payload.visualContext.size();
 
   // 5. Run inference
-  std::expected<QString, QString> inference =
-      backend.isLocal ? queryLocal(payload, backend)
-                      : queryRemote(payload, backend);
+  m_backend = makeChatBackend(backend);
+  std::expected<QString, QString> inference = generate(payload, backend);
 
   if (m_cancelled) {
     // The user stopped the query mid-inference. Do NOT persist a partial
@@ -351,29 +346,6 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
     m_database->endDbOperation();
 }
 
-/* ── Backend resolution ─────────────────────────────────────────── */
-
-QueryWorker::BackendInfo QueryWorker::resolveBackend(ConfigManager *config) {
-  BackendInfo info;
-  info.isLocal = (config->activeBackend() == "Llama.cpp");
-  info.modelName = config->activeModel();
-  info.config = config->backendConfig(config->activeBackend());
-
-  if (info.isLocal) {
-    QString folderPath = config->summarizersPath() + "/" + info.modelName;
-    QStringList ggufs =
-        QDir(folderPath)
-            .entryList(QStringList{"*.gguf"}, QDir::Files | QDir::NoSymLinks);
-    for (const QString &f : ggufs) {
-      if (!f.contains("mmproj", Qt::CaseInsensitive)) {
-        info.modelPath = folderPath + "/" + f;
-        break;
-      }
-    }
-  }
-  return info;
-}
-
 /* ── GPU preparation ────────────────────────────────────────────── */
 
 bool QueryWorker::prepareGpu(bool isLocal) {
@@ -392,130 +364,38 @@ void QueryWorker::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
     qDebug() << "[QueryWorker] Embedding model reloaded in" << t.elapsed()
              << "ms";
   }
-  if (isLocal) {
-    m_chatBackend->unloadModel();
-    qDebug() << "[QueryWorker] Chat model unloaded";
-  }
+  if (isLocal && m_backend)
+    m_backend->release();
+  m_backend.reset();
 }
 
-/* ── Local query ────────────────────────────────────────────────── */
+/* ── Inference ──────────────────────────────────────────────────── */
 
 std::expected<QString, QString>
-QueryWorker::queryLocal(const PromptPayload &payload,
-                        const BackendInfo &backend) {
-  if (backend.modelPath.isEmpty()) {
-    qWarning() << "[QueryWorker] No .gguf model found for" << backend.modelName;
+QueryWorker::generate(const PromptPayload &payload,
+                      const ActiveBackend &active) {
+  GenerationOptions options;
+  options.responseHeadroom = ResponseHeadroom;
+  options.timeoutMs = RemoteTimeoutMs;
+  auto result = m_backend->generate(payload, options, &m_cancelled);
+  if (result)
+    return *result;
+
+  const GenerationError &e = result.error();
+  switch (e.kind) {
+  case GenerationError::Kind::NoModelFile:
+    qWarning() << "[QueryWorker] No .gguf model found for" << active.modelName;
     return std::unexpected(
-        tr("No model file found for \"%1\"").arg(backend.modelName));
-  }
-  // The backend counts the exact prompt tokens during its no-alloc probe and
-  // sizes the KV cache as prompt_tokens + headroom, so no char heuristic here.
-  qDebug() << "[QueryWorker] Loading local model:" << backend.modelPath;
-  QElapsedTimer loadTimer;
-  loadTimer.start();
-
-  auto loadResult =
-      m_chatBackend->loadModel(backend.modelPath, payload, ResponseHeadroom);
-  if (!loadResult) {
-    qWarning() << "[QueryWorker] Failed to load model:" << loadResult.error();
-    return std::unexpected(
-        tr("Failed to load model: %1").arg(loadResult.error()));
-  }
-  qDebug() << "[QueryWorker] Model loaded in" << loadTimer.elapsed() << "ms";
-
-  QElapsedTimer genTimer;
-  genTimer.start();
-  // Pass the cancel flag so a queued stop() can interrupt a long local
-  // generation at the next token boundary (see InferenceEngine::generate).
-  QString result = m_chatBackend->summarize(payload, &m_cancelled);
-  qDebug() << "[QueryWorker] Generation completed in" << genTimer.elapsed()
-           << "ms"
-           << "(" << result.length() << "chars)"
-           << (m_cancelled ? "— CANCELLED" : "");
-  return result;
-}
-
-/* ── Remote query ───────────────────────────────────────────────── */
-
-std::expected<QString, QString>
-QueryWorker::queryRemote(const PromptPayload &payload,
-                         const BackendInfo &backend) {
-  QString apiUrl = backend.config.value("url").toString();
-  QString apiKey = backend.config.value("api_key").toString();
-
-  m_remoteBackend->setApiUrl(apiUrl);
-  m_remoteBackend->setApiKey(apiKey);
-  m_remoteBackend->setModelName(backend.modelName);
-
-  qDebug() << "[QueryWorker] Remote request — URL:" << apiUrl
-           << "| Model:" << backend.modelName << "| Visual context:"
-           << (payload.visualContext.empty() ? "disabled" : "enabled");
-
-  QElapsedTimer genTimer;
-  genTimer.start();
-
-  QString result, error;
-  bool timedOut = false;
-  QEventLoop loop;
-  QObject::connect(
-      m_remoteBackend, &RemoteBackend::finished, this,
-      [&result, &error, &loop](const QString &text, const QString &err) {
-        result = text;
-        error = err;
-        loop.quit();
-      },
-      Qt::SingleShotConnection);
-
-  // Watchdog: if the endpoint hangs (no response, server stall) the reply
-  // never finishes and this loop would block the worker thread forever,
-  // wedging the controller. Abort after the budget and surface an error.
-  // Generous — a large multimodal prompt can take minutes to process.
-  const int kRemoteTimeoutMs = 10 * 60 * 1000; // 10 minutes
-  QTimer timeout;
-  timeout.setSingleShot(true);
-  QObject::connect(&timeout, &QTimer::timeout, this, [&loop, &timedOut]() {
-    timedOut = true;
-    if (loop.isRunning())
-      loop.quit();
-  });
-  timeout.start(kRemoteTimeoutMs);
-
-  if (!payload.pageBlocks.empty()) {
-    m_remoteBackend->generateInterleaved(payload.systemPrompt, payload,
-                                         !payload.visualContext.empty());
-  } else if (payload.visualContext.empty()) {
-    m_remoteBackend->generate(payload.systemPrompt, payload.userMessage +
-                                                        "\n\n" +
-                                                        payload.textContext);
-  } else {
-    m_remoteBackend->generate(payload.systemPrompt,
-                              payload.userMessage + "\n\n" +
-                                  payload.textContext,
-                              payload.visualContext);
-  }
-
-  loop.exec(QEventLoop::ExcludeUserInputEvents);
-  timeout.stop();
-
-  qDebug() << "[QueryWorker] Remote generation completed in"
-           << genTimer.elapsed() << "ms"
-           << "(" << result.length() << "chars)"
-           << (timedOut ? "— TIMED OUT" : "");
-
-  if (timedOut) {
-    // The reply never finished; cancel the still-in-flight request so it
-    // doesn't fire later into a dead loop, and report the failure.
-    m_remoteBackend->cancel();
-    qWarning() << "[QueryWorker] Remote request timed out after"
-               << kRemoteTimeoutMs / 1000 << "s";
+        tr("No model file found for \"%1\"").arg(active.modelName));
+  case GenerationError::Kind::LoadFailed:
+    return std::unexpected(tr("Failed to load model: %1").arg(e.detail));
+  case GenerationError::Kind::Timeout:
     return std::unexpected(tr("Remote request timed out after %1 minutes")
-                               .arg(kRemoteTimeoutMs / 60000));
+                               .arg(RemoteTimeoutMs / 60000));
+  case GenerationError::Kind::RequestFailed:
+    break;
   }
-  if (!error.isEmpty()) {
-    qWarning() << "[QueryWorker] Remote request failed:" << error;
-    return std::unexpected(tr("Remote request failed: %1").arg(error));
-  }
-  return result;
+  return std::unexpected(tr("Remote request failed: %1").arg(e.detail));
 }
 
 /* ── Retrieval & page grouping ──────────────────────────────────── */
@@ -744,7 +624,8 @@ void QueryWorker::stop() {
   // boundary. executeQuery() sees m_cancelled and skips the DB write.
   m_cancelled = true;
   // Cancel the in-flight remote request so its QEventLoop exits.
-  m_remoteBackend->cancel();
+  if (m_backend)
+    m_backend->cancel();
   // Do NOT unload the chat model here: it may be held mid-llama_decode.
   // cleanupGpu() unloads it exactly once on the normal exit path.
   emit stopped();

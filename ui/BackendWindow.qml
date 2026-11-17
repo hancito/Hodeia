@@ -15,6 +15,7 @@ StyledDialog {
         nameValue.text = "";
         urlValue.text = "";
         keyValue.text = "";
+        apiValue.currentIndex = 0;
         editingIndex = -1;
         connectionVerified = false;
         modelCheckLabel.visible = false;
@@ -22,6 +23,8 @@ StyledDialog {
 
     property int editingIndex: -1
     property bool connectionVerified: false
+    // Protocol of the backend being edited ("openai" | "anthropic").
+    readonly property string apiType: apiValue.currentIndex === 1 ? "anthropic" : "openai"
 
     // React to checkRemoteModels result
     Connections {
@@ -74,6 +77,7 @@ StyledDialog {
                             nameValue.text = modelData.name || "";
                             urlValue.text = modelData.url || "";
                             keyValue.text = modelData.api_key || "";
+                            apiValue.currentIndex = modelData.api === "anthropic" ? 1 : 0;
                             connectionVerified = false;
                         }
                     }
@@ -120,13 +124,29 @@ StyledDialog {
                 RowLayout {
                     Layout.fillWidth: true
                     Label {
+                        text: qsTr("API")
+                        Layout.preferredWidth: 80
+                    }
+                    StyledComboBox {
+                        id: apiValue
+                        Layout.fillWidth: true
+                        model: [qsTr("OpenAI-compatible"), qsTr("Anthropic")]
+                        onActivated: connectionVerified = false
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
                         text: qsTr("URL")
                         Layout.preferredWidth: 80
                     }
                     StyledTextField {
                         id: urlValue
                         Layout.fillWidth: true
-                        placeholderText: "http://localhost:11434/v1"
+                        placeholderText: backendWindow.apiType === "anthropic"
+                                         ? "https://api.anthropic.com/v1"
+                                         : "http://localhost:11434/v1"
                     }
                 }
 
@@ -157,7 +177,7 @@ StyledDialog {
                             modelCheckLabel.visible = true;
                             return;
                         }
-                        helpers.checkRemoteModels(n, u, k);
+                        helpers.checkRemoteModels(n, u, k, backendWindow.apiType);
                     }
                 }
 
@@ -178,7 +198,8 @@ StyledDialog {
                         let n = nameValue.text.trim();
                         if (n === "")
                             return;
-                        configManager.setBackend(n, urlValue.text.trim(), keyValue.text.trim());
+                        configManager.setBackend(n, urlValue.text.trim(), keyValue.text.trim(),
+                                                 backendWindow.apiType);
                         editingIndex = -1;
                         nameValue.clear();
                         urlValue.clear();
