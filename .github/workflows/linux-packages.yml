@@ -61,7 +61,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             build-essential clang libomp-dev cmake ninja-build pkg-config \
             patchelf git git-lfs ca-certificates python3 python3-venv file \
-            xz-utils dpkg-dev \
+            xz-utils dpkg-dev unzip zip \
             libpng-dev libjpeg-turbo8-dev libtiff-dev zlib1g-dev libsqlite3-dev \
             libvulkan-dev glslc spirv-headers \
             libgl-dev libegl-dev libopengl0 libxkbcommon-dev libfontconfig-dev \
@@ -79,7 +79,7 @@ jobs:
         run: |
           dnf install -y \
             gcc-c++ clang libomp-devel cmake ninja-build make pkgconf-pkg-config \
-            patchelf git git-lfs python3 file xz findutils rpm-build \
+            patchelf git git-lfs python3 file xz findutils rpm-build unzip zip \
             libpng-devel libjpeg-turbo-devel libtiff-devel zlib-devel sqlite-devel \
             vulkan-loader-devel vulkan-headers glslc spirv-headers-devel \
             mesa-libGL-devel mesa-libEGL-devel libglvnd-opengl \
