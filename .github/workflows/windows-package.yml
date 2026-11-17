@@ -44,6 +44,10 @@ env:
   SQLITEVEC_VER: v0.1.10-alpha.4
   DEPS: C:\d          # short path: vcpkg / MuPDF hit MAX_PATH otherwise
   VCPKG_BINARY_SOURCES: clear;files,C:\vcpkg-cache,readwrite
+  # vcpkg builds ports in a clean environment: let the libmupdf overlay port
+  # see where the MuPDF checkout is (else it falls back to a local dev path).
+  MUPDF_LOCAL_SOURCE: C:\d\mupdf
+  VCPKG_KEEP_ENV_VARS: MUPDF_LOCAL_SOURCE
 
 defaults:
   run:

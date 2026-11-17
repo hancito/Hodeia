@@ -69,6 +69,8 @@ if (-not (Test-Path $toolchain)) { throw "vcpkg toolchain not found at $toolchai
 # when the source changes, and point the overlay port at that checkout.
 & (Join-Path $PSScriptRoot "update-mupdf-stamp.ps1") -MupdfSourceDir $MupdfSourceDir
 $env:MUPDF_LOCAL_SOURCE = $MupdfSourceDir
+# vcpkg builds ports in a clean environment: pass MUPDF_LOCAL_SOURCE through.
+$env:VCPKG_KEEP_ENV_VARS = "MUPDF_LOCAL_SOURCE"
 $overlayPorts = Join-Path $repoRoot "vcpkg-overlay\ports"
 $cmakeArgs = @(
     "-S", $repoRoot,

@@ -61,7 +61,9 @@ Write-Host ">> vcpkg install (overlay: libmupdf from $MupdfSourceDir)"
 & (Join-Path $scriptDir "update-mupdf-stamp.ps1") -MupdfSourceDir $MupdfSourceDir
 Push-Location $repoRoot
 try {
-    $vcpkgCmd = "set MUPDF_LOCAL_SOURCE=$MupdfSourceDir && `"$VcpkgRoot\vcpkg.exe`" install --triplet x64-windows --overlay-ports `"$repoRoot\vcpkg-overlay\ports`""
+    # VCPKG_KEEP_ENV_VARS: vcpkg builds ports in a clean environment, so the
+    # overlay port would not see MUPDF_LOCAL_SOURCE otherwise.
+    $vcpkgCmd = "set MUPDF_LOCAL_SOURCE=$MupdfSourceDir && set VCPKG_KEEP_ENV_VARS=MUPDF_LOCAL_SOURCE && `"$VcpkgRoot\vcpkg.exe`" install --triplet x64-windows --overlay-ports `"$repoRoot\vcpkg-overlay\ports`""
     & cmd /c $vcpkgCmd
     if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
 }
