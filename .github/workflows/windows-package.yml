@@ -313,7 +313,7 @@ jobs:
           }
 
       - name: Package
-        run: ./scripts/Windows/package-app.ps1 -BuildDir build\src
+        run: ./scripts/Windows/package-app.ps1 -BuildDir build
 
       - name: Upload the installer
         uses: actions/upload-artifact@v7
