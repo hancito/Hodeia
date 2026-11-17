@@ -107,7 +107,7 @@ jobs:
       # ── Vulkan SDK (glslc for the ggml Vulkan shaders) ──────────────────
       - name: Cache Vulkan SDK
         id: vulkan
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: C:\VulkanSDK\${{ env.VULKAN_VERSION }}
           key: vulkan-sdk-${{ env.VULKAN_VERSION }}
@@ -120,6 +120,13 @@ jobs:
           & $exe --root "C:\VulkanSDK\$env:VULKAN_VERSION" --accept-licenses --default-answer --confirm-command install
           if ($LASTEXITCODE -ne 0) { throw "Vulkan SDK install failed" }
 
+      - name: Save Vulkan SDK to the cache
+        if: steps.vulkan.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: C:\VulkanSDK\${{ env.VULKAN_VERSION }}
+          key: ${{ steps.vulkan.outputs.cache-primary-key }}
+
       - name: Use Vulkan SDK
         run: |
           "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION" | Add-Content $env:GITHUB_ENV
@@ -128,7 +135,7 @@ jobs:
       # ── CUDA toolkit (redistributable archives) ─────────────────────────
       - name: Cache CUDA
         id: cuda
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.CUDA_DIR }}
           key: cuda-${{ env.CUDA_VERSION }}-${{ env.CUDA_COMPONENTS }}
@@ -154,6 +161,13 @@ jobs:
             Remove-Item $zip, $tmp -Recurse -Force
           }
 
+      - name: Save CUDA to the cache
+        if: steps.cuda.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CUDA_DIR }}
+          key: ${{ steps.cuda.outputs.cache-primary-key }}
+
       - name: Use CUDA
         run: |
           "CUDA_PATH=$env:CUDA_DIR" | Add-Content $env:GITHUB_ENV
@@ -165,7 +179,7 @@ jobs:
       # ── Qt (MSVC build) ─────────────────────────────────────────────────
       - name: Cache Qt
         id: qt
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.QT_DIR }}
           key: qt-${{ env.QT_VERSION }}-win64_msvc2022_64
@@ -181,6 +195,13 @@ jobs:
           python -m aqt install-qt windows desktop $env:QT_VERSION win64_msvc2022_64 --outputdir $env:QT_DIR
           if ($LASTEXITCODE -ne 0) { throw "aqt install-qt failed" }
 
+      - name: Save Qt to the cache
+        if: steps.qt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.QT_DIR }}
+          key: ${{ steps.qt.outputs.cache-primary-key }}
+
       # ── Third-party sources ─────────────────────────────────────────────
       - name: Fetch dependency sources
         run: |
@@ -194,7 +215,7 @@ jobs:
       # ── llama.cpp (every CPU variant + Vulkan + CUDA) ──────────────────────────
       - name: Cache llama.cpp
         id: llama
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: external/lib/windows/llamacpp
           key: llama-win-${{ env.LLAMA_VER }}-vk${{ env.VULKAN_VERSION }}-cuda${{ env.CUDA_VERSION }}-${{ hashFiles('scripts/Windows/build-llama.ps1') }}
@@ -207,6 +228,13 @@ jobs:
           if (-not (Test-Path external/lib/windows/llamacpp/ggml-cuda.dll)) {
             throw "ggml-cuda.dll was not built (CUDA configure failed?)"
           }
+
+      - name: Save llama.cpp to the cache
+        if: steps.llama.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: external/lib/windows/llamacpp
+          key: ${{ steps.llama.outputs.cache-primary-key }}
 
       # ── sqlite-vec (vec0.dll) ───────────────────────────────────────────
       # The git tree only has sqlite-vec.h.tmpl; its Makefile fills it with

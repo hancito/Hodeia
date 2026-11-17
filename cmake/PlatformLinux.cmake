@@ -134,9 +134,19 @@ set(MUPDF_LIB_TARGETS
     ${_MUPDF_THIRD_LIB}
     ${_MUPDF_THREADS_LIB})
 
-set(TESS_LEPTO_TARGETS
-    ${_TESS_LIB}
-    ${_LEPTO_LIB})
+# Imported targets, so that the image codecs static Leptonica needs are placed
+# AFTER it on the link line.  As plain file paths, -lpng/-ljpeg/-ltiff/-lz came
+# first and a linker using --as-needed (Ubuntu's default) dropped them:
+# "undefined reference to symbol 'png_write_row' ... DSO missing from command line".
+add_library(hodeia_leptonica STATIC IMPORTED)
+set_target_properties(hodeia_leptonica PROPERTIES
+    IMPORTED_LOCATION "${_LEPTO_LIB}"
+    INTERFACE_LINK_LIBRARIES "png;jpeg;tiff;z;m")
+add_library(hodeia_tesseract STATIC IMPORTED)
+set_target_properties(hodeia_tesseract PROPERTIES
+    IMPORTED_LOCATION "${_TESS_LIB}"
+    INTERFACE_LINK_LIBRARIES "hodeia_leptonica")
+set(TESS_LEPTO_TARGETS hodeia_tesseract)
 
 # ===========================================================================
 # C. Platform-specific system libraries

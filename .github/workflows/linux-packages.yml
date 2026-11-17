@@ -150,7 +150,7 @@ jobs:
       # ── Qt (bundled into the package) ───────────────────────────────────
       - name: Cache Qt
         id: qt
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.QT_DIR }}
           key: qt-${{ env.QT_VERSION }}-linux_gcc_64
@@ -163,10 +163,17 @@ jobs:
           "$RUNNER_TEMP/aqt/bin/aqt" install-qt linux desktop "$QT_VERSION" linux_gcc_64 \
             --outputdir "$QT_DIR"
 
+      - name: Save Qt to the cache
+        if: steps.qt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.QT_DIR }}
+          key: ${{ steps.qt.outputs.cache-primary-key }}
+
       # ── CUDA toolkit (redistributable archives, for hodeia-cuda) ────────
       - name: Cache CUDA
         id: cuda
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.CUDA_DIR }}
           key: cuda-linux-${{ env.CUDA_VERSION }}-${{ env.CUDA_COMPONENTS }}
@@ -189,6 +196,13 @@ jobs:
             rm -rf "$tmp"
           done
 
+      - name: Save CUDA to the cache
+        if: steps.cuda.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.CUDA_DIR }}
+          key: ${{ steps.cuda.outputs.cache-primary-key }}
+
       - name: Use CUDA
         run: |
           # The archives put the libraries in lib/; CMake's FindCUDAToolkit
@@ -203,7 +217,7 @@ jobs:
       # ── Third-party dependencies (llama.cpp, MuPDF, Tesseract...) ──────
       - name: Cache third-party dependencies
         id: deps
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: |
             external/lib/linux
@@ -221,6 +235,19 @@ jobs:
           # Free the disk: the CUDA build tree alone takes several GB.
           rm -rf "$RUNNER_TEMP/deps"
           df -h .
+
+      - name: Save third-party dependencies to the cache
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            external/lib/linux
+            external/include/leptonica
+            external/include/tesseract
+            external/include/mupdf
+            external/include/llamacpp
+            external/include/SqliteVec
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       # ── Hodeia ──────────────────────────────────────────────────────────
       - name: Configure
