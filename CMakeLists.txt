@@ -74,9 +74,14 @@ add_subdirectory(src)
 
 # ---------------------------------------------------------------------------
 # 7. Install
+#    Linux: full install tree (/opt/hodeia) + DEB/RPM packages via CPack.
 # ---------------------------------------------------------------------------
-install(TARGETS Hodeia
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+if(HODEIA_PLATFORM_LINUX)
+  include(cmake/PackagingLinux.cmake)
+else()
+  install(TARGETS Hodeia
+      BUNDLE DESTINATION .
+      LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
