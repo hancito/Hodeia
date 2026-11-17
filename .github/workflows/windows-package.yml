@@ -3,10 +3,14 @@
 # Same chain as a local Windows build (scripts/Windows/*.ps1):
 #   MSVC + Ninja, Qt (aqtinstall, msvc2022_64), vcpkg manifest (MuPDF from the
 #   overlay port, Tesseract, Leptonica, Vulkan loader), llama.cpp built with
-#   build-llama.ps1 (every CPU variant + Vulkan, NO CUDA: the CUDA toolkit is
-#   a multi-GB install and cuBLAS would push the installer towards the 2 GiB
-#   release-asset limit), sqlite-vec with build-sqlitevec.ps1, then
-#   package-app.ps1 (windeployqt output + Inno Setup).
+#   build-llama.ps1 (every CPU variant + Vulkan + CUDA), sqlite-vec with
+#   build-sqlitevec.ps1, then package-app.ps1 (windeployqt output + Inno
+#   Setup).  The CUDA runtime (cudart, cuBLAS) is bundled by the deploy step
+#   (cmake/PlatformWindows.cmake); the installer stays under the 2 GiB
+#   release-asset limit (package-app.ps1 checks it).
+#
+# CUDA comes from NVIDIA's redistributable archives (only the components the
+# ggml CUDA backend needs), not the full multi-GB installer.
 #
 # Triggers: same as linux-packages.yml.
 
@@ -25,6 +29,10 @@ env:
   QT_VERSION: '6.12.0'
   QT_DIR: C:\Qt
   VULKAN_VERSION: '1.4.363.0'
+  CUDA_VERSION: '13.4.3'
+  CUDA_DIR: C:\cuda
+  # Components of redistrib_<CUDA_VERSION>.json needed to build ggml-cuda.
+  CUDA_COMPONENTS: cuda_nvcc cuda_crt libnvvm cuda_cudart libcublas cccl cuda_nvrtc cuda_profiler_api
   # Pinned dependency versions — keep in sync with scripts/Linux/build_deps.sh.
   LLAMA_VER: v0.9.0
   MUPDF_VER: 1.28.6
@@ -112,6 +120,43 @@ jobs:
           "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION" | Add-Content $env:GITHUB_ENV
           "C:\VulkanSDK\$env:VULKAN_VERSION\Bin" | Add-Content $env:GITHUB_PATH
 
+      # ── CUDA toolkit (redistributable archives) ─────────────────────────
+      - name: Cache CUDA
+        id: cuda
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CUDA_DIR }}
+          key: cuda-${{ env.CUDA_VERSION }}-${{ env.CUDA_COMPONENTS }}
+
+      - name: Install CUDA
+        if: steps.cuda.outputs.cache-hit != 'true'
+        run: |
+          $base = 'https://developer.download.nvidia.com/compute/cuda/redist'
+          $manifest = Invoke-RestMethod "$base/redistrib_$env:CUDA_VERSION.json"
+          New-Item -ItemType Directory -Force $env:CUDA_DIR | Out-Null
+          foreach ($c in $env:CUDA_COMPONENTS -split ' ') {
+            $rel = $manifest.$c.'windows-x86_64'.relative_path
+            if (-not $rel) { throw "CUDA component $c not in redistrib_$env:CUDA_VERSION.json" }
+            $zip = "$env:RUNNER_TEMP\$c.zip"
+            Write-Host ">> $rel"
+            curl.exe -fsSL -o $zip "$base/$rel"
+            if ($LASTEXITCODE -ne 0) { throw "download failed: $rel" }
+            $tmp = "$env:RUNNER_TEMP\cuda-$c"
+            Expand-Archive -Path $zip -DestinationPath $tmp -Force
+            # Each archive holds one top folder with bin/, include/, lib/...
+            $top = Get-ChildItem $tmp -Directory | Select-Object -First 1
+            Copy-Item -Path "$($top.FullName)\*" -Destination $env:CUDA_DIR -Recurse -Force
+            Remove-Item $zip, $tmp -Recurse -Force
+          }
+
+      - name: Use CUDA
+        run: |
+          "CUDA_PATH=$env:CUDA_DIR" | Add-Content $env:GITHUB_ENV
+          "CUDACXX=$env:CUDA_DIR\bin\nvcc.exe" | Add-Content $env:GITHUB_ENV
+          # The runner's Visual Studio may be newer than this CUDA release lists.
+          "NVCC_APPEND_FLAGS=-allow-unsupported-compiler" | Add-Content $env:GITHUB_ENV
+          "$env:CUDA_DIR\bin" | Add-Content $env:GITHUB_PATH
+
       # ── Qt (MSVC build) ─────────────────────────────────────────────────
       - name: Cache Qt
         id: qt
@@ -137,19 +182,22 @@ jobs:
           git -C "$env:DEPS\mupdf" submodule update --init --depth 1
           if ($LASTEXITCODE -ne 0) { throw "MuPDF submodules failed" }
 
-      # ── llama.cpp (every CPU variant + Vulkan) ──────────────────────────
+      # ── llama.cpp (every CPU variant + Vulkan + CUDA) ──────────────────────────
       - name: Cache llama.cpp
         id: llama
         uses: actions/cache@v6
         with:
           path: external/lib/windows/llamacpp
-          key: llama-win-${{ env.LLAMA_VER }}-vk${{ env.VULKAN_VERSION }}-${{ hashFiles('scripts/Windows/build-llama.ps1') }}
+          key: llama-win-${{ env.LLAMA_VER }}-vk${{ env.VULKAN_VERSION }}-cuda${{ env.CUDA_VERSION }}-${{ hashFiles('scripts/Windows/build-llama.ps1') }}
 
       - name: Build llama.cpp
         if: steps.llama.outputs.cache-hit != 'true'
         run: |
           ./scripts/Windows/build-llama.ps1 -SourceDir "$env:DEPS\llama.cpp" `
-            -Backends cpu,vulkan -VulkanSdk $env:VULKAN_SDK
+            -Backends cpu,vulkan,cuda -VulkanSdk $env:VULKAN_SDK -CudaToolkit $env:CUDA_DIR
+          if (-not (Test-Path external/lib/windows/llamacpp/ggml-cuda.dll)) {
+            throw "ggml-cuda.dll was not built (CUDA configure failed?)"
+          }
 
       # ── sqlite-vec (vec0.dll) ───────────────────────────────────────────
       # The git tree only has sqlite-vec.h.tmpl; its Makefile fills it with
