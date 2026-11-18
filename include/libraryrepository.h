@@ -49,6 +49,14 @@ struct CitationRow {
   int citedByCount = 0;
 };
 
+/// A paper present in the chunks table (ingested), summarized or not.
+struct IndexedPaper {
+  QString paperHash;
+  QString cleanTitle; ///< summary title, else the file name
+  QString citation;   ///< "Authors (year)" once summarized, else file name
+  int pages = 0;      ///< highest page with text + 1
+};
+
 /// Result of a batch delete: how many items could not be (fully) deleted,
 /// and the last database error.
 struct BatchResult {
@@ -76,6 +84,8 @@ public:
   QList<QueryRow> queries() const;
   /// Citation data of the summarized papers, by hash.
   QList<CitationRow> citations() const;
+  /// Every ingested paper (in the chunks table), by hash.
+  QList<IndexedPaper> indexedPapers() const;
   /// Title of a summarized paper, empty if none.
   QString summaryTitle(const QString &paperHash) const;
 

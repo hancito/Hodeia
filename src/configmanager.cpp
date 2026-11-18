@@ -1,4 +1,5 @@
 #include "configmanager.h"
+#include "apppaths.h"
 #include "notifier.h"
 #include <QCoreApplication>
 #include <QDir>
@@ -49,10 +50,8 @@ ConfigManager::~ConfigManager() { saveConfig(); }
 
 QString ConfigManager::getFilePath() const {
   // Finds location like: AppData/Roaming/Hodeia/ or ~/.local/share/Hodeia/
-  QString dirPath =
-      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  QDir().mkpath(dirPath); // Creates directory if it doesn't exist yet
-  return dirPath + "/config.json";
+  QDir().mkpath(AppPaths::dataDir()); // Creates directory if it doesn't exist yet
+  return AppPaths::configFile();
 }
 
 void ConfigManager::loadConfig() {
@@ -357,10 +356,8 @@ void ConfigManager::removeBackend(const QString &name) {
 }
 
 QString ConfigManager::projectsRoot() const {
-  QString dirPath =
-      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  QDir().mkpath(dirPath);
-  return dirPath + "/Projects";
+  QDir().mkpath(AppPaths::dataDir());
+  return AppPaths::projectsRoot();
 }
 
 std::expected<void, QString>
@@ -551,8 +548,7 @@ void ConfigManager::seedBundledModels() {
   // idempotent: a fresh install seeds the whole tree, while a version bump only
   // fills in newly-bundled models and never overwrites files the user already
   // has (e.g. a model they deleted is not re-seeded, a renamed file is added).
-  const QString appDir = QCoreApplication::applicationDirPath();
-  const QString srcRoot = appDir + "/Resources/Models";
+  const QString srcRoot = AppPaths::bundledModelsRoot();
   if (!QDir(srcRoot).exists()) {
     qWarning() << "[Config] No bundled model tree found at" << srcRoot;
     return;
@@ -624,19 +620,17 @@ void ConfigManager::selectDefaultModel() {
 }
 
 QString ConfigManager::modelsRoot() const {
-  QString dirPath =
-      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  return dirPath + "/Models";
+  return AppPaths::modelsRoot();
 }
 
 QString ConfigManager::modelsPath() const { return modelsRoot(); }
 
 QString ConfigManager::embeddersPath() const {
-  return modelsRoot() + "/Embedders";
+  return AppPaths::embeddersPath();
 }
 
 QString ConfigManager::summarizersPath() const {
-  return modelsRoot() + "/Summarizers";
+  return AppPaths::summarizersPath();
 }
 
 void ConfigManager::refreshProjectList() {
@@ -655,11 +649,11 @@ QString ConfigManager::projectPath(const QString &projectName) const {
 }
 
 QString ConfigManager::projectDbPath(const QString &projectName) const {
-  return projectsRoot() + "/" + projectName + "/" + projectName + ".db";
+  return AppPaths::projectDbPath(projectName);
 }
 
 QString ConfigManager::projectImgPath(const QString &projectName) const {
-  return projectsRoot() + "/" + projectName + "/" + "IMG";
+  return AppPaths::projectImgPath(projectName);
 }
 QString ConfigManager::deleteImages(const QStringList &hashList,
                                     const QString &imgPath) const {

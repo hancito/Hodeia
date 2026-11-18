@@ -3,6 +3,7 @@
 
 #include "citationformat.h"
 
+#include <QJsonObject>
 #include <QtTest>
 
 namespace {
@@ -39,6 +40,9 @@ private slots:
   void sourcesCitedOnly();
   void sourcesAllWhenNoneCited();
   void sourcesEmpty();
+  void sentence();
+  void marks();
+  void apaReference();
 };
 
 void TestCitationFormat::pageRange() {
@@ -102,6 +106,37 @@ void TestCitationFormat::sourcesAllWhenNoneCited() {
 
 void TestCitationFormat::sourcesEmpty() {
   QVERIFY(CitationFormat::sourcesSection({}, {}).isEmpty());
+}
+
+void TestCitationFormat::sentence() {
+  QCOMPARE(CitationFormat::sentence("Journal"), QString("Journal."));
+  QCOMPARE(CitationFormat::sentence("J. Econ."), QString("J. Econ."));
+  QCOMPARE(CitationFormat::sentence("Why? "), QString("Why?"));
+  QCOMPARE(CitationFormat::sentence(""), QString(""));
+}
+
+void TestCitationFormat::marks() {
+  const QString hash = "95f8ed1543981065d32ad0c4932dda45";
+  QCOMPARE(CitationFormat::shortId(hash), QString("95f8ed154398"));
+  QCOMPARE(CitationFormat::paperMark(hash), QString("[@95f8ed154398]"));
+  QCOMPARE(CitationFormat::pageMark(hash, 12), QString("[@95f8ed154398:p12]"));
+}
+
+void TestCitationFormat::apaReference() {
+  const QJsonObject work{
+      {"display_name", "Sickness Absence"},
+      {"authors", QString("Barmby, Tim") + QChar(0x1F) + "Ercolani, Marco" +
+                      QChar(0x1F) + "Treble, John"},
+      {"publication_year", 2002},
+      {"journal", "The Economic Journal"},
+      {"doi", "10.1111/1468-0297.00046"}};
+  QCOMPARE(CitationFormat::apaReference(work, "Unknown"),
+           QString("Barmby, Tim, Ercolani, Marco & Treble, John (2002). "
+                   "Sickness Absence. The Economic Journal. "
+                   "[10.1111/1468-0297.00046](https://doi.org/"
+                   "10.1111/1468-0297.00046)"));
+  // Nothing known but the missing title.
+  QCOMPARE(CitationFormat::apaReference({}, "Unknown"), QString("Unknown"));
 }
 
 QTEST_GUILESS_MAIN(TestCitationFormat)

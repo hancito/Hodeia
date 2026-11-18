@@ -18,6 +18,10 @@ add_library(HodeiaEngine STATIC
     ../include/database.h
     ../include/projectstore.h
     ../include/libraryrepository.h
+    ../include/mcpserver.h
+    ../include/mcpstdio.h
+    ../include/mcplibrary.h
+    ../include/apppaths.h
     ../include/summary.h
     ../include/query.h
     ../include/summaryproxymodel.h
@@ -58,6 +62,10 @@ add_library(HodeiaEngine STATIC
     database.cpp
     projectstore.cpp
     libraryrepository.cpp
+    mcpserver.cpp
+    mcpstdio.cpp
+    mcplibrary.cpp
+    apppaths.cpp
     summary.cpp
     query.cpp
     summaryproxymodel.cpp

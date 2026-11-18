@@ -34,3 +34,20 @@ hodeia_add_test(tst_querypromptbuilder)
 hodeia_add_test(tst_summarypromptbuilder)
 hodeia_add_test(tst_projectstore)
 hodeia_add_test(tst_libraryrepository)
+hodeia_add_test(tst_mcpserver)
+
+# End to end: runs the Hodeia executable itself with --mcp.
+hodeia_add_test(tst_mcpstdio)
+target_compile_definitions(tst_mcpstdio PRIVATE
+    HODEIA_EXE="$<TARGET_FILE:Hodeia>")
+add_dependencies(tst_mcpstdio Hodeia)
+
+hodeia_add_test(tst_mcplibrary)
+# ggml_backend_load_all() looks next to the executable and in the current
+# folder: run from Hodeia's folder, where the ggml backends are deployed.
+set_tests_properties(tst_mcplibrary PROPERTIES
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:Hodeia>)
+add_dependencies(tst_mcplibrary Hodeia)
+# The bundled E5 model (Git LFS) for the search test; skipped if absent.
+target_compile_definitions(tst_mcplibrary PRIVATE
+    HODEIA_E5_MODEL="${CMAKE_SOURCE_DIR}/Resources/Models/Embedders/multilingual-e5-small-q8_0.gguf")

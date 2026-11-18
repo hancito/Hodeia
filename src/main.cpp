@@ -4,6 +4,9 @@
 #include "enginemanager.h"
 #include "helpers.h"
 #include "llama.h"
+#include "mcplibrary.h"
+#include "mcpserver.h"
+#include "mcpstdio.h"
 #include "mtmd-helper.h"
 #include "notifier.h"
 #include "openalex.h"
@@ -262,8 +265,102 @@ static void registerApplicationFonts(const QString &fontsDir) {
   }
 }
 
+// ── MCP server mode (Hodeia --mcp) ─────────────────────────────────────────
+// An agent (Claude Code, Claude Desktop...) starts the executable with --mcp
+// and talks MCP over stdin/stdout.  No window, no QML: a QCoreApplication.
+// stdout carries the protocol only, so every log line goes to stderr and to
+// Hodeia-mcp.log (a file of its own: the GUI app may be running and writing
+// Hodeia.log at the same time).
+
+static bool hasArgument(int argc, char *argv[], const char *arg) {
+  for (int i = 1; i < argc; ++i)
+    if (std::strcmp(argv[i], arg) == 0)
+      return true;
+  return false;
+}
+
+static FILE *s_mcpLogFile = nullptr;
+
+static void mcpLog(const QString &line) {
+  const QByteArray bytes = line.toUtf8() + '\n';
+#ifdef Q_OS_WIN
+  // GUI-subsystem build: write to the inherited stderr handle directly.
+  HANDLE h = GetStdHandle(STD_ERROR_HANDLE);
+  if (h && h != INVALID_HANDLE_VALUE) {
+    DWORD written = 0;
+    WriteFile(h, bytes.constData(), DWORD(bytes.size()), &written, nullptr);
+  }
+#else
+  fwrite(bytes.constData(), 1, size_t(bytes.size()), stderr);
+#endif
+  if (s_mcpLogFile) {
+    fwrite(bytes.constData(), 1, size_t(bytes.size()), s_mcpLogFile);
+    fflush(s_mcpLogFile);
+  }
+}
+
+static int runMcpServer(int argc, char *argv[]) {
+  QCoreApplication app(argc, argv);
+  app.setApplicationName("Hodeia");
+  app.setApplicationVersion(QStringLiteral(HODEIA_VERSION));
+
+  const QString dataDir =
+      QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+  QDir().mkpath(dataDir);
+  s_mcpLogFile = fopen((dataDir + "/Hodeia-mcp.log").toUtf8().constData(), "wb");
+  qInstallMessageHandler(
+      [](QtMsgType type, const QMessageLogContext &, const QString &msg) {
+        const char *tag = type == QtDebugMsg      ? "DEBUG"
+                          : type == QtInfoMsg     ? "INFO"
+                          : type == QtWarningMsg  ? "WARN"
+                          : type == QtCriticalMsg ? "CRIT"
+                                                  : "FATAL";
+        mcpLog(QString("[%1] %2").arg(tag, msg));
+        if (type == QtFatalMsg)
+          std::abort();
+      });
+  qInfo() << "[MCP] HodeIA" << HODEIA_VERSION << "MCP server on stdio";
+  // llama.cpp (embedding model) logs through the same filter as the app.
+  initLlamaLogging();
+
+  int rc = 0;
+  {
+    // Everything that may log lives in this scope: the log file is closed
+    // only after all of it is destroyed.
+    McpServer server(QStringLiteral(HODEIA_VERSION));
+    server.addTool(
+        {QStringLiteral("ping"), QStringLiteral("Ping"),
+         QStringLiteral("Check that the HodeIA server answers. Returns its "
+                        "version."),
+         QJsonObject{{"type", "object"}, {"properties", QJsonObject{}}},
+         [](const QJsonObject &) -> std::expected<QString, QString> {
+           return QStringLiteral("pong — HodeIA %1").arg(HODEIA_VERSION);
+         }});
+
+    // The library tools (search, list, summary, page, citations).
+    McpLibrary library(McpLibrary::defaultPaths());
+    library.registerTools(server);
+
+    McpStdioTransport transport(server);
+    QObject::connect(&transport, &McpStdioTransport::closed, &app,
+                     &QCoreApplication::quit);
+    transport.start();
+    rc = QCoreApplication::exec();
+  }
+  qInfo() << "[MCP] exit";
+  if (s_mcpLogFile) {
+    FILE *f = s_mcpLogFile;
+    s_mcpLogFile = nullptr;
+    fclose(f);
+  }
+  return rc;
+}
+
 // Main app section. The entry point
 int main(int argc, char *argv[]) {
+  if (hasArgument(argc, argv, "--mcp"))
+    return runMcpServer(argc, argv);
+
 #ifdef Q_OS_LINUX
   // Native file dialogs through xdg-desktop-portal.  This is a
   // QGuiApplication (no Qt Widgets), so desktop themes whose dialogs are

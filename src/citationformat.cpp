@@ -19,6 +19,59 @@ QString pageRange(QList<int> pages) {
   return (pages.size() > 1 ? "pp. " : "p. ") + nums.join(", ");
 }
 
+QString sentence(const QString &text) {
+  const QString t = text.trimmed();
+  if (t.isEmpty() || t.endsWith('.') || t.endsWith('?') || t.endsWith('!'))
+    return t;
+  return t + ".";
+}
+
+QString apaReference(const QJsonObject &work, const QString &untitled) {
+  QStringList names;
+  for (const QString &s : work.value("authors").toString().split(QChar(0x1F))) {
+    const QString t = s.trimmed();
+    if (!t.isEmpty())
+      names << t;
+  }
+  QString line;
+  if (!names.isEmpty())
+    line += (names.size() == 1
+                 ? names.first()
+                 : names.mid(0, names.size() - 1).join(", ") + " & " +
+                       names.last()) +
+            " ";
+  const int year = work.value("publication_year").toInt();
+  if (year > 0)
+    line += "(" + QString::number(year) + "). ";
+  const QString title = work.value("display_name").toString();
+  line += title.isEmpty() ? untitled : sentence(title);
+  const QString journal = work.value("journal").toString();
+  if (!journal.isEmpty())
+    line += " " + sentence(journal);
+  const QString doi = work.value("doi").toString();
+  if (!doi.isEmpty()) {
+    // OpenAlex returns a full URL; a bare DOI gets the canonical resolver.
+    const QString url = doi.startsWith("http://", Qt::CaseInsensitive) ||
+                                doi.startsWith("https://", Qt::CaseInsensitive)
+                            ? doi
+                            : QStringLiteral("https://doi.org/") + doi;
+    line += " [" + doi + "](" + url + ")";
+  }
+  return line;
+}
+
+QString shortId(const QString &paperHash) {
+  return paperHash.left(ShortIdLength);
+}
+
+QString paperMark(const QString &paperHash) {
+  return "[@" + shortId(paperHash) + "]";
+}
+
+QString pageMark(const QString &paperHash, int displayPage) {
+  return "[@" + shortId(paperHash) + ":p" + QString::number(displayPage) + "]";
+}
+
 QString resolveReferenceTags(const QString &text,
                              const QList<PageContext> &pages,
                              QSet<int> &cited) {

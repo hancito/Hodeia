@@ -91,6 +91,21 @@ QList<CitationRow> LibraryRepository::citations() const {
   return rows;
 }
 
+QList<IndexedPaper> LibraryRepository::indexedPapers() const {
+  QList<IndexedPaper> rows;
+  SqliteStatement stmt = m_db.prepare(
+      "SELECT paper_hash, MAX(clean_title), MAX(citation), MAX(page) + 1 "
+      "FROM chunks GROUP BY paper_hash ORDER BY paper_hash");
+  while (true) {
+    auto step = stmt.step();
+    if (!step || !*step)
+      break;
+    rows.append({stmt.columnText(0), stmt.columnText(1), stmt.columnText(2),
+                 stmt.columnInt(3)});
+  }
+  return rows;
+}
+
 QString LibraryRepository::summaryTitle(const QString &paperHash) const {
   SqliteStatement stmt =
       m_db.prepare("SELECT title FROM Summaries WHERE paper_hash = ?");

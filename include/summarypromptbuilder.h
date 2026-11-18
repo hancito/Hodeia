@@ -5,6 +5,7 @@
 #include "sqlitevec.h"     // ChunkSearchResult
 
 #include <QList>
+#include <QMap>
 #include <QString>
 
 /// The prompt asking for the structured JSON summary of one paper: its text
@@ -22,6 +23,10 @@ const QString &userPrompt();
 /// Chunk overlap trimmed when chunks are joined back into pages; matches the
 /// ingestion's chunk overlap (PdfWorker::m_overlapChars).
 inline constexpr int ChunkOverlapChars = 200;
+
+/// The text of each page (0-based page → text) rebuilt from a paper's
+/// `chunks` (in chunk order), the overlap between chunks trimmed.
+QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks);
 
 /// The prompt for the paper `paperHash` from its `chunks` (in chunk order).
 /// `mode` decides which pages get their image: all (Full), those whose

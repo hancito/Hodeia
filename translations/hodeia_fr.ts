@@ -126,27 +126,27 @@
 <context>
     <name>CitationsModel</name>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="73"/>
+        <location filename="../src/citationsmodel.cpp" line="74"/>
         <source>Cited by</source>
         <translation>Cité par</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="85"/>
+        <location filename="../src/citationsmodel.cpp" line="86"/>
         <source>References</source>
         <translation>Références</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="123"/>
+        <location filename="../src/citationsmodel.cpp" line="103"/>
         <source> ( Showing top %1 ) </source>
         <translation> ( Affichage des %1 premiers ) </translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="127"/>
+        <location filename="../src/citationsmodel.cpp" line="107"/>
         <source>None found on OpenAlex</source>
         <translation>Aucun trouvé sur OpenAlex</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="141"/>
+        <location filename="../src/citationsmodel.cpp" line="112"/>
         <source>Unknown</source>
         <translation>Inconnu</translation>
     </message>
@@ -154,12 +154,12 @@
 <context>
     <name>ConfigManager</name>
     <message>
-        <location filename="../src/configmanager.cpp" line="77"/>
+        <location filename="../src/configmanager.cpp" line="76"/>
         <source>Settings Reset</source>
         <translation>Réglages réinitialisés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="78"/>
+        <location filename="../src/configmanager.cpp" line="77"/>
         <source>The settings file was damaged and could not be read, so default settings are used. Backends and the OpenAlex API key may need to be entered again.
 
 A copy of the damaged file was kept:
@@ -170,19 +170,19 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="83"/>
+        <location filename="../src/configmanager.cpp" line="82"/>
         <source>The settings file was damaged and could not be read, so default settings are used for this session. Changes will not be saved, to keep the original file:
 %1</source>
         <translation>Le fichier des réglages était endommagé et n&apos;a pas pu être lu : les réglages par défaut sont utilisés pour cette session. Les modifications ne seront pas enregistrées, afin de conserver le fichier d&apos;origine :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="179"/>
+        <location filename="../src/configmanager.cpp" line="178"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="180"/>
+        <location filename="../src/configmanager.cpp" line="179"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -197,88 +197,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="234"/>
-        <location filename="../src/configmanager.cpp" line="243"/>
-        <location filename="../src/configmanager.cpp" line="249"/>
+        <location filename="../src/configmanager.cpp" line="233"/>
+        <location filename="../src/configmanager.cpp" line="242"/>
+        <location filename="../src/configmanager.cpp" line="248"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="236"/>
-        <location filename="../src/configmanager.cpp" line="244"/>
-        <location filename="../src/configmanager.cpp" line="251"/>
+        <location filename="../src/configmanager.cpp" line="235"/>
+        <location filename="../src/configmanager.cpp" line="243"/>
+        <location filename="../src/configmanager.cpp" line="250"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="238"/>
-        <location filename="../src/configmanager.cpp" line="243"/>
+        <location filename="../src/configmanager.cpp" line="237"/>
+        <location filename="../src/configmanager.cpp" line="242"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="369"/>
-        <location filename="../src/configmanager.cpp" line="406"/>
+        <location filename="../src/configmanager.cpp" line="366"/>
+        <location filename="../src/configmanager.cpp" line="403"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="377"/>
+        <location filename="../src/configmanager.cpp" line="374"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="390"/>
+        <location filename="../src/configmanager.cpp" line="387"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="412"/>
+        <location filename="../src/configmanager.cpp" line="409"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="422"/>
+        <location filename="../src/configmanager.cpp" line="419"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="478"/>
+        <location filename="../src/configmanager.cpp" line="475"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="483"/>
+        <location filename="../src/configmanager.cpp" line="480"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="492"/>
+        <location filename="../src/configmanager.cpp" line="489"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="500"/>
+        <location filename="../src/configmanager.cpp" line="497"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="518"/>
+        <location filename="../src/configmanager.cpp" line="515"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="530"/>
+        <location filename="../src/configmanager.cpp" line="527"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="594"/>
+        <location filename="../src/configmanager.cpp" line="590"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="595"/>
+        <location filename="../src/configmanager.cpp" line="591"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -293,7 +293,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="691"/>
+        <location filename="../src/configmanager.cpp" line="685"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -304,22 +304,22 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>DatabaseManager</name>
     <message>
-        <location filename="../src/database.cpp" line="33"/>
+        <location filename="../src/database.cpp" line="34"/>
         <source>No Project Database</source>
         <translation>Aucune base de projet</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="34"/>
+        <location filename="../src/database.cpp" line="35"/>
         <source>No active project could be opened. Create a project from the Project menu.</source>
         <translation>Aucun projet actif n&apos;a pu être ouvert. Créez un projet depuis le menu Projet.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="45"/>
+        <location filename="../src/database.cpp" line="46"/>
         <source>Project Database Unavailable</source>
         <translation>Base du projet indisponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="46"/>
+        <location filename="../src/database.cpp" line="47"/>
         <source>The database of project &quot;%1&quot; could not be opened, so the library is empty.
 
 %2
@@ -352,12 +352,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %2</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="72"/>
+        <location filename="../src/database.cpp" line="73"/>
         <source>This project was saved by a newer version of HodeIA (database version %1; this version reads up to %2). Update HodeIA to open it.</source>
         <translation>Ce projet a été enregistré par une version plus récente de HodeIA (version de base %1 ; cette version lit jusqu&apos;à %2). Mettez HodeIA à jour pour l&apos;ouvrir.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="79"/>
+        <location filename="../src/database.cpp" line="80"/>
         <source>The project database needs an update, but the safety copy made before updating failed, so it was left unchanged: %1</source>
         <translation>La base du projet doit être mise à jour, mais la copie de sécurité préalable a échoué, elle n&apos;a donc pas été modifiée : %1</translation>
     </message>
@@ -370,56 +370,56 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="85"/>
+        <location filename="../src/database.cpp" line="86"/>
         <source>The project database could not be updated to the new version; the failed step was undone.</source>
         <translation>La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="89"/>
+        <location filename="../src/database.cpp" line="90"/>
         <source>A copy from before the update is kept: %1</source>
         <translation>Une copie d&apos;avant la mise à jour est conservée : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="113"/>
-        <location filename="../src/database.cpp" line="194"/>
+        <location filename="../src/database.cpp" line="114"/>
+        <location filename="../src/database.cpp" line="195"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="128"/>
+        <location filename="../src/database.cpp" line="129"/>
         <source>The project database could not be opened: %1</source>
         <translation>La base de données du projet n&apos;a pas pu être ouverte : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="148"/>
-        <location filename="../src/database.cpp" line="190"/>
-        <location filename="../src/database.cpp" line="223"/>
+        <location filename="../src/database.cpp" line="149"/>
+        <location filename="../src/database.cpp" line="191"/>
+        <location filename="../src/database.cpp" line="224"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="165"/>
+        <location filename="../src/database.cpp" line="166"/>
         <source>Cannot delete the active project while an operation is in progress.</source>
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="225"/>
+        <location filename="../src/database.cpp" line="226"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="264"/>
-        <location filename="../src/database.cpp" line="279"/>
+        <location filename="../src/database.cpp" line="265"/>
+        <location filename="../src/database.cpp" line="280"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="268"/>
+        <location filename="../src/database.cpp" line="269"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="270"/>
+        <location filename="../src/database.cpp" line="271"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -427,12 +427,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="287"/>
+        <location filename="../src/database.cpp" line="288"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="291"/>
+        <location filename="../src/database.cpp" line="292"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -1488,58 +1488,58 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>QueryPane</name>
     <message>
-        <location filename="../ui/QueryPane.qml" line="100"/>
+        <location filename="../ui/QueryPane.qml" line="117"/>
         <source>Error: %1</source>
         <translation>Erreur : %1</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="117"/>
+        <location filename="../ui/QueryPane.qml" line="134"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="129"/>
-        <location filename="../ui/QueryPane.qml" line="130"/>
+        <location filename="../ui/QueryPane.qml" line="146"/>
+        <location filename="../ui/QueryPane.qml" line="147"/>
         <source>Query</source>
         <translation>Interroger</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="129"/>
+        <location filename="../ui/QueryPane.qml" line="146"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="165"/>
+        <location filename="../ui/QueryPane.qml" line="182"/>
         <source>Ask a question about your paper library...</source>
         <translation>Posez une question sur votre bibliothèque d&apos;articles...</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="174"/>
+        <location filename="../ui/QueryPane.qml" line="191"/>
         <source>Context</source>
         <translation>Contexte</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="191"/>
+        <location filename="../ui/QueryPane.qml" line="208"/>
         <source>Auto (%1)</source>
         <translation>Auto (%1)</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="210"/>
+        <location filename="../ui/QueryPane.qml" line="227"/>
         <source>GPU</source>
         <translation>GPU</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="210"/>
+        <location filename="../ui/QueryPane.qml" line="227"/>
         <source>GPU + CPU</source>
         <translation>GPU + CPU</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="210"/>
+        <location filename="../ui/QueryPane.qml" line="227"/>
         <source>CPU (slow)</source>
         <translation>CPU (lent)</translation>
     </message>
     <message>
-        <location filename="../ui/QueryPane.qml" line="211"/>
+        <location filename="../ui/QueryPane.qml" line="228"/>
         <source>%1 · truncated</source>
         <translation>%1 · tronqué</translation>
     </message>

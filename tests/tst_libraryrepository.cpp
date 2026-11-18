@@ -60,6 +60,7 @@ private slots:
   void queries();
   void removePapers();
   void removeQueries();
+  void indexedPapers();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -178,6 +179,16 @@ void TestLibraryRepository::removeQueries() {
   QVERIFY(repo.removeQueries({first}).ok());
   QCOMPARE(repo.queries().size(), 1);
   QCOMPARE(repo.queries().first().queryText, QString("Q2"));
+}
+
+void TestLibraryRepository::indexedPapers() {
+  addChunk(m_db, "h2");
+  addChunk(m_db, "h1");
+  const QList<IndexedPaper> papers = LibraryRepository(m_db).indexedPapers();
+  QCOMPARE(papers.size(), 2);
+  QCOMPARE(papers[0].paperHash, QString("h1"));
+  QCOMPARE(papers[0].cleanTitle, QString("file.pdf"));
+  QCOMPARE(papers[0].pages, 1);
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

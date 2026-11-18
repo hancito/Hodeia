@@ -74,6 +74,18 @@ const QString &visualSystemPrompt() { return s_systemPromptVisual; }
 const QString &textSystemPrompt() { return s_systemPromptText; }
 const QString &userPrompt() { return s_userPrompt; }
 
+QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks) {
+  QMap<int, QString> pages;
+  for (int i = 0; i < chunks.size(); ++i) {
+    const auto &c = chunks[i];
+    QString text = c.text;
+    if (i < chunks.size() - 1 && text.length() > ChunkOverlapChars)
+      text = text.left(text.length() - ChunkOverlapChars);
+    pages[c.page] += text;
+  }
+  return pages;
+}
+
 PromptPayload build(const QString &paperHash,
                     const QList<ChunkSearchResult> &chunks, VisualMode mode,
                     const QString &imageDir) {
@@ -83,14 +95,7 @@ PromptPayload build(const QString &paperHash,
     return payload;
 
   // ── Merge chunks per page (0-based page → text) ──
-  QMap<int, QString> pageTextMap;
-  for (int i = 0; i < chunks.size(); ++i) {
-    const auto &c = chunks[i];
-    QString text = c.text;
-    if (i < chunks.size() - 1 && text.length() > ChunkOverlapChars)
-      text = text.left(text.length() - ChunkOverlapChars);
-    pageTextMap[c.page] += text;
-  }
+  const QMap<int, QString> pageTextMap = pageTexts(chunks);
 
   // ── Which pages get an image? ──
   QSet<int> pagesWithImage;

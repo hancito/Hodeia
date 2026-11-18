@@ -1,4 +1,5 @@
 #include "citationsmodel.h"
+#include "citationformat.h"
 #include "sqlitedb.h"
 
 #include <QJsonArray>
@@ -86,27 +87,6 @@ QString CitationsModel::citesDisplayForHash(const QString &paperHash) const {
   return out;
 }
 
-// APA-style: "Authors (Year). Title. Journal. https://doi.org/DOI"
-// Authors in the stored string are joined with \u001F (unit separator) because
-// each name itself contains a comma ("Family, Given").
-static QString apaAuthors(const QString &raw) {
-  if (raw.isEmpty())
-    return {};
-  const QStringList parts = raw.split(QChar(0x1F));
-  QStringList names;
-  for (const QString &s : parts) {
-    const QString t = s.trimmed();
-    if (!t.isEmpty())
-      names << t;
-  }
-  if (names.isEmpty())
-    return {};
-  if (names.size() == 1)
-    return names.first();
-  const QString head = names.mid(0, names.size() - 1).join(", ");
-  return head + " & " + names.last();
-}
-
 QString CitationsModel::formatSection(const QString &header,
                                       const QString &itemsJson,
                                       int total) const {
@@ -128,34 +108,8 @@ QString CitationsModel::formatSection(const QString &header,
     return out;
   }
 
-  for (const QJsonValue &v : arr) {
-    const QJsonObject r = v.toObject();
-    const QString authors = apaAuthors(r.value("authors").toString());
-    QString line = "- ";
-    if (!authors.isEmpty())
-      line += authors + " ";
-    const int year = r.value("publication_year").toInt();
-    if (year > 0)
-      line += "(" + QString::number(year) + "). ";
-    line += r.value("display_name").toString().isEmpty()
-                ? tr("Unknown")
-                : r.value("display_name").toString() + ".";
-    const QString journal = r.value("journal").toString();
-    if (!journal.isEmpty())
-      line += " " + journal + ".";
-    const QString doi = r.value("doi").toString();
-    if (!doi.isEmpty()) {
-      // Render as a Markdown link so the references tab shows a clickable
-      // DOI.  OpenAlex returns a full URL; if a bare DOI is stored instead,
-      // prefix the canonical resolver so it still resolves.
-      const QString url =
-          doi.startsWith("http://", Qt::CaseInsensitive) ||
-                  doi.startsWith("https://", Qt::CaseInsensitive)
-              ? doi
-              : QStringLiteral("https://doi.org/") + doi;
-      line += " [" + doi + "](" + url + ")";
-    }
-    out += line + "\n";
-  }
+  for (const QJsonValue &v : arr)
+    out += "- " + CitationFormat::apaReference(v.toObject(), tr("Unknown")) +
+           "\n";
   return out;
 }
