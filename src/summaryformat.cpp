@@ -1,6 +1,8 @@
 #include "summaryformat.h"
 #include "textformat.h"
 
+#include <algorithm>
+
 #include <QDebug>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -45,6 +47,56 @@ QString dropTrailingCommas(const QString &in) {
         continue; // drop the comma run
     }
     out += c;
+  }
+  return out;
+}
+
+// Escape quotes a model left raw inside a string value, e.g. a copied
+// formula: `"the trade involves w" = 0."`.  Inside a string, a `"` really
+// closes it only when followed (after spaces) by `:` `}` `]`, by `,` then
+// another string / closer, or by the end of the text; any other `"` is text.
+QString escapeStrayQuotes(const QString &in) {
+  auto nextNonSpace = [&in](int from) {
+    while (from < in.length() && in[from].isSpace())
+      ++from;
+    return from;
+  };
+  auto closesString = [&](int quotePos) {
+    const int j = nextNonSpace(quotePos + 1);
+    if (j >= in.length())
+      return true;
+    const QChar c = in[j];
+    if (c == ':' || c == '}' || c == ']')
+      return true;
+    if (c != ',')
+      return false;
+    const int k = nextNonSpace(j + 1);
+    return k >= in.length() || in[k] == '"' || in[k] == '}' || in[k] == ']';
+  };
+
+  QString out;
+  out.reserve(in.length() + 8);
+  bool inString = false;
+  for (int i = 0; i < in.length(); ++i) {
+    const QChar c = in[i];
+    if (!inString) {
+      inString = (c == '"');
+      out += c;
+      continue;
+    }
+    if (c == '\\' && i + 1 < in.length()) {
+      out += c;
+      out += in[++i];
+    } else if (c == '"') {
+      if (closesString(i)) {
+        inString = false;
+        out += c;
+      } else {
+        out += QStringLiteral("\\\"");
+      }
+    } else {
+      out += c;
+    }
   }
   return out;
 }
@@ -135,13 +187,13 @@ QString toHtmlList(const QStringList &items) {
 
 namespace SummaryFormat {
 
-PaperSummary parseJson(const QString &raw) {
+std::optional<PaperSummary> tryParseJson(const QString &raw) {
   PaperSummary summary;
   const QString text = extractJsonObject(raw);
   if (text.isEmpty()) {
     qWarning() << "[SummaryFormat] No JSON object found (length:"
                << raw.length() << ")";
-    return summary;
+    return std::nullopt;
   }
 
   QJsonParseError err;
@@ -152,6 +204,11 @@ PaperSummary parseJson(const QString &raw) {
     const char *repair = "trailing-comma";
     doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
     if (err.error != QJsonParseError::NoError) {
+      candidate = escapeStrayQuotes(candidate);
+      repair = "stray-quotes";
+      doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
+    }
+    if (err.error != QJsonParseError::NoError) {
       candidate = appendMissingClosers(candidate);
       repair = "missing-closers";
       doc = QJsonDocument::fromJson(candidate.toUtf8(), &err);
@@ -161,7 +218,7 @@ PaperSummary parseJson(const QString &raw) {
                  << origError << "| offset:" << err.offset << "| context:"
                  << candidate.mid(qMax(0, err.offset - 30), 60)
                         .replace('\n', " ");
-      return summary;
+      return std::nullopt;
     }
     qInfo() << "[SummaryFormat] Repaired malformed summary JSON via" << repair;
   }
@@ -174,6 +231,16 @@ PaperSummary parseJson(const QString &raw) {
   };
 
   const QJsonObject obj = doc.object();
+  static const QStringList kFields = {
+      "title",       "authors",          "journal",
+      "year",        "topics",           "researchObjective",
+      "methodology", "coreFindingsAndSignificance",
+      "criticalLimitations",             "citableSummary"};
+  if (std::none_of(kFields.cbegin(), kFields.cend(),
+                   [&obj](const QString &k) { return obj.contains(k); })) {
+    qWarning() << "[SummaryFormat] JSON object has none of the summary fields";
+    return std::nullopt;
+  }
   summary.title = clean(obj.value("title"));
   summary.journal = obj.value("journal").toString();
   summary.year = obj.value("year").toInt();
@@ -189,6 +256,10 @@ PaperSummary parseJson(const QString &raw) {
   for (const auto &t : obj.value("topics").toArray())
     summary.topics.append(t.toString());
   return summary;
+}
+
+PaperSummary parseJson(const QString &raw) {
+  return tryParseJson(raw).value_or(PaperSummary{});
 }
 
 QString toHtml(const PaperSummary &s) {

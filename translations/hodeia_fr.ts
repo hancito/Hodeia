@@ -1517,67 +1517,67 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>QueryWorker</name>
     <message>
-        <location filename="../src/queryworker.cpp" line="239"/>
+        <location filename="../src/queryworker.cpp" line="238"/>
         <source>Empty query</source>
         <translation>Requête vide</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="279"/>
+        <location filename="../src/queryworker.cpp" line="272"/>
         <source>No relevant information found in the library.</source>
         <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="281"/>
+        <location filename="../src/queryworker.cpp" line="274"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="284"/>
+        <location filename="../src/queryworker.cpp" line="277"/>
         <source>The library cannot be searched: %1</source>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="307"/>
+        <location filename="../src/queryworker.cpp" line="299"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="313"/>
+        <location filename="../src/queryworker.cpp" line="305"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="337"/>
+        <location filename="../src/queryworker.cpp" line="329"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="389"/>
+        <location filename="../src/queryworker.cpp" line="366"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="391"/>
+        <location filename="../src/queryworker.cpp" line="368"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="393"/>
+        <location filename="../src/queryworker.cpp" line="370"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="398"/>
+        <location filename="../src/queryworker.cpp" line="375"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="642"/>
+        <location filename="../src/queryworker.cpp" line="619"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="652"/>
+        <location filename="../src/queryworker.cpp" line="629"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>
@@ -1795,32 +1795,37 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Le modèle a renvoyé une réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="157"/>
+        <location filename="../src/summarizer.cpp" line="156"/>
+        <source>The model&apos;s response is not a readable summary</source>
+        <translation>La réponse du modèle n&apos;est pas un résumé lisible</translation>
+    </message>
+    <message>
+        <location filename="../src/summarizer.cpp" line="165"/>
         <source>The summary could not be saved: %1</source>
         <translation>Le résumé n&apos;a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="225"/>
+        <location filename="../src/summarizer.cpp" line="233"/>
         <source>No model file found for &quot;%1&quot;. Check the selected model.</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 ». Vérifiez le modèle sélectionné.</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="229"/>
+        <location filename="../src/summarizer.cpp" line="237"/>
         <source>The model could not be loaded: %1</source>
         <translation>Le modèle n&apos;a pas pu être chargé : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="234"/>
+        <location filename="../src/summarizer.cpp" line="242"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="369"/>
+        <location filename="../src/summarizer.cpp" line="377"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="390"/>
+        <location filename="../src/summarizer.cpp" line="398"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>
@@ -1829,7 +1834,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="165"/>
+        <location filename="../src/summarizer.cpp" line="173"/>
         <source>Summary generated and saved (%1 chars)</source>
         <translation>Résumé généré et enregistré (%1 caractères)</translation>
     </message>

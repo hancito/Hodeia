@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -23,8 +25,13 @@ struct PaperSummary {
 namespace SummaryFormat {
 
 /// Parse a raw LLM JSON response into a PaperSummary. Code fences, reasoning
-/// text and common malformed-JSON patterns are tolerated; an unrecoverable
-/// response yields an empty summary.
+/// text and common malformed-JSON patterns are tolerated.  nullopt when the
+/// response is unreadable: no JSON object, malformed beyond repair, or none
+/// of the summary fields.
+std::optional<PaperSummary> tryParseJson(const QString &raw);
+
+/// tryParseJson(), with an empty summary for an unreadable response (display
+/// of stored summaries).
 PaperSummary parseJson(const QString &raw);
 
 /// HTML body fragment for one summary. No font family is set: each renderer

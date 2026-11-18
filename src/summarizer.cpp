@@ -105,10 +105,10 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
 
   const ActiveBackend backend = resolveActiveBackend(m_config);
   m_backend = makeChatBackend(backend);
-  qDebug() << "[Summarizer] Backend:" << (backend.isLocal ? "local" : "remote")
+  qDebug() << "[Summarizer] Backend:" << backendKindName(backend.kind)
            << "| Model:" << backend.modelName;
 
-  bool wasEmbeddingReady = prepareGpu(backend.isLocal);
+  const bool wasEmbeddingReady = prepareGpu();
 
   int successCount = 0;
   for (int i = 0; i < hashes.size(); ++i) {
@@ -149,8 +149,16 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
       QString msg = tr("The model returned an empty response");
       emit paperFinished(hash, title, false, msg);
       qWarning() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg;
+    } else if (const auto parsed = SummaryFormat::tryParseJson(*result);
+               !parsed) {
+      // Unreadable: saving it would store a summary with no title or
+      // authors (and no OpenAlex match).  Fail so the paper can be redone.
+      QString msg = tr("The model's response is not a readable summary");
+      emit paperFinished(hash, title, false, msg);
+      qWarning() << "[Summarizer] ✗ Paper" << hash << "failed:" << msg
+                 << "| response:" << result->left(200);
     } else {
-      PaperSummary summary = SummaryFormat::parseJson(*result);
+      const PaperSummary &summary = *parsed;
       auto saved = saveSummary(hash, summary, *result, backend.modelName);
       if (!saved) {
         emit paperFinished(hash, title, false,
@@ -172,15 +180,15 @@ void Summarizer::summarizePapers(const QStringList &hashes) {
   qDebug() << "[Summarizer] All done —" << successCount << "/" << hashes.size()
            << "succeeded in" << totalTimer.elapsed() << "ms";
 
-  cleanupGpu(backend.isLocal, wasEmbeddingReady);
+  cleanupGpu(wasEmbeddingReady);
   if (m_database)
     m_database->endDbOperation();
 }
 
 /* ── GPU preparation ────────────────────────────────────────────── */
 
-bool Summarizer::prepareGpu(bool isLocal) {
-  if (!isLocal || !m_database)
+bool Summarizer::prepareGpu() {
+  if (!m_backend || !m_backend->caps().usesLocalGpu || !m_database)
     return false;
 
   SqliteVecManager &vecMgr = m_database->vecManager();
@@ -192,7 +200,7 @@ bool Summarizer::prepareGpu(bool isLocal) {
   return false;
 }
 
-void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
+void Summarizer::cleanupGpu(bool wasEmbeddingReady) {
   if (wasEmbeddingReady && m_database) {
     qDebug() << "[Summarizer] Reloading embedding model...";
     QElapsedTimer t;
@@ -201,7 +209,7 @@ void Summarizer::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
     qDebug() << "[Summarizer] Embedding model reloaded in" << t.elapsed()
              << "ms";
   }
-  if (isLocal && m_backend)
+  if (m_backend)
     m_backend->release();
   m_backend.reset();
 }

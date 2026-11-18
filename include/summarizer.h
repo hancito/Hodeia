@@ -37,8 +37,10 @@ signals:
 
 private:
   /* GPU lifecycle */
-  bool prepareGpu(bool isLocal);
-  void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
+  /// Unload the embedding model when the backend needs the GPU; true if it
+  /// was loaded (cleanupGpu() then reloads it).
+  bool prepareGpu();
+  void cleanupGpu(bool wasEmbeddingReady);
 
   /* inference */
   /// The generated text (empty if cancelled), or a user-facing error.
