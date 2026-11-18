@@ -1,7 +1,10 @@
 #pragma once
 
+#include "zoterosource.h"
+
 #include <QString>
 #include <QStringList>
+#include <optional>
 
 /// One page worth of context aggregated from vector search results
 /// (Retriever), turned into a prompt block (QueryPrompt) and cited in the
@@ -15,6 +18,9 @@ struct PageContext {
   QString imageFile;       ///< absolute PNG path, empty if unavailable
   bool withImage = false;  ///< image sent to the model (visual mode, within
                            ///< the image cap and the token budget)
+  /// Zotero's metadata of the paper, set only when they take precedence
+  /// (zoteroPriority): see MetadataResolver::attachZotero().
+  std::optional<ZoteroMeta> zotero;
 
   /// 1-based page number, as readers and the page image files
   /// (hash_page_001.png) count.

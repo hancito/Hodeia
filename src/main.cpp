@@ -430,6 +430,7 @@ int main(int argc, char *argv[]) {
   // Create the Helpers (manages model discovery, summary formatting, PDF
   // export)
   Helpers helpers(&configManager);
+  helpers.setDatabase(&databaseManager);
 
   // Create the OpenAlex reference service (independent background thread)
   OpenAlexClient openAlexClient(&configManager, &databaseManager);
@@ -443,6 +444,9 @@ int main(int argc, char *argv[]) {
   // Zotero connector (reads Zotero, imports through the ingestion)
   ZoteroController zoteroController(&configManager, &databaseManager,
                                     &engineController);
+  // Zotero's metadata first, or not: the paper list shows the other names.
+  QObject::connect(&configManager, &ConfigManager::zoteroPriorityChanged,
+                   &databaseManager, &DatabaseManager::reloadModels);
 
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);

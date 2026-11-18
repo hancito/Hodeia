@@ -18,6 +18,7 @@ Rectangle {
     property bool summarizing: false
     property bool ingesting: false
     property var reportJsons: []
+    property var reportHashes: []
     // Summary run report: failures ("title — cause") collected from
     // paperFinished, shown in one window when the run ends.
     property var summaryFailures: []
@@ -221,13 +222,16 @@ Rectangle {
                         return;
                     }
                     var jsons = [];
+                    var hashes = [];
                     for (var i = 0; i < databaseManager.summaryProxyModel.rowCount(); i++) {
                         var hash = databaseManager.summaryProxyModel.get(i, "paperHash");
                         if (summaryDbPane.selectedPapers.includes(hash)) {
                             jsons.push(databaseManager.summaryProxyModel.get(i, "summaryJson"));
+                            hashes.push(hash);
                         }
                     }
                     summaryDbPane.reportJsons = jsons;
+                    summaryDbPane.reportHashes = hashes;
                     reportSaveDialog.open();
                 }
             }
@@ -565,7 +569,7 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF Files (*.pdf)"]
         onAccepted: {
-            var result = helpers.exportPdf(summaryDbPane.reportJsons, selectedFile.toString());
+            var result = helpers.exportPdf(summaryDbPane.reportJsons, selectedFile.toString(), summaryDbPane.reportHashes, configManager.zoteroPriority);
             if (result)
                 messageBox.showInfo(qsTr("Report Saved"), qsTr("The report was saved to:\n%1").arg(result));
             else

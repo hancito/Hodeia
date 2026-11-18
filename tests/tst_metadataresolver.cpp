@@ -1,6 +1,8 @@
 // Unit tests for MetadataResolver: how papers are named in citations.
 
+#include "libraryrepository.h"
 #include "metadataresolver.h"
+#include "summaryformat.h"
 
 #include <QtTest>
 
@@ -13,6 +15,10 @@ private slots:
   void paperLabel_data();
   void paperLabel();
   void forms();
+  void zoteroNames();
+  void labelWithZotero();
+  void summaryWithZotero();
+  void pagesWithZotero();
 };
 
 void TestMetadataResolver::compactAuthors_data() {
@@ -83,6 +89,88 @@ void TestMetadataResolver::forms() {
   const PaperLabel bare{"Zanardelli et al", "", ""};
   QCOMPARE(bare.inlineForm(), QString("Zanardelli et al"));
   QCOMPARE(bare.sourceForm(), QString("Zanardelli et al"));
+}
+
+namespace {
+
+ZoteroMeta zoteroMeta() {
+  ZoteroMeta z;
+  z.title = "Strategies in the  Repeated Game";
+  z.authors = {"Ioannou, Christos A.", "Romero, Julian", "Smith, Ann"};
+  z.year = "2014";
+  z.journal = "Games and Economic Behavior";
+  return z;
+}
+
+} // namespace
+
+void TestMetadataResolver::zoteroNames() {
+  using MetadataResolver::compactAuthorList;
+  QCOMPARE(compactAuthorList({"Walker, Joan"}), QString("Walker"));
+  QCOMPARE(compactAuthorList({"Walker, Joan", "Ben-Akiva, Moshe"}),
+           QString("Walker & Ben-Akiva"));
+  QCOMPARE(compactAuthorList(zoteroMeta().authors), QString("Ioannou et al."));
+  QCOMPARE(compactAuthorList({"World Bank"}), QString("World Bank")); // institution
+  QCOMPARE(compactAuthorList({}), QString());
+  QCOMPARE(MetadataResolver::displayName("Ioannou, Christos A."),
+           QString("Christos A. Ioannou"));
+  QCOMPARE(MetadataResolver::displayName("World Bank"), QString("World Bank"));
+}
+
+void TestMetadataResolver::labelWithZotero() {
+  const PaperLabel fromFile =
+      MetadataResolver::paperLabel("abcdef", "Ioannou - 2014 - Strategies", "");
+  const PaperLabel l = MetadataResolver::withZotero(fromFile, zoteroMeta());
+  QCOMPARE(l.authors, QString("Ioannou et al."));
+  QCOMPARE(l.year, QString("2014"));
+  QCOMPARE(l.title, QString("Strategies in the Repeated Game"));
+
+  // A field Zotero lacks keeps the summary's.
+  ZoteroMeta partial;
+  partial.title = "Only a title";
+  const PaperLabel summary{"Walker & Ben-Akiva", "2002", "Summary title"};
+  const PaperLabel p = MetadataResolver::withZotero(summary, partial);
+  QCOMPARE(p.authors, QString("Walker & Ben-Akiva"));
+  QCOMPARE(p.year, QString("2002"));
+  QCOMPARE(p.title, QString("Only a title"));
+}
+
+void TestMetadataResolver::summaryWithZotero() {
+  PaperSummary s;
+  s.title = "summary title";
+  s.authors = {"C. Ioannou"};
+  s.year = 2013;
+  s.journal = "";
+  s.methodology = "kept";
+  MetadataResolver::applyZotero(s, zoteroMeta());
+  QCOMPARE(s.title, QString("Strategies in the Repeated Game"));
+  QCOMPARE(s.authors, QStringList({"Christos A. Ioannou", "Julian Romero", "Ann Smith"}));
+  QCOMPARE(s.year, 2014);
+  QCOMPARE(s.journal, QString("Games and Economic Behavior"));
+  QCOMPARE(s.methodology, QString("kept")); // the content is the summary's
+
+  SummaryRow row;
+  row.title = "t";
+  row.year = "2013";
+  ZoteroMeta noYear = zoteroMeta();
+  noYear.year.clear();
+  MetadataResolver::applyZotero(row, noYear);
+  QCOMPARE(row.authors, QString("Christos A. Ioannou; Julian Romero; Ann Smith"));
+  QCOMPARE(row.year, QString("2013"));
+}
+
+void TestMetadataResolver::pagesWithZotero() {
+  QList<PageContext> pages(2);
+  pages[0].paperHash = "h1";
+  pages[0].cleanTitle = "file name";
+  pages[1].paperHash = "h2";
+  pages[1].cleanTitle = "other file";
+  MetadataResolver::attachZotero(pages, {{"h1", zoteroMeta()}});
+  QVERIFY(pages[0].zotero.has_value());
+  QVERIFY(!pages[1].zotero.has_value());
+  QCOMPARE(MetadataResolver::paperLabel(pages[0]).footerForm(),
+           QString("Ioannou et al. (2014)"));
+  QCOMPARE(MetadataResolver::paperLabel(pages[1]).title, QString());
 }
 
 QTEST_GUILESS_MAIN(TestMetadataResolver)

@@ -6,6 +6,7 @@
 #include "mcplibrary.h"
 #include "projectstore.h"
 #include "sqlitevec.h"
+#include "zoterorepository.h"
 
 #include <QDir>
 #include <QFile>
@@ -105,6 +106,7 @@ private slots:
   void missingProject();
   void otherSchemaVersion();
   void search();
+  void zoteroPriority();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -134,6 +136,50 @@ void TestMcpLibrary::listPapers() {
   // Ingested only: labelled from its file name, not "summarized".
   QVERIFY(out->contains("[@bbbbbbbbbbbb] Carlin (1989) — Why shirking varies. "
                         "1 pages. Summary: no"));
+}
+
+// With zoteroPriority in config.json, papers known to Zotero are named with
+// Zotero's metadata (field by field); without it, nothing changes.
+void TestMcpLibrary::zoteroPriority() {
+  {
+    SqliteDb db;
+    QVERIFY(db.open(dbPath(m_dir->path(), "Lib")).has_value());
+    ZoteroItemRow row;
+    row.libraryId = 1;
+    row.itemKey = "ITEMCARL";
+    row.attachmentKey = "ATTCARL1";
+    row.paperHash = kIngested;
+    row.meta.title = "Why the incidence of shirking varies across employers";
+    row.meta.authors = {"Carlin, Paul S."};
+    row.meta.year = "1989";
+    QVERIFY(ZoteroRepository(db).upsertItem(row).has_value());
+    row.attachmentKey = "ATTWALK1";
+    row.paperHash = kSummarized;
+    row.meta.title = "Generalized random utility model";
+    row.meta.authors = {"Walker, Joan", "Ben-Akiva, Moshe"};
+    row.meta.year = ""; // Zotero has none: the summary's stays
+    QVERIFY(ZoteroRepository(db).upsertItem(row).has_value());
+  }
+  // Off: as before.
+  QVERIFY(m_lib->listPapers({})->contains("Hybrid Choice Models"));
+
+  QFile f(m_dir->filePath("config.json"));
+  QVERIFY(f.open(QIODevice::WriteOnly));
+  f.write(QJsonDocument(QJsonObject{{"lastProject", "Lib"}, {"zoteroPriority", true}})
+              .toJson());
+  f.close();
+
+  const auto out = m_lib->listPapers({});
+  QVERIFY2(out->contains("[@aaaaaaaaaaaa] Joan Walker; Moshe Ben-Akiva (2002). "
+                         "Generalized random utility model."),
+           qPrintable(*out));
+  QVERIFY2(out->contains("[@bbbbbbbbbbbb] Carlin (1989) — Why the incidence of "
+                         "shirking varies across employers."),
+           qPrintable(*out));
+  const auto summary = m_lib->getSummary({{"paper", "aaaaaaaaaaaa"}});
+  QVERIFY(summary->startsWith("[@aaaaaaaaaaaa] Generalized random utility model\n"));
+  QVERIFY(summary->contains("Authors: Joan Walker; Moshe Ben-Akiva"));
+  QVERIFY(summary->contains("## Research objective\nObjective.")); // content kept
 }
 
 void TestMcpLibrary::listFilter() {

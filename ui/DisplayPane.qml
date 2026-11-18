@@ -246,7 +246,7 @@ Rectangle {
                             font.hintingPreference: Font.PreferNoHinting
                             wrapMode: TextEdit.Wrap
                             selectByMouse: true
-                            text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson) : qsTr("Please make a summary of this paper")
+                            text: displayPane.activeSummaryJson ? helpers.summaryToHtml(displayPane.activeSummaryJson, displayPane.activePaperHash, configManager.zoteroPriority) : qsTr("Please make a summary of this paper")
                         }
                     }
                     RowLayout {
@@ -525,7 +525,7 @@ Rectangle {
         fileMode: FileDialog.SaveFile
         nameFilters: ["PDF Files (*.pdf)"]
         onAccepted: {
-            var result = helpers.exportPdf([displayPane.activeSummaryJson], selectedFile.toString());
+            var result = helpers.exportPdf([displayPane.activeSummaryJson], selectedFile.toString(), [displayPane.activePaperHash], configManager.zoteroPriority);
             if (result)
                 messageBox.showInfo(qsTr("PDF Saved"), qsTr("The summary was saved to:\n%1").arg(result));
             else

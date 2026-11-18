@@ -1,7 +1,9 @@
 #pragma once
 
 #include "sqlitedb.h"
+#include "zoterosource.h"
 
+#include <QHash>
 #include <QJsonObject>
 #include <QString>
 #include <expected>
@@ -54,10 +56,14 @@ private:
   std::expected<QString, QString> resolvePaper(const QString &id);
   /// "Authors (year) — Title" of a paper.
   QString label(const QString &paperHash);
+  /// Zotero's metadata by paper hash when they take precedence
+  /// (zoteroPriority), else empty.
+  QHash<QString, ZoteroMeta> zoteroMeta();
 
   Paths m_paths;
   SqliteDb m_db;
   QString m_project; ///< project whose database is open
+  bool m_zoteroPriority = false; ///< config.json, read at each call
   std::unique_ptr<SqliteVecManager> m_embeddings;
   bool m_modelLoaded = false;
 };

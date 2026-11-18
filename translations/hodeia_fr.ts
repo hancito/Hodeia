@@ -177,12 +177,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="180"/>
+        <location filename="../src/configmanager.cpp" line="182"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="181"/>
+        <location filename="../src/configmanager.cpp" line="183"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -197,88 +197,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="243"/>
-        <location filename="../src/configmanager.cpp" line="252"/>
-        <location filename="../src/configmanager.cpp" line="258"/>
+        <location filename="../src/configmanager.cpp" line="253"/>
+        <location filename="../src/configmanager.cpp" line="262"/>
+        <location filename="../src/configmanager.cpp" line="268"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="245"/>
-        <location filename="../src/configmanager.cpp" line="253"/>
-        <location filename="../src/configmanager.cpp" line="260"/>
+        <location filename="../src/configmanager.cpp" line="255"/>
+        <location filename="../src/configmanager.cpp" line="263"/>
+        <location filename="../src/configmanager.cpp" line="270"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="247"/>
-        <location filename="../src/configmanager.cpp" line="252"/>
+        <location filename="../src/configmanager.cpp" line="257"/>
+        <location filename="../src/configmanager.cpp" line="262"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="376"/>
-        <location filename="../src/configmanager.cpp" line="413"/>
+        <location filename="../src/configmanager.cpp" line="386"/>
+        <location filename="../src/configmanager.cpp" line="423"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="384"/>
+        <location filename="../src/configmanager.cpp" line="394"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="397"/>
+        <location filename="../src/configmanager.cpp" line="407"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="419"/>
+        <location filename="../src/configmanager.cpp" line="429"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="429"/>
+        <location filename="../src/configmanager.cpp" line="439"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="485"/>
+        <location filename="../src/configmanager.cpp" line="495"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="490"/>
+        <location filename="../src/configmanager.cpp" line="500"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="499"/>
+        <location filename="../src/configmanager.cpp" line="509"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="507"/>
+        <location filename="../src/configmanager.cpp" line="517"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="525"/>
+        <location filename="../src/configmanager.cpp" line="535"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="537"/>
+        <location filename="../src/configmanager.cpp" line="547"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="600"/>
+        <location filename="../src/configmanager.cpp" line="610"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="601"/>
+        <location filename="../src/configmanager.cpp" line="611"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -293,7 +293,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="695"/>
+        <location filename="../src/configmanager.cpp" line="705"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -381,7 +381,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../src/database.cpp" line="114"/>
-        <location filename="../src/database.cpp" line="195"/>
+        <location filename="../src/database.cpp" line="197"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
@@ -391,35 +391,35 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>La base de données du projet n&apos;a pas pu être ouverte : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="149"/>
-        <location filename="../src/database.cpp" line="191"/>
-        <location filename="../src/database.cpp" line="224"/>
+        <location filename="../src/database.cpp" line="151"/>
+        <location filename="../src/database.cpp" line="193"/>
+        <location filename="../src/database.cpp" line="226"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="166"/>
+        <location filename="../src/database.cpp" line="168"/>
         <source>Cannot delete the active project while an operation is in progress.</source>
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="226"/>
+        <location filename="../src/database.cpp" line="228"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="265"/>
-        <location filename="../src/database.cpp" line="280"/>
+        <location filename="../src/database.cpp" line="267"/>
+        <location filename="../src/database.cpp" line="282"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="269"/>
+        <location filename="../src/database.cpp" line="271"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="271"/>
+        <location filename="../src/database.cpp" line="273"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -427,12 +427,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="288"/>
+        <location filename="../src/database.cpp" line="290"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="292"/>
+        <location filename="../src/database.cpp" line="294"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -566,55 +566,55 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Paramètres invalides</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="285"/>
+        <location filename="../src/helpers.cpp" line="313"/>
         <source>URL is empty</source>
         <translation>L&apos;URL est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="365"/>
+        <location filename="../src/helpers.cpp" line="393"/>
         <source>Invalid JSON</source>
         <translation>JSON invalide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="239"/>
+        <location filename="../src/helpers.cpp" line="267"/>
         <source>Model file does not exist: %1</source>
         <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="147"/>
+        <location filename="../src/helpers.cpp" line="175"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="163"/>
+        <location filename="../src/helpers.cpp" line="191"/>
         <source>These models could not be fully deleted (a file may still be in use, e.g. by a running summary or query):</source>
         <translation>Ces modèles n&apos;ont pas pu être entièrement supprimés (un fichier est peut-être encore utilisé, par exemple par un résumé ou une requête en cours) :</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="190"/>
-        <location filename="../src/helpers.cpp" line="208"/>
+        <location filename="../src/helpers.cpp" line="218"/>
+        <location filename="../src/helpers.cpp" line="236"/>
         <source>Cannot read %1: %2</source>
         <translation>Impossible de lire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="193"/>
+        <location filename="../src/helpers.cpp" line="221"/>
         <source>%1 is empty</source>
         <translation>%1 est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="198"/>
-        <location filename="../src/helpers.cpp" line="210"/>
         <location filename="../src/helpers.cpp" line="226"/>
+        <location filename="../src/helpers.cpp" line="238"/>
+        <location filename="../src/helpers.cpp" line="254"/>
         <source>Cannot write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="244"/>
+        <location filename="../src/helpers.cpp" line="272"/>
         <source>MMProj file does not exist: %1</source>
         <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="252"/>
+        <location filename="../src/helpers.cpp" line="280"/>
         <source>Cannot create folder %1</source>
         <translation>Impossible de créer le dossier %1</translation>
     </message>
@@ -1556,62 +1556,62 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>QueryWorker</name>
     <message>
-        <location filename="../src/queryworker.cpp" line="29"/>
+        <location filename="../src/queryworker.cpp" line="31"/>
         <source>Empty query</source>
         <translation>Requête vide</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="72"/>
+        <location filename="../src/queryworker.cpp" line="78"/>
         <source>No relevant information found in the library.</source>
         <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="74"/>
+        <location filename="../src/queryworker.cpp" line="80"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="77"/>
+        <location filename="../src/queryworker.cpp" line="83"/>
         <source>The library cannot be searched: %1</source>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="100"/>
+        <location filename="../src/queryworker.cpp" line="106"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="106"/>
+        <location filename="../src/queryworker.cpp" line="112"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="125"/>
+        <location filename="../src/queryworker.cpp" line="131"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="162"/>
+        <location filename="../src/queryworker.cpp" line="168"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="164"/>
+        <location filename="../src/queryworker.cpp" line="170"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="166"/>
+        <location filename="../src/queryworker.cpp" line="172"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="171"/>
+        <location filename="../src/queryworker.cpp" line="177"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="197"/>
+        <location filename="../src/queryworker.cpp" line="203"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
@@ -1879,50 +1879,50 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>SummaryDbPane</name>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="78"/>
-        <location filename="../ui/SummaryDbPane.qml" line="96"/>
-        <location filename="../ui/SummaryDbPane.qml" line="126"/>
-        <location filename="../ui/SummaryDbPane.qml" line="156"/>
+        <location filename="../ui/SummaryDbPane.qml" line="79"/>
+        <location filename="../ui/SummaryDbPane.qml" line="97"/>
+        <location filename="../ui/SummaryDbPane.qml" line="127"/>
+        <location filename="../ui/SummaryDbPane.qml" line="157"/>
         <source>Paper Number: %1</source>
         <translation>Nombre d&apos;articles : %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="107"/>
+        <location filename="../ui/SummaryDbPane.qml" line="108"/>
         <source>Summarizing...</source>
         <translation>Résumé en cours...</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="137"/>
+        <location filename="../ui/SummaryDbPane.qml" line="138"/>
         <source>Summarize done: %1/%2 in %3</source>
         <translation>Résumés terminés : %1/%2 en %3</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="158"/>
+        <location filename="../ui/SummaryDbPane.qml" line="159"/>
         <source>Summarization stopped by user after %1</source>
         <translation>Résumé arrêté par l&apos;utilisateur après %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="170"/>
+        <location filename="../ui/SummaryDbPane.qml" line="171"/>
         <source>Search paper</source>
         <translation>Rechercher un article</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="179"/>
+        <location filename="../ui/SummaryDbPane.qml" line="180"/>
         <source>Summarize</source>
         <translation>Résumer</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="201"/>
+        <location filename="../ui/SummaryDbPane.qml" line="202"/>
         <source>Refresh</source>
         <translation>Rafraîchir</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="213"/>
+        <location filename="../ui/SummaryDbPane.qml" line="214"/>
         <source>Generate Report from selection</source>
         <translation>Générer un rapport à partir de la sélection</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="237"/>
+        <location filename="../ui/SummaryDbPane.qml" line="241"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
@@ -1931,27 +1931,27 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Aucun article sélectionné</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="59"/>
+        <location filename="../ui/SummaryDbPane.qml" line="60"/>
         <source>No Papers Selected</source>
         <translation>Aucun article sélectionné</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="59"/>
+        <location filename="../ui/SummaryDbPane.qml" line="60"/>
         <source>Select at least one paper first.</source>
         <translation>Sélectionnez d&apos;abord au moins un article.</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="76"/>
+        <location filename="../ui/SummaryDbPane.qml" line="77"/>
         <source>Deletion Incomplete</source>
         <translation>Suppression incomplète</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="131"/>
+        <location filename="../ui/SummaryDbPane.qml" line="132"/>
         <source>Summarization Stopped</source>
         <translation>Résumé arrêté</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/SummaryDbPane.qml" line="131"/>
+        <location filename="../ui/SummaryDbPane.qml" line="132"/>
         <source>%n paper(s) failed before the stop:</source>
         <translation>
             <numerusform>%n article a échoué avant l&apos;arrêt :</numerusform>
@@ -1959,12 +1959,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="141"/>
+        <location filename="../ui/SummaryDbPane.qml" line="142"/>
         <source>Summarization Complete</source>
         <translation>Résumé terminé</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/SummaryDbPane.qml" line="141"/>
+        <location filename="../ui/SummaryDbPane.qml" line="142"/>
         <source>%n paper(s) summarized in %1.</source>
         <translation>
             <numerusform>%n article résumé en %1.</numerusform>
@@ -1972,12 +1972,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="143"/>
+        <location filename="../ui/SummaryDbPane.qml" line="144"/>
         <source>%1 of %2 paper(s) summarized in %3.</source>
         <translation>%1 article(s) résumé(s) sur %2 en %3.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/SummaryDbPane.qml" line="144"/>
+        <location filename="../ui/SummaryDbPane.qml" line="145"/>
         <source>%n paper(s) failed:</source>
         <translation>
             <numerusform>%n article a échoué :</numerusform>
@@ -1985,144 +1985,144 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="145"/>
+        <location filename="../ui/SummaryDbPane.qml" line="146"/>
         <source>Summarization Failed</source>
         <translation>Échec du résumé</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="145"/>
+        <location filename="../ui/SummaryDbPane.qml" line="146"/>
         <source>Summarization Partly Failed</source>
         <translation>Résumé partiellement échoué</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="269"/>
+        <location filename="../ui/SummaryDbPane.qml" line="273"/>
         <source>Summarizing %1/%2 papers</source>
         <translation>Résumé en cours : %1/%2 articles</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="281"/>
+        <location filename="../ui/SummaryDbPane.qml" line="285"/>
         <source>Elapsed Time: %1h %2m</source>
         <translation>Temps écoulé : %1h %2m</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="285"/>
+        <location filename="../ui/SummaryDbPane.qml" line="289"/>
         <source>Elapsed Time: %1m %2s</source>
         <translation>Temps écoulé : %1m %2s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="287"/>
+        <location filename="../ui/SummaryDbPane.qml" line="291"/>
         <source>Elapsed Time: %1s</source>
         <translation>Temps écoulé : %1s</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="298"/>
+        <location filename="../ui/SummaryDbPane.qml" line="302"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="332"/>
+        <location filename="../ui/SummaryDbPane.qml" line="336"/>
         <source>Select All</source>
         <translation>Tout sélectionner</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="351"/>
+        <location filename="../ui/SummaryDbPane.qml" line="355"/>
         <source>Documents: %1</source>
         <translation>Documents : %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="366"/>
+        <location filename="../ui/SummaryDbPane.qml" line="370"/>
         <source>Sort by</source>
         <translation>Trier par</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Title</source>
         <translation>Titre</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Pages</source>
         <translation>Pages</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Year</source>
         <translation>Année</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="373"/>
+        <location filename="../ui/SummaryDbPane.qml" line="377"/>
         <source>Citations</source>
         <translation>Citations</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="398"/>
+        <location filename="../ui/SummaryDbPane.qml" line="402"/>
         <source>Descending</source>
         <translation>Décroissant</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="496"/>
+        <location filename="../ui/SummaryDbPane.qml" line="500"/>
         <source>Please summarise for authors name</source>
         <translation>Veuillez résumer pour obtenir les noms des auteurs</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="508"/>
+        <location filename="../ui/SummaryDbPane.qml" line="512"/>
         <source>Year: %1 · %2 pages </source>
         <translation>Année : %1 · %2 pages </translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="517"/>
+        <location filename="../ui/SummaryDbPane.qml" line="521"/>
         <source>· cited by %1</source>
         <translation>· cité par %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="564"/>
+        <location filename="../ui/SummaryDbPane.qml" line="568"/>
         <source>Save Report as PDF</source>
         <translation>Enregistrer le rapport en PDF</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="570"/>
+        <location filename="../ui/SummaryDbPane.qml" line="574"/>
         <source>Report Saved</source>
         <translation>Rapport enregistré</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="570"/>
+        <location filename="../ui/SummaryDbPane.qml" line="574"/>
         <source>The report was saved to:
 %1</source>
         <translation>Le rapport a été enregistré dans :
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="572"/>
+        <location filename="../ui/SummaryDbPane.qml" line="576"/>
         <source>Report Export Failed</source>
         <translation>Échec de l&apos;export du rapport</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="572"/>
+        <location filename="../ui/SummaryDbPane.qml" line="576"/>
         <source>The report could not be saved. See the log for details.</source>
         <translation>Le rapport n&apos;a pas pu être enregistré. Consultez le journal pour plus de détails.</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="586"/>
+        <location filename="../ui/SummaryDbPane.qml" line="590"/>
         <source>Delete Papers</source>
         <translation>Supprimer les articles</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="590"/>
+        <location filename="../ui/SummaryDbPane.qml" line="594"/>
         <source>Delete the selected paper(s)? This cannot be undone.</source>
         <translation>Supprimer le(s) article(s) sélectionné(s) ? Cette action est irréversible.</translation>
     </message>
     <message>
-        <location filename="../ui/SummaryDbPane.qml" line="596"/>
+        <location filename="../ui/SummaryDbPane.qml" line="600"/>
         <source>Deletion cancelled</source>
         <translation>Suppression annulée</translation>
     </message>
@@ -2149,17 +2149,17 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
     <message>
         <location filename="../src/zoterocontroller.cpp" line="137"/>
-        <location filename="../src/zoterocontroller.cpp" line="236"/>
+        <location filename="../src/zoterocontroller.cpp" line="239"/>
         <source>Cannot update the project: %1</source>
         <translation>Impossible de mettre à jour le projet : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="187"/>
+        <location filename="../src/zoterocontroller.cpp" line="190"/>
         <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
         <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="201"/>
+        <location filename="../src/zoterocontroller.cpp" line="204"/>
         <source>Cannot save the collections: %1</source>
         <translation>Impossible d&apos;enregistrer les collections : %1</translation>
     </message>
@@ -2197,12 +2197,17 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Parcourir…</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="88"/>
+        <location filename="../ui/ZoteroWindow.qml" line="70"/>
+        <source>Name papers with Zotero&apos;s title, authors, year and journal (instead of the summary&apos;s)</source>
+        <translation>Nommer les articles avec le titre, les auteurs, l&apos;année et la revue de Zotero (plutôt que ceux du résumé)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="94"/>
         <source>Collections followed by this project</source>
         <translation>Collections suivies par ce projet</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="142"/>
+        <location filename="../ui/ZoteroWindow.qml" line="148"/>
         <source>%n PDF</source>
         <translation>
             <numerusform>%n PDF</numerusform>
@@ -2210,7 +2215,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="144"/>
+        <location filename="../ui/ZoteroWindow.qml" line="150"/>
         <source>%n in the project</source>
         <translation>
             <numerusform>%n dans le projet</numerusform>
@@ -2218,7 +2223,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="147"/>
+        <location filename="../ui/ZoteroWindow.qml" line="153"/>
         <source>%n not downloaded</source>
         <translation>
             <numerusform>%n non téléchargé</numerusform>
@@ -2226,22 +2231,22 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="161"/>
+        <location filename="../ui/ZoteroWindow.qml" line="167"/>
         <source>Ticking a collection ticks its sub-collections.</source>
         <translation>Cocher une collection coche ses sous-collections.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="165"/>
+        <location filename="../ui/ZoteroWindow.qml" line="171"/>
         <source>Save Selection</source>
         <translation>Enregistrer la sélection</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="178"/>
+        <location filename="../ui/ZoteroWindow.qml" line="184"/>
         <source>New PDFs (%1)</source>
         <translation>Nouveaux PDF (%1)</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="190"/>
+        <location filename="../ui/ZoteroWindow.qml" line="196"/>
         <source>%n PDF(s) of the followed collections are not on this computer. Download them in Zotero: they will be proposed here once downloaded.</source>
         <translation>
             <numerusform>%n PDF des collections suivies n&apos;est pas sur cet ordinateur. Téléchargez-le dans Zotero : il sera proposé ici une fois téléchargé.</numerusform>
@@ -2249,42 +2254,42 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="199"/>
+        <location filename="../ui/ZoteroWindow.qml" line="205"/>
         <source>Follow collections above to have their PDFs proposed.</source>
         <translation>Suivez des collections ci-dessus pour que leurs PDF soient proposés.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="200"/>
+        <location filename="../ui/ZoteroWindow.qml" line="206"/>
         <source>Nothing new: every downloaded PDF of the followed collections is in the project or ignored.</source>
         <translation>Rien de nouveau : chaque PDF téléchargé des collections suivies est dans le projet ou ignoré.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="238"/>
+        <location filename="../ui/ZoteroWindow.qml" line="244"/>
         <source>(untitled)</source>
         <translation>(sans titre)</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="268"/>
+        <location filename="../ui/ZoteroWindow.qml" line="274"/>
         <source>Untick All</source>
         <translation>Tout décocher</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="268"/>
+        <location filename="../ui/ZoteroWindow.qml" line="274"/>
         <source>Tick All</source>
         <translation>Tout cocher</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="282"/>
+        <location filename="../ui/ZoteroWindow.qml" line="288"/>
         <source>Ignore</source>
         <translation>Ignorer</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="283"/>
+        <location filename="../ui/ZoteroWindow.qml" line="289"/>
         <source>Never propose the ticked PDFs again</source>
         <translation>Ne plus jamais proposer les PDF cochés</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="288"/>
+        <location filename="../ui/ZoteroWindow.qml" line="294"/>
         <source>Import (%1)</source>
         <translation>Importer (%1)</translation>
     </message>

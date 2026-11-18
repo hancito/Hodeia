@@ -139,6 +139,8 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
 }
 
 void DatabaseManager::reloadModels() {
+  if (m_config)
+    m_summaryModel->setZoteroPriority(m_config->zoteroPriority());
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
   m_citationsModel->loadAll();

@@ -3,6 +3,7 @@
 #include "zoterosource.h"
 
 #include <QDateTime>
+#include <QHash>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -75,6 +76,8 @@ public:
   /// of that hash, those still in Zotero first, then the user's library
   /// (library 1); nullopt if the paper is not in ZoteroItems.
   std::optional<ZoteroItemRow> itemByHash(const QString &paperHash) const;
+  /// The metadata itemByHash() would give, for every paper at once.
+  QHash<QString, ZoteroMeta> metaByHash() const;
 
 private:
   SqliteDb &m_db;

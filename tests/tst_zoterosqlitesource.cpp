@@ -222,7 +222,7 @@ void TestZoteroSqliteSource::metadata() {
   QVERIFY(a);
   QCOMPARE(a->itemKey, QString("ITEMA111"));
   QCOMPARE(a->meta.title, QString("Strategies"));
-  QCOMPARE(a->meta.authors, QStringList({"Christos A. Ioannou", "Julian Romero"}));
+  QCOMPARE(a->meta.authors, QStringList({"Ioannou, Christos A.", "Romero, Julian"}));
   QCOMPARE(a->meta.year, QString("2014"));
   QCOMPARE(a->meta.journal, QString("Games"));
   QCOMPARE(a->meta.doi, QString("10.1/x"));
@@ -236,7 +236,7 @@ void TestZoteroSqliteSource::metadata() {
 
   const ZoteroPdf *b = findPdf(*snap, "ATTB1111");
   QVERIFY(b);
-  QCOMPARE(b->meta.authors, QStringList({"Jane Doe", "World Bank"})); // editors
+  QCOMPARE(b->meta.authors, QStringList({"Doe, Jane", "World Bank"})); // editors
   QCOMPARE(b->meta.year, QString("2019"));
   QVERIFY(b->collectionKeys.isEmpty()); // only in a trashed collection
 

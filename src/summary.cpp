@@ -1,5 +1,8 @@
 #include "summary.h"
 
+#include "metadataresolver.h"
+#include "zoterorepository.h"
+
 SummaryModel::SummaryModel(QObject *parent) : QAbstractListModel(parent) {}
 
 void SummaryModel::setDatabase(SqliteDb &db) { m_db = &db; }
@@ -79,6 +82,12 @@ void SummaryModel::loadAll() {
   beginResetModel();
 
   m_rows = LibraryRepository(*m_db).summaries();
+  if (m_zoteroPriority) {
+    const auto zotero = ZoteroRepository(*m_db).metaByHash();
+    for (SummaryRow &row : m_rows)
+      if (const auto it = zotero.constFind(row.paperHash); it != zotero.constEnd())
+        MetadataResolver::applyZotero(row, *it);
+  }
 
   endResetModel();
   ++m_version;

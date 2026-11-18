@@ -37,6 +37,10 @@ class ConfigManager : public QObject {
   /// Zotero's data folder chosen by the user or found once; empty = search.
   Q_PROPERTY(QString zoteroDataDir READ zoteroDataDir WRITE setZoteroDataDir
                  NOTIFY zoteroDataDirChanged)
+  /// Show Zotero's title, authors, year and journal instead of the summary's
+  /// wherever a paper is named (field by field, when Zotero has a value).
+  Q_PROPERTY(bool zoteroPriority READ zoteroPriority WRITE setZoteroPriority
+                 NOTIFY zoteroPriorityChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -54,6 +58,7 @@ public:
   QString language() const;
   int queryContextTokens() const { return m_queryContextTokens; }
   QString zoteroDataDir() const { return m_zoteroDataDir; }
+  bool zoteroPriority() const { return m_zoteroPriority; }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -71,6 +76,7 @@ public:
   void setLanguage(const QString &lang);
   void setQueryContextTokens(int tokens);
   void setZoteroDataDir(const QString &dir);
+  void setZoteroPriority(bool priority);
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
   bool useVisualContext() const;
@@ -130,6 +136,7 @@ signals:
   void activeModelChanged();
   void openAlexApiKeyChanged();
   void zoteroDataDirChanged();
+  void zoteroPriorityChanged();
   void backendListChanged();
 
   void visualModeChanged();
@@ -169,4 +176,5 @@ private:
   QString m_language = QStringLiteral("en");
   int m_queryContextTokens = 0; // 0 = auto
   QString m_zoteroDataDir;
+  bool m_zoteroPriority = false;
 };

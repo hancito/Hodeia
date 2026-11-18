@@ -1,5 +1,8 @@
 #include "metadataresolver.h"
 
+#include "libraryrepository.h"
+#include "summaryformat.h"
+
 #include <QRegularExpression>
 #include <QStringList>
 
@@ -69,6 +72,86 @@ PaperLabel paperLabel(const QString &paperHash, const QString &cleanTitle,
     return {m.captured(1), QString(), m.captured(2)};
   // A bare file name such as "Zanardelli et al": short enough to stand alone.
   return {elide(title, 50), QString(), title.size() > 50 ? title : QString()};
+}
+
+PaperLabel paperLabel(const PageContext &pc) {
+  const PaperLabel label = paperLabel(pc.paperHash, pc.cleanTitle, pc.citation);
+  return pc.zotero ? withZotero(label, *pc.zotero) : label;
+}
+
+QString displayName(const QString &zoteroName) {
+  const qsizetype comma = zoteroName.indexOf(',');
+  if (comma < 0)
+    return zoteroName.simplified();
+  const QString last = zoteroName.left(comma).simplified();
+  const QString first = zoteroName.mid(comma + 1).simplified();
+  return first.isEmpty() ? last : first + ' ' + last;
+}
+
+QString compactAuthorList(const QStringList &names) {
+  QStringList family;
+  for (const QString &n : names) {
+    const QString f = n.section(',', 0, 0).simplified();
+    if (!f.isEmpty())
+      family.append(f);
+  }
+  if (family.size() <= 1)
+    return family.value(0);
+  if (family.size() == 2)
+    return family[0] + " & " + family[1];
+  return family.first() + " et al.";
+}
+
+PaperLabel withZotero(PaperLabel label, const ZoteroMeta &zotero) {
+  if (!zotero.authors.isEmpty())
+    label.authors = compactAuthorList(zotero.authors);
+  if (!zotero.year.isEmpty())
+    label.year = zotero.year;
+  if (!zotero.title.trimmed().isEmpty())
+    label.title = zotero.title.simplified();
+  return label;
+}
+
+namespace {
+
+QStringList displayNames(const QStringList &zoteroNames) {
+  QStringList out;
+  for (const QString &n : zoteroNames)
+    out.append(displayName(n));
+  return out;
+}
+
+} // namespace
+
+void applyZotero(PaperSummary &summary, const ZoteroMeta &zotero) {
+  if (!zotero.title.trimmed().isEmpty())
+    summary.title = zotero.title.simplified();
+  if (!zotero.authors.isEmpty())
+    summary.authors = displayNames(zotero.authors);
+  if (!zotero.year.isEmpty())
+    summary.year = zotero.year.toInt();
+  if (!zotero.journal.trimmed().isEmpty())
+    summary.journal = zotero.journal.simplified();
+}
+
+void applyZotero(SummaryRow &row, const ZoteroMeta &zotero) {
+  if (!zotero.title.trimmed().isEmpty())
+    row.title = zotero.title.simplified();
+  if (!zotero.authors.isEmpty())
+    row.authors = displayNames(zotero.authors).join("; "); // as in Summaries
+  if (!zotero.year.isEmpty())
+    row.year = zotero.year;
+  if (!zotero.journal.trimmed().isEmpty())
+    row.journal = zotero.journal.simplified();
+}
+
+void attachZotero(QList<PageContext> &pages,
+                  const QHash<QString, ZoteroMeta> &byHash) {
+  for (PageContext &pc : pages) {
+    const auto it = byHash.constFind(pc.paperHash);
+    if (it != byHash.constEnd())
+      pc.zotero = *it;
+  }
 }
 
 } // namespace MetadataResolver

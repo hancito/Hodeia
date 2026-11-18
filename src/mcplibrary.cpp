@@ -10,6 +10,7 @@
 #include "sqlitevec.h"
 #include "summaryformat.h"
 #include "summarypromptbuilder.h"
+#include "zoterorepository.h"
 
 #include <QDebug>
 #include <QFile>
@@ -80,10 +81,10 @@ std::expected<void, QString> McpLibrary::openActiveProject() {
     return std::unexpected(QStringLiteral(
         "HodeIA's settings were not found: start HodeIA once and open a "
         "project."));
-  const QString project = QJsonDocument::fromJson(file.readAll())
-                              .object()
-                              .value("lastProject")
-                              .toString();
+  const QJsonObject config = QJsonDocument::fromJson(file.readAll()).object();
+  const QString project = config.value("lastProject").toString();
+  // Like the app: Zotero's title, authors, year and journal first.
+  m_zoteroPriority = config.value("zoteroPriority").toBool(false);
   if (project.isEmpty())
     return std::unexpected(
         QStringLiteral("No project is active in HodeIA: open one there."));
@@ -149,15 +150,28 @@ std::expected<QString, QString> McpLibrary::resolvePaper(const QString &id) {
   return matches.first();
 }
 
+QHash<QString, ZoteroMeta> McpLibrary::zoteroMeta() {
+  return m_zoteroPriority ? ZoteroRepository(m_db).metaByHash()
+                          : QHash<QString, ZoteroMeta>();
+}
+
 QString McpLibrary::label(const QString &paperHash) {
   const LibraryRepository repo(m_db);
+  PaperLabel l;
+  bool found = false;
   for (const IndexedPaper &p : repo.indexedPapers())
-    if (p.paperHash == paperHash)
-      return MetadataResolver::paperLabel(paperHash, p.cleanTitle, p.citation)
-          .sourceForm();
-  return MetadataResolver::paperLabel(paperHash, repo.summaryTitle(paperHash),
-                                      QString())
-      .sourceForm();
+    if (p.paperHash == paperHash) {
+      l = MetadataResolver::paperLabel(paperHash, p.cleanTitle, p.citation);
+      found = true;
+      break;
+    }
+  if (!found)
+    l = MetadataResolver::paperLabel(paperHash, repo.summaryTitle(paperHash),
+                                     QString());
+  const auto zotero = zoteroMeta();
+  if (const auto it = zotero.constFind(paperHash); it != zotero.constEnd())
+    l = MetadataResolver::withZotero(l, *it);
+  return l.sourceForm();
 }
 
 /* ── Tools ──────────────────────────────────────────────────────── */
@@ -189,6 +203,7 @@ McpLibrary::searchLibrary(const QJsonObject &args) {
       Retriever(m_db, *m_embeddings).retrieve(query, options);
   if (pages.size() > k)
     pages.resize(k);
+  MetadataResolver::attachZotero(pages, zoteroMeta());
   if (pages.isEmpty())
     return QString("No passage of the library matches \"%1\".").arg(query);
 
@@ -223,10 +238,13 @@ McpLibrary::listPapers(const QJsonObject &args) {
 
   // Ingestion already adds a Summaries row (file name as title): a paper is
   // summarized once its summary JSON is stored.
+  const QHash<QString, ZoteroMeta> zotero = zoteroMeta();
   QSet<QString> summarized;
-  for (const SummaryRow &s : repo.summaries()) {
+  for (SummaryRow s : repo.summaries()) {
     if (s.summaryJson.toByteArray().isEmpty())
       continue;
+    if (const auto it = zotero.constFind(s.paperHash); it != zotero.constEnd())
+      MetadataResolver::applyZotero(s, *it);
     summarized.insert(s.paperHash);
     QString text = CitationFormat::paperMark(s.paperHash) + " " +
                    (s.authors.isEmpty() ? QString() : s.authors + " ") +
@@ -243,8 +261,10 @@ McpLibrary::listPapers(const QJsonObject &args) {
   for (const IndexedPaper &p : repo.indexedPapers()) {
     if (summarized.contains(p.paperHash))
       continue;
-    const PaperLabel l =
+    PaperLabel l =
         MetadataResolver::paperLabel(p.paperHash, p.cleanTitle, p.citation);
+    if (const auto it = zotero.constFind(p.paperHash); it != zotero.constEnd())
+      l = MetadataResolver::withZotero(l, *it);
     lines.append({l.sourceForm(),
                   CitationFormat::paperMark(p.paperHash) + " " +
                       l.sourceForm() +
@@ -287,11 +307,14 @@ McpLibrary::getSummary(const QJsonObject &args) {
   for (const SummaryRow &row : LibraryRepository(m_db).summaries()) {
     if (row.paperHash != *hash || row.summaryJson.toByteArray().isEmpty())
       continue;
-    const auto s = SummaryFormat::tryParseJson(
+    auto s = SummaryFormat::tryParseJson(
         QString::fromUtf8(row.summaryJson.toByteArray()));
     if (!s)
       return std::unexpected(
           QStringLiteral("The stored summary of this paper is unreadable."));
+    const auto zotero = zoteroMeta();
+    if (const auto it = zotero.constFind(*hash); it != zotero.constEnd())
+      MetadataResolver::applyZotero(*s, *it);
     QString out = CitationFormat::paperMark(*hash) + " " + s->title + "\n";
     if (!s->authors.isEmpty())
       out += "Authors: " + s->authors.join("; ") + "\n";

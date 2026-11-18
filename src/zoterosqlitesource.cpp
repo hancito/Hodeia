@@ -227,10 +227,13 @@ std::expected<ZoteroSnapshot, QString> ZoteroSqliteSource::load() {
           "ORDER BY ic.itemID, ic.orderIndex",
           "creators",
           [&](SqliteStatement &s) {
-            // fieldMode 1: a single-field name (an institution).
-            const QString name = s.columnInt(3) == 1
-                                     ? s.columnText(2)
-                                     : (s.columnText(1) + " " + s.columnText(2));
+            // "Last, First"; fieldMode 1: a single-field name (an
+            // institution), kept whole and without a comma.
+            const QString first = s.columnText(1).simplified();
+            const QString last = s.columnText(2).simplified();
+            const QString name = (s.columnInt(3) == 1 || first.isEmpty())
+                                     ? last
+                                     : last + ", " + first;
             creators[s.columnInt(0)].append(
                 {name.simplified(), s.columnText(4) == "author"});
           });

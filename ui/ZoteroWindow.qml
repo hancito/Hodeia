@@ -65,6 +65,12 @@ StyledDialog {
                 onClicked: folderDialog.open()
             }
         }
+        StyledCheckBox {
+            Layout.fillWidth: true
+            text: qsTr("Name papers with Zotero's title, authors, year and journal (instead of the summary's)")
+            checked: configManager.zoteroPriority
+            onToggled: configManager.zoteroPriority = checked
+        }
         Label {
             id: folderError
             Layout.fillWidth: true

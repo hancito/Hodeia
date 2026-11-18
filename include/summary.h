@@ -58,6 +58,9 @@ public:
   QHash<int, QByteArray> roleNames() const override;
 
   Q_INVOKABLE void loadAll();
+  /// Show Zotero's title, authors, year and journal (from the next
+  /// loadAll()).
+  void setZoteroPriority(bool priority) { m_zoteroPriority = priority; }
 
   // Bumped by loadAll(). QML bindings that read rows through functions
   // (rowCount()/get()) are not notified by a model reset; reading `version`
@@ -70,6 +73,7 @@ signals:
 
 private:
   int m_version = 0;
+  bool m_zoteroPriority = false;
   SqliteDb *m_db = nullptr;
   QVector<SummaryRow> m_rows;
   QString formatDate(const QDateTime &dt) const;

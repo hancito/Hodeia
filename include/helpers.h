@@ -5,6 +5,7 @@
 #include <QStringList>
 
 class ConfigManager;
+class DatabaseManager;
 class QNetworkAccessManager;
 class QNetworkReply;
 
@@ -22,8 +23,15 @@ public:
 
   // ── Summaries ──────────────────────────────────────────────────
 
+  /// The project database, for Zotero's metadata.  Set once from main().
+  void setDatabase(DatabaseManager *database) { m_database = database; }
+
   /// Convert a JSON summary string to HTML (same source used for PDF export).
-  Q_INVOKABLE QString summaryToHtml(const QString &json) const;
+  /// With `zoteroPriority`, the title, authors, year and journal of paper
+  /// `paperHash` come from Zotero where it has them.
+  Q_INVOKABLE QString summaryToHtml(const QString &json,
+                                    const QString &paperHash = QString(),
+                                    bool zoteroPriority = false) const;
 
   /// Render Markdown (RAG answers) as HTML with paragraph, heading and list
   /// spacing.  Qt's MarkdownText lays blocks out with no margins at all, so
@@ -32,9 +40,12 @@ public:
 
   /// Export a list of JSON summaries as a PDF (a single summary is a
   /// one-paper report). Returns the saved path on success, or an empty
-  /// string on failure.
+  /// string on failure.  `paperHashes` (same order as `jsonList`) and
+  /// `zoteroPriority`: as for summaryToHtml().
   Q_INVOKABLE QString exportPdf(const QStringList &jsonList,
-                                const QString &destPath) const;
+                                const QString &destPath,
+                                const QStringList &paperHashes = QStringList(),
+                                bool zoteroPriority = false) const;
 
   /// Return the list of absolute PNG paths for a given paper hash,
   /// sorted by page number.
@@ -95,6 +106,7 @@ private:
   void refreshLocalModelList();
 
   ConfigManager *m_config = nullptr;
+  DatabaseManager *m_database = nullptr;
   QNetworkAccessManager *m_networkManager = nullptr;
   QNetworkReply *m_currentReply = nullptr;
   QStringList m_localModelList;

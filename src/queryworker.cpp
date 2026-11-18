@@ -3,10 +3,12 @@
 #include "configmanager.h"
 #include "database.h"
 #include "libraryrepository.h"
+#include "metadataresolver.h"
 #include "querypromptbuilder.h"
 #include "retriever.h"
 #include "sqlitevec.h"
 #include "textformat.h"
+#include "zoterorepository.h"
 
 #include <QElapsedTimer>
 
@@ -63,6 +65,10 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
              << "| context:" << contextTokens << "tokens | page budget:"
              << options.budgetTokens;
     pages = retriever.retrieve(queryText, options);
+    // Zotero's metadata name the papers in the prompt and the sources.
+    if (m_config->zoteroPriority())
+      MetadataResolver::attachZotero(
+          pages, ZoteroRepository(m_database->db()).metaByHash());
   } else {
     qWarning() << "[QueryWorker] database not open";
   }

@@ -229,13 +229,34 @@ std::expected<void, QString> ZoteroRepository::markRemoved(const QList<int> &ids
       });
 }
 
+namespace {
+// Rows of a hash in order of preference: still in Zotero, then the user's
+// library (library 1 is always the user's own in Zotero).
+const char *const kPreference = "removed_at IS NOT NULL, library_id, id";
+} // namespace
+
+QHash<QString, ZoteroMeta> ZoteroRepository::metaByHash() const {
+  QHash<QString, ZoteroMeta> out;
+  SqliteStatement stmt = m_db.prepare(
+      QString("SELECT %1 FROM ZoteroItems ORDER BY paper_hash, %2")
+          .arg(kItemColumns, kPreference));
+  while (true) {
+    auto step = stmt.step();
+    if (!step || !*step)
+      break;
+    const ZoteroItemRow row = readItem(stmt);
+    if (!out.contains(row.paperHash)) // the first is the preferred one
+      out.insert(row.paperHash, row.meta);
+  }
+  return out;
+}
+
 std::optional<ZoteroItemRow>
 ZoteroRepository::itemByHash(const QString &paperHash) const {
-  // Library 1 is always the user's own in Zotero.
   SqliteStatement stmt = m_db.prepare(
       QString("SELECT %1 FROM ZoteroItems WHERE paper_hash = ? "
-              "ORDER BY removed_at IS NOT NULL, library_id, id LIMIT 1")
-          .arg(kItemColumns));
+              "ORDER BY %2 LIMIT 1")
+          .arg(kItemColumns, kPreference));
   (void)stmt.bind(1, paperHash);
   auto step = stmt.step();
   if (!step || !*step)

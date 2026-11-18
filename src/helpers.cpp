@@ -1,8 +1,11 @@
 #include "helpers.h"
 #include "anthropicapi.h"
 #include "configmanager.h"
+#include "database.h"
+#include "metadataresolver.h"
 #include "pdfexport.h"
 #include "summaryformat.h"
+#include "zoterorepository.h"
 
 #include <QDir>
 #include <QFile>
@@ -37,8 +40,25 @@ Helpers::~Helpers() = default;
 
 /* ── Summaries ───────────────────────────────────────────────── */
 
-QString Helpers::summaryToHtml(const QString &json) const {
-  return SummaryFormat::toHtml(SummaryFormat::parseJson(json));
+namespace {
+
+/// Zotero's metadata by paper hash, or nothing when they do not apply.
+QHash<QString, ZoteroMeta> zoteroMetaFor(DatabaseManager *database,
+                                         bool zoteroPriority) {
+  if (!zoteroPriority || !database || !database->isOpen())
+    return {};
+  return ZoteroRepository(database->db()).metaByHash();
+}
+
+} // namespace
+
+QString Helpers::summaryToHtml(const QString &json, const QString &paperHash,
+                               bool zoteroPriority) const {
+  PaperSummary summary = SummaryFormat::parseJson(json);
+  const auto zotero = zoteroMetaFor(m_database, zoteroPriority && !paperHash.isEmpty());
+  if (const auto it = zotero.constFind(paperHash); it != zotero.constEnd())
+    MetadataResolver::applyZotero(summary, *it);
+  return SummaryFormat::toHtml(summary);
 }
 
 QString Helpers::markdownToHtml(const QString &markdown) const {
@@ -81,12 +101,20 @@ QString Helpers::markdownToHtml(const QString &markdown) const {
   return html;
 }
 
-QString Helpers::exportPdf(const QStringList &jsonList,
-                           const QString &destPath) const {
+QString Helpers::exportPdf(const QStringList &jsonList, const QString &destPath,
+                           const QStringList &paperHashes,
+                           bool zoteroPriority) const {
+  const auto zotero = zoteroMetaFor(m_database, zoteroPriority);
   QList<PaperSummary> papers;
-  for (const QString &json : jsonList)
-    if (!json.isEmpty())
-      papers.append(SummaryFormat::parseJson(json));
+  for (qsizetype i = 0; i < jsonList.size(); ++i) {
+    if (jsonList[i].isEmpty())
+      continue;
+    PaperSummary summary = SummaryFormat::parseJson(jsonList[i]);
+    if (const auto it = zotero.constFind(paperHashes.value(i));
+        it != zotero.constEnd())
+      MetadataResolver::applyZotero(summary, *it);
+    papers.append(summary);
+  }
   if (papers.isEmpty())
     return QString();
   return PdfExport::writeHtml(SummaryFormat::reportToHtml(papers), destPath);

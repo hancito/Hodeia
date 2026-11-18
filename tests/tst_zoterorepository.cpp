@@ -42,6 +42,7 @@ private slots:
   void statusAndRemoval();
   void itemByHash();
   void statusStrings();
+  void metaByHash();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -167,6 +168,27 @@ void TestZoteroRepository::statusStrings() {
        {ZoteroStatus::Pending, ZoteroStatus::Ingested, ZoteroStatus::Ignored})
     QCOMPARE(zoteroStatusFromString(zoteroStatusName(s)), std::optional(s));
   QVERIFY(!zoteroStatusFromString("lost").has_value());
+}
+
+// Same preference as itemByHash(), for every hash at once.
+void TestZoteroRepository::metaByHash() {
+  ZoteroRepository repo(m_db);
+  QVERIFY(repo.metaByHash().isEmpty());
+  ZoteroItemRow group = item("G", "same", 2);
+  group.meta.title = "From the group";
+  QVERIFY(repo.upsertItem(group).has_value());
+  ZoteroItemRow mine = item("U", "same", 1);
+  mine.meta.title = "From my library";
+  const int u = *repo.upsertItem(mine);
+  QVERIFY(repo.upsertItem(item("O", "other")).has_value());
+
+  auto metas = repo.metaByHash();
+  QCOMPARE(metas.size(), 2);
+  QCOMPARE(metas.value("same").title, QString("From my library"));
+  QCOMPARE(metas.value("other").title, QString("Title O"));
+
+  QVERIFY(repo.markRemoved({u}, QDateTime::currentDateTimeUtc()));
+  QCOMPARE(repo.metaByHash().value("same").title, QString("From the group"));
 }
 
 QTEST_GUILESS_MAIN(TestZoteroRepository)

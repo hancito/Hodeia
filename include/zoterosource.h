@@ -27,7 +27,8 @@ struct ZoteroCollection {
 /// Bibliographic data of a Zotero item (the parent of a PDF).
 struct ZoteroMeta {
   QString title;
-  QStringList authors; ///< "First Last", in Zotero's order (authors only)
+  QStringList authors; ///< "Last, First" ("World Bank" for a one-field name),
+                       ///< in Zotero's order; authors, else every creator
   QString year;        ///< four digits, empty when unknown
   QString journal;     ///< publication, book or proceedings title
   QString doi;

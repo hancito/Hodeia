@@ -141,6 +141,9 @@ void ZoteroController::apply(const Loaded &loaded) {
           << plan.missing.size() << "not downloaded";
   m_missingCount = int(plan.missing.size());
   rebuildView();
+  // New or corrected Zotero metadata: the paper list names papers with them.
+  if (m_config->zoteroPriority() && !plan.store.isEmpty())
+    m_database->reloadModels();
   setBusy(false);
   emit stateChanged();
 

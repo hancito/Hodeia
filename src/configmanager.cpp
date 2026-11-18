@@ -95,6 +95,7 @@ void ConfigManager::loadConfig() {
     m_language = obj.value("language").toString("en");
     m_queryContextTokens = qMax(0, obj.value("queryContextTokens").toInt(0));
     m_zoteroDataDir = obj.value("zoteroDataDir").toString();
+    m_zoteroPriority = obj.value("zoteroPriority").toBool(false);
     // Support string "visualMode", old int "visualMode", and legacy
     // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
@@ -151,6 +152,7 @@ void ConfigManager::saveConfig() {
   obj["language"] = m_language;
   obj["queryContextTokens"] = m_queryContextTokens;
   obj["zoteroDataDir"] = m_zoteroDataDir;
+  obj["zoteroPriority"] = m_zoteroPriority;
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;
@@ -222,6 +224,14 @@ void ConfigManager::setZoteroDataDir(const QString &dir) {
   if (m_zoteroDataDir != dir) {
     m_zoteroDataDir = dir;
     emit zoteroDataDirChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setZoteroPriority(bool priority) {
+  if (m_zoteroPriority != priority) {
+    m_zoteroPriority = priority;
+    emit zoteroPriorityChanged();
     saveConfig();
   }
 }
