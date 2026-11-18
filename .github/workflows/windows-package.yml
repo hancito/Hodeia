@@ -273,18 +273,45 @@ jobs:
           ./scripts/Windows/update-mupdf-stamp.ps1 -MupdfSourceDir "$env:DEPS\mupdf"
           "commit=$(git -C $env:VCPKG_INSTALLATION_ROOT rev-parse HEAD)" | Add-Content $env:GITHUB_OUTPUT
 
-      - name: Cache vcpkg packages
-        uses: actions/cache@v6
+      # Restore/save split, one entry per run: the packages built before a
+      # failure (e.g. an upstream download timing out) are kept for the next
+      # run instead of being rebuilt from scratch.
+      - name: Restore vcpkg packages
+        id: vcpkg-cache
+        uses: actions/cache/restore@v6
         with:
           path: C:\vcpkg-cache
-          key: vcpkg-${{ steps.vcpkg.outputs.commit }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay/**') }}
+          key: vcpkg-${{ steps.vcpkg.outputs.commit }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay/**') }}-${{ github.run_id }}
+          restore-keys: vcpkg-${{ steps.vcpkg.outputs.commit }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay/**') }}-
 
+      # Source tarballs come from many hosts (codeberg, sourceforge...) that
+      # time out now and then: retry; ports already built come back from the
+      # binary cache at once.
       - name: vcpkg install
+        id: vcpkg-install
         run: |
           $env:MUPDF_LOCAL_SOURCE = "$env:DEPS\mupdf"
-          & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows `
-            --overlay-ports "$PWD\vcpkg-overlay\ports" --clean-after-build
-          if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed" }
+          $before = (Get-ChildItem C:\vcpkg-cache -Recurse -File).Count
+          $ok = $false
+          foreach ($attempt in 1..3) {
+            & "$env:VCPKG_ROOT\vcpkg.exe" install --triplet x64-windows `
+              --overlay-ports "$PWD\vcpkg-overlay\ports" --clean-after-build
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            if ($attempt -lt 3) {
+              Write-Host "::warning::vcpkg install failed (attempt $attempt/3), retrying in $(120 * $attempt) s"
+              Start-Sleep -Seconds (120 * $attempt)
+            }
+          }
+          $after = (Get-ChildItem C:\vcpkg-cache -Recurse -File).Count
+          "changed=$($after -ne $before)" | Add-Content $env:GITHUB_OUTPUT
+          if (-not $ok) { throw "vcpkg install failed" }
+
+      - name: Save vcpkg packages
+        if: always() && steps.vcpkg-install.outputs.changed == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: C:\vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
       # ── Hodeia ──────────────────────────────────────────────────────────
       - name: Configure
