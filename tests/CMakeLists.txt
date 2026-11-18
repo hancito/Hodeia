@@ -10,6 +10,15 @@ function(hodeia_add_test name)
   add_test(NAME ${name} COMMAND ${name})
   # No display needed: QtTest's offscreen platform for any Gui code.
   set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  # Windows has no rpath: copy the DLLs the test links (Qt6Test.dll... —
+  # windeployqt only ships the app's) next to it, so it runs from ctest
+  # and on its own.  COMMAND_EXPAND_LISTS: one argument per DLL.
+  if(WIN32)
+    add_custom_command(TARGET ${name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:${name}> $<TARGET_FILE_DIR:${name}>
+        COMMAND_EXPAND_LISTS)
+  endif()
   # SqliteDb::open() loads the sqlite-vec extension from the executable's
   # folder, as for the app.
   if(EXISTS "${_SQLITEVEC_LIB}")
