@@ -1,5 +1,6 @@
 #include "configmanager.h"
 #include "database.h"
+#include "sqlitevec.h"
 #include "enginemanager.h"
 #include "helpers.h"
 #include "llama.h"
@@ -312,12 +313,15 @@ int main(int argc, char *argv[]) {
   ThemeManager themeManager;
   themeManager.loadThemesFromFolder(app.applicationDirPath() + "/ui/themes");
 
+  // E5 embedding service (search, ingestion), independent of the UI models;
+  // loaded lazily on first use.  Declared first: destroyed last.
+  SqliteVecManager embeddings(&configManager);
+
   // Create DatabaseManager with config reference for project DB resolution
-  DatabaseManager databaseManager(&configManager);
+  DatabaseManager databaseManager(&configManager, embeddings);
 
   // Create the PDF ingestion worker
-  EngineController engineController(&configManager,
-                                    &databaseManager.vecManager());
+  EngineController engineController(&configManager, &embeddings);
 
   // Create the Summarizer (orchestrates local/remote backends)
   SummaryController summaryController(&configManager, &databaseManager);

@@ -25,7 +25,10 @@ class DatabaseManager : public QObject {
   Q_PROPERTY(QueryProxyModel *queryProxyModel READ queryProxyModel CONSTANT)
 
 public:
-  explicit DatabaseManager(ConfigManager *config, QObject *parent = nullptr);
+  /// @p embeddings: the E5 embedding service, owned by the caller (main),
+  /// which must outlive this manager.
+  DatabaseManager(ConfigManager *config, SqliteVecManager &embeddings,
+                  QObject *parent = nullptr);
   ~DatabaseManager() override;
 
   SummaryModel *summaryModel() const { return m_summaryModel; }
@@ -90,7 +93,7 @@ private:
   CitationsModel *m_citationsModel = nullptr;
   SummaryProxyModel *m_summaryProxyModel = nullptr;
   QueryProxyModel *m_queryProxyModel = nullptr;
-  SqliteVecManager m_vecManager;
+  SqliteVecManager &m_vecManager;
   OpenAlexClient *m_openAlexClient = nullptr;
   QAtomicInt m_opsInFlight{0};
 };

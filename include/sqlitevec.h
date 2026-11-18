@@ -1,7 +1,8 @@
 #pragma once
 
 #include "llama.h"
-#include "summary.h"
+#include "sqlitedb.h"
+#include "textchunk.h"
 #include <QList>
 #include <QMutex>
 #include <QString>

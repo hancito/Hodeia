@@ -11,12 +11,13 @@
 #include <QJsonObject>
 #include <expected>
 
-DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
+DatabaseManager::DatabaseManager(ConfigManager *config,
+                                 SqliteVecManager &embeddings, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
       m_queryModel(new QueryModel(this)),
       m_citationsModel(new CitationsModel(this)),
       m_summaryProxyModel(new SummaryProxyModel(this)),
-      m_queryProxyModel(new QueryProxyModel(this)), m_vecManager(config) {
+      m_queryProxyModel(new QueryProxyModel(this)), m_vecManager(embeddings) {
   m_summaryProxyModel->setSourceModel(m_summaryModel);
   m_queryProxyModel->setSourceModel(m_queryModel);
   m_summaryModel->setDatabase(m_db);

@@ -27,6 +27,7 @@ add_library(HodeiaEngine STATIC
     ../include/enginemanager.h
     ../include/sqlitedb.h
     ../include/sqlitevec.h
+    ../include/textchunk.h
     ../include/localbackend.h
     ../include/localprompt.h
     ../include/vramfit.h

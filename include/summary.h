@@ -2,20 +2,11 @@
 
 #include "libraryrepository.h"
 #include "sqlitedb.h"
+#include "textchunk.h"
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QString>
 #include <QVariant>
-
-struct TextChunk {
-  QString text;
-  QString paperHash;
-  int page = 0;
-  int chunkIdx = 0;
-  QString cleanTitle;
-  QString citation;
-  QString pageMetadata; ///< JSON metadata: figures, tables, scanned, etc.
-};
 
 /// Per-page metadata detected during PDF extraction.
 struct PageMetadata {
