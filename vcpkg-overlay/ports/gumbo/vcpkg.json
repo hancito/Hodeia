@@ -1,0 +1,17 @@
+{
+  "name": "gumbo",
+  "version-string": "mupdf-1.28.6",
+  "description": "HTML5 parser in C99: the Artifex fork bundled with MuPDF (thirdparty/gumbo-parser), built from the local MuPDF checkout",
+  "homepage": "https://github.com/ArtifexSoftware/thirdparty-gumbo-parser",
+  "license": "Apache-2.0",
+  "dependencies": [
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}
