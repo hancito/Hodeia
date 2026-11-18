@@ -22,6 +22,9 @@ add_library(HodeiaEngine STATIC
     ../include/mcpstdio.h
     ../include/mcplibrary.h
     ../include/apppaths.h
+    ../include/zoterosource.h
+    ../include/zoterolocator.h
+    ../include/zoterosqlitesource.h
     ../include/summary.h
     ../include/query.h
     ../include/summaryproxymodel.h
@@ -66,6 +69,8 @@ add_library(HodeiaEngine STATIC
     mcpstdio.cpp
     mcplibrary.cpp
     apppaths.cpp
+    zoterolocator.cpp
+    zoterosqlitesource.cpp
     summary.cpp
     query.cpp
     summaryproxymodel.cpp
@@ -121,9 +126,10 @@ target_include_directories(HodeiaEngine
     PUBLIC
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
-    PRIVATE
+        # Public: include/sqlitevec.h includes llama.h (needed by the tests).
         ${LLAMA_INC}
         ${LLAMA_INC}/vendor
+    PRIVATE
         ${EXTERNAL}/include
         ${MUPDF_INC}
         ${SQLITEVEC_INC}
