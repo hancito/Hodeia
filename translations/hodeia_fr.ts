@@ -126,27 +126,27 @@
 <context>
     <name>CitationsModel</name>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="91"/>
+        <location filename="../src/citationsmodel.cpp" line="73"/>
         <source>Cited by</source>
         <translation>Cité par</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="103"/>
+        <location filename="../src/citationsmodel.cpp" line="85"/>
         <source>References</source>
         <translation>Références</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="141"/>
+        <location filename="../src/citationsmodel.cpp" line="123"/>
         <source> ( Showing top %1 ) </source>
         <translation> ( Affichage des %1 premiers ) </translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="145"/>
+        <location filename="../src/citationsmodel.cpp" line="127"/>
         <source>None found on OpenAlex</source>
         <translation>Aucun trouvé sur OpenAlex</translation>
     </message>
     <message>
-        <location filename="../src/citationsmodel.cpp" line="159"/>
+        <location filename="../src/citationsmodel.cpp" line="141"/>
         <source>Unknown</source>
         <translation>Inconnu</translation>
     </message>
@@ -409,17 +409,17 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../src/database.cpp" line="264"/>
-        <location filename="../src/database.cpp" line="324"/>
+        <location filename="../src/database.cpp" line="279"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="272"/>
+        <location filename="../src/database.cpp" line="268"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="314"/>
+        <location filename="../src/database.cpp" line="270"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -427,12 +427,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="329"/>
+        <location filename="../src/database.cpp" line="287"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="348"/>
+        <location filename="../src/database.cpp" line="291"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -714,6 +714,14 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <location filename="../ui/IngestionDialog.qml" line="317"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
+    </message>
+</context>
+<context>
+    <name>LibraryRepository</name>
+    <message>
+        <location filename="../src/libraryrepository.cpp" line="12"/>
+        <source>database error (prepare failed)</source>
+        <translation>erreur de base de données (préparation échouée)</translation>
     </message>
 </context>
 <context>
@@ -1603,9 +1611,8 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="207"/>
         <source>database error (prepare failed)</source>
-        <translation>erreur de base de données (préparation échouée)</translation>
+        <translation type="vanished">erreur de base de données (préparation échouée)</translation>
     </message>
     <message>
         <source>Sources Consulted</source>
@@ -1851,9 +1858,8 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="247"/>
         <source>database error (prepare failed)</source>
-        <translation>erreur de base de données (préparation échouée)</translation>
+        <translation type="vanished">erreur de base de données (préparation échouée)</translation>
     </message>
     <message>
         <source>Empty response</source>

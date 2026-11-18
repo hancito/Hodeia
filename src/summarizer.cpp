@@ -1,11 +1,11 @@
 #include "summarizer.h"
 #include "configmanager.h"
 #include "database.h"
+#include "libraryrepository.h"
 #include "sqlitevec.h"
 #include "summarypromptbuilder.h"
 
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QElapsedTimer>
 #include <QEventLoop>
 
@@ -225,105 +225,18 @@ Summarizer::saveSummary(const QString &hash, const PaperSummary &summary,
     qWarning() << "[Summarizer] Database not open — cannot save summary";
     return std::unexpected(tr("the project database is not open"));
   }
-
-  auto &db = m_database->db();
-
-  SqliteStatement stmt =
-      db.prepare("INSERT INTO Summaries "
-                 "(paper_hash, title, authors, pages_num, journal, year, "
-                 "topics, llmodel, summary_json, date) "
-                 "VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?) "
-                 "ON CONFLICT(paper_hash) DO UPDATE SET "
-                 "title = excluded.title, "
-                 "authors = excluded.authors, "
-                 "journal = excluded.journal, "
-                 "year = excluded.year, "
-                 "topics = excluded.topics, "
-                 "llmodel = excluded.llmodel, "
-                 "summary_json = excluded.summary_json, "
-                 "date = excluded.date");
-  if (!stmt.isValid()) {
-    qCritical() << "[Summarizer] Failed to prepare summary upsert";
-    return std::unexpected(tr("database error (prepare failed)"));
-  }
-
-  (void)stmt.bind(1, hash);
-  (void)stmt.bind(2, summary.title);
-  (void)stmt.bind(3, summary.authors.join("; "));
-  (void)stmt.bind(4, summary.journal);
-  (void)stmt.bind(5, QString::number(summary.year));
-  (void)stmt.bind(6, summary.topics.join(", "));
-  (void)stmt.bind(7, modelName);
-  (void)stmt.bind(8, rawJson.toUtf8());
-  (void)stmt.bind(9, QDateTime::currentDateTimeUtc());
-
-  auto execResult = stmt.exec();
-  if (!execResult) {
-    qCritical() << "[Summarizer] Failed to save summary for" << hash << ":"
-                << execResult.error();
-    return std::unexpected(execResult.error());
-  }
-
   // Do NOT reload SummaryModel here: this runs on the Summarizer thread and the
   // model is owned by / bound to the GUI thread.  The UI reloads it on the
   // main thread from paperFinished / allFinished (SummaryDbPane.qml).
-
-  // ── Update chunk metadata (clean_title + citation) ──
-  QString citation =
-      summary.authors.join(", ") + " (" + QString::number(summary.year) + ")";
-  citation = citation.trimmed();
-
-  // Escape single quotes for SQL literals.
-  QString sqlTitle = summary.title;
-  sqlTitle.replace("'", "''");
-  QString sqlCitation = citation;
-  sqlCitation.replace("'", "''");
-  QString sqlHash = hash;
-  sqlHash.replace("'", "''");
-
-  auto updateResult =
-      db.exec(QString("UPDATE chunks SET clean_title = '%1', citation = '%2' "
-                      "WHERE paper_hash = '%3'")
-                  .arg(sqlTitle, sqlCitation, sqlHash));
-  if (!updateResult) {
-    qWarning() << "[Summarizer] Failed to update chunks metadata for" << hash
-               << ":" << updateResult.error();
-  }
-
-  // ── Register in Citations table (OpenAlex will fill cites/cited_by) ──
-  SqliteStatement refStmt =
-      db.prepare("INSERT INTO Citations (paper_hash, clean_title, work_id, "
-                 "cites, cited_by) VALUES (?, ?, '', '', '') "
-                 "ON CONFLICT(paper_hash) DO UPDATE SET clean_title = "
-                 "excluded.clean_title, "
-                 // Re-summarised: the metadata may have improved, so give an
-                 // unmatched paper another OpenAlex lookup right away.
-                 "lookup_status = CASE WHEN work_id = '' THEN 'pending' "
-                 "ELSE lookup_status END");
-  if (refStmt.isValid()) {
-    (void)refStmt.bind(1, hash);
-    (void)refStmt.bind(2, summary.title);
-    (void)refStmt.exec();
-  }
-
-  qDebug() << "[Summarizer] Saved summary for" << hash
-           << "— title:" << summary.title;
-  return {};
+  return LibraryRepository(m_database->db())
+      .saveSummary(hash, summary, rawJson, modelName);
 }
 
 QString Summarizer::paperTitle(const QString &hash) const {
   if (m_database && m_database->isOpen()) {
-    SqliteStatement stmt = m_database->db().prepare(
-        "SELECT title FROM Summaries WHERE paper_hash = ?");
-    if (stmt.isValid()) {
-      (void)stmt.bind(1, hash);
-      auto step = stmt.step();
-      if (step && *step) {
-        const QString title = stmt.columnText(0).trimmed();
-        if (!title.isEmpty())
-          return title;
-      }
-    }
+    const QString title = LibraryRepository(m_database->db()).summaryTitle(hash);
+    if (!title.isEmpty())
+      return title;
   }
   return hash;
 }

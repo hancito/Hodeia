@@ -1,15 +1,9 @@
 #pragma once
+
+#include "libraryrepository.h"
 #include "sqlitedb.h"
 #include <QAbstractListModel>
 #include <QDateTime>
-
-struct QueryRow {
-  int id = 0;
-  QString queryText;
-  QString response;
-  QDateTime date;
-  QString llmodel;
-};
 
 class QueryModel : public QAbstractListModel {
   Q_OBJECT

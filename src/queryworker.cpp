@@ -2,12 +2,12 @@
 #include "citationformat.h"
 #include "configmanager.h"
 #include "database.h"
+#include "libraryrepository.h"
 #include "querypromptbuilder.h"
 #include "retriever.h"
 #include "sqlitevec.h"
 #include "textformat.h"
 
-#include <QDateTime>
 #include <QElapsedTimer>
 
 /* ── Construction / destruction ─────────────────────────────────── */
@@ -197,31 +197,12 @@ QueryWorker::saveQuery(const QString &queryText, const QString &response,
     return std::unexpected(tr("the project database is not open"));
   }
 
-  auto &db = m_database->db();
-
-  SqliteStatement stmt =
-      db.prepare("INSERT INTO Queries (query, response, llmodel, date) "
-                 "VALUES (?, ?, ?, ?)");
-  if (!stmt.isValid()) {
-    qCritical() << "[QueryWorker] Failed to prepare query insert";
-    return std::unexpected(tr("database error (prepare failed)"));
-  }
-
-  (void)stmt.bind(1, queryText);
-  (void)stmt.bind(2, response);
-  (void)stmt.bind(3, modelName);
-  (void)stmt.bind(4, QDateTime::currentDateTimeUtc());
-
-  auto execResult = stmt.exec();
-  if (!execResult) {
-    qCritical() << "[QueryWorker] Failed to save query:" << execResult.error();
-    return std::unexpected(execResult.error());
-  }
+  if (auto saved = LibraryRepository(m_database->db())
+                       .saveQuery(queryText, response, modelName);
+      !saved)
+    return saved;
 
   if (m_database->queryModel())
     m_database->queryModel()->loadAll();
-
-  qDebug() << "[QueryWorker] Saved query response (" << response.length()
-           << "chars)";
   return {};
 }

@@ -77,35 +77,8 @@ void SummaryModel::loadAll() {
     return;
 
   beginResetModel();
-  m_rows.clear();
 
-  // LEFT JOIN so papers without citation data still appear (cites_count 0).
-  SqliteStatement stmt = m_db->prepare(
-      "SELECT s.id, s.paper_hash, s.title, s.authors, s.pages_num, s.journal, "
-      "s.year, s.topics, s.llmodel, s.summary_json, s.date, "
-      "COALESCE(c.cites_count, 0) "
-      "FROM Summaries s LEFT JOIN Citations c ON c.paper_hash = s.paper_hash "
-      "ORDER BY s.id");
-
-  while (true) {
-    auto stepResult = stmt.step();
-    if (!stepResult || !stepResult.value())
-      break;
-    SummaryRow row;
-    row.id = stmt.columnInt(0);
-    row.paperHash = stmt.columnText(1);
-    row.title = stmt.columnText(2);
-    row.authors = stmt.columnText(3);
-    row.pagesNum = stmt.columnInt(4);
-    row.journal = stmt.columnText(5);
-    row.year = stmt.columnText(6);
-    row.topics = stmt.columnText(7);
-    row.llmodel = stmt.columnText(8);
-    row.summaryJson = stmt.columnBlob(9);
-    row.date = stmt.columnDateTime(10);
-    row.citesCount = stmt.columnInt(11);
-    m_rows.append(row);
-  }
+  m_rows = LibraryRepository(*m_db).summaries();
 
   endResetModel();
   ++m_version;

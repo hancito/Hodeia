@@ -1,21 +1,12 @@
 #pragma once
 
+#include "libraryrepository.h"
+
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QVariant>
 
 class SqliteDb;
-
-/// One citation row per summarized paper.
-struct CitationRow {
-  QString paperHash;
-  // Raw JSON blobs as stored in the Citations table (an array of works, or a
-  // marker string when OpenAlex has no data).
-  QString cites;   // works that cite this paper
-  QString citedBy; // works this paper cited
-  int citesCount = 0;
-  int citedByCount = 0;
-};
 
 /// Model over the Citations table (joined to Summaries) that backs the
 /// references display.  It also owns the APA formatting so QML only renders a

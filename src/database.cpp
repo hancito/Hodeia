@@ -1,6 +1,7 @@
 #include "database.h"
 #include "configmanager.h"
 #include "notifier.h"
+#include "libraryrepository.h"
 #include "openalex.h"
 #include "projectstore.h"
 #include "sqlitevec.h"
@@ -8,7 +9,6 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QSet>
 #include <expected>
 
 DatabaseManager::DatabaseManager(ConfigManager *config, QObject *parent)
@@ -263,57 +263,12 @@ QString DatabaseManager::removeByHashes(const QStringList &hashes) {
   if (!m_db.isOpen())
     return tr("The project database is not open.");
 
-  QSet<QString> failed; // papers with at least one failed delete
-  QString lastError;
-
-  SqliteStatement stmt =
-      m_db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
-  if (!stmt.isValid())
+  const BatchResult r = LibraryRepository(m_db).removePapers(hashes);
+  if (r.prepareFailed)
     return tr("The papers could not be deleted (database error).");
-  for (const QString &hash : hashes) {
-    (void)stmt.bind(1, hash);
-    auto execResult = stmt.exec();
-    if (!execResult) {
-      qWarning() << "Delete by hash failed for" << hash << ":"
-                 << execResult.error();
-      failed.insert(hash);
-      lastError = execResult.error();
-    }
-    stmt.resetAndClearBindings();
-  }
-
-  // Also remove associated vector chunks
-  SqliteStatement chunkStmt =
-      m_db.prepare("DELETE FROM chunks WHERE paper_hash = ?");
-  for (const QString &hash : hashes) {
-    if (!chunkStmt.isValid())
-      break;
-    (void)chunkStmt.bind(1, hash);
-    auto chunkExecResult = chunkStmt.exec();
-    if (!chunkExecResult) {
-      qWarning() << "Delete chunks by hash failed for" << hash << ":"
-                 << chunkExecResult.error();
-      failed.insert(hash);
-      lastError = chunkExecResult.error();
-    }
-    chunkStmt.resetAndClearBindings();
-  }
-
-  // Also remove associated citations
-  SqliteStatement refStmt =
-      m_db.prepare("DELETE FROM Citations WHERE paper_hash = ?");
-  if (refStmt.isValid()) {
-    for (const QString &hash : hashes) {
-      (void)refStmt.bind(1, hash);
-      (void)refStmt.exec();
-      refStmt.resetAndClearBindings();
-    }
-  }
-
-  if (!failed.isEmpty())
-    return tr("%n paper(s) could not be fully deleted: %1", nullptr,
-              int(failed.size()))
-        .arg(lastError);
+  if (r.failed > 0)
+    return tr("%n paper(s) could not be fully deleted: %1", nullptr, r.failed)
+        .arg(r.lastError);
   return {};
 }
 
@@ -323,29 +278,17 @@ QString DatabaseManager::removeQueriesByIds(const QVariantList &ids) {
   if (!m_db.isOpen())
     return tr("The project database is not open.");
 
-  SqliteStatement stmt = m_db.prepare("DELETE FROM Queries WHERE id = ?");
-  if (!stmt.isValid()) {
-    qCritical() << "Failed to prepare query delete";
+  QList<int> intIds;
+  intIds.reserve(ids.size());
+  for (const QVariant &id : ids)
+    intIds.append(id.toInt());
+  const BatchResult r = LibraryRepository(m_db).removeQueries(intIds);
+  if (r.prepareFailed)
     return tr("The queries could not be deleted (database error).");
-  }
-
-  int failed = 0;
-  QString lastError;
-  for (const QVariant &id : ids) {
-    (void)stmt.bind(1, id.toInt());
-    auto execResult = stmt.exec();
-    if (!execResult) {
-      qWarning() << "Delete query failed for id" << id.toInt() << ":"
-                 << execResult.error();
-      ++failed;
-      lastError = execResult.error();
-    }
-    stmt.resetAndClearBindings();
-  }
 
   m_queryModel->loadAll();
-  if (failed > 0)
-    return tr("%n query(ies) could not be deleted: %1", nullptr, failed)
-        .arg(lastError);
+  if (r.failed > 0)
+    return tr("%n query(ies) could not be deleted: %1", nullptr, r.failed)
+        .arg(r.lastError);
   return {};
 }

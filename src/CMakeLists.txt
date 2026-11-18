@@ -17,6 +17,7 @@ add_library(HodeiaEngine STATIC
     ../include/configmanager.h
     ../include/database.h
     ../include/projectstore.h
+    ../include/libraryrepository.h
     ../include/summary.h
     ../include/query.h
     ../include/summaryproxymodel.h
@@ -55,6 +56,7 @@ add_library(HodeiaEngine STATIC
     configmanager.cpp
     database.cpp
     projectstore.cpp
+    libraryrepository.cpp
     summary.cpp
     query.cpp
     summaryproxymodel.cpp

@@ -1,4 +1,6 @@
 #pragma once
+
+#include "libraryrepository.h"
 #include "sqlitedb.h"
 #include <QAbstractListModel>
 #include <QDateTime>
@@ -24,23 +26,6 @@ struct PageMetadata {
   bool hasTable = false;  ///< Page contains table-like structure (heuristic)
   bool isScanned = false; ///< Page was OCR'd by Tesseract fallback
   int ocrChars = 0;       ///< Characters produced by OCR (0 = native text)
-};
-
-struct SummaryRow {
-  int id = 0;
-  QString paperHash;
-  QString title;
-  QString authors;
-  int pagesNum = 0;
-  QString journal;
-  QString year;
-  QString topics;
-  QString llmodel;
-  QVariant summaryJson;
-  QDateTime date;
-  // Number of works that cite this paper (from Citations.cites_count, 0 if
-  // the paper has no citation data yet).
-  int citesCount = 0;
 };
 
 struct ExtractionResult {

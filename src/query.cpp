@@ -54,24 +54,8 @@ void QueryModel::loadAll() {
     return;
 
   beginResetModel();
-  m_rows.clear();
 
-  SqliteStatement stmt =
-      m_db->prepare("SELECT id, query, response, date, llmodel FROM Queries "
-                    "ORDER BY id");
-
-  while (true) {
-    auto stepResult = stmt.step();
-    if (!stepResult || !stepResult.value())
-      break;
-    QueryRow row;
-    row.id = stmt.columnInt(0);
-    row.queryText = stmt.columnText(1);
-    row.response = stmt.columnText(2);
-    row.date = stmt.columnDateTime(3);
-    row.llmodel = stmt.columnText(4);
-    m_rows.append(row);
-  }
+  m_rows = LibraryRepository(*m_db).queries();
 
   endResetModel();
 }

@@ -44,26 +44,8 @@ void CitationsModel::loadAll() {
     return;
 
   beginResetModel();
-  m_rows.clear();
 
-  // Only summarized papers (joined to Summaries), matching the paper list.
-  SqliteStatement stmt =
-      m_db->prepare("SELECT c.paper_hash, c.cites, c.cited_by, c.cites_count, "
-                    "c.cited_by_count FROM Citations c JOIN Summaries s "
-                    "ON s.paper_hash = c.paper_hash ORDER BY c.paper_hash");
-
-  while (true) {
-    auto stepResult = stmt.step();
-    if (!stepResult || !stepResult.value())
-      break;
-    CitationRow row;
-    row.paperHash = stmt.columnText(0);
-    row.cites = stmt.columnText(1);
-    row.citedBy = stmt.columnText(2);
-    row.citesCount = stmt.columnInt(3);
-    row.citedByCount = stmt.columnInt(4);
-    m_rows.append(row);
-  }
+  m_rows = LibraryRepository(*m_db).citations();
 
   endResetModel();
 
