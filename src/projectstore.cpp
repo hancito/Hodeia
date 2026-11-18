@@ -4,7 +4,7 @@
 
 #include <QDebug>
 #include <QFile>
-#include <sqlite3.h>
+#include <Sqlite3/sqlite3.h>
 
 namespace {
 
