@@ -41,11 +41,6 @@ public:
   /// across multiple papers with citations, so this is larger than the
   /// summary headroom.
   static constexpr uint32_t ResponseHeadroom = 4096;
-  /// Prompt budget used for remote backends in "auto" mode (their context
-  /// size is unknown to the app).
-  static constexpr int RemoteAutoTokens = 16384;
-  /// Upper bound offered for remote backends.
-  static constexpr int RemoteMaxTokens = 262144;
   /// Abort a remote request with no answer after this long.  Generous: a
   /// large multimodal prompt can take minutes to process.
   static constexpr int RemoteTimeoutMs = 10 * 60 * 1000;
@@ -67,9 +62,9 @@ signals:
   void stopped();
 
 private:
-  /* GPU lifecycle */
-  bool prepareGpu(bool isLocal);
-  void cleanupGpu(bool isLocal, bool wasEmbeddingReady);
+  /* backend lifecycle */
+  /// Free the backend (and a local model's memory) once the query is over.
+  void releaseBackend();
 
   /* inference — the generated text, or a user-facing error message */
   std::expected<QString, QString> generate(const PromptPayload &payload,

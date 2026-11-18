@@ -1,7 +1,6 @@
 #include "querycontroller.h"
 #include "chatbackend.h"
 #include "database.h"
-#include "localbackend.h"
 
 #include <QDebug>
 
@@ -12,40 +11,28 @@ QueryController::QueryController(ConfigManager *config,
 QueryController::~QueryController() { stopQuery(); }
 
 QVariantMap QueryController::contextInfo(int contextTokens) const {
-  const ActiveBackend backend = resolveActiveBackend(m_config);
-  if (!backend.isLocal) {
-    return {{"remote", true},
-            {"autoTokens", QueryWorker::RemoteAutoTokens},
-            {"maxTokens", QueryWorker::RemoteMaxTokens},
-            {"placement", QString()},
-            {"truncated", false}};
-  }
-  const LocalBackend::ContextEstimate est = LocalBackend::estimateContext(
-      backend.modelPath, contextTokens, QueryWorker::ResponseHeadroom);
-  if (!est.valid) {
-    return {{"remote", false},
-            {"autoTokens", 8192},
-            {"maxTokens", QueryWorker::RemoteMaxTokens},
-            {"placement", QString()},
-            {"truncated", false}};
-  }
+  const ContextBudget budget =
+      estimateContextBudget(resolveActiveBackend(m_config), contextTokens,
+                            QueryWorker::ResponseHeadroom);
   QString placement;
-  switch (est.placement) {
-  case LocalBackend::Placement::Gpu:
+  switch (budget.placement) {
+  case ContextBudget::Placement::Unknown:
+    break;
+  case ContextBudget::Placement::Gpu:
     placement = QStringLiteral("gpu");
     break;
-  case LocalBackend::Placement::Split:
+  case ContextBudget::Placement::Split:
     placement = QStringLiteral("split");
     break;
-  case LocalBackend::Placement::Cpu:
+  case ContextBudget::Placement::Cpu:
     placement = QStringLiteral("cpu");
     break;
   }
-  return {{"remote", false},
-          {"autoTokens", est.autoTokens},
-          {"maxTokens", est.maxTokens},
+  return {{"remote", budget.remote},
+          {"autoTokens", budget.autoTokens},
+          {"maxTokens", budget.maxTokens},
           {"placement", placement},
-          {"truncated", est.truncated}};
+          {"truncated", budget.truncated}};
 }
 
 void QueryController::startQuery(const QString &queryText, int contextTokens) {

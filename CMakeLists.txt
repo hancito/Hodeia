@@ -73,6 +73,21 @@ set(TESS_INC      ${EXTERNAL}/include/tesseract)
 add_subdirectory(src)
 
 # ---------------------------------------------------------------------------
+# 6b. Unit tests (QtTest + CTest) — on by default in Debug builds only, so the
+#     packaging builds (Release) are unchanged.  Run: ctest --test-dir <build>
+# ---------------------------------------------------------------------------
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(_HODEIA_TESTS_DEFAULT ON)
+else()
+  set(_HODEIA_TESTS_DEFAULT OFF)
+endif()
+option(HODEIA_BUILD_TESTS "Build the unit tests" ${_HODEIA_TESTS_DEFAULT})
+if(HODEIA_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
+
+# ---------------------------------------------------------------------------
 # 7. Install
 #    Linux: full install tree (/opt/hodeia) + DEB/RPM packages via CPack.
 # ---------------------------------------------------------------------------

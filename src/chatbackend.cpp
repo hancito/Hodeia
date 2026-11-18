@@ -19,11 +19,16 @@
 
 ActiveBackend resolveActiveBackend(ConfigManager *config) {
   ActiveBackend info;
-  info.isLocal = (config->activeBackend() == "Llama.cpp");
   info.modelName = config->activeModel();
   info.config = config->backendConfig(config->activeBackend());
+  if (config->activeBackend() == "Llama.cpp")
+    info.kind = ActiveBackend::Kind::Local;
+  else if (info.config.value("api").toString() == QLatin1String("anthropic"))
+    info.kind = ActiveBackend::Kind::Anthropic;
+  else
+    info.kind = ActiveBackend::Kind::OpenAi;
 
-  if (info.isLocal) {
+  if (info.kind == ActiveBackend::Kind::Local) {
     QString folderPath = config->summarizersPath() + "/" + info.modelName;
     QStringList ggufs =
         QDir(folderPath)
@@ -38,6 +43,52 @@ ActiveBackend resolveActiveBackend(ConfigManager *config) {
   return info;
 }
 
+const char *backendKindName(ActiveBackend::Kind kind) {
+  switch (kind) {
+  case ActiveBackend::Kind::Local:
+    return "local";
+  case ActiveBackend::Kind::OpenAi:
+    return "openai";
+  case ActiveBackend::Kind::Anthropic:
+    return "anthropic";
+  }
+  return "?";
+}
+
+ContextBudget estimateContextBudget(const ActiveBackend &active,
+                                    int promptTokens,
+                                    uint32_t responseHeadroom) {
+  ContextBudget budget;
+  if (active.kind != ActiveBackend::Kind::Local) {
+    budget.remote = true;
+    budget.autoTokens = ContextBudget::RemoteAutoTokens;
+    budget.maxTokens = ContextBudget::RemoteMaxTokens;
+    return budget;
+  }
+  const LocalBackend::ContextEstimate est = LocalBackend::estimateContext(
+      active.modelPath, promptTokens, responseHeadroom);
+  if (!est.valid) {
+    budget.autoTokens = ContextBudget::LocalFallbackTokens;
+    budget.maxTokens = ContextBudget::RemoteMaxTokens;
+    return budget;
+  }
+  budget.autoTokens = est.autoTokens;
+  budget.maxTokens = est.maxTokens;
+  budget.truncated = est.truncated;
+  switch (est.placement) {
+  case LocalBackend::Placement::Gpu:
+    budget.placement = ContextBudget::Placement::Gpu;
+    break;
+  case LocalBackend::Placement::Split:
+    budget.placement = ContextBudget::Placement::Split;
+    break;
+  case LocalBackend::Placement::Cpu:
+    budget.placement = ContextBudget::Placement::Cpu;
+    break;
+  }
+  return budget;
+}
+
 namespace {
 
 /* ── Local (llama.cpp) ──────────────────────────────────────────── */
@@ -47,7 +98,7 @@ public:
   explicit LocalChatBackend(QString modelPath)
       : m_modelPath(std::move(modelPath)) {}
 
-  bool isLocal() const override { return true; }
+  BackendCaps caps() const override { return {.usesLocalGpu = true}; }
 
   std::expected<QString, GenerationError>
   generate(const PromptPayload &payload, const GenerationOptions &options,
@@ -101,7 +152,7 @@ public:
     m_backend.setModelName(modelName);
   }
 
-  bool isLocal() const override { return false; }
+  BackendCaps caps() const override { return {}; }
 
   std::expected<QString, GenerationError>
   generate(const PromptPayload &payload, const GenerationOptions &options,
@@ -196,7 +247,7 @@ public:
       : m_modelName(modelName), m_url(config.value("url").toString()),
         m_apiKey(config.value("api_key").toString()) {}
 
-  bool isLocal() const override { return false; }
+  BackendCaps caps() const override { return {}; }
 
   std::expected<QString, GenerationError>
   generate(const PromptPayload &payload, const GenerationOptions &options,
@@ -289,10 +340,14 @@ private:
 } // namespace
 
 std::unique_ptr<ChatBackend> makeChatBackend(const ActiveBackend &active) {
-  if (active.isLocal)
+  switch (active.kind) {
+  case ActiveBackend::Kind::Local:
     return std::make_unique<LocalChatBackend>(active.modelPath);
-  if (active.config.value("api").toString() == QLatin1String("anthropic"))
+  case ActiveBackend::Kind::Anthropic:
     return std::make_unique<AnthropicChatBackend>(active.modelName,
                                                   active.config);
+  case ActiveBackend::Kind::OpenAi:
+    break;
+  }
   return std::make_unique<RemoteChatBackend>(active.modelName, active.config);
 }

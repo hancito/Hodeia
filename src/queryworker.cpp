@@ -1,7 +1,6 @@
 #include "queryworker.h"
 #include "configmanager.h"
 #include "database.h"
-#include "localbackend.h"
 #include "sqlitevec.h"
 #include "textformat.h"
 
@@ -250,18 +249,12 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
 
   // 1. Resolve the backend: it decides the default prompt budget.
   const ActiveBackend backend = resolveActiveBackend(m_config);
-  qDebug() << "[QueryWorker] Backend:" << (backend.isLocal ? "local" : "remote")
+  qDebug() << "[QueryWorker] Backend:" << backendKindName(backend.kind)
            << "| Model:" << backend.modelName;
 
-  if (contextTokens <= 0) {
-    if (backend.isLocal) {
-      const auto est = LocalBackend::estimateContext(backend.modelPath, 0,
-                                                     ResponseHeadroom);
-      contextTokens = est.valid ? est.autoTokens : 8192;
-    } else {
-      contextTokens = RemoteAutoTokens;
-    }
-  }
+  if (contextTokens <= 0)
+    contextTokens =
+        estimateContextBudget(backend, 0, ResponseHeadroom).autoTokens;
   // The page context gets what the system prompt, the instructions and the
   // question leave of the budget.
   const int fixedTokens =
@@ -289,9 +282,8 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
     return;
   }
 
-  bool wasEmbeddingReady = prepareGpu(backend.isLocal);
-
-  // 4. Build prompt
+  // 4. Build prompt (the embedding model stays loaded: vector search is
+  // done, and a query is a single generation).
   PromptPayload payload = buildPrompt(pages, queryText);
   qDebug() << "[QueryWorker] Prompt built — text context:"
            << payload.textContext.length()
@@ -341,30 +333,15 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
              << "chars) in" << totalTimer.elapsed() << "ms";
   }
 
-  cleanupGpu(backend.isLocal, wasEmbeddingReady);
+  releaseBackend();
   if (m_database)
     m_database->endDbOperation();
 }
 
-/* ── GPU preparation ────────────────────────────────────────────── */
+/* ── Backend lifecycle ──────────────────────────────────────────── */
 
-bool QueryWorker::prepareGpu(bool isLocal) {
-  if (!isLocal || !m_database)
-    return false;
-  // Keep embedding model loaded — vector search already completed.
-  return false;
-}
-
-void QueryWorker::cleanupGpu(bool isLocal, bool wasEmbeddingReady) {
-  if (wasEmbeddingReady && m_database) {
-    qDebug() << "[QueryWorker] Reloading embedding model...";
-    QElapsedTimer t;
-    t.start();
-    m_database->vecManager().initialize();
-    qDebug() << "[QueryWorker] Embedding model reloaded in" << t.elapsed()
-             << "ms";
-  }
-  if (isLocal && m_backend)
+void QueryWorker::releaseBackend() {
+  if (m_backend)
     m_backend->release();
   m_backend.reset();
 }
