@@ -25,6 +25,7 @@ add_library(HodeiaEngine STATIC
     ../include/zoterosource.h
     ../include/zoterolocator.h
     ../include/zoterosqlitesource.h
+    ../include/zoterorepository.h
     ../include/summary.h
     ../include/query.h
     ../include/summaryproxymodel.h
@@ -71,6 +72,7 @@ add_library(HodeiaEngine STATIC
     apppaths.cpp
     zoterolocator.cpp
     zoterosqlitesource.cpp
+    zoterorepository.cpp
     summary.cpp
     query.cpp
     summaryproxymodel.cpp

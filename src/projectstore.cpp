@@ -72,6 +72,53 @@ std::expected<void, QString> migrateV1(SqliteDb &db) {
   return {};
 }
 
+// v2 — Zotero connector: the collections a project follows and one row per
+// PDF of Zotero known to the project (proposed, imported or refused).
+// Linked to the other tables by paper_hash (MD5 of the file, as at import).
+std::expected<void, QString> migrateV2(SqliteDb &db) {
+  if (auto r = db.exec("CREATE TABLE ZoteroCollections ("
+                       "library_id INTEGER NOT NULL, "
+                       "collection_key TEXT NOT NULL, "
+                       "name TEXT NOT NULL, "
+                       "PRIMARY KEY (library_id, collection_key))");
+      !r)
+    return std::unexpected("ZoteroCollections: " + r.error());
+
+  // One PDF attachment of Zotero.  Keys, not Zotero's numeric ids: they
+  // survive syncs.  The same file in two libraries gives two rows with the
+  // same paper_hash.  authors and tags are JSON arrays.
+  if (auto r = db.exec(
+          "CREATE TABLE ZoteroItems ("
+          "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+          "library_id INTEGER NOT NULL, "
+          "item_key TEXT NOT NULL, "
+          "attachment_key TEXT NOT NULL, "
+          "paper_hash TEXT NOT NULL, "
+          "title TEXT NOT NULL DEFAULT '', "
+          "authors TEXT NOT NULL DEFAULT '[]', "
+          "year TEXT NOT NULL DEFAULT '', "
+          "journal TEXT NOT NULL DEFAULT '', "
+          "doi TEXT NOT NULL DEFAULT '', "
+          "item_type TEXT NOT NULL DEFAULT '', "
+          "tags TEXT NOT NULL DEFAULT '[]', "
+          "date_modified TEXT NOT NULL DEFAULT '', "
+          "status TEXT NOT NULL DEFAULT 'pending' "
+          "  CHECK (status IN ('pending', 'ingested', 'ignored')), "
+          // Set when the PDF left Zotero or the followed collections; the
+          // paper itself is never deleted from the project.
+          "removed_at DATETIME, "
+          "added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+          "UNIQUE (library_id, attachment_key))");
+      !r)
+    return std::unexpected("ZoteroItems: " + r.error());
+
+  if (auto r = db.exec("CREATE INDEX ZoteroItems_paper_hash "
+                       "ON ZoteroItems (paper_hash)");
+      !r)
+    return std::unexpected("ZoteroItems index: " + r.error());
+  return {};
+}
+
 /// A consistent copy of the open database (WAL content included) at `dest`.
 std::expected<void, QString> backupTo(SqliteDb &db, const QString &dest) {
   QFile::remove(dest);
@@ -124,6 +171,7 @@ namespace ProjectStore {
 const QList<Migration> &migrations() {
   static const QList<Migration> kMigrations = {
       {1, QStringLiteral("initial schema"), migrateV1},
+      {2, QStringLiteral("Zotero connector"), migrateV2},
   };
   return kMigrations;
 }

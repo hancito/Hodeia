@@ -177,7 +177,7 @@ void TestZoteroSqliteSource::readsChangesStillInTheWal() {
   Fixture f;
   QVERIFY(QFileInfo(f.dataDir + "/zotero.sqlite-wal").size() > 0);
   auto snap = ZoteroSqliteSource(f.dataDir, f.baseDir).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
   // Rows written after the schema, never checkpointed into zotero.sqlite.
   QVERIFY(findPdf(*snap, "ATTSTAND"));
   QVERIFY(findPdf(*snap, "ATTG1111"));
@@ -186,7 +186,7 @@ void TestZoteroSqliteSource::readsChangesStillInTheWal() {
 void TestZoteroSqliteSource::librariesAndCollections() {
   Fixture f;
   auto snap = ZoteroSqliteSource(f.dataDir).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
 
   QCOMPARE(snap->libraries.size(), 2); // the feed is left out
   QCOMPARE(snap->libraries[0].type, QString("user"));
@@ -203,7 +203,7 @@ void TestZoteroSqliteSource::librariesAndCollections() {
 void TestZoteroSqliteSource::pdfsOutOfTheTrash() {
   Fixture f;
   auto snap = ZoteroSqliteSource(f.dataDir, f.baseDir).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
   QStringList keys;
   for (const auto &p : snap->pdfs)
     keys << p.attachmentKey;
@@ -216,7 +216,7 @@ void TestZoteroSqliteSource::pdfsOutOfTheTrash() {
 void TestZoteroSqliteSource::metadata() {
   Fixture f;
   auto snap = ZoteroSqliteSource(f.dataDir, f.baseDir).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
 
   const ZoteroPdf *a = findPdf(*snap, "ATTA1111");
   QVERIFY(a);
@@ -251,7 +251,7 @@ void TestZoteroSqliteSource::metadata() {
 void TestZoteroSqliteSource::paths() {
   Fixture f;
   auto snap = ZoteroSqliteSource(f.dataDir, f.baseDir).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
 
   const ZoteroPdf *a = findPdf(*snap, "ATTA1111");
   QCOMPARE(a->path, f.dataDir + "/storage/ATTA1111/a.pdf");
@@ -306,7 +306,7 @@ void TestZoteroSqliteSource::realLibrary() {
   QElapsedTimer timer;
   timer.start();
   auto snap = ZoteroSqliteSource(dir, ZoteroLocator::readPrefs().baseAttachmentPath).load();
-  QVERIFY2(snap.has_value(), qPrintable(snap.error()));
+  QVERIFY2(snap.has_value(), qPrintable(snap ? QString() : snap.error()));
   for (const ZoteroCollection &c : snap->collections) {
     int total = 0, onDisk = 0;
     for (const ZoteroPdf &p : snap->pdfs)

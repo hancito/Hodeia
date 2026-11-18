@@ -30,9 +30,11 @@ void addQuery(SqliteDb &db) {
                   "VALUES ('q', 'r', 'm')"));
 }
 
-// v2 used by the tests: one more table.
+// The version after this build's, used by the tests: one more table.
+int nextVersion() { return ProjectStore::currentVersion() + 1; }
+
 ProjectStore::Migration addTable(const QString &table) {
-  return {2, "test table", [table](SqliteDb &db) {
+  return {nextVersion(), "test table", [table](SqliteDb &db) {
             return db.exec("CREATE TABLE " + table + " (id INTEGER)");
           }};
 }
@@ -50,6 +52,7 @@ private slots:
   void failedMigrationRollsBack();
   void tooNew();
   void openFailed();
+  void v1ToV2();
 };
 
 void TestProjectStore::newDatabase() {
@@ -64,20 +67,22 @@ void TestProjectStore::newDatabase() {
   QVERIFY(!QFile::exists(ProjectStore::backupPath(path, 0)));
 }
 
-// A project from before the migrations: current schema, user_version 0,
-// data.  Gets version 1, data intact, no backup (nothing changes).
+// A project from before the migrations: schema of v1, user_version 0,
+// data.  Brought to the current version, data intact, no backup (v1 only
+// creates what is missing).
 void TestProjectStore::unversionedProject() {
   QTemporaryDir dir;
   const QString path = dir.filePath("Old.db");
   {
     SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path).has_value());
+    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 1))
+                .has_value());
     addQuery(db);
     QVERIFY(db.exec("PRAGMA user_version = 0"));
   }
   SqliteDb db;
   QVERIFY(ProjectStore::open(db, path).has_value());
-  QCOMPARE(ProjectStore::schemaVersion(db), 1);
+  QCOMPARE(ProjectStore::schemaVersion(db), ProjectStore::currentVersion());
   QCOMPARE(countRows(db, "Queries"), 1);
   QVERIFY(!QFile::exists(ProjectStore::backupPath(path, 0)));
 }
@@ -110,15 +115,16 @@ void TestProjectStore::migrationKeepsBackup() {
 
   SqliteDb db;
   QVERIFY(ProjectStore::open(db, path, migrations).has_value());
-  QCOMPARE(ProjectStore::schemaVersion(db), 2);
+  QCOMPARE(ProjectStore::schemaVersion(db), nextVersion());
   QVERIFY(hasTable(db, "Extra"));
   QCOMPARE(countRows(db, "Queries"), 1);
 
-  const QString copy = ProjectStore::backupPath(path, 1);
+  const QString copy =
+      ProjectStore::backupPath(path, ProjectStore::currentVersion());
   QVERIFY(QFile::exists(copy));
   SqliteDb old;
   QVERIFY(old.open(copy).has_value());
-  QCOMPARE(ProjectStore::schemaVersion(old), 1);
+  QCOMPARE(ProjectStore::schemaVersion(old), ProjectStore::currentVersion());
   QVERIFY(!hasTable(old, "Extra"));
   QCOMPARE(countRows(old, "Queries"), 1);
 }
@@ -133,7 +139,7 @@ void TestProjectStore::failedMigrationRollsBack() {
     addQuery(db);
   }
   QList<ProjectStore::Migration> migrations = ProjectStore::migrations();
-  migrations.append({2, "broken", [](SqliteDb &db) {
+  migrations.append({nextVersion(), "broken", [](SqliteDb &db) {
                        (void)db.exec("CREATE TABLE Half (id INTEGER)");
                        (void)db.exec("DELETE FROM Queries");
                        return db.exec("THIS IS NOT SQL");
@@ -148,7 +154,7 @@ void TestProjectStore::failedMigrationRollsBack() {
 
   SqliteDb check;
   QVERIFY(check.open(path).has_value());
-  QCOMPARE(ProjectStore::schemaVersion(check), 1);
+  QCOMPARE(ProjectStore::schemaVersion(check), ProjectStore::currentVersion());
   QVERIFY(!hasTable(check, "Half"));
   QCOMPARE(countRows(check, "Queries"), 1);
 }
@@ -181,6 +187,35 @@ void TestProjectStore::openFailed() {
   QVERIFY(!r.has_value());
   QCOMPARE(r.error().kind, ProjectStore::OpenError::Kind::OpenFailed);
   QVERIFY(!db.isOpen());
+}
+
+// A project of HodeIA 0.99rc (version 1) gains the Zotero tables; its data
+// and a v1 copy are kept.
+void TestProjectStore::v1ToV2() {
+  QTemporaryDir dir;
+  const QString path = dir.filePath("P.db");
+  {
+    SqliteDb db;
+    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 1))
+                .has_value());
+    addQuery(db);
+    QCOMPARE(ProjectStore::schemaVersion(db), 1);
+  }
+  SqliteDb db;
+  QVERIFY(ProjectStore::open(db, path).has_value());
+  QVERIFY(ProjectStore::schemaVersion(db) >= 2);
+  QVERIFY(hasTable(db, "ZoteroItems"));
+  QVERIFY(hasTable(db, "ZoteroCollections"));
+  QCOMPARE(countRows(db, "Queries"), 1);
+  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 1)));
+
+  // A status outside the three known ones is refused.
+  QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
+                  "attachment_key, paper_hash) VALUES (1, 'I', 'A', 'h')"));
+  QVERIFY(!db.exec("UPDATE ZoteroItems SET status = 'lost'"));
+  // One row per attachment of a library.
+  QVERIFY(!db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
+                   "attachment_key, paper_hash) VALUES (1, 'I', 'A', 'h')"));
 }
 
 QTEST_GUILESS_MAIN(TestProjectStore)
