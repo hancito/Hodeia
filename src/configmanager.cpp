@@ -94,6 +94,7 @@ void ConfigManager::loadConfig() {
     m_openAlexApiKey = obj.value("openAlexApiKey").toString("");
     m_language = obj.value("language").toString("en");
     m_queryContextTokens = qMax(0, obj.value("queryContextTokens").toInt(0));
+    m_zoteroDataDir = obj.value("zoteroDataDir").toString();
     // Support string "visualMode", old int "visualMode", and legacy
     // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
@@ -149,6 +150,7 @@ void ConfigManager::saveConfig() {
   obj["visualMode"] = m_visualModeIndex;
   obj["language"] = m_language;
   obj["queryContextTokens"] = m_queryContextTokens;
+  obj["zoteroDataDir"] = m_zoteroDataDir;
 
   // Save backend list as JSON array of objects
   QJsonArray backendArray;
@@ -212,6 +214,14 @@ void ConfigManager::setActiveModel(const QString &model) {
   if (m_activeModel != model) {
     m_activeModel = model;
     emit activeModelChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setZoteroDataDir(const QString &dir) {
+  if (m_zoteroDataDir != dir) {
+    m_zoteroDataDir = dir;
+    emit zoteroDataDirChanged();
     saveConfig();
   }
 }

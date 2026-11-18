@@ -177,12 +177,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="178"/>
+        <location filename="../src/configmanager.cpp" line="180"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="179"/>
+        <location filename="../src/configmanager.cpp" line="181"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -197,88 +197,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="233"/>
-        <location filename="../src/configmanager.cpp" line="242"/>
-        <location filename="../src/configmanager.cpp" line="248"/>
+        <location filename="../src/configmanager.cpp" line="243"/>
+        <location filename="../src/configmanager.cpp" line="252"/>
+        <location filename="../src/configmanager.cpp" line="258"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="235"/>
-        <location filename="../src/configmanager.cpp" line="243"/>
-        <location filename="../src/configmanager.cpp" line="250"/>
+        <location filename="../src/configmanager.cpp" line="245"/>
+        <location filename="../src/configmanager.cpp" line="253"/>
+        <location filename="../src/configmanager.cpp" line="260"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="237"/>
-        <location filename="../src/configmanager.cpp" line="242"/>
+        <location filename="../src/configmanager.cpp" line="247"/>
+        <location filename="../src/configmanager.cpp" line="252"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="366"/>
-        <location filename="../src/configmanager.cpp" line="403"/>
+        <location filename="../src/configmanager.cpp" line="376"/>
+        <location filename="../src/configmanager.cpp" line="413"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="374"/>
+        <location filename="../src/configmanager.cpp" line="384"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="387"/>
+        <location filename="../src/configmanager.cpp" line="397"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="409"/>
+        <location filename="../src/configmanager.cpp" line="419"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="419"/>
+        <location filename="../src/configmanager.cpp" line="429"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="475"/>
+        <location filename="../src/configmanager.cpp" line="485"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="480"/>
+        <location filename="../src/configmanager.cpp" line="490"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="489"/>
+        <location filename="../src/configmanager.cpp" line="499"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="497"/>
+        <location filename="../src/configmanager.cpp" line="507"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="515"/>
+        <location filename="../src/configmanager.cpp" line="525"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="527"/>
+        <location filename="../src/configmanager.cpp" line="537"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="590"/>
+        <location filename="../src/configmanager.cpp" line="600"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="591"/>
+        <location filename="../src/configmanager.cpp" line="601"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -293,7 +293,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="685"/>
+        <location filename="../src/configmanager.cpp" line="695"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -760,52 +760,52 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>Main</name>
     <message>
-        <location filename="../ui/Main.qml" line="367"/>
+        <location filename="../ui/Main.qml" line="368"/>
         <source>Public domain</source>
         <translation>Domaine public</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="401"/>
+        <location filename="../ui/Main.qml" line="402"/>
         <source>Your personal research assistant — powered by AI.</source>
         <translation>Votre assistant de recherche personnel — propulsé par l’IA.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="410"/>
+        <location filename="../ui/Main.qml" line="411"/>
         <source>Manage, summarize and search your collection of academic papers: import PDFs, get structured AI summaries, pull their references from OpenAlex, and ask questions across your entire library.</source>
         <translation>Gérez, résumez et explorez votre collection d’articles scientifiques : importez des PDF, obtenez des résumés structurés par l’IA, récupérez leurs références depuis OpenAlex et posez des questions sur toute votre bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="416"/>
+        <location filename="../ui/Main.qml" line="417"/>
         <source>“HodeIA” — from the Ancient Greek ὁδός (hodós), meaning “path”.</source>
         <translation>« HodeIA » — du grec ancien ὁδός (hodós), qui signifie « chemin ».</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="423"/>
+        <location filename="../ui/Main.qml" line="424"/>
         <source>Free and open source software, licensed under the &lt;a href=&quot;%1&quot;&gt;GNU AGPL-3.0&lt;/a&gt;.&lt;br&gt;Source code: &lt;a href=&quot;%2&quot;&gt;%2&lt;/a&gt;</source>
         <translation>Logiciel libre et open source, sous licence &lt;a href=&quot;%1&quot;&gt;GNU AGPL-3.0&lt;/a&gt;.&lt;br&gt;Code source : &lt;a href=&quot;%2&quot;&gt;%2&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="439"/>
+        <location filename="../ui/Main.qml" line="440"/>
         <source>Third-Party Components</source>
         <translation>Composants tiers</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="479"/>
+        <location filename="../ui/Main.qml" line="480"/>
         <source>Each component remains under its own license; see the NOTICE file shipped with HodeIA for the full notices.</source>
         <translation>Chaque composant reste sous sa propre licence ; consultez le fichier NOTICE fourni avec HodeIA pour les mentions complètes.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="358"/>
+        <location filename="../ui/Main.qml" line="359"/>
         <source>About HodeIA</source>
         <translation>À propos de HodeIA</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="201"/>
+        <location filename="../ui/Main.qml" line="202"/>
         <source>Cannot Create Project</source>
         <translation>Impossible de créer le projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="396"/>
+        <location filename="../ui/Main.qml" line="397"/>
         <source>Version %1</source>
         <translation>Version %1</translation>
     </message>
@@ -816,32 +816,32 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../ui/Main.qml" line="72"/>
-        <location filename="../ui/Main.qml" line="220"/>
+        <location filename="../ui/Main.qml" line="221"/>
         <source>Cannot Switch Project</source>
         <translation>Impossible de changer de projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="147"/>
+        <location filename="../ui/Main.qml" line="148"/>
         <source>New Project</source>
         <translation>Nouveau projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="163"/>
+        <location filename="../ui/Main.qml" line="164"/>
         <source>Enter the Project Name</source>
         <translation>Saisir le nom du projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="168"/>
+        <location filename="../ui/Main.qml" line="169"/>
         <source>Type here...</source>
         <translation>Tapez ici...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="179"/>
+        <location filename="../ui/Main.qml" line="180"/>
         <source>Please enter a name or cancel</source>
         <translation>Veuillez saisir un nom ou annuler</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="151"/>
+        <location filename="../ui/Main.qml" line="152"/>
         <source>Create</source>
         <translation>Créer</translation>
     </message>
@@ -850,22 +850,22 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Annuler</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="210"/>
+        <location filename="../ui/Main.qml" line="211"/>
         <source>Project Already Exists</source>
         <translation>Le projet existe déjà</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="225"/>
+        <location filename="../ui/Main.qml" line="226"/>
         <source>Project &quot;%1&quot; already exists. Switch to it?</source>
         <translation>Le projet « %1 » existe déjà. Voulez-vous y basculer ?</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="212"/>
+        <location filename="../ui/Main.qml" line="213"/>
         <source>Switch</source>
         <translation>Basculer</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="109"/>
+        <location filename="../ui/Main.qml" line="110"/>
         <source>Cannot Open Query Window</source>
         <translation>Impossible d&apos;ouvrir la fenêtre de requêtes</translation>
     </message>
@@ -878,62 +878,62 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Nettoyer le projet « %1 » ? Tous les fichiers et les données seront définitivement supprimés.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="236"/>
+        <location filename="../ui/Main.qml" line="237"/>
         <source>Clear Project Data</source>
         <translation>Vider le projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="240"/>
+        <location filename="../ui/Main.qml" line="241"/>
         <source>Clear all data of project &quot;%1&quot;? Its papers, summaries and queries will be permanently removed; the empty project is kept.</source>
         <translation>Vider toutes les données du projet « %1 » ? Ses articles, résumés et requêtes seront définitivement supprimés ; le projet vide est conservé.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="246"/>
+        <location filename="../ui/Main.qml" line="247"/>
         <source>Cannot Clear Project</source>
         <translation>Impossible de vider le projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="256"/>
+        <location filename="../ui/Main.qml" line="257"/>
         <source>Delete Projects</source>
         <translation>Supprimer les projets</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="263"/>
+        <location filename="../ui/Main.qml" line="264"/>
         <source>Delete the selected project(s)? This cannot be undone.</source>
         <translation>Supprimer le(s) projet(s) sélectionné(s) ? Cette action est irréversible.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="280"/>
+        <location filename="../ui/Main.qml" line="281"/>
         <source>Project Deletion Failed</source>
         <translation>Échec de la suppression du projet</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="294"/>
+        <location filename="../ui/Main.qml" line="295"/>
         <source>Delete Models</source>
         <translation>Supprimer les modèles</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="301"/>
+        <location filename="../ui/Main.qml" line="302"/>
         <source>Delete the selected model(s)? This cannot be undone.</source>
         <translation>Supprimer le(s) modèle(s) sélectionné(s) ? Cette action est irréversible.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="317"/>
+        <location filename="../ui/Main.qml" line="318"/>
         <source>Model Deletion Failed</source>
         <translation>Échec de la suppression du modèle</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="329"/>
+        <location filename="../ui/Main.qml" line="330"/>
         <source>OpenAlex API Key</source>
         <translation>Clé API OpenAlex</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="335"/>
+        <location filename="../ui/Main.qml" line="336"/>
         <source>Enter your OpenAlex API key:</source>
         <translation>Saisissez votre clé API OpenAlex :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="341"/>
+        <location filename="../ui/Main.qml" line="342"/>
         <source>Paste your API key...</source>
         <translation>Collez votre clé API...</translation>
     </message>
@@ -942,33 +942,33 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Échec de l&apos;indexation</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="520"/>
+        <location filename="../ui/Main.qml" line="526"/>
         <source>Add Local Model</source>
         <translation>Ajouter un modèle local</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="532"/>
+        <location filename="../ui/Main.qml" line="538"/>
         <source>Model:</source>
         <translation>Modèle :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="538"/>
+        <location filename="../ui/Main.qml" line="544"/>
         <source>Select a .gguf model file...</source>
         <translation>Sélectionnez un fichier de modèle .gguf...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="542"/>
-        <location filename="../ui/Main.qml" line="562"/>
+        <location filename="../ui/Main.qml" line="548"/>
+        <location filename="../ui/Main.qml" line="568"/>
         <source>Browse...</source>
         <translation>Parcourir...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="552"/>
+        <location filename="../ui/Main.qml" line="558"/>
         <source>MMProj:</source>
         <translation>MMProj :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="558"/>
+        <location filename="../ui/Main.qml" line="564"/>
         <source>Select a .gguf mmproj file...</source>
         <translation>Sélectionnez un fichier mmproj .gguf...</translation>
     </message>
@@ -981,52 +981,52 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Le fichier mmproj est facultatif. Laisser vide pour passer.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="591"/>
+        <location filename="../ui/Main.qml" line="597"/>
         <source>Select GGUF Model File</source>
         <translation>Sélectionner le fichier de modèle GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="602"/>
+        <location filename="../ui/Main.qml" line="608"/>
         <source>Select MMProj GGUF File</source>
         <translation>Sélectionner le fichier MMProj GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="626"/>
+        <location filename="../ui/Main.qml" line="632"/>
         <source>Adding Model</source>
         <translation>Ajout du modèle</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="636"/>
+        <location filename="../ui/Main.qml" line="642"/>
         <source>Preparing the copy...</source>
         <translation>Préparation de la copie...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="636"/>
+        <location filename="../ui/Main.qml" line="642"/>
         <source>Copying %1</source>
         <translation>Copie de %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="647"/>
+        <location filename="../ui/Main.qml" line="653"/>
         <source>%1% — please wait, large models can take a few minutes.</source>
         <translation>%1 % — veuillez patienter, la copie d&apos;un gros modèle peut prendre quelques minutes.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="660"/>
+        <location filename="../ui/Main.qml" line="666"/>
         <source>Copying model: %1 — %2%</source>
         <translation>Copie du modèle : %1 — %2 %</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="665"/>
+        <location filename="../ui/Main.qml" line="671"/>
         <source>Model copied: %1</source>
         <translation>Modèle copié : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="666"/>
+        <location filename="../ui/Main.qml" line="672"/>
         <source>Model Added</source>
         <translation>Modèle ajouté</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="666"/>
+        <location filename="../ui/Main.qml" line="672"/>
         <source>The model was added and can now be selected in the toolbar.
 
 %1</source>
@@ -1035,25 +1035,25 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="668"/>
+        <location filename="../ui/Main.qml" line="674"/>
         <source>Copy failed: %1</source>
         <translation>Échec de la copie : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="669"/>
+        <location filename="../ui/Main.qml" line="675"/>
         <source>Model Copy Failed</source>
         <translation>Échec de la copie du modèle</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="669"/>
+        <location filename="../ui/Main.qml" line="675"/>
         <source>The model could not be added:
 %1</source>
         <translation>Le modèle n&apos;a pas pu être ajouté :
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="677"/>
-        <location filename="../ui/Main.qml" line="678"/>
+        <location filename="../ui/Main.qml" line="683"/>
+        <location filename="../ui/Main.qml" line="684"/>
         <source>%1 -- Ready</source>
         <translation>%1 -- Prêt</translation>
     </message>
@@ -1061,12 +1061,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>MyMenuBar</name>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="211"/>
+        <location filename="../ui/MyMenuBar.qml" line="217"/>
         <source>Help</source>
         <translation>Aide</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="213"/>
+        <location filename="../ui/MyMenuBar.qml" line="219"/>
         <source>About HodeIA...</source>
         <translation>À propos de HodeIA...</translation>
     </message>
@@ -1087,8 +1087,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Supprimer un projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="104"/>
-        <location filename="../ui/MyMenuBar.qml" line="161"/>
+        <location filename="../ui/MyMenuBar.qml" line="110"/>
+        <location filename="../ui/MyMenuBar.qml" line="167"/>
         <source>Delete Selected</source>
         <translation>Supprimer la sélection</translation>
     </message>
@@ -1101,7 +1101,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="170"/>
+        <location filename="../ui/MyMenuBar.qml" line="176"/>
         <source>Settings</source>
         <translation>Paramètres</translation>
     </message>
@@ -1114,82 +1114,87 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Langues</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="60"/>
+        <location filename="../ui/MyMenuBar.qml" line="61"/>
         <source>Project</source>
         <translation>Projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="62"/>
+        <location filename="../ui/MyMenuBar.qml" line="63"/>
         <source>New Project...</source>
         <translation>Nouveau projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="66"/>
+        <location filename="../ui/MyMenuBar.qml" line="67"/>
         <source>Open Project</source>
         <translation>Ouvrir un projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="82"/>
+        <location filename="../ui/MyMenuBar.qml" line="83"/>
+        <source>Zotero...</source>
+        <translation>Zotero…</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="88"/>
         <source>Clear Project Data...</source>
         <translation>Vider le projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="87"/>
+        <location filename="../ui/MyMenuBar.qml" line="93"/>
         <source>Delete Projects</source>
         <translation>Supprimer des projets</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="112"/>
+        <location filename="../ui/MyMenuBar.qml" line="118"/>
         <source>Quit</source>
         <translation>Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="118"/>
+        <location filename="../ui/MyMenuBar.qml" line="124"/>
         <source>Models</source>
         <translation>Modèles</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="135"/>
+        <location filename="../ui/MyMenuBar.qml" line="141"/>
         <source>Manage Backends...</source>
         <translation>Gérer les backends...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="140"/>
+        <location filename="../ui/MyMenuBar.qml" line="146"/>
         <source>Add Local Model...</source>
         <translation>Ajouter un modèle local...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="144"/>
+        <location filename="../ui/MyMenuBar.qml" line="150"/>
         <source>Delete Local Models</source>
         <translation>Supprimer des modèles locaux</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="172"/>
+        <location filename="../ui/MyMenuBar.qml" line="178"/>
         <source>Theme</source>
         <translation>Thème</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="189"/>
+        <location filename="../ui/MyMenuBar.qml" line="195"/>
         <source>Language</source>
         <translation>Langue</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="191"/>
+        <location filename="../ui/MyMenuBar.qml" line="197"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="197"/>
+        <location filename="../ui/MyMenuBar.qml" line="203"/>
         <source>Français</source>
         <translation>Français</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="205"/>
+        <location filename="../ui/MyMenuBar.qml" line="211"/>
         <source>OpenAlex API Key...</source>
         <translation>Clé API OpenAlex...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="120"/>
+        <location filename="../ui/MyMenuBar.qml" line="126"/>
         <source>Backend</source>
         <translation>Backend</translation>
     </message>
@@ -2120,6 +2125,168 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <location filename="../ui/SummaryDbPane.qml" line="596"/>
         <source>Deletion cancelled</source>
         <translation>Suppression annulée</translation>
+    </message>
+</context>
+<context>
+    <name>ZoteroCollectionModel</name>
+    <message>
+        <location filename="../src/zoterocollectionmodel.cpp" line="62"/>
+        <source>My Library</source>
+        <translation>Ma bibliothèque</translation>
+    </message>
+</context>
+<context>
+    <name>ZoteroController</name>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="72"/>
+        <source>No project is open.</source>
+        <translation>Aucun projet n&apos;est ouvert.</translation>
+    </message>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="115"/>
+        <source>Cannot read Zotero: %1</source>
+        <translation>Impossible de lire Zotero : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="137"/>
+        <location filename="../src/zoterocontroller.cpp" line="236"/>
+        <source>Cannot update the project: %1</source>
+        <translation>Impossible de mettre à jour le projet : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="187"/>
+        <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
+        <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
+    </message>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="201"/>
+        <source>Cannot save the collections: %1</source>
+        <translation>Impossible d&apos;enregistrer les collections : %1</translation>
+    </message>
+</context>
+<context>
+    <name>ZoteroWindow</name>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="15"/>
+        <source>Zotero</source>
+        <translation>Zotero</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="36"/>
+        <source>Zotero data folder</source>
+        <translation>Dossier de données de Zotero</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="53"/>
+        <source>Zotero folder: %1</source>
+        <translation>Dossier Zotero : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="54"/>
+        <source>Zotero was not found. Choose its data folder (the one holding zotero.sqlite).</source>
+        <translation>Zotero n&apos;a pas été trouvé. Choisissez son dossier de données (celui qui contient zotero.sqlite).</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="64"/>
+        <source>Change...</source>
+        <translation>Changer…</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="64"/>
+        <source>Browse...</source>
+        <translation>Parcourir…</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="88"/>
+        <source>Collections followed by this project</source>
+        <translation>Collections suivies par ce projet</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/ZoteroWindow.qml" line="142"/>
+        <source>%n PDF</source>
+        <translation>
+            <numerusform>%n PDF</numerusform>
+            <numerusform>%n PDF</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/ZoteroWindow.qml" line="144"/>
+        <source>%n in the project</source>
+        <translation>
+            <numerusform>%n dans le projet</numerusform>
+            <numerusform>%n dans le projet</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/ZoteroWindow.qml" line="147"/>
+        <source>%n not downloaded</source>
+        <translation>
+            <numerusform>%n non téléchargé</numerusform>
+            <numerusform>%n non téléchargés</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="161"/>
+        <source>Ticking a collection ticks its sub-collections.</source>
+        <translation>Cocher une collection coche ses sous-collections.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="165"/>
+        <source>Save Selection</source>
+        <translation>Enregistrer la sélection</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="178"/>
+        <source>New PDFs (%1)</source>
+        <translation>Nouveaux PDF (%1)</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/ZoteroWindow.qml" line="190"/>
+        <source>%n PDF(s) of the followed collections are not on this computer. Download them in Zotero: they will be proposed here once downloaded.</source>
+        <translation>
+            <numerusform>%n PDF des collections suivies n&apos;est pas sur cet ordinateur. Téléchargez-le dans Zotero : il sera proposé ici une fois téléchargé.</numerusform>
+            <numerusform>%n PDF des collections suivies ne sont pas sur cet ordinateur. Téléchargez-les dans Zotero : ils seront proposés ici une fois téléchargés.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="199"/>
+        <source>Follow collections above to have their PDFs proposed.</source>
+        <translation>Suivez des collections ci-dessus pour que leurs PDF soient proposés.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="200"/>
+        <source>Nothing new: every downloaded PDF of the followed collections is in the project or ignored.</source>
+        <translation>Rien de nouveau : chaque PDF téléchargé des collections suivies est dans le projet ou ignoré.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="238"/>
+        <source>(untitled)</source>
+        <translation>(sans titre)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="268"/>
+        <source>Untick All</source>
+        <translation>Tout décocher</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="268"/>
+        <source>Tick All</source>
+        <translation>Tout cocher</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="282"/>
+        <source>Ignore</source>
+        <translation>Ignorer</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="283"/>
+        <source>Never propose the ticked PDFs again</source>
+        <translation>Ne plus jamais proposer les PDF cochés</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="288"/>
+        <source>Import (%1)</source>
+        <translation>Importer (%1)</translation>
     </message>
 </context>
 </TS>

@@ -13,6 +13,7 @@
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
 #include "thememanager.h"
+#include "zoterocontroller.h"
 
 #include <QDir>
 #include <QStandardPaths>
@@ -439,6 +440,10 @@ int main(int argc, char *argv[]) {
   // Startup catch-up: fetch references for papers summarized in prior sessions
   QTimer::singleShot(0, &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 
+  // Zotero connector (reads Zotero, imports through the ingestion)
+  ZoteroController zoteroController(&configManager, &databaseManager,
+                                    &engineController);
+
   QQmlApplicationEngine engine;
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
@@ -450,6 +455,8 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("queryController", &queryController);
   engine.rootContext()->setContextProperty("helpers", &helpers);
   engine.rootContext()->setContextProperty("notifier", Notifier::instance());
+  engine.rootContext()->setContextProperty("zoteroController",
+                                           &zoteroController);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

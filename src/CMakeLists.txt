@@ -26,6 +26,9 @@ add_library(HodeiaEngine STATIC
     ../include/zoterolocator.h
     ../include/zoterosqlitesource.h
     ../include/zoterorepository.h
+    ../include/zoterosync.h
+    ../include/zoterocollectionmodel.h
+    ../include/zoterocontroller.h
     ../include/summary.h
     ../include/query.h
     ../include/summaryproxymodel.h
@@ -73,6 +76,9 @@ add_library(HodeiaEngine STATIC
     zoterolocator.cpp
     zoterosqlitesource.cpp
     zoterorepository.cpp
+    zoterosync.cpp
+    zoterocollectionmodel.cpp
+    zoterocontroller.cpp
     summary.cpp
     query.cpp
     summaryproxymodel.cpp
@@ -204,7 +210,7 @@ set_source_files_properties(../ui/Style.qml  PROPERTIES QT_QML_SINGLETON_TYPE TR
 set(_QML_FILES
     Colors.qml Fonts.qml Main.qml MyMenuBar.qml DisplayPane.qml
     SummaryDbPane.qml RagWindow.qml RagDbPane.qml QueryPane.qml
-    BackendWindow.qml MyToolBar.qml
+    BackendWindow.qml MyToolBar.qml ZoteroWindow.qml
     # Shared styled components (see Style.qml)
     Style.qml PopupBackground.qml CheckIndicator.qml StyledButton.qml
     StyledCheckBox.qml StyledComboBox.qml StyledTextField.qml StyledSpinBox.qml
@@ -233,6 +239,7 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/QueryPane.qml
         ${CMAKE_SOURCE_DIR}/ui/BackendWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/MyToolBar.qml
+        ${CMAKE_SOURCE_DIR}/ui/ZoteroWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/Style.qml
         ${CMAKE_SOURCE_DIR}/ui/PopupBackground.qml
         ${CMAKE_SOURCE_DIR}/ui/CheckIndicator.qml

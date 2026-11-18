@@ -12,6 +12,7 @@ MenuBar {
     signal requestDeleteModels
     signal requestOpenAlexApiKey
     signal requestAbout
+    signal requestZotero
 
     // ── Bar ──────────────────────────────────────────────────────────────
 
@@ -76,6 +77,11 @@ MenuBar {
                     }
                 }
             }
+        }
+        StyledMenuSeparator {}
+        StyledMenuItem {
+            text: qsTr("Zotero...")
+            onTriggered: menuBar.requestZotero()
         }
         StyledMenuSeparator {}
         StyledMenuItem {

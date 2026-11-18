@@ -77,6 +77,7 @@ ThemedWindow {
         onRequestDeleteModels: deleteModelDialog.open()
         onRequestOpenAlexApiKey: openAlexKeyDialog.open()
         onRequestAbout: aboutDialog.open()
+        onRequestZotero: zoteroDialog.open()
     }
 
     header: MyToolBar {
@@ -511,6 +512,11 @@ ThemedWindow {
     // Backend setup modal
     BackendWindow {
         id: backendDialog
+    }
+
+    // Zotero connector: followed collections and new PDFs to import
+    ZoteroWindow {
+        id: zoteroDialog
     }
 
     // Dialog for adding a local GGUF model (+ optional mmproj)

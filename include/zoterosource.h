@@ -33,6 +33,8 @@ struct ZoteroMeta {
   QString doi;
   QString itemType;    ///< Zotero type name: journalArticle, book...
   QStringList tags;
+
+  bool operator==(const ZoteroMeta &) const = default;
 };
 
 /// A PDF attachment of the library, with the data of its parent item.

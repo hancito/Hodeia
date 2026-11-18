@@ -47,6 +47,8 @@ hodeia_add_test(tst_mcpserver)
 hodeia_add_test(tst_zoterolocator)
 hodeia_add_test(tst_zoterosqlitesource)
 hodeia_add_test(tst_zoterorepository)
+hodeia_add_test(tst_zoterosync)
+hodeia_add_test(tst_zoterocollectionmodel)
 
 # End to end: runs the Hodeia executable itself with --mcp.
 hodeia_add_test(tst_mcpstdio)
