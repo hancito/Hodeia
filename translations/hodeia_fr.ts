@@ -304,12 +304,12 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>DatabaseManager</name>
     <message>
-        <location filename="../src/database.cpp" line="32"/>
+        <location filename="../src/database.cpp" line="33"/>
         <source>No Project Database</source>
         <translation>Aucune base de projet</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="33"/>
+        <location filename="../src/database.cpp" line="34"/>
         <source>No active project could be opened. Create a project from the Project menu.</source>
         <translation>Aucun projet actif n&apos;a pu être ouvert. Créez un projet depuis le menu Projet.</translation>
     </message>
@@ -336,64 +336,90 @@ Check that the file exists and is not used by another program, or switch to anot
 Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programme, ou passez à un autre projet.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="110"/>
         <source>Project Database Error</source>
-        <translation>Erreur de la base du projet</translation>
+        <translation type="vanished">Erreur de la base du projet</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="111"/>
         <source>The project database could not be prepared; some features may not work.
 
 %1
 
 %2</source>
-        <translation>La base de données du projet n&apos;a pas pu être préparée ; certaines fonctions risquent de ne pas marcher.
+        <translation type="vanished">La base de données du projet n&apos;a pas pu être préparée ; certaines fonctions risquent de ne pas marcher.
 
 %1
 
 %2</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="141"/>
-        <location filename="../src/database.cpp" line="224"/>
+        <location filename="../src/database.cpp" line="72"/>
+        <source>This project was saved by a newer version of HodeIA (database version %1; this version reads up to %2). Update HodeIA to open it.</source>
+        <translation>Ce projet a été enregistré par une version plus récente de HodeIA (version de base %1 ; cette version lit jusqu&apos;à %2). Mettez HodeIA à jour pour l&apos;ouvrir.</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="79"/>
+        <source>The project database needs an update, but the safety copy made before updating failed, so it was left unchanged: %1</source>
+        <translation>La base du projet doit être mise à jour, mais la copie de sécurité préalable a échoué, elle n&apos;a donc pas été modifiée : %1</translation>
+    </message>
+    <message>
+        <source>The project database could not be updated to the new version; the failed step was undone. A copy from before the update is kept next to it.
+
+%1</source>
+        <translation type="vanished">La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée. Une copie d&apos;avant la mise à jour est conservée à côté.
+
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="85"/>
+        <source>The project database could not be updated to the new version; the failed step was undone.</source>
+        <translation>La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée.</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="89"/>
+        <source>A copy from before the update is kept: %1</source>
+        <translation>Une copie d&apos;avant la mise à jour est conservée : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="113"/>
+        <location filename="../src/database.cpp" line="194"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="157"/>
+        <location filename="../src/database.cpp" line="128"/>
         <source>The project database could not be opened: %1</source>
         <translation>La base de données du projet n&apos;a pas pu être ouverte : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="178"/>
-        <location filename="../src/database.cpp" line="220"/>
-        <location filename="../src/database.cpp" line="253"/>
+        <location filename="../src/database.cpp" line="148"/>
+        <location filename="../src/database.cpp" line="190"/>
+        <location filename="../src/database.cpp" line="223"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="195"/>
+        <location filename="../src/database.cpp" line="165"/>
         <source>Cannot delete the active project while an operation is in progress.</source>
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="255"/>
+        <location filename="../src/database.cpp" line="225"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="294"/>
-        <location filename="../src/database.cpp" line="354"/>
+        <location filename="../src/database.cpp" line="264"/>
+        <location filename="../src/database.cpp" line="324"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="302"/>
+        <location filename="../src/database.cpp" line="272"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="344"/>
+        <location filename="../src/database.cpp" line="314"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -401,12 +427,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="359"/>
+        <location filename="../src/database.cpp" line="329"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="378"/>
+        <location filename="../src/database.cpp" line="348"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -1522,62 +1548,62 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Requête vide</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="71"/>
+        <location filename="../src/queryworker.cpp" line="72"/>
         <source>No relevant information found in the library.</source>
         <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="73"/>
+        <location filename="../src/queryworker.cpp" line="74"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="76"/>
+        <location filename="../src/queryworker.cpp" line="77"/>
         <source>The library cannot be searched: %1</source>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="99"/>
+        <location filename="../src/queryworker.cpp" line="100"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="105"/>
+        <location filename="../src/queryworker.cpp" line="106"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="124"/>
+        <location filename="../src/queryworker.cpp" line="125"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="161"/>
+        <location filename="../src/queryworker.cpp" line="162"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="163"/>
+        <location filename="../src/queryworker.cpp" line="164"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="165"/>
+        <location filename="../src/queryworker.cpp" line="166"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="170"/>
+        <location filename="../src/queryworker.cpp" line="171"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="196"/>
+        <location filename="../src/queryworker.cpp" line="197"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="206"/>
+        <location filename="../src/queryworker.cpp" line="207"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>

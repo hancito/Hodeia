@@ -2,6 +2,7 @@
 #include "configmanager.h"
 #include "notifier.h"
 #include "openalex.h"
+#include "projectstore.h"
 #include "sqlitevec.h"
 #include <QDir>
 #include <QJsonArray>
@@ -38,23 +39,18 @@ bool DatabaseManager::initDatabase() {
   m_dbPath = m_config->projectDbPath(m_config->lastProject());
   qDebug() << "Loading project database:" << m_dbPath;
 
-  auto openResult = m_db.open(m_dbPath);
-  if (!openResult) {
-    qCritical() << "Failed to open database:" << m_dbPath << openResult.error();
+  if (auto opened = openProjectDb(m_dbPath); !opened) {
+    qCritical() << "Failed to open database:" << m_dbPath << opened.error();
     Notifier::post(
         "db-init", tr("Project Database Unavailable"),
         tr("The database of project \"%1\" could not be opened, so the "
            "library is empty.\n\n%2\n\n%3\n\nCheck that the file exists and is "
            "not used by another program, or switch to another project.")
-            .arg(m_config->lastProject(), m_dbPath, openResult.error()));
+            .arg(m_config->lastProject(), m_dbPath, opened.error()));
     return false;
   }
 
-  createTables();
-
   // Embedding model is loaded lazily on first use (see SqliteVecManager).
-  (void)m_vecManager.createChunksTable(m_db);
-
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
   m_citationsModel->loadAll();
@@ -62,61 +58,37 @@ bool DatabaseManager::initDatabase() {
   return true;
 }
 
-void DatabaseManager::createTables() {
-  qInfo() << "[Database] createTables() — ensuring schema";
-
-  auto r1 = m_db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
-                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                      "paper_hash TEXT NOT NULL UNIQUE, "
-                      "title TEXT, "
-                      "authors TEXT, "
-                      "pages_num INTEGER NOT NULL, "
-                      "journal TEXT, "
-                      "year TEXT, "
-                      "topics TEXT, "
-                      "llmodel TEXT, "
-                      "summary_json TEXT, "
-                      "date DATETIME)");
-  if (!r1)
-    qCritical() << "[Database] Summaries table failed:" << r1.error();
-
-  auto r2 = m_db.exec("CREATE TABLE IF NOT EXISTS Queries ("
-                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                      "query TEXT NOT NULL, "
-                      "response TEXT NOT NULL, "
-                      "date DATETIME DEFAULT CURRENT_TIMESTAMP, "
-                      "llmodel TEXT NOT NULL)");
-  if (!r2)
-    qCritical() << "[Database] Queries table failed:" << r2.error();
-
-  auto r3 = m_db.exec("CREATE TABLE IF NOT EXISTS Citations ("
-                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                      "paper_hash TEXT NOT NULL UNIQUE, "
-                      "clean_title TEXT NOT NULL, "
-                      "work_id TEXT NOT NULL DEFAULT '', "
-                      "cites TEXT NOT NULL DEFAULT '', "
-                      "cited_by TEXT NOT NULL DEFAULT '', "
-                      "cites_count INTEGER NOT NULL DEFAULT 0, "
-                      "cited_by_count INTEGER NOT NULL DEFAULT 0, "
-                      // OpenAlex lookup state: pending | matched | not_found.
-                      // not_found rows are not searched again for a while
-                      // (see OpenAlexClient::dbLoadPendingJobs).
-                      "lookup_status TEXT NOT NULL DEFAULT 'pending', "
-                      "lookup_at DATETIME)");
-  if (!r3)
-    qCritical() << "[Database] Citations table failed:" << r3.error();
-  if (!r1 || !r2 || !r3) {
-    const QString err = !r1 ? r1.error() : !r2 ? r2.error() : r3.error();
-    Notifier::post("db-schema:" + m_dbPath, tr("Project Database Error"),
-                   tr("The project database could not be prepared; some "
-                      "features may not work.\n\n%1\n\n%2")
-                       .arg(m_dbPath, err));
+std::expected<void, QString>
+DatabaseManager::openProjectDb(const QString &path) {
+  auto opened = ProjectStore::open(m_db, path);
+  if (opened)
+    return {};
+  const ProjectStore::OpenError &e = opened.error();
+  switch (e.kind) {
+  case ProjectStore::OpenError::Kind::OpenFailed:
+    return std::unexpected(e.detail);
+  case ProjectStore::OpenError::Kind::TooNew:
+    return std::unexpected(
+        tr("This project was saved by a newer version of HodeIA (database "
+           "version %1; this version reads up to %2). Update HodeIA to open "
+           "it.")
+            .arg(e.dbVersion)
+            .arg(e.supportedVersion));
+  case ProjectStore::OpenError::Kind::BackupFailed:
+    return std::unexpected(
+        tr("The project database needs an update, but the safety copy made "
+           "before updating failed, so it was left unchanged: %1")
+            .arg(e.detail));
+  case ProjectStore::OpenError::Kind::MigrationFailed:
+    break;
   }
-  else
-    qInfo() << "[Database] Citations table OK";
-
-  // Create vec0 virtual table for text chunks with embeddings
-  (void)m_vecManager.createChunksTable(m_db);
+  QString msg = tr("The project database could not be updated to the new "
+                   "version; the failed step was undone.");
+  // ProjectStore saves a copy before migrating a versioned database.
+  if (e.dbVersion > 0)
+    msg += " " + tr("A copy from before the update is kept: %1")
+                     .arg(ProjectStore::backupPath(path, e.dbVersion));
+  return std::unexpected(msg + "\n\n" + e.detail);
 }
 
 bool DatabaseManager::isOpen() const { return m_db.isOpen(); }
@@ -145,22 +117,20 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
   const QString previousPath = m_dbPath;
   m_db.close();
 
-  auto openResult = m_db.open(dbPath);
-  if (!openResult) {
-    qCritical() << "Failed to open database:" << dbPath << openResult.error();
+  if (auto opened = openProjectDb(dbPath); !opened) {
+    qCritical() << "Failed to open database:" << dbPath << opened.error();
     // Don't leave the app without a database: go back to the previous one.
     if (!previousPath.isEmpty() && previousPath != dbPath &&
-        m_db.open(previousPath)) {
+        openProjectDb(previousPath)) {
       reloadModels();
     }
     return std::unexpected(
         tr("The project database could not be opened: %1")
-            .arg(openResult.error()));
+            .arg(opened.error()));
   }
 
   m_dbPath = dbPath;
   qDebug() << "Switched database to:" << m_dbPath;
-  createTables();
   reloadModels();
   emit databaseSwitched();
 

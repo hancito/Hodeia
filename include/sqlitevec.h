@@ -36,9 +36,6 @@ public:
   // Empty string uses the default E5 model in Models/Embedders/.
   bool initialize(const QString &modelPath = QString());
 
-  // Create the vec0 virtual table "chunks" in the given database
-  std::expected<void, QString> createChunksTable(SqliteDb &db);
-
   // Embed a batch of text strings; returns flat float vectors (rows × dims).
   // Mode controls the E5 prefix ("passage: " vs "query: ").
   QVector<float> embed(const QStringList &texts,

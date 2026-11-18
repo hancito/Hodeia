@@ -10,6 +10,18 @@ function(hodeia_add_test name)
   add_test(NAME ${name} COMMAND ${name})
   # No display needed: QtTest's offscreen platform for any Gui code.
   set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+  # SqliteDb::open() loads the sqlite-vec extension from the executable's
+  # folder, as for the app.
+  if(EXISTS "${_SQLITEVEC_LIB}")
+    if(WIN32)
+      set(_vec0 vec0.dll)
+    else()
+      set(_vec0 vec0.so)
+    endif()
+    add_custom_command(TARGET ${name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_SQLITEVEC_LIB} $<TARGET_FILE_DIR:${name}>/${_vec0})
+  endif()
 endfunction()
 
 hodeia_add_test(tst_anthropicapi)
@@ -20,3 +32,4 @@ hodeia_add_test(tst_citationformat)
 hodeia_add_test(tst_retriever)
 hodeia_add_test(tst_querypromptbuilder)
 hodeia_add_test(tst_summarypromptbuilder)
+hodeia_add_test(tst_projectstore)

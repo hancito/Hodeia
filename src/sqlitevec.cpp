@@ -130,20 +130,6 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
   return true;
 }
 
-/* ── vec0 table creation ─────────────────────────────────────── */
-
-std::expected<void, QString> SqliteVecManager::createChunksTable(SqliteDb &db) {
-  return db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING vec0("
-                 "embedding float[384], "
-                 "paper_hash text, "
-                 "page integer, "
-                 "chunk_idx integer, "
-                 "chunk_text text, "
-                 "citation text, "
-                 "clean_title text, "
-                 "page_metadata text)");
-}
-
 /* ── Embedding ───────────────────────────────────────────────── */
 
 QVector<float> SqliteVecManager::embed(const QStringList &texts,

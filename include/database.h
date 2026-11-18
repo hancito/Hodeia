@@ -78,7 +78,9 @@ private:
   // the previous project on failure.  @p action changes the configuration.
   QString activateProject(
       const std::function<std::expected<void, QString>()> &action);
-  void createTables();
+  /// Open a project database through ProjectStore (schema migrations);
+  /// a user-facing message on failure.
+  std::expected<void, QString> openProjectDb(const QString &path);
 
   QString m_dbPath;
   SqliteDb m_db;
