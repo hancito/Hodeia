@@ -201,8 +201,7 @@ QueryWorker::saveQuery(const QString &queryText, const QString &response,
                        .saveQuery(queryText, response, modelName);
       !saved)
     return saved;
-
-  if (m_database->queryModel())
-    m_database->queryModel()->loadAll();
+  // The history model is reloaded on the GUI thread (QueryController), not
+  // here: this runs on the worker thread.
   return {};
 }

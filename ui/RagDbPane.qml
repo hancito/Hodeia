@@ -7,7 +7,7 @@ Rectangle {
     id: dbPane
     property list<int> selectedQueryIds: []
     property int activeQueryId: 0
-    property int nqueries: databaseManager.queryProxyModel.rowCount()
+    property int nqueries: databaseManager.queryProxyModel.count
 
     function addSelectedQuery(id) {
         if (!selectedQueryIds.includes(id)) {

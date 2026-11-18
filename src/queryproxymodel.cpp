@@ -5,6 +5,15 @@ QueryProxyModel::QueryProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent) {
   setDynamicSortFilter(true);
   setSortRole(QueryModel::DateRole);
+  // Every way the row count can change: reload, new/deleted query, filter.
+  connect(this, &QAbstractItemModel::rowsInserted, this,
+          &QueryProxyModel::countChanged);
+  connect(this, &QAbstractItemModel::rowsRemoved, this,
+          &QueryProxyModel::countChanged);
+  connect(this, &QAbstractItemModel::modelReset, this,
+          &QueryProxyModel::countChanged);
+  connect(this, &QAbstractItemModel::layoutChanged, this,
+          &QueryProxyModel::countChanged);
 }
 
 QString QueryProxyModel::filterText() const { return m_filterText; }

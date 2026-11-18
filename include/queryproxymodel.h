@@ -11,6 +11,9 @@ class QueryProxyModel : public QSortFilterProxyModel {
       int sortRole READ sortRole WRITE setSortRole NOTIFY sortRoleChanged)
   Q_PROPERTY(bool sortDescending READ isSortDescending WRITE setSortDescending
                  NOTIFY sortDescendingChanged)
+  /// Rows shown (filter applied).  A property so QML bindings update; a
+  /// rowCount() call in a binding is never re-evaluated.
+  Q_PROPERTY(int count READ count NOTIFY countChanged)
 
 public:
   explicit QueryProxyModel(QObject *parent = nullptr);
@@ -26,6 +29,8 @@ public:
 
   Q_INVOKABLE QVariant get(int index, const QString &roleName) const;
 
+  int count() const { return rowCount(); }
+
   QHash<int, QByteArray> roleNames() const override;
 
 protected:
@@ -39,6 +44,7 @@ signals:
   void filterTextChanged();
   void sortRoleChanged();
   void sortDescendingChanged();
+  void countChanged();
 
 private:
   QString m_filterText;

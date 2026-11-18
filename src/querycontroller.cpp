@@ -86,8 +86,14 @@ void QueryController::startQuery(const QString &queryText, int contextTokens) {
   // Forward signals to QML
   connect(worker, &QueryWorker::started, this, &QueryController::queryStarted);
 
+  // Runs on this (GUI) thread: reload the history model, which QML is bound
+  // to, before telling QML the answer is in.
   connect(worker, &QueryWorker::queryFinished, this,
-          &QueryController::queryFinished);
+          [this](const QString &response, bool success, const QString &error) {
+            if (success && m_database && m_database->queryModel())
+              m_database->queryModel()->loadAll();
+            emit queryFinished(response, success, error);
+          });
 
   connect(worker, &QueryWorker::stopped, this, &QueryController::queryStopped);
 

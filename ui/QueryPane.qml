@@ -14,6 +14,16 @@ Rectangle {
     // after the active query was deleted).
     property int modelRevision: 0
 
+    // History emptied (everything deleted, empty project): nothing left to
+    // show, the question field included.  The source model, not the proxy:
+    // a search filter matching nothing must not clear anything.
+    function clearIfHistoryEmpty() {
+        if (databaseManager.queryModel.rowCount() === 0 && !querying) {
+            lastResponse = "";
+            queryLlm.text = "";
+        }
+    }
+
     function activeQueryExists() {
         for (var i = 0; i < databaseManager.queryProxyModel.rowCount(); i++)
             if (databaseManager.queryProxyModel.get(i, "id") === activeQueryId)
@@ -31,16 +41,23 @@ Rectangle {
             // The shown answer belonged to a deleted query: drop it too.
             if (queryPane.activeQueryId !== 0 && !queryPane.activeQueryExists())
                 queryPane.lastResponse = "";
+            queryPane.clearIfHistoryEmpty();
         }
         function onModelReset() {
             queryPane.modelRevision++;
             if (!queryPane.activeQueryExists())
                 queryPane.lastResponse = "";
+            queryPane.clearIfHistoryEmpty();
         }
         function onDataChanged() {
             queryPane.modelRevision++;
         }
     }
+
+    // Typing in the question field breaks its binding: put the active query
+    // back whenever it changes (another query selected, the active one
+    // deleted, everything deleted).
+    onActiveQueryTextChanged: queryLlm.text = activeQueryText
 
     // Live lookup of the active query from the proxy model.
     readonly property string activeQueryText: {
