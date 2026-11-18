@@ -1,0 +1,65 @@
+# Prepare the GitHub release of a "v*" tag, before any package is built:
+#
+#   1. The tag must be v<HODEIA_VERSION_STRING> (CMakeLists.txt: the numeric
+#      project(VERSION) + HODEIA_VERSION_SUFFIX), so the packages attached to
+#      the release carry the version the tag names.
+#   2. Create the release if it does not exist yet.  Both packaging workflows
+#      (Linux, Windows) run this at the same time on a tag push: when the
+#      creation fails, the release must exist (the other workflow won).
+#
+# The packaging jobs then only upload their files to an existing release.
+# Requires a checkout of the tagged commit.
+
+name: Prepare release
+description: Check the tag against the project version and create the release
+
+inputs:
+  token:
+    description: Token allowed to create releases (contents write)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check the tag against the project version
+      shell: bash
+      run: |
+        version=$(sed -nE 's/^project\(Hodeia VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
+        suffix=$(sed -nE 's/^set\(HODEIA_VERSION_SUFFIX "([^"]*)"\).*/\1/p' CMakeLists.txt)
+        if [ -z "$version" ]; then
+          echo "::error::project(Hodeia VERSION ...) not found in CMakeLists.txt"
+          exit 1
+        fi
+        expected="v${version}${suffix}"
+        if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+          echo "::error::Tag $GITHUB_REF_NAME does not match the project version $expected (CMakeLists.txt: project VERSION + HODEIA_VERSION_SUFFIX)"
+          exit 1
+        fi
+        echo "Tag $GITHUB_REF_NAME matches the project version"
+
+    - name: Create the release
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        tag="$GITHUB_REF_NAME"
+        if gh release view "$tag" >/dev/null 2>&1; then
+          echo "Release $tag already exists"
+          exit 0
+        fi
+        flags=()
+        case "$tag" in *rc*|*beta*) flags+=(--prerelease) ;; esac
+        if gh release create "$tag" --verify-tag --title "HodeIA ${tag#v}" \
+             --generate-notes "${flags[@]}"; then
+          echo "Release $tag created"
+          exit 0
+        fi
+        # Lost the race against the other packaging workflow?
+        sleep 5
+        if gh release view "$tag" >/dev/null 2>&1; then
+          echo "Release $tag created by the other workflow"
+          exit 0
+        fi
+        echo "::error::Could not create release $tag"
+        exit 1

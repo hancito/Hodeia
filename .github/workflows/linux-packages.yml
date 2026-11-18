@@ -46,8 +46,30 @@ defaults:
     shell: bash
 
 jobs:
+  # Tags only: check the tag against the project version, create the release.
+  # Skipped otherwise; the packaging job then runs on its own.
+  release:
+    name: Prepare the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: false
+          sparse-checkout: |
+            CMakeLists.txt
+            .github
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/prepare-release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
   package:
     name: ${{ matrix.format }} (${{ matrix.image }})
+    needs: release
+    # Runs when the release job succeeded (tag) or was skipped (branch,
+    # manual run); a tag that fails the version check builds nothing.
+    if: ${{ !cancelled() && needs.release.result != 'failure' }}
     runs-on: ubuntu-24.04
     container: ${{ matrix.image }}
     strategy:
