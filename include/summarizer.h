@@ -48,6 +48,7 @@ private:
                                            const ActiveBackend &active);
 
   /* prompt building */
+  /// Read the paper's chunks and build its prompt (SummaryPrompt).
   PromptPayload buildPrompt(const QString &paperHash) const;
 
   /* result handling */
@@ -57,9 +58,6 @@ private:
                                            const QString &modelName);
   /// Title stored at ingestion, or the hash if it cannot be read.
   QString paperTitle(const QString &hash) const;
-
-  static const QString &systemPrompt();
-  static const QString &userPrompt();
 
   bool isStopping() const { return m_stopping; }
 

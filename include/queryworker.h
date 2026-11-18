@@ -1,8 +1,6 @@
 #pragma once
 
 #include <QObject>
-#include <QSet>
-#include <QVariantMap>
 #include <expected>
 #include <memory>
 
@@ -12,22 +10,9 @@
 class ConfigManager;
 class DatabaseManager;
 
-/// One page worth of context aggregated from vector search results.
-struct PageContext {
-  QString paperHash;
-  int page;
-  QString cleanTitle;
-  QString citation;
-  QStringList textChunks; ///< may hold multiple chunks from the same page
-  QString imageFile;      ///< absolute PNG path, empty if unavailable
-  bool withImage = false; ///< image sent to the model (visual mode, within
-                          ///< the image cap and the token budget)
-};
-
-/// Orchestrator for RAG queries over the paper library.
-/// Retrieves relevant chunks via vector search, groups by page,
-/// builds a structured prompt, runs inference (local or remote),
-/// and persists the response with a sources footer.
+/// Orchestrator for RAG queries over the paper library: Retriever (pages),
+/// QueryPrompt (prompt), ChatBackend (answer), CitationFormat (citations and
+/// Sources footer), then the answer is saved in the query history.
 class QueryWorker : public QObject {
   Q_OBJECT
 
@@ -70,25 +55,10 @@ private:
   std::expected<QString, QString> generate(const PromptPayload &payload,
                                            const ActiveBackend &active);
 
-  /* retrieval & grouping */
-  /// Fill `budgetTokens` with the most relevant chunks, grouped by page.
-  QList<PageContext> retrieveAndGroupPages(const QString &queryText,
-                                           int budgetTokens) const;
-  /// Token count with the embedding tokenizer (chars/3 if unavailable).
-  int countTokens(const QString &text) const;
-
-  /* prompt building */
-  PromptPayload buildPrompt(const QList<PageContext> &pages,
-                            const QString &queryText) const;
-  QStringList buildCitationsFooter(const QList<PageContext> &pages,
-                                   const QSet<int> &cited) const;
-
   /* result handling */
   std::expected<void, QString> saveQuery(const QString &queryText,
                                          const QString &response,
                                          const QString &modelName);
-
-  static const QString &systemPrompt();
 
   bool isStopping() const { return m_stopping; }
 

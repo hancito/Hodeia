@@ -35,6 +35,12 @@ add_library(HodeiaEngine STATIC
     ../include/summarizer.h
     ../include/summarythreadmanager.h
     ../include/queryworker.h
+    ../include/pagecontext.h
+    ../include/retriever.h
+    ../include/querypromptbuilder.h
+    ../include/summarypromptbuilder.h
+    ../include/metadataresolver.h
+    ../include/citationformat.h
     ../include/querycontroller.h
     ../include/openalex.h
     ../include/helpers.h
@@ -67,6 +73,11 @@ add_library(HodeiaEngine STATIC
     summarythreadmanager.cpp
     openalex.cpp
     queryworker.cpp
+    retriever.cpp
+    querypromptbuilder.cpp
+    summarypromptbuilder.cpp
+    metadataresolver.cpp
+    citationformat.cpp
     querycontroller.cpp
     helpers.cpp
     notifier.cpp
