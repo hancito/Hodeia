@@ -1,0 +1,16 @@
+{
+  "id": "claude",
+  "name": "Claude Code",
+  "connector": "claude",
+  "command": "claude",
+  "verified": true,
+  "install": "https://code.claude.com/docs/en/setup (native installer, no Node.js needed)",
+  "login": "claude, then /login",
+  "models": [
+    "default",
+    "opus",
+    "sonnet",
+    "haiku",
+    "fable"
+  ]
+}

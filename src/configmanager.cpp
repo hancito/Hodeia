@@ -364,6 +364,21 @@ void ConfigManager::setBackend(const QString &name, const QString &url,
   saveConfig();
 }
 
+void ConfigManager::setAgentBackend(const QString &name, const QString &agentId,
+                                    const QString &command) {
+  QVariantMap entry{{"name", name}, {"api", "agent"}, {"agent", agentId}, {"url", command}};
+  for (int i = 0; i < m_backendList.size(); ++i)
+    if (m_backendList[i].toMap().value("name").toString() == name) {
+      m_backendList[i] = entry;
+      emit backendListChanged();
+      saveConfig();
+      return;
+    }
+  m_backendList.append(entry);
+  emit backendListChanged();
+  saveConfig();
+}
+
 void ConfigManager::removeBackend(const QString &name) {
   for (int i = 0; i < m_backendList.size(); ++i) {
     if (m_backendList[i].toMap().value("name").toString() == name) {

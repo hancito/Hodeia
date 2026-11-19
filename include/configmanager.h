@@ -92,6 +92,10 @@ public:
                               const QString &api = QStringLiteral("openai"));
 
   /// Remove a backend by name.
+  /// Add or update an agent backend ({"api": "agent", "agent", "url"}, see
+  /// AgentBackend): `command` replaces the profile's when not empty.
+  Q_INVOKABLE void setAgentBackend(const QString &name, const QString &agentId,
+                                   const QString &command);
   Q_INVOKABLE void removeBackend(const QString &name);
 
   // Project Operations (on disk + lastProject only).  QML goes through

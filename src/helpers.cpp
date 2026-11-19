@@ -1,4 +1,5 @@
 #include "helpers.h"
+#include "agentbackend.h"
 #include "anthropicapi.h"
 #include "configmanager.h"
 #include "database.h"
@@ -309,6 +310,7 @@ void Helpers::addLocalSummarizer(const QString &modelPath,
 
 void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
                                 const QString &apiKey, const QString &api) {
+  ++m_modelsRequest;
   if (apiUrl.isEmpty()) {
     emit modelsChecked(false, {}, tr("URL is empty"));
     return;
@@ -319,7 +321,13 @@ void Helpers::checkRemoteModels(const QString &name, const QString &apiUrl,
 void Helpers::loadActiveBackendModels() {
   if (!m_config)
     return;
+  ++m_modelsRequest;
   const QVariantMap cfg = m_config->backendConfig(m_config->activeBackend());
+  if (cfg.value("api").toString() == QLatin1String("agent")) {
+    cancelPendingReply();
+    fetchAgentModels(cfg, QString());
+    return;
+  }
   const QString url = cfg.value("url").toString();
   if (!url.isEmpty()) {
     fetchRemoteModels(url, cfg.value("api_key").toString(),
@@ -332,6 +340,40 @@ void Helpers::loadActiveBackendModels() {
   // Success even when empty: the scan worked, there is just no model left
   // (the combobox must then be cleared, not left showing a deleted model).
   emit modelsChecked(true, m_localModelList, QString());
+}
+
+QVariantList Helpers::agentProfiles() const { return AgentBackend::profiles(); }
+
+void Helpers::checkAgentModels(const QString &name, const QString &agentId,
+                               const QString &command) {
+  ++m_modelsRequest;
+  cancelPendingReply();
+  fetchAgentModels({{"api", "agent"}, {"agent", agentId}, {"url", command.trimmed()}},
+                   name);
+}
+
+void Helpers::fetchAgentModels(const QVariantMap &config, const QString &saveAs) {
+  const int request = m_modelsRequest;
+  QThreadPool::globalInstance()->start([this, config, saveAs, request] {
+    const auto models = AgentBackend::listModels(config);
+    QMetaObject::invokeMethod(
+        this,
+        [this, models, config, saveAs, request] {
+          if (request != m_modelsRequest)
+            return; // another listing was asked meanwhile
+          if (!models) {
+            emit modelsChecked(false, {}, models.error());
+            return;
+          }
+          emit modelsChecked(true, *models, QString());
+          if (!saveAs.isEmpty() && m_config) {
+            m_config->setAgentBackend(saveAs, config.value("agent").toString(),
+                                      config.value("url").toString());
+            m_config->setActiveBackend(saveAs);
+          }
+        },
+        Qt::QueuedConnection);
+  });
 }
 
 // Drop a pending /models request silently: disconnected first, its abort()

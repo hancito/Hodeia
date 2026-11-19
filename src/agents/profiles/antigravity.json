@@ -1,0 +1,9 @@
+{
+  "id": "antigravity",
+  "name": "Google Antigravity",
+  "connector": "acp",
+  "command": "agy acp",
+  "verified": false,
+  "install": "https://antigravity.google",
+  "login": "agy acp --login"
+}

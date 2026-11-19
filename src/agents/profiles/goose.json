@@ -1,0 +1,9 @@
+{
+  "id": "goose",
+  "name": "Goose",
+  "connector": "acp",
+  "command": "goose acp",
+  "verified": false,
+  "install": "https://github.com/block/goose",
+  "login": "goose configure"
+}

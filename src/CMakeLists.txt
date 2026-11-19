@@ -52,6 +52,7 @@ add_library(HodeiaEngine STATIC
     ../include/pagecontext.h
     ../include/retriever.h
     ../include/reindexer.h
+    ../include/agentbackend.h
     ../include/reindexcontroller.h
     ../include/querypromptbuilder.h
     ../include/summarypromptbuilder.h
@@ -103,6 +104,7 @@ add_library(HodeiaEngine STATIC
     queryworker.cpp
     retriever.cpp
     reindexer.cpp
+    agentbackend.cpp
     reindexcontroller.cpp
     querypromptbuilder.cpp
     summarypromptbuilder.cpp
@@ -130,6 +132,42 @@ if(HODEIA_SANITIZE MATCHES "undefined")
       COMPILE_OPTIONS "-fno-sanitize=alignment")
 endif()
 
+# --- Agent connectors (src/agents) ---
+# The common ground, then one folder per connector under agents/connectors.
+# The list of connectors is generated from those folders: adding a connector
+# is adding a folder <name>/ whose sources define hodeia_connector_<name>()
+# (no self-registration, which the linker would drop from this static lib).
+target_sources(HodeiaEngine PRIVATE
+    agents/agentconnection.h
+    agents/agentprocess.h agents/agentprocess.cpp
+    agents/agentregistry.h agents/agentregistry.cpp
+    agents/agentsync.h agents/agentsync.cpp
+)
+file(GLOB _agent_connector_dirs LIST_DIRECTORIES true CONFIGURE_DEPENDS
+     ${CMAKE_CURRENT_SOURCE_DIR}/agents/connectors/*)
+set(HODEIA_CONNECTOR_DECLS "")
+set(HODEIA_CONNECTOR_CALLS "")
+foreach(_dir IN LISTS _agent_connector_dirs)
+  if(IS_DIRECTORY ${_dir})
+    get_filename_component(_name ${_dir} NAME)
+    file(GLOB _connector_sources CONFIGURE_DEPENDS ${_dir}/*.h ${_dir}/*.cpp)
+    target_sources(HodeiaEngine PRIVATE ${_connector_sources})
+    target_include_directories(HodeiaEngine PUBLIC ${_dir})
+    string(APPEND HODEIA_CONNECTOR_DECLS
+           "std::unique_ptr<Agents::Connector> hodeia_connector_${_name}();\n")
+    string(APPEND HODEIA_CONNECTOR_CALLS
+           "  list.push_back(hodeia_connector_${_name}());\n")
+  endif()
+endforeach()
+configure_file(agents/builtinconnectors.cpp.in
+               ${CMAKE_CURRENT_BINARY_DIR}/builtinconnectors.cpp @ONLY)
+target_sources(HodeiaEngine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/builtinconnectors.cpp)
+# Built-in agent profiles (adding an ACP agent = adding a JSON file here).
+file(GLOB _agent_profiles CONFIGURE_DEPENDS
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/agents/profiles/*.json)
+qt_add_resources(HodeiaEngine "agent_profiles" PREFIX "/agents/profiles"
+    BASE agents/profiles FILES ${_agent_profiles})
+
 # --- Include directories ---
 #   ${CMAKE_SOURCE_DIR}         → also gives direct access to include/ (flat).
 #   ${CMAKE_SOURCE_DIR}/include → PUBLIC staging area, isolated from external/.
@@ -138,6 +176,7 @@ target_include_directories(HodeiaEngine
     PUBLIC
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agents
         # Public: include/sqlitevec.h includes llama.h (needed by the tests).
         ${LLAMA_INC}
         ${LLAMA_INC}/vendor

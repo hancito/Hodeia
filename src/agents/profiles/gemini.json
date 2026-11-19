@@ -1,0 +1,12 @@
+{
+  "id": "gemini",
+  "name": "Gemini CLI",
+  "connector": "acp",
+  "command": "gemini --acp",
+  "verified": false,
+  "install": "npm install -g @google/gemini-cli",
+  "login": "gemini",
+  "requires": [
+    "node"
+  ]
+}

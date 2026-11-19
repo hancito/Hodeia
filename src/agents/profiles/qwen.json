@@ -1,0 +1,12 @@
+{
+  "id": "qwen",
+  "name": "Qwen Code",
+  "connector": "acp",
+  "command": "qwen --acp",
+  "verified": true,
+  "install": "npm install -g @qwen-code/qwen-code",
+  "login": "qwen, then /auth",
+  "requires": [
+    "node"
+  ]
+}

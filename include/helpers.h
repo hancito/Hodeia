@@ -87,6 +87,15 @@ public:
   /// Emits modelsChecked() with the result.
   Q_INVOKABLE void loadActiveBackendModels();
 
+  /// The agent profiles for the Backends window (see AgentBackend::profiles):
+  /// the ones that can start on this computer first.
+  Q_INVOKABLE QVariantList agentProfiles() const;
+  /// Check an agent backend (Claude Code, Qwen Code, Pi...) by listing its
+  /// models; on success it is saved as @p name and made active.  @p command
+  /// replaces the profile's when not empty.  Emits modelsChecked().
+  Q_INVOKABLE void checkAgentModels(const QString &name, const QString &agentId,
+                                    const QString &command);
+
 signals:
   void modelsChecked(bool success, const QStringList &models,
                      const QString &error);
@@ -96,6 +105,10 @@ signals:
   void localModelListChanged();
 
 private:
+  /// The models of an agent backend, read on a pool thread (the agent may be
+  /// started once).  Saves the backend as @p saveAs on success.
+  void fetchAgentModels(const QVariantMap &config, const QString &saveAs);
+  int m_modelsRequest = 0; ///< bumped by each model listing: stale ones drop
   /// GET <apiUrl>/models. If @p saveAs is set, the backend is saved under
   /// that name and made active once the server answered.
   void fetchRemoteModels(const QString &apiUrl, const QString &apiKey,

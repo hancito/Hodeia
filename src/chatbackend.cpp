@@ -1,5 +1,6 @@
 #include "chatbackend.h"
 
+#include "agentbackend.h"
 #include "anthropicapi.h"
 #include "configmanager.h"
 #include "localbackend.h"
@@ -25,6 +26,8 @@ ActiveBackend resolveActiveBackend(ConfigManager *config) {
     info.kind = ActiveBackend::Kind::Local;
   else if (info.config.value("api").toString() == QLatin1String("anthropic"))
     info.kind = ActiveBackend::Kind::Anthropic;
+  else if (info.config.value("api").toString() == QLatin1String("agent"))
+    info.kind = ActiveBackend::Kind::Agent;
   else
     info.kind = ActiveBackend::Kind::OpenAi;
 
@@ -51,6 +54,8 @@ const char *backendKindName(ActiveBackend::Kind kind) {
     return "openai";
   case ActiveBackend::Kind::Anthropic:
     return "anthropic";
+  case ActiveBackend::Kind::Agent:
+    return "agent";
   }
   return "?";
 }
@@ -346,6 +351,8 @@ std::unique_ptr<ChatBackend> makeChatBackend(const ActiveBackend &active) {
   case ActiveBackend::Kind::Anthropic:
     return std::make_unique<AnthropicChatBackend>(active.modelName,
                                                   active.config);
+  case ActiveBackend::Kind::Agent:
+    return AgentBackend::make(active.modelName, active.config);
   case ActiveBackend::Kind::OpenAi:
     break;
   }

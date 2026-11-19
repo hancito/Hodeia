@@ -23,8 +23,15 @@ StyledDialog {
 
     property int editingIndex: -1
     property bool connectionVerified: false
-    // Protocol of the backend being edited ("openai" | "anthropic").
-    readonly property string apiType: apiValue.currentIndex === 1 ? "anthropic" : "openai"
+    // Protocol of the backend being edited ("openai" | "anthropic" | "agent").
+    // "agent": a coding agent (Claude Code, Qwen Code, Pi...) from the agent
+    // profiles; the URL field may replace its command.
+    readonly property string apiType: ["openai", "anthropic", "agent"][apiValue.currentIndex] || "openai"
+    readonly property bool isAgent: apiType === "agent"
+    // Read again at each opening: an agent may have been installed meanwhile.
+    property var agentProfiles: helpers.agentProfiles()
+    onAboutToShow: agentProfiles = helpers.agentProfiles()
+    readonly property var selectedAgent: agentProfiles[agentValue.currentIndex] || null
 
     // React to checkRemoteModels result
     Connections {
@@ -77,7 +84,8 @@ StyledDialog {
                             nameValue.text = modelData.name || "";
                             urlValue.text = modelData.url || "";
                             keyValue.text = modelData.api_key || "";
-                            apiValue.currentIndex = modelData.api === "anthropic" ? 1 : 0;
+                            apiValue.currentIndex = Math.max(0, ["openai", "anthropic", "agent"].indexOf(modelData.api));
+                            agentValue.currentIndex = Math.max(0, backendWindow.agentProfiles.findIndex(p => p.id === modelData.agent));
                             connectionVerified = false;
                         }
                     }
@@ -130,28 +138,83 @@ StyledDialog {
                     StyledComboBox {
                         id: apiValue
                         Layout.fillWidth: true
-                        model: [qsTr("OpenAI-compatible"), qsTr("Anthropic")]
+                        model: [qsTr("OpenAI-compatible"), qsTr("Anthropic"), qsTr("Agent (Claude Code, Qwen, Pi...)")]
                         onActivated: connectionVerified = false
                     }
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: backendWindow.isAgent
                     Label {
-                        text: qsTr("URL")
+                        text: qsTr("Agent")
                         Layout.preferredWidth: 80
                     }
-                    StyledTextField {
-                        id: urlValue
+                    StyledComboBox {
+                        id: agentValue
                         Layout.fillWidth: true
-                        placeholderText: backendWindow.apiType === "anthropic"
-                                         ? "https://api.anthropic.com/v1"
-                                         : "http://localhost:11434/v1"
+                        model: backendWindow.agentProfiles.map(p => {
+                            if (p.missingRuntimes)
+                                return qsTr("%1 (needs %2)").arg(p.name).arg(p.missingRuntimes);
+                            if (!p.installed)
+                                return qsTr("%1 (not installed)").arg(p.name);
+                            return p.verified ? p.name : qsTr("%1 (not tested)").arg(p.name);
+                        })
+                        onActivated: connectionVerified = false
+                    }
+                }
+
+                // How to get an agent that cannot start here.
+                Label {
+                    Layout.fillWidth: true
+                    visible: backendWindow.isAgent && backendWindow.selectedAgent !== null
+                             && (!backendWindow.selectedAgent.installed || backendWindow.selectedAgent.missingRuntimes !== "")
+                    wrapMode: Text.WordWrap
+                    color: Colors.red
+                    font.pixelSize: Style.fontSmall
+                    text: {
+                        const a = backendWindow.selectedAgent;
+                        if (!a)
+                            return "";
+                        let s = a.missingRuntimes
+                                ? qsTr("%1 needs %2, which is not on this computer.").arg(a.name).arg(a.missingRuntimes)
+                                : qsTr("%1 is not installed on this computer (or not in the PATH).").arg(a.name);
+                        if (a.install)
+                            s += " " + qsTr("Install it with: %1").arg(a.install);
+                        return s;
                     }
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
+                    Label {
+                        text: backendWindow.isAgent ? qsTr("Command") : qsTr("URL")
+                        Layout.preferredWidth: 80
+                    }
+                    StyledTextField {
+                        id: urlValue
+                        Layout.fillWidth: true
+                        placeholderText: backendWindow.isAgent
+                                         ? (backendWindow.selectedAgent ? backendWindow.selectedAgent.command : "")
+                                         : backendWindow.apiType === "anthropic"
+                                           ? "https://api.anthropic.com/v1"
+                                           : "http://localhost:11434/v1"
+                    }
+                }
+
+                // The agent uses its own login (the user's account with it).
+                Label {
+                    Layout.fillWidth: true
+                    visible: backendWindow.isAgent
+                    wrapMode: Text.WordWrap
+                    color: Colors.overlay1
+                    font.pixelSize: Style.fontSmall
+                    text: qsTr("Uses the agent installed on this computer, with your own login to it. Leave the command empty to use the usual one.")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: !backendWindow.isAgent
                     Label {
                         text: qsTr("API Key")
                         Layout.preferredWidth: 80
@@ -172,9 +235,18 @@ StyledDialog {
                         let n = nameValue.text.trim() || "Remote";
                         let u = urlValue.text.trim();
                         let k = keyValue.text.trim();
-                        if (u === "") {
+                        if (u === "" && !backendWindow.isAgent) {
                             modelCheckLabel.text = qsTr("Please enter a URL");
                             modelCheckLabel.visible = true;
+                            return;
+                        }
+                        if (backendWindow.isAgent) {
+                            if (!backendWindow.selectedAgent)
+                                return;
+                            modelCheckLabel.text = qsTr("Starting the agent...");
+                            modelCheckLabel.visible = true;
+                            helpers.checkAgentModels(nameValue.text.trim() || backendWindow.selectedAgent.name,
+                                                     backendWindow.selectedAgent.id, u);
                             return;
                         }
                         helpers.checkRemoteModels(n, u, k, backendWindow.apiType);
@@ -198,8 +270,11 @@ StyledDialog {
                         let n = nameValue.text.trim();
                         if (n === "")
                             return;
-                        configManager.setBackend(n, urlValue.text.trim(), keyValue.text.trim(),
-                                                 backendWindow.apiType);
+                        if (backendWindow.isAgent && backendWindow.selectedAgent)
+                            configManager.setAgentBackend(n, backendWindow.selectedAgent.id, urlValue.text.trim());
+                        else
+                            configManager.setBackend(n, urlValue.text.trim(), keyValue.text.trim(),
+                                                     backendWindow.apiType);
                         editingIndex = -1;
                         nameValue.clear();
                         urlValue.clear();

@@ -73,3 +73,16 @@ set_tests_properties(tst_reindexer PROPERTIES
 add_dependencies(tst_reindexer Hodeia)
 target_compile_definitions(tst_reindexer PRIVATE
     HODEIA_E5_MODEL="${CMAKE_SOURCE_DIR}/Resources/Models/Embedders/multilingual-e5-small-q8_0.gguf")
+
+# The agent connectors and the Agent backend, against fake agents (no
+# Claude, no network): one fake per protocol.
+foreach(_fake fake_acp_agent fake_claude fake_pi)
+  qt_add_executable(${_fake} ${_fake}.cpp)
+  target_link_libraries(${_fake} PRIVATE Qt6::Core)
+endforeach()
+hodeia_add_test(tst_agents)
+add_dependencies(tst_agents fake_acp_agent fake_claude fake_pi)
+target_compile_definitions(tst_agents PRIVATE
+    FAKE_ACP_AGENT="$<TARGET_FILE:fake_acp_agent>"
+    FAKE_CLAUDE="$<TARGET_FILE:fake_claude>"
+    FAKE_PI="$<TARGET_FILE:fake_pi>")

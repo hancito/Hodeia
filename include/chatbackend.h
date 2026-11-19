@@ -17,12 +17,14 @@ struct ActiveBackend {
     Local,     ///< llama.cpp on this machine
     OpenAi,    ///< remote OpenAI-compatible endpoint (/v1/chat/completions)
     Anthropic, ///< remote Anthropic Messages API (/v1/messages)
+    Agent,     ///< coding agent (Claude Code, Qwen Code, Pi...), see AgentBackend
   };
   /// Local by default: nothing leaves the machine unless the settings say so.
   Kind kind = Kind::Local;
   QString modelName;  ///< model folder (local) or model id (remote)
   QString modelPath;  ///< local only: the .gguf to load (empty if none)
-  QVariantMap config; ///< remote only: url, api_key, api...
+  QVariantMap config; ///< remote only: url, api_key, api ("openai",
+                      ///< "anthropic" or "agent": see AgentBackend)
 };
 
 /// Resolve the active backend and, for a local one, its .gguf file.

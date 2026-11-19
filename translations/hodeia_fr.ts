@@ -2,6 +2,216 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="fr-FR">
 <context>
+    <name>AcpClient</name>
+    <message>
+        <source>the agent stopped unexpectedly</source>
+        <translation type="vanished">l’agent s’est arrêté de façon inattendue</translation>
+    </message>
+    <message>
+        <source>the agent exited (code %1)</source>
+        <translation type="vanished">l’agent s’est terminé (code %1)</translation>
+    </message>
+    <message>
+        <source>No command to start the agent.</source>
+        <translation type="vanished">Aucune commande pour lancer l’agent.</translation>
+    </message>
+    <message>
+        <source>Cannot start &quot;%1&quot;: %2</source>
+        <translation type="vanished">Impossible de lancer « %1 » : %2</translation>
+    </message>
+    <message>
+        <source>the agent was stopped</source>
+        <translation type="vanished">l’agent a été arrêté</translation>
+    </message>
+    <message>
+        <source>the agent is not running</source>
+        <translation type="vanished">l’agent n’est pas lancé</translation>
+    </message>
+</context>
+<context>
+    <name>AgentBackend</name>
+    <message>
+        <source>Claude Code is not logged in: run &quot;claude&quot; in a terminal and log in (/login), then try again.
+(%1)</source>
+        <translation type="vanished">Claude Code n’est pas connecté : lancez « claude » dans un terminal et connectez-vous (/login), puis réessayez.
+(%1)</translation>
+    </message>
+    <message>
+        <source>%1
+Install the agent with &quot;npm install -g @agentclientprotocol/claude-agent-acp&quot;, or set its command in the Backends window.</source>
+        <translation type="vanished">%1
+Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp », ou indiquez sa commande dans la fenêtre Backends.</translation>
+    </message>
+    <message>
+        <source>The agent did not start: %1</source>
+        <translation type="vanished">L’agent n’a pas démarré : %1</translation>
+    </message>
+    <message>
+        <source>no answer</source>
+        <translation type="vanished">pas de réponse</translation>
+    </message>
+    <message>
+        <source>The agent refused the model &quot;%1&quot;: %2</source>
+        <translation type="vanished">L’agent a refusé le modèle « %1 » : %2</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="35"/>
+        <source>Unknown agent &quot;%1&quot;: choose one in the Backends window.</source>
+        <translation>Agent inconnu « %1 » : choisissez-en un dans la fenêtre Backends.</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="40"/>
+        <source>No connector &quot;%1&quot; for the agent %2.</source>
+        <translation>Aucun connecteur « %1 » pour l’agent %2.</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="79"/>
+        <source>The agent failed.</source>
+        <translation>L’agent a échoué.</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="81"/>
+        <source>The agent declined the request.</source>
+        <translation>L’agent a refusé la demande.</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="152"/>
+        <source>Unknown agent &quot;%1&quot;.</source>
+        <translation>Agent inconnu « %1 ».</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="156"/>
+        <source>No connector &quot;%1&quot;.</source>
+        <translation>Aucun connecteur « %1 ».</translation>
+    </message>
+    <message>
+        <source>The agent stopped without answering (%1).</source>
+        <translation type="vanished">L’agent s’est arrêté sans répondre (%1).</translation>
+    </message>
+</context>
+<context>
+    <name>Agents</name>
+    <message>
+        <location filename="../src/agents/agentsync.cpp" line="43"/>
+        <source>The agent did not answer.</source>
+        <translation>L’agent n’a pas répondu.</translation>
+    </message>
+</context>
+<context>
+    <name>Agents::AcpConnection</name>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="106"/>
+        <source>%1 is not logged in.</source>
+        <translation>%1 n’est pas connecté.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="108"/>
+        <source>Log in with: %1</source>
+        <translation>Connectez-vous avec : %1</translation>
+    </message>
+    <message>
+        <source>Install it with: %1</source>
+        <translation type="vanished">Installez-le avec : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="139"/>
+        <source>The agent did not start: %1</source>
+        <translation>L’agent n’a pas démarré : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="187"/>
+        <source>The agent refused the model &quot;%1&quot;: %2</source>
+        <translation>L’agent a refusé le modèle « %1 » : %2</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="200"/>
+        <source>No open session.</source>
+        <translation>Aucune session ouverte.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="222"/>
+        <source>The agent declined the request.</source>
+        <translation>L’agent a refusé la demande.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="231"/>
+        <source>Cancelled.</source>
+        <translation>Annulé.</translation>
+    </message>
+</context>
+<context>
+    <name>Agents::AgentProcess</name>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="62"/>
+        <source>%1 needs %2.</source>
+        <translation>%1 nécessite %2.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="65"/>
+        <source>%1 is not installed on this computer.</source>
+        <translation>%1 n’est pas installé sur cet ordinateur.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="72"/>
+        <source>Install it with: %1</source>
+        <translation>Installez-le avec : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="96"/>
+        <source>the agent stopped unexpectedly</source>
+        <translation>l’agent s’est arrêté de façon inattendue</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="99"/>
+        <source>the agent exited (code %1)</source>
+        <translation>l’agent s’est terminé (code %1)</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="133"/>
+        <source>No command to start the agent.</source>
+        <translation>Aucune commande pour lancer l’agent.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/agentprocess.cpp" line="150"/>
+        <source>Cannot start &quot;%1&quot;: %2</source>
+        <translation>Impossible de lancer « %1 » : %2</translation>
+    </message>
+</context>
+<context>
+    <name>Agents::ClaudeConnection</name>
+    <message>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="27"/>
+        <source>The agent was stopped.</source>
+        <translation>L’agent a été arrêté.</translation>
+    </message>
+    <message>
+        <source>Install it with: %1</source>
+        <translation type="vanished">Installez-le avec : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="101"/>
+        <source>No open session.</source>
+        <translation>Aucune session ouverte.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="159"/>
+        <source>Claude usage limit reached.</source>
+        <translation>Limite d’utilisation de Claude atteinte.</translation>
+    </message>
+</context>
+<context>
+    <name>Agents::PiConnection</name>
+    <message>
+        <source>Install it with: %1</source>
+        <translation type="vanished">Installez-le avec : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/pi/piconnector.cpp" line="91"/>
+        <source>No open session.</source>
+        <translation>Aucune session ouverte.</translation>
+    </message>
+</context>
+<context>
     <name>AnthropicApi</name>
     <message>
         <location filename="../src/anthropicapi.cpp" line="96"/>
@@ -32,93 +242,156 @@
         <translation>Gestion des backends</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="34"/>
+        <location filename="../ui/BackendWindow.qml" line="41"/>
         <source>Connected — %1 model(s) available</source>
         <translation>Connecté — %1 modèle(s) disponible(s)</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="38"/>
+        <location filename="../ui/BackendWindow.qml" line="45"/>
         <source>Connection failed: %1</source>
         <translation>Échec de la connexion : %1</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="53"/>
+        <location filename="../ui/BackendWindow.qml" line="60"/>
         <source>Backends</source>
         <translation>Backends</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="73"/>
+        <location filename="../ui/BackendWindow.qml" line="80"/>
         <source>Edit</source>
         <translation>Modifier</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="86"/>
+        <location filename="../ui/BackendWindow.qml" line="94"/>
         <source>Remove</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="104"/>
+        <location filename="../ui/BackendWindow.qml" line="112"/>
         <source>Edit Backend</source>
         <translation>Modifier le backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="104"/>
-        <location filename="../ui/BackendWindow.qml" line="193"/>
+        <location filename="../ui/BackendWindow.qml" line="112"/>
+        <location filename="../ui/BackendWindow.qml" line="265"/>
         <source>Add Backend</source>
         <translation>Ajouter un backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="113"/>
+        <location filename="../ui/BackendWindow.qml" line="121"/>
         <source>Name</source>
         <translation>Nom</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="120"/>
+        <location filename="../ui/BackendWindow.qml" line="128"/>
         <source>my-backend</source>
         <translation>mon-backend</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="127"/>
+        <location filename="../ui/BackendWindow.qml" line="135"/>
         <source>API</source>
         <translation>API</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="133"/>
+        <location filename="../ui/BackendWindow.qml" line="141"/>
         <source>OpenAI-compatible</source>
         <translation>Compatible OpenAI</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="133"/>
+        <location filename="../ui/BackendWindow.qml" line="141"/>
         <source>Anthropic</source>
         <translation>Anthropic</translation>
     </message>
     <message>
         <location filename="../ui/BackendWindow.qml" line="141"/>
+        <source>Agent (Claude Code, Qwen, Pi...)</source>
+        <translation>Agent (Claude Code, Qwen, Pi…)</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="150"/>
+        <source>Agent</source>
+        <translation>Agent</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="158"/>
+        <source>%1 (needs %2)</source>
+        <translation>%1 (nécessite %2)</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="160"/>
+        <source>%1 (not installed)</source>
+        <translation>%1 (non installé)</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="161"/>
+        <source>%1 (not tested)</source>
+        <translation>%1 (non testé)</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="180"/>
+        <source>%1 needs %2, which is not on this computer.</source>
+        <translation>%1 nécessite %2, absent de cet ordinateur.</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="181"/>
+        <source>%1 is not installed on this computer (or not in the PATH).</source>
+        <translation>%1 n’est pas installé sur cet ordinateur (ou pas dans le PATH).</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="183"/>
+        <source>Install it with: %1</source>
+        <translation>Installez-le avec : %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="212"/>
+        <source>Uses the agent installed on this computer, with your own login to it. Leave the command empty to use the usual one.</source>
+        <translation>Utilise l’agent installé sur cet ordinateur, avec votre propre connexion. Laissez la commande vide pour utiliser la commande habituelle.</translation>
+    </message>
+    <message>
+        <source>Claude Code (ACP)</source>
+        <translation type="vanished">Claude Code (ACP)</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="191"/>
         <source>URL</source>
         <translation>URL</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="156"/>
+        <location filename="../ui/BackendWindow.qml" line="191"/>
+        <source>Command</source>
+        <translation>Commande</translation>
+    </message>
+    <message>
+        <source>Uses your Claude Code and its login (claude-agent-acp, Node.js 22 or later). Leave the command empty to use the default one.</source>
+        <translation type="vanished">Utilise votre Claude Code et sa connexion (claude-agent-acp, Node.js 22 ou plus). Laissez la commande vide pour utiliser celle par défaut.</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="219"/>
         <source>API Key</source>
         <translation>Clé API</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="163"/>
+        <location filename="../ui/BackendWindow.qml" line="226"/>
         <source>API Key (empty if not needed)</source>
         <translation>Clé API (vide si non nécessaire)</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="169"/>
+        <location filename="../ui/BackendWindow.qml" line="232"/>
         <source>Check Connection</source>
         <translation>Vérifier la connexion</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="176"/>
+        <location filename="../ui/BackendWindow.qml" line="239"/>
         <source>Please enter a URL</source>
         <translation>Veuillez saisir une URL</translation>
     </message>
     <message>
-        <location filename="../ui/BackendWindow.qml" line="193"/>
+        <location filename="../ui/BackendWindow.qml" line="246"/>
+        <source>Starting the agent...</source>
+        <translation>Démarrage de l’agent…</translation>
+    </message>
+    <message>
+        <location filename="../ui/BackendWindow.qml" line="265"/>
         <source>Save Changes</source>
         <translation>Enregistrer les modifications</translation>
     </message>
@@ -217,68 +490,68 @@ Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="386"/>
-        <location filename="../src/configmanager.cpp" line="423"/>
+        <location filename="../src/configmanager.cpp" line="401"/>
+        <location filename="../src/configmanager.cpp" line="438"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="394"/>
+        <location filename="../src/configmanager.cpp" line="409"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="407"/>
+        <location filename="../src/configmanager.cpp" line="422"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="429"/>
+        <location filename="../src/configmanager.cpp" line="444"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="439"/>
+        <location filename="../src/configmanager.cpp" line="454"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="495"/>
+        <location filename="../src/configmanager.cpp" line="510"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="500"/>
+        <location filename="../src/configmanager.cpp" line="515"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="509"/>
+        <location filename="../src/configmanager.cpp" line="524"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="517"/>
+        <location filename="../src/configmanager.cpp" line="532"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="535"/>
+        <location filename="../src/configmanager.cpp" line="550"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="547"/>
+        <location filename="../src/configmanager.cpp" line="562"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="610"/>
+        <location filename="../src/configmanager.cpp" line="625"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="611"/>
+        <location filename="../src/configmanager.cpp" line="626"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -293,7 +566,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="705"/>
+        <location filename="../src/configmanager.cpp" line="720"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -566,55 +839,55 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Paramètres invalides</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="313"/>
+        <location filename="../src/helpers.cpp" line="315"/>
         <source>URL is empty</source>
         <translation>L&apos;URL est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="393"/>
+        <location filename="../src/helpers.cpp" line="435"/>
         <source>Invalid JSON</source>
         <translation>JSON invalide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="267"/>
+        <location filename="../src/helpers.cpp" line="268"/>
         <source>Model file does not exist: %1</source>
         <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="175"/>
+        <location filename="../src/helpers.cpp" line="176"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="191"/>
+        <location filename="../src/helpers.cpp" line="192"/>
         <source>These models could not be fully deleted (a file may still be in use, e.g. by a running summary or query):</source>
         <translation>Ces modèles n&apos;ont pas pu être entièrement supprimés (un fichier est peut-être encore utilisé, par exemple par un résumé ou une requête en cours) :</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="218"/>
-        <location filename="../src/helpers.cpp" line="236"/>
+        <location filename="../src/helpers.cpp" line="219"/>
+        <location filename="../src/helpers.cpp" line="237"/>
         <source>Cannot read %1: %2</source>
         <translation>Impossible de lire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="221"/>
+        <location filename="../src/helpers.cpp" line="222"/>
         <source>%1 is empty</source>
         <translation>%1 est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="226"/>
-        <location filename="../src/helpers.cpp" line="238"/>
-        <location filename="../src/helpers.cpp" line="254"/>
+        <location filename="../src/helpers.cpp" line="227"/>
+        <location filename="../src/helpers.cpp" line="239"/>
+        <location filename="../src/helpers.cpp" line="255"/>
         <source>Cannot write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="272"/>
+        <location filename="../src/helpers.cpp" line="273"/>
         <source>MMProj file does not exist: %1</source>
         <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="280"/>
+        <location filename="../src/helpers.cpp" line="281"/>
         <source>Cannot create folder %1</source>
         <translation>Impossible de créer le dossier %1</translation>
     </message>
