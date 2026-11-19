@@ -168,7 +168,10 @@ QString DatabaseManager::deleteProjects(const QStringList &projectNames) {
       return tr("Cannot delete the active project while an operation is in "
                 "progress.");
     }
-    // Release the .db (and its -wal/-shm files) so they can be deleted.
+    // Release the .db (and its -wal/-shm files) so they can be deleted,
+    // including the connections of background work (direct connections:
+    // they are closed when this returns).
+    emit databaseClosing();
     m_db.close();
   }
 

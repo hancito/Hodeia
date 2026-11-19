@@ -51,6 +51,8 @@ add_library(HodeiaEngine STATIC
     ../include/queryworker.h
     ../include/pagecontext.h
     ../include/retriever.h
+    ../include/reindexer.h
+    ../include/reindexcontroller.h
     ../include/querypromptbuilder.h
     ../include/summarypromptbuilder.h
     ../include/metadataresolver.h
@@ -100,6 +102,8 @@ add_library(HodeiaEngine STATIC
     openalex.cpp
     queryworker.cpp
     retriever.cpp
+    reindexer.cpp
+    reindexcontroller.cpp
     querypromptbuilder.cpp
     summarypromptbuilder.cpp
     metadataresolver.cpp

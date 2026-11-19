@@ -66,3 +66,10 @@ add_dependencies(tst_mcplibrary Hodeia)
 # The bundled E5 model (Git LFS) for the search test; skipped if absent.
 target_compile_definitions(tst_mcplibrary PRIVATE
     HODEIA_E5_MODEL="${CMAKE_SOURCE_DIR}/Resources/Models/Embedders/multilingual-e5-small-q8_0.gguf")
+
+hodeia_add_test(tst_reindexer)
+set_tests_properties(tst_reindexer PROPERTIES
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:Hodeia>)
+add_dependencies(tst_reindexer Hodeia)
+target_compile_definitions(tst_reindexer PRIVATE
+    HODEIA_E5_MODEL="${CMAKE_SOURCE_DIR}/Resources/Models/Embedders/multilingual-e5-small-q8_0.gguf")

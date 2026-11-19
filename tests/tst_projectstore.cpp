@@ -53,6 +53,7 @@ private slots:
   void tooNew();
   void openFailed();
   void v1ToV2();
+  void v2ToV3();
 };
 
 void TestProjectStore::newDatabase() {
@@ -216,6 +217,39 @@ void TestProjectStore::v1ToV2() {
   // One row per attachment of a library.
   QVERIFY(!db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
                    "attachment_key, paper_hash) VALUES (1, 'I', 'A', 'h')"));
+}
+
+// v3 records a re-embedding for a project with chunks, none for an empty one.
+void TestProjectStore::v2ToV3() {
+  QTemporaryDir dir;
+  for (const bool withChunks : {true, false}) {
+    const QString path = dir.filePath(withChunks ? "Full.db" : "Empty.db");
+    {
+      SqliteDb db;
+      QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 2))
+                  .has_value());
+      if (withChunks) {
+        // vec0 metadata columns take no NULL: every column is given.
+        SqliteStatement insert = db.prepare(
+            "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, "
+            "chunk_text, citation, clean_title, page_metadata) "
+            "VALUES (vec_f32(?), 'h', 1, 0, 'text', '', '', '')");
+        (void)insert.bind(1, QByteArray(384 * sizeof(float), '\0'));
+        const auto r = insert.exec();
+        QVERIFY2(r.has_value(), r ? "" : qPrintable(r.error()));
+      }
+    }
+    SqliteDb db;
+    QVERIFY(ProjectStore::open(db, path).has_value());
+    QVERIFY(ProjectStore::schemaVersion(db) >= 3);
+    QVERIFY(hasTable(db, "Maintenance"));
+    QCOMPARE(countRows(db, "Maintenance WHERE task = 'reembed' AND progress = 0"),
+             withChunks ? 1 : 0);
+  }
+  // A new project has nothing to redo.
+  SqliteDb db;
+  QVERIFY(ProjectStore::open(db, dir.filePath("New.db")).has_value());
+  QCOMPARE(countRows(db, "Maintenance"), 0);
 }
 
 QTEST_GUILESS_MAIN(TestProjectStore)

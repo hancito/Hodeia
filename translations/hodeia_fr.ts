@@ -381,7 +381,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../src/database.cpp" line="114"/>
-        <location filename="../src/database.cpp" line="197"/>
+        <location filename="../src/database.cpp" line="200"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
@@ -392,8 +392,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
     <message>
         <location filename="../src/database.cpp" line="151"/>
-        <location filename="../src/database.cpp" line="193"/>
-        <location filename="../src/database.cpp" line="226"/>
+        <location filename="../src/database.cpp" line="196"/>
+        <location filename="../src/database.cpp" line="229"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
@@ -403,23 +403,23 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="228"/>
+        <location filename="../src/database.cpp" line="231"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="267"/>
-        <location filename="../src/database.cpp" line="282"/>
+        <location filename="../src/database.cpp" line="270"/>
+        <location filename="../src/database.cpp" line="285"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="271"/>
+        <location filename="../src/database.cpp" line="274"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="273"/>
+        <location filename="../src/database.cpp" line="276"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -427,12 +427,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="290"/>
+        <location filename="../src/database.cpp" line="293"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="294"/>
+        <location filename="../src/database.cpp" line="297"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -1071,6 +1071,19 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>
             <numerusform>Zotero : %n nouveau PDF</numerusform>
             <numerusform>Zotero : %n nouveaux PDF</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../ui/Main.qml" line="700"/>
+        <source>Improving search: %1%</source>
+        <translation>Amélioration de la recherche : %1 %</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/Main.qml" line="707"/>
+        <source>Search improved: %n passage(s) indexed again</source>
+        <translation>
+            <numerusform>Recherche améliorée : %n passage réindexé</numerusform>
+            <numerusform>Recherche améliorée : %n passages réindexés</numerusform>
         </translation>
     </message>
 </context>
@@ -1762,6 +1775,21 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
 </context>
 <context>
+    <name>ReindexController</name>
+    <message>
+        <location filename="../src/reindexcontroller.cpp" line="120"/>
+        <source>Search Index</source>
+        <translation>Index de recherche</translation>
+    </message>
+    <message>
+        <location filename="../src/reindexcontroller.cpp" line="121"/>
+        <source>The search index of the project could not be updated: %1
+It will be tried again at the next start.</source>
+        <translation>L’index de recherche du projet n’a pas pu être mis à jour : %1
+Nouvel essai au prochain démarrage.</translation>
+    </message>
+</context>
+<context>
     <name>RemoteBackend</name>
     <message>
         <location filename="../src/remotebackend.cpp" line="23"/>
@@ -1804,34 +1832,34 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>SqliteVecManager</name>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="59"/>
         <location filename="../src/sqlitevec.cpp" line="61"/>
+        <location filename="../src/sqlitevec.cpp" line="63"/>
         <source>Embedding model file not found: %1</source>
         <translation>Fichier du modèle d&apos;embedding introuvable : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="65"/>
+        <location filename="../src/sqlitevec.cpp" line="67"/>
         <source>Loading embedding model: %1</source>
         <translation>Chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="88"/>
         <location filename="../src/sqlitevec.cpp" line="90"/>
+        <location filename="../src/sqlitevec.cpp" line="92"/>
         <source>Failed to load embedding model: %1</source>
         <translation>Échec du chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="113"/>
+        <location filename="../src/sqlitevec.cpp" line="115"/>
         <source>The embedding model could not be started (not enough memory?)</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu démarrer (mémoire insuffisante ?)</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="115"/>
+        <location filename="../src/sqlitevec.cpp" line="117"/>
         <source>Failed to create llama context</source>
         <translation>Échec de la création du contexte llama</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="129"/>
+        <location filename="../src/sqlitevec.cpp" line="131"/>
         <source>E5 embedding model loaded (%1 dimensions)</source>
         <translation>Modèle d&apos;embedding E5 chargé (%1 dimensions)</translation>
     </message>
@@ -2159,33 +2187,33 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>ZoteroController</name>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="160"/>
+        <location filename="../src/zoterocontroller.cpp" line="161"/>
         <source>No project is open.</source>
         <translation>Aucun projet n&apos;est ouvert.</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="205"/>
+        <location filename="../src/zoterocontroller.cpp" line="206"/>
         <source>Cannot read Zotero: %1</source>
         <translation>Impossible de lire Zotero : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="228"/>
-        <location filename="../src/zoterocontroller.cpp" line="347"/>
+        <location filename="../src/zoterocontroller.cpp" line="229"/>
+        <location filename="../src/zoterocontroller.cpp" line="362"/>
         <source>Cannot update the project: %1</source>
         <translation>Impossible de mettre à jour le projet : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="293"/>
+        <location filename="../src/zoterocontroller.cpp" line="299"/>
         <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
         <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="307"/>
+        <location filename="../src/zoterocontroller.cpp" line="313"/>
         <source>Cannot save the collections: %1</source>
         <translation>Impossible d&apos;enregistrer les collections : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="330"/>
+        <location filename="../src/zoterocontroller.cpp" line="336"/>
         <source>Another import is running: import these PDFs once it has finished.</source>
         <translation>Une autre importation est en cours : importez ces PDF une fois qu’elle sera terminée.</translation>
     </message>
@@ -2198,42 +2226,42 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Zotero</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="36"/>
+        <location filename="../ui/ZoteroWindow.qml" line="42"/>
         <source>Zotero data folder</source>
         <translation>Dossier de données de Zotero</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="53"/>
+        <location filename="../ui/ZoteroWindow.qml" line="59"/>
         <source>Zotero folder: %1</source>
         <translation>Dossier Zotero : %1</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="54"/>
+        <location filename="../ui/ZoteroWindow.qml" line="60"/>
         <source>Zotero was not found. Choose its data folder (the one holding zotero.sqlite).</source>
         <translation>Zotero n&apos;a pas été trouvé. Choisissez son dossier de données (celui qui contient zotero.sqlite).</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="64"/>
+        <location filename="../ui/ZoteroWindow.qml" line="70"/>
         <source>Change...</source>
         <translation>Changer…</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="64"/>
+        <location filename="../ui/ZoteroWindow.qml" line="70"/>
         <source>Browse...</source>
         <translation>Parcourir…</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="70"/>
+        <location filename="../ui/ZoteroWindow.qml" line="76"/>
         <source>Name papers with Zotero&apos;s title, authors, year and journal (instead of the summary&apos;s)</source>
         <translation>Nommer les articles avec le titre, les auteurs, l&apos;année et la revue de Zotero (plutôt que ceux du résumé)</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="94"/>
+        <location filename="../ui/ZoteroWindow.qml" line="100"/>
         <source>Collections followed by this project</source>
         <translation>Collections suivies par ce projet</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="148"/>
+        <location filename="../ui/ZoteroWindow.qml" line="154"/>
         <source>%n PDF</source>
         <translation>
             <numerusform>%n PDF</numerusform>
@@ -2241,7 +2269,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="150"/>
+        <location filename="../ui/ZoteroWindow.qml" line="156"/>
         <source>%n in the project</source>
         <translation>
             <numerusform>%n dans le projet</numerusform>
@@ -2249,7 +2277,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="153"/>
+        <location filename="../ui/ZoteroWindow.qml" line="159"/>
         <source>%n not downloaded</source>
         <translation>
             <numerusform>%n non téléchargé</numerusform>
@@ -2257,22 +2285,27 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="167"/>
+        <location filename="../ui/ZoteroWindow.qml" line="173"/>
         <source>Ticking a collection ticks its sub-collections.</source>
         <translation>Cocher une collection coche ses sous-collections.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="171"/>
+        <location filename="../ui/ZoteroWindow.qml" line="177"/>
         <source>Save Selection</source>
         <translation>Enregistrer la sélection</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="184"/>
+        <location filename="../ui/ZoteroWindow.qml" line="191"/>
+        <source>Ignored PDFs (%1)</source>
+        <translation>PDF ignorés (%1)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="192"/>
         <source>New PDFs (%1)</source>
         <translation>Nouveaux PDF (%1)</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/ZoteroWindow.qml" line="196"/>
+        <location filename="../ui/ZoteroWindow.qml" line="204"/>
         <source>%n PDF(s) of the followed collections are not on this computer. Download them in Zotero: they will be proposed here once downloaded.</source>
         <translation>
             <numerusform>%n PDF des collections suivies n&apos;est pas sur cet ordinateur. Téléchargez-le dans Zotero : il sera proposé ici une fois téléchargé.</numerusform>
@@ -2280,42 +2313,67 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="205"/>
+        <location filename="../ui/ZoteroWindow.qml" line="213"/>
+        <source>No ignored PDF.</source>
+        <translation>Aucun PDF ignoré.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="215"/>
         <source>Follow collections above to have their PDFs proposed.</source>
         <translation>Suivez des collections ci-dessus pour que leurs PDF soient proposés.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="206"/>
+        <location filename="../ui/ZoteroWindow.qml" line="216"/>
         <source>Nothing new: every downloaded PDF of the followed collections is in the project or ignored.</source>
         <translation>Rien de nouveau : chaque PDF téléchargé des collections suivies est dans le projet ou ignoré.</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="244"/>
+        <location filename="../ui/ZoteroWindow.qml" line="254"/>
         <source>(untitled)</source>
         <translation>(sans titre)</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="274"/>
+        <location filename="../ui/ZoteroWindow.qml" line="284"/>
         <source>Untick All</source>
         <translation>Tout décocher</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="274"/>
+        <location filename="../ui/ZoteroWindow.qml" line="284"/>
         <source>Tick All</source>
         <translation>Tout cocher</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="288"/>
+        <location filename="../ui/ZoteroWindow.qml" line="300"/>
+        <source>Back to New PDFs</source>
+        <translation>Retour aux nouveaux PDF</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="301"/>
+        <source>Ignored (%1)</source>
+        <translation>Ignorés (%1)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="307"/>
+        <source>Propose Again (%1)</source>
+        <translation>Proposer à nouveau (%1)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="308"/>
+        <source>Put the ticked PDFs back among the new PDFs</source>
+        <translation>Remettre les PDF cochés parmi les nouveaux PDF</translation>
+    </message>
+    <message>
+        <location filename="../ui/ZoteroWindow.qml" line="315"/>
         <source>Ignore</source>
         <translation>Ignorer</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="289"/>
+        <location filename="../ui/ZoteroWindow.qml" line="316"/>
         <source>Never propose the ticked PDFs again</source>
         <translation>Ne plus jamais proposer les PDF cochés</translation>
     </message>
     <message>
-        <location filename="../ui/ZoteroWindow.qml" line="294"/>
+        <location filename="../ui/ZoteroWindow.qml" line="322"/>
         <source>Import (%1)</source>
         <translation>Importer (%1)</translation>
     </message>

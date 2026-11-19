@@ -159,9 +159,15 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     QString prefixed = QString::fromUtf8(prefix) + text;
     QByteArray utf8 = prefixed.toUtf8();
 
+    // The model's special tokens (<s> … </s> for multilingual E5) frame the
+    // text as in training; without them the embeddings are much less
+    // discriminating (a paper's exact title did not find the paper).
+    // Changing this changes every vector: the stored chunks must then be
+    // embedded again (a migration, see ProjectStore v3 and Reindexer).
+    constexpr bool addSpecial = true;
     auto tokens =
         common_tokenize(vocab, std::string(utf8.constData()),
-                        /*add_special=*/false, /*parse_special=*/true);
+                        /*add_special=*/addSpecial, /*parse_special=*/true);
 
     if (tokens.empty()) {
       // Never legitimate: the E5 prefix alone yields tokens.  Seen when the
@@ -176,9 +182,13 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
       return {};
     }
 
-    // Truncate to context window
-    if ((int)tokens.size() > m_maxTokens)
+    // Truncate to context window, keeping the closing special token.
+    if ((int)tokens.size() > m_maxTokens) {
+      const llama_token last = tokens.back();
       tokens.resize(m_maxTokens);
+      if (addSpecial)
+        tokens.back() = last;
+    }
 
     // Build the batch using llama_batch_init (heap-allocated, safe).
     auto batch_tokens = std::min((int32_t)tokens.size(), (int32_t)m_maxTokens);

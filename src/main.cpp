@@ -13,6 +13,7 @@
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
 #include "thememanager.h"
+#include "reindexcontroller.h"
 #include "zoterocontroller.h"
 
 #include <QDir>
@@ -441,6 +442,11 @@ int main(int argc, char *argv[]) {
   // Startup catch-up: fetch references for papers summarized in prior sessions
   QTimer::singleShot(0, &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 
+  // Re-embedding of the chunks after a change in how they are embedded
+  // (migration v3), in the background.
+  ReindexController reindexController(&databaseManager, &engineController,
+                                      embeddings);
+
   // Zotero connector (reads Zotero, imports through the ingestion)
   ZoteroController zoteroController(&configManager, &databaseManager,
                                     &engineController);
@@ -461,6 +467,8 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("notifier", Notifier::instance());
   engine.rootContext()->setContextProperty("zoteroController",
                                            &zoteroController);
+  engine.rootContext()->setContextProperty("reindexController",
+                                           &reindexController);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

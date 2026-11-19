@@ -74,6 +74,9 @@ public:
 signals:
   // Emitted after switchDatabase() opened a new project DB.
   void databaseSwitched();
+  // The active project's file is about to be deleted: background work with
+  // its own connection to it must close it before returning.
+  void databaseClosing();
 
 private:
   bool initDatabase();

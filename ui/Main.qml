@@ -695,5 +695,16 @@ ThemedWindow {
         actionText: zoteroController.proposals.length > 0
                     ? qsTr("Zotero: %n new PDF(s)", "", zoteroController.proposals.length) : ""
         onActionClicked: zoteroDialog.open()
+        // Search index being rebuilt after an update (migration v3).
+        detailText: reindexController.running && reindexController.total > 0
+                    ? qsTr("Improving search: %1%").arg(Math.floor(100 * reindexController.done / reindexController.total))
+                    : ""
+    }
+
+    Connections {
+        target: reindexController
+        function onFinished(total) {
+            footerLabel.text = qsTr("Search improved: %n passage(s) indexed again", "", total);
+        }
     }
 }

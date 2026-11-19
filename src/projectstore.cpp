@@ -119,6 +119,25 @@ std::expected<void, QString> migrateV2(SqliteDb &db) {
   return {};
 }
 
+// v3 — The E5 embeddings are now computed with the model's special tokens,
+// which makes the search much more accurate (titles find their paper).  The
+// chunks already stored must be embedded again: too long to do here, so this
+// only records the work, and Reindexer does it in the background (resumable:
+// `progress` is the last chunk rowid done).  A project with no chunks has
+// nothing to redo.
+std::expected<void, QString> migrateV3(SqliteDb &db) {
+  if (auto r = db.exec("CREATE TABLE Maintenance ("
+                       "task TEXT PRIMARY KEY, "
+                       "progress INTEGER NOT NULL DEFAULT 0)");
+      !r)
+    return std::unexpected("Maintenance: " + r.error());
+  if (auto r = db.exec("INSERT INTO Maintenance (task) "
+                       "SELECT 'reembed' WHERE EXISTS (SELECT 1 FROM chunks)");
+      !r)
+    return std::unexpected("Maintenance task: " + r.error());
+  return {};
+}
+
 /// A consistent copy of the open database (WAL content included) at `dest`.
 std::expected<void, QString> backupTo(SqliteDb &db, const QString &dest) {
   QFile::remove(dest);
@@ -172,6 +191,7 @@ const QList<Migration> &migrations() {
   static const QList<Migration> kMigrations = {
       {1, QStringLiteral("initial schema"), migrateV1},
       {2, QStringLiteral("Zotero connector"), migrateV2},
+      {3, QStringLiteral("re-embed the chunks for search"), migrateV3},
   };
   return kMigrations;
 }
