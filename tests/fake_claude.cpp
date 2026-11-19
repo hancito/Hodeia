@@ -4,6 +4,10 @@
 //   "SLOW"  sends "Partial", then waits for an interrupt control request;
 //   "HANG"  sends "Partial" and ignores the interrupt;
 //   otherwise "Echo: <text>".
+// FAKE_CLAUDE_SESSION=<id>: the session id it reports (default:
+// the id given with --resume, else "fake-claude").
+// FAKE_CLAUDE_RESUME_FAIL=1: with --resume, exits with an error at once,
+// as Claude Code does for a session it does not have.
 // FAKE_AGENT_LOG=<file>: the arguments (first line, JSON array), then each
 // message received, are appended to that file.
 
@@ -72,6 +76,17 @@ int main(int argc, char **argv) {
     args << QString::fromLocal8Bit(argv[i]);
   log(QJsonDocument(QJsonArray::fromStringList(args)).toJson(QJsonDocument::Compact));
 
+  if (qgetenv("FAKE_CLAUDE_RESUME_FAIL") == "1" && args.contains("--resume")) {
+    std::fputs("No conversation found with session ID\n", stderr);
+    return 1;
+  }
+  QString sessionId = QString::fromLocal8Bit(qgetenv("FAKE_CLAUDE_SESSION"));
+  if (sessionId.isEmpty()) {
+    const qsizetype resume = args.indexOf("--resume");
+    sessionId = resume >= 0 && resume + 1 < args.size() ? args[resume + 1]
+                                                         : QStringLiteral("fake-claude");
+  }
+
   QJsonObject msg;
   while (readMessage(msg)) {
     if (msg.value("type").toString() != "user")
@@ -80,7 +95,7 @@ int main(int argc, char **argv) {
     for (const QJsonValue &b : msg.value("message").toObject().value("content").toArray())
       if (b.toObject().value("type").toString() == "text")
         text += b.toObject().value("text").toString();
-    send({{"type", "system"}, {"subtype", "init"}, {"session_id", "fake-claude"}});
+    send({{"type", "system"}, {"subtype", "init"}, {"session_id", sessionId}});
 
     if (text.contains("LIMIT")) {
       send({{"type", "rate_limit_event"},
@@ -102,8 +117,8 @@ int main(int argc, char **argv) {
         }
       }
     } else {
-      assistant("Echo: " + text.left(200));
-      result("Echo: " + text.left(200), false);
+      assistant("Echo: " + text.left(400));
+      result("Echo: " + text.left(400), false);
     }
   }
   return 0;

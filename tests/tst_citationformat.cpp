@@ -31,6 +31,8 @@ class TestCitationFormat : public QObject {
   Q_OBJECT
 
 private slots:
+  void paperMarks();
+  void paperMarksUnknown();
   void pageRange();
   void singleTag();
   void groupedTags();
@@ -137,6 +139,44 @@ void TestCitationFormat::apaReference() {
                    "10.1111/1468-0297.00046)"));
   // Nothing known but the missing title.
   QCOMPARE(CitationFormat::apaReference({}, "Unknown"), QString("Unknown"));
+}
+
+namespace {
+QHash<QString, PaperLabel> markLabels() {
+  return {{"aaaaaaaaaaaa1111111111111111111a", {"Smith", "2020", "Peer absence"}},
+          {"bbbbbbbbbbbb2222222222222222222b", {"Walker & Ben-Akiva", "2002", ""}}};
+}
+} // namespace
+
+// The marks an agent copies from the MCP tools become citations + Sources.
+void TestCitationFormat::paperMarks() {
+  const QString text =
+      "Absence spreads [@aaaaaaaaaaaa:p4][@aaaaaaaaaaaa:p7] in teams "
+      "[@bbbbbb:p2; @aaaaaaaaaaaa:p4]. See also [@bbbbbbbbbbbb].";
+  const QString out = CitationFormat::resolvePaperMarks(text, markLabels());
+  QVERIFY2(out.startsWith("Absence spreads (Smith, 2020, pp. 4, 7) in teams "
+                          "(Walker & Ben-Akiva, 2002, p. 2; Smith, 2020, p. 4). "
+                          "See also (Walker & Ben-Akiva, 2002)."),
+           qPrintable(out));
+  QVERIFY2(out.contains("**Sources**"), qPrintable(out));
+  QVERIFY(out.contains("- **Smith (2020)** — *Peer absence* — pp. 4, 7"));
+  QVERIFY(out.contains("- **Walker & Ben-Akiva (2002)** — p. 2"));
+  // Smith first: cited first.
+  QVERIFY(out.indexOf("**Smith (2020)**") < out.indexOf("**Walker"));
+}
+
+// Unknown or ambiguous ids, and text without marks, stay as they are.
+void TestCitationFormat::paperMarksUnknown() {
+  QCOMPARE(CitationFormat::resolvePaperMarks("No marks [3].", markLabels()),
+           QString("No marks [3]."));
+  QCOMPARE(CitationFormat::resolvePaperMarks("Gone [@cccccccccccc:p1].", markLabels()),
+           QString("Gone [@cccccccccccc:p1]."));
+  // A run with one unknown paper is left whole.
+  QCOMPARE(CitationFormat::resolvePaperMarks("Mixed [@aaaaaa:p1][@cccccc:p2].", markLabels()),
+           QString("Mixed [@aaaaaa:p1][@cccccc:p2]."));
+  // A Markdown link is not a mark.
+  QCOMPARE(CitationFormat::resolvePaperMarks("[@aaaaaa](https://x.org)", markLabels()),
+           QString("[@aaaaaa](https://x.org)"));
 }
 
 QTEST_GUILESS_MAIN(TestCitationFormat)

@@ -109,6 +109,7 @@ private slots:
   void acpNotLoggedIn();
   void acpCannotStart();
   void acpListModels();
+  void acpPermissionAnswer();
 
   // Claude Code (stream-json)
   void claudeArguments();
@@ -348,6 +349,26 @@ void TestAgents::acpListModels() {
            (QStringList{"qwen-a", "qwen-b"}));
 }
 
+// Mode agentique: HodeIA's tools are allowed, whatever the agent calls them;
+// anything else is refused.
+void TestAgents::acpPermissionAnswer() {
+  const QStringList allowed{"hodeia/search_library", "hodeia/get_page"};
+  const QJsonArray options{QJsonObject{{"optionId", "yes"}, {"kind", "allow_once"}},
+                           QJsonObject{{"optionId", "no"}, {"kind", "reject_once"}}};
+  const auto ask = [&](const QJsonObject &call) {
+    return AcpConnection::permissionAnswer({{"toolCall", call}, {"options", options}}, allowed);
+  };
+  QCOMPARE(ask({{"title", "mcp__hodeia__search_library"}}), QString("yes"));
+  QCOMPARE(ask({{"title", "search_library (hodeia MCP Server)"}}), QString("yes"));
+  QCOMPARE(ask({{"title", "mcp__other__search_library"}}), QString("no"));
+  QCOMPARE(ask({{"title", "Write file"}, {"rawInput", QJsonObject{{"path", "/etc/x"}}}}),
+           QString("no"));
+  QCOMPARE(AcpConnection::permissionAnswer({{"toolCall", QJsonObject{{"title", "Edit"}}},
+                                            {"options", options}},
+                                           {}),
+           QString("no")); // classic mode: nothing allowed
+}
+
 /* ── Claude Code ───────────────────────────────────────────────── */
 
 void TestAgents::claudeArguments() {
@@ -363,9 +384,15 @@ void TestAgents::claudeArguments() {
   SessionOptions agentic = classic("/tmp", "default");
   agentic.tools = true;
   agentic.mcpServers.append({"hodeia", "/opt/Hodeia", {"--mcp"}, {}});
+  agentic.allowedTools = {"hodeia/search_library", "hodeia/get_page"};
+  agentic.resumeSessionId = "s-42";
   args = ClaudeConnection::arguments(agentic);
   QVERIFY(!args.contains("--model")); // "default": the account's
   QVERIFY(!args.contains("--tools"));
+  QCOMPARE(args.at(args.indexOf("--resume") + 1), QString("s-42"));
+  QCOMPARE(args.at(args.indexOf("--allowedTools") + 1),
+           QString("mcp__hodeia__search_library,mcp__hodeia__get_page"));
+  QCOMPARE(args.at(args.size() - 2), QString("--mcp-config")); // takes several values: last
   const QJsonObject mcp =
       QJsonDocument::fromJson(args.at(args.indexOf("--mcp-config") + 1).toUtf8()).object();
   QCOMPARE(mcp.value("mcpServers").toObject().value("hodeia").toObject().value("command").toString(),

@@ -54,6 +54,7 @@ private slots:
   void openFailed();
   void v1ToV2();
   void v2ToV3();
+  void v3ToV4();
 };
 
 void TestProjectStore::newDatabase() {
@@ -250,6 +251,23 @@ void TestProjectStore::v2ToV3() {
   SqliteDb db;
   QVERIFY(ProjectStore::open(db, dir.filePath("New.db")).has_value());
   QCOMPARE(countRows(db, "Maintenance"), 0);
+}
+
+void TestProjectStore::v3ToV4() {
+  QTemporaryDir dir;
+  const QString path = dir.filePath("P.db");
+  {
+    SqliteDb db;
+    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 3)).has_value());
+    addQuery(db);
+  }
+  SqliteDb db;
+  QVERIFY(ProjectStore::open(db, path).has_value());
+  QVERIFY(ProjectStore::schemaVersion(db) >= 4);
+  QVERIFY(hasTable(db, "Conversations"));
+  QVERIFY(hasTable(db, "ConversationMessages"));
+  QCOMPARE(countRows(db, "Queries"), 1);
+  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 3)));
 }
 
 QTEST_GUILESS_MAIN(TestProjectStore)

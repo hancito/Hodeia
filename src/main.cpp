@@ -13,6 +13,7 @@
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
 #include "thememanager.h"
+#include "agentchatcontroller.h"
 #include "reindexcontroller.h"
 #include "zoterocontroller.h"
 
@@ -447,6 +448,9 @@ int main(int argc, char *argv[]) {
   ReindexController reindexController(&databaseManager, &engineController,
                                       embeddings);
 
+  // Conversations with an agent (mode agentique of the Query window).
+  AgentChatController agentChat(&configManager, &databaseManager);
+
   // Zotero connector (reads Zotero, imports through the ingestion)
   ZoteroController zoteroController(&configManager, &databaseManager,
                                     &engineController);
@@ -469,6 +473,7 @@ int main(int argc, char *argv[]) {
                                            &zoteroController);
   engine.rootContext()->setContextProperty("reindexController",
                                            &reindexController);
+  engine.rootContext()->setContextProperty("agentChat", &agentChat);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

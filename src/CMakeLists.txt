@@ -52,6 +52,8 @@ add_library(HodeiaEngine STATIC
     ../include/pagecontext.h
     ../include/retriever.h
     ../include/reindexer.h
+    ../include/conversationrepository.h
+    ../include/agentchatcontroller.h
     ../include/agentbackend.h
     ../include/reindexcontroller.h
     ../include/querypromptbuilder.h
@@ -104,6 +106,8 @@ add_library(HodeiaEngine STATIC
     queryworker.cpp
     retriever.cpp
     reindexer.cpp
+    conversationrepository.cpp
+    agentchatcontroller.cpp
     agentbackend.cpp
     reindexcontroller.cpp
     querypromptbuilder.cpp
@@ -254,6 +258,7 @@ set(_QML_FILES
     Colors.qml Fonts.qml Main.qml MyMenuBar.qml DisplayPane.qml
     SummaryDbPane.qml RagWindow.qml RagDbPane.qml QueryPane.qml
     BackendWindow.qml MyToolBar.qml ZoteroWindow.qml
+    ConversationListPane.qml ConversationPane.qml
     # Shared styled components (see Style.qml)
     Style.qml PopupBackground.qml CheckIndicator.qml StyledButton.qml
     StyledCheckBox.qml StyledComboBox.qml StyledTextField.qml StyledSpinBox.qml
@@ -283,6 +288,8 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/BackendWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/MyToolBar.qml
         ${CMAKE_SOURCE_DIR}/ui/ZoteroWindow.qml
+        ${CMAKE_SOURCE_DIR}/ui/ConversationListPane.qml
+        ${CMAKE_SOURCE_DIR}/ui/ConversationPane.qml
         ${CMAKE_SOURCE_DIR}/ui/Style.qml
         ${CMAKE_SOURCE_DIR}/ui/PopupBackground.qml
         ${CMAKE_SOURCE_DIR}/ui/CheckIndicator.qml

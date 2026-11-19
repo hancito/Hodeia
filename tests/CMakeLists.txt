@@ -44,6 +44,7 @@ hodeia_add_test(tst_summarypromptbuilder)
 hodeia_add_test(tst_sqlitedb)
 hodeia_add_test(tst_projectstore)
 hodeia_add_test(tst_libraryrepository)
+hodeia_add_test(tst_conversationrepository)
 hodeia_add_test(tst_mcpserver)
 hodeia_add_test(tst_zoterolocator)
 hodeia_add_test(tst_zoterosqlitesource)
@@ -83,6 +84,12 @@ endforeach()
 hodeia_add_test(tst_agents)
 add_dependencies(tst_agents fake_acp_agent fake_claude fake_pi)
 target_compile_definitions(tst_agents PRIVATE
+    FAKE_ACP_AGENT="$<TARGET_FILE:fake_acp_agent>"
+    FAKE_CLAUDE="$<TARGET_FILE:fake_claude>"
+    FAKE_PI="$<TARGET_FILE:fake_pi>")
+hodeia_add_test(tst_agentchat)
+add_dependencies(tst_agentchat fake_claude fake_pi fake_acp_agent)
+target_compile_definitions(tst_agentchat PRIVATE
     FAKE_ACP_AGENT="$<TARGET_FILE:fake_acp_agent>"
     FAKE_CLAUDE="$<TARGET_FILE:fake_claude>"
     FAKE_PI="$<TARGET_FILE:fake_pi>")

@@ -55,6 +55,14 @@ struct SessionOptions {
   /// (skills, CLAUDE.md...) when the agent lets us say so.
   bool tools = false;
   QList<McpServer> mcpServers;
+  /// Tools of those servers the agent may use without asking (HodeIA's
+  /// read-only tools): "<server>/<tool>".  Every other permission request
+  /// is refused.
+  QStringList allowedTools;
+  /// The agent's id of a session to resume (sessionId() of an earlier
+  /// connection).  When it cannot be resumed a new session opens:
+  /// sessionId() then differs.
+  QString resumeSessionId;
 };
 
 /// Something the agent did during a turn.
@@ -97,6 +105,10 @@ public:
   virtual void close() = 0;
   /// The agent's session id once known (to resume it later); may be empty.
   virtual QString sessionId() const = 0;
+  /// Whether open() resumed SessionOptions::resumeSessionId (the agent
+  /// remembers the conversation).  An agent may still fail to resume at the
+  /// first turn (Claude Code): that turn then ends with an error.
+  virtual bool resumed() const { return false; }
 
 signals:
   void opened();
@@ -131,6 +143,8 @@ public:
   /// The models of the agent, for the Backends window.  Blocking (may start
   /// the agent for a few seconds): call it from a worker thread.
   virtual std::expected<QStringList, QString> listModels(const Profile &profile) const = 0;
+  /// Whether SessionOptions::mcpServers reach the agent (mode agentique).
+  virtual bool supportsMcp() const = 0;
 };
 
 } // namespace Agents

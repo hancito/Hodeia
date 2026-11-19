@@ -29,6 +29,7 @@ public:
   void cancel() override;
   void close() override;
   QString sessionId() const override { return m_sessionId; }
+  bool resumed() const override { return m_resumed; }
 
   /// The command-line arguments added for `options` (tests).
   static QStringList arguments(const SessionOptions &options);
@@ -47,6 +48,7 @@ private:
   bool m_inTurn = false;
   bool m_cancelled = false;
   bool m_closed = false;
+  bool m_resumed = false;
   QTimer m_killTimer;
   int m_controlId = 0;
 };
@@ -58,6 +60,7 @@ public:
   /// The aliases Claude Code accepts (profile "models"): the CLI cannot list
   /// the models of the account.
   std::expected<QStringList, QString> listModels(const Profile &profile) const override;
+  bool supportsMcp() const override { return true; }
 };
 
 } // namespace Agents

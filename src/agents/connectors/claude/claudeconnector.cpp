@@ -50,7 +50,16 @@ QStringList ClaudeConnection::arguments(const SessionOptions &options) {
     args << "--system-prompt" << options.systemPrompt;
   if (!options.tools)
     args << "--tools" << "" << "--setting-sources" << "";
-  // Only the MCP servers given here, never the user's.
+  if (!options.resumeSessionId.isEmpty())
+    args << "--resume" << options.resumeSessionId;
+  if (!options.allowedTools.isEmpty()) {
+    QStringList tools; // "server/tool" -> "mcp__server__tool"
+    for (const QString &t : options.allowedTools)
+      tools.append("mcp__" + t.section('/', 0, 0) + "__" + t.section('/', 1));
+    args << "--allowedTools" << tools.join(',');
+  }
+  // Only the MCP servers given here, never the user's.  --mcp-config takes
+  // several values: it comes last.
   args << "--strict-mcp-config";
   if (!options.mcpServers.isEmpty()) {
     QJsonObject servers;
@@ -85,6 +94,10 @@ QJsonObject ClaudeConnection::userMessage(const Prompt &prompt) {
 
 void ClaudeConnection::open(const SessionOptions &options) {
   m_closed = false;
+  // Claude Code reports its session id with the first answer; when it cannot
+  // resume a session it exits with an error instead (failed()).
+  m_sessionId = options.resumeSessionId;
+  m_resumed = !options.resumeSessionId.isEmpty();
   if (!m_process.start(m_profile.command, arguments(options), options.workDir,
                        m_profile.env)) {
     const QString error = startFailureMessage(m_profile, m_process.lastError());

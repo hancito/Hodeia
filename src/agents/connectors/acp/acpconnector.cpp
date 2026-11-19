@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <memory>
 
 namespace Agents {
@@ -147,18 +148,44 @@ void AcpConnection::open(const SessionOptions &options) {
                                 .contains("override");
     if (!overrideOk)
       m_instructions = m_options.systemPrompt;
-    call("session/new",
-         sessionParams(m_options, m_profile.options.value("sessionMeta").toObject(),
-                       overrideOk),
-         [this](const QJsonValue &session, const QJsonObject *e) {
+    const bool canResume = init.toObject()
+                               .value("agentCapabilities").toObject()
+                               .value("sessionCapabilities").toObject()
+                               .contains("resume");
+    if (m_options.resumeSessionId.isEmpty() || !canResume) {
+      newSession(overrideOk);
+      return;
+    }
+    QJsonObject params = sessionParams(m_options, m_profile.options.value("sessionMeta").toObject(),
+                                       overrideOk);
+    params.remove("systemPrompt");
+    params["sessionId"] = m_options.resumeSessionId;
+    call("session/resume", params,
+         [this, overrideOk](const QJsonValue &session, const QJsonObject *e) {
            if (e) {
-             fail(describe(*e));
+             qInfo() << "[ACP] session not resumed:" << e->value("message").toString();
+             newSession(overrideOk);
              return;
            }
-           m_sessionId = session.toObject().value("sessionId").toString();
+           m_sessionId = m_options.resumeSessionId;
+           m_resumed = true;
+           m_instructions.clear(); // already given in that session
            selectModel(session.toObject());
          });
   });
+}
+
+void AcpConnection::newSession(bool overrideOk) {
+  call("session/new",
+       sessionParams(m_options, m_profile.options.value("sessionMeta").toObject(), overrideOk),
+       [this](const QJsonValue &session, const QJsonObject *e) {
+         if (e) {
+           fail(describe(*e));
+           return;
+         }
+         m_sessionId = session.toObject().value("sessionId").toString();
+         selectModel(session.toObject());
+       });
 }
 
 void AcpConnection::selectModel(const QJsonObject &session) {
@@ -270,16 +297,13 @@ void AcpConnection::handle(const QJsonObject &msg) {
                   u.value("toolCallId").toString(), u.value("status").toString()});
     }
   } else if (method == "session/request_permission" && msg.contains("id")) {
-    // No tool is given in classic mode: refuse.  (Mode agentique: HodeIA's
-    // own read-only tools will be allowed here.)
-    QString optionId;
-    for (const QJsonValue &o : params.value("options").toArray())
-      if (o.toObject().value("kind").toString() == "reject_once")
-        optionId = o.toObject().value("optionId").toString();
+    // Only HodeIA's own tools are allowed (mode agentique); the rest, and
+    // everything in classic mode, is refused.
+    const QString optionId = permissionAnswer(params, m_options.allowedTools);
     const QJsonObject outcome =
         optionId.isEmpty() ? QJsonObject{{"outcome", "cancelled"}}
                            : QJsonObject{{"outcome", "selected"}, {"optionId", optionId}};
-    qInfo() << "[ACP] permission refused:"
+    qInfo() << "[ACP] permission" << optionId << "for"
             << params.value("toolCall").toObject().value("title").toString();
     m_process.write({{"jsonrpc", "2.0"}, {"id", msg.value("id")},
                      {"result", QJsonObject{{"outcome", outcome}}}});
@@ -288,6 +312,29 @@ void AcpConnection::handle(const QJsonObject &msg) {
                      {"error", QJsonObject{{"code", kMethodNotFound},
                                            {"message", "Method not supported: " + method}}}});
   }
+}
+
+QString AcpConnection::permissionAnswer(const QJsonObject &params,
+                                       const QStringList &allowedTools) {
+  // Agents name MCP tools differently ("mcp__hodeia__search_library",
+  // "search_library (hodeia MCP Server)"...): the tool call is searched for
+  // the server and the tool name.
+  const QJsonObject call = params.value("toolCall").toObject();
+  const QString seen = call.value("title").toString() + " " +
+                       QJsonDocument(call.value("rawInput").toObject()).toJson() + " " +
+                       call.value("name").toString() + " " +
+                       params.value("_meta").toVariant().toString();
+  bool allowed = false;
+  for (const QString &tool : allowedTools) {
+    const QString server = tool.section('/', 0, 0), name = tool.section('/', 1);
+    if (seen.contains(name) && (seen.contains(server, Qt::CaseInsensitive)))
+      allowed = true;
+  }
+  QString wanted = allowed ? QStringLiteral("allow_once") : QStringLiteral("reject_once");
+  for (const QJsonValue &o : params.value("options").toArray())
+    if (o.toObject().value("kind").toString() == wanted)
+      return o.toObject().value("optionId").toString();
+  return {};
 }
 
 Connection *AcpConnector::create(const Profile &profile, QObject *parent) const {

@@ -34,6 +34,7 @@ public:
   void cancel() override;
   void close() override;
   QString sessionId() const override { return m_sessionId; }
+  bool resumed() const override { return m_resumed; }
 
   /// The models the session offers (after opened()).
   QStringList models() const { return m_models; }
@@ -44,6 +45,10 @@ public:
                                    bool systemPromptSupported);
   /// The ACP content blocks of a prompt.
   static QJsonArray promptBlocks(const Prompt &prompt);
+  /// The option to answer a permission request with: "allow_once" when the
+  /// tool is one of `allowedTools` ("server/tool"), else "reject_once";
+  /// empty for "cancelled" (tests).
+  static QString permissionAnswer(const QJsonObject &params, const QStringList &allowedTools);
 
 private:
   using Callback = std::function<void(const QJsonValue &result, const QJsonObject *error)>;
@@ -52,6 +57,7 @@ private:
   void handle(const QJsonObject &message);
   void fail(const QString &error);
   void selectModel(const QJsonObject &session);
+  void newSession(bool overrideOk);
   QString describe(const QJsonObject &error) const;
 
   Profile m_profile;
@@ -65,6 +71,7 @@ private:
   QString m_answer;
   bool m_inTurn = false;
   bool m_failed = false;
+  bool m_resumed = false;
 };
 
 class AcpConnector : public Connector {
@@ -72,6 +79,7 @@ public:
   QString id() const override { return QStringLiteral("acp"); }
   Connection *create(const Profile &profile, QObject *parent) const override;
   std::expected<QStringList, QString> listModels(const Profile &profile) const override;
+  bool supportsMcp() const override { return true; }
 };
 
 } // namespace Agents

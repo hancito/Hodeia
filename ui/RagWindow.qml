@@ -16,32 +16,66 @@ ThemedWindow {
     onClosing: {
         // Stop any in-flight query before closing
         queryController.stopQuery();
+        agentChat.closeAgent();
         ragwindow.closed(); // Fire our custom signal
         ragwindow.destroy(); // Free memory
     }
 
-    GridLayout {
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: Style.paneMargin
+        spacing: Style.spacing
 
-        SplitView {
-            id: secondSplitView
-            Layout.fillHeight: true
+        // Two modes: questions answered from the library (classic), or a
+        // conversation with an agent that searches it itself (agentique).
+        StyledTabBar {
+            id: modeBar
             Layout.fillWidth: true
-            handle: SplitHandleBar {}
+            StyledTabButton {
+                text: qsTr("Questions")
+            }
+            StyledTabButton {
+                text: qsTr("Conversation with an Agent")
+            }
+        }
 
-            RagDbPane {
-                id: dbPaneItem
-                // Proportional width so both panes fit with display scaling.
-                SplitView.preferredWidth: secondSplitView.width * 0.4
-                SplitView.minimumWidth: 260
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            currentIndex: modeBar.currentIndex
+
+            SplitView {
+                id: secondSplitView
+                handle: SplitHandleBar {}
+
+                RagDbPane {
+                    id: dbPaneItem
+                    // Proportional width so both panes fit with display scaling.
+                    SplitView.preferredWidth: secondSplitView.width * 0.4
+                    SplitView.minimumWidth: 260
+                }
+
+                QueryPane {
+                    id: queryPaneItem
+                    SplitView.fillWidth: true
+                    SplitView.minimumWidth: 360
+                    activeQueryId: dbPaneItem.activeQueryId
+                }
             }
 
-            QueryPane {
-                id: queryPaneItem
-                SplitView.fillWidth: true
-                SplitView.minimumWidth: 360
-                activeQueryId: dbPaneItem.activeQueryId
+            SplitView {
+                id: agentSplitView
+                handle: SplitHandleBar {}
+
+                ConversationListPane {
+                    SplitView.preferredWidth: agentSplitView.width * 0.3
+                    SplitView.minimumWidth: 220
+                }
+
+                ConversationPane {
+                    SplitView.fillWidth: true
+                    SplitView.minimumWidth: 360
+                }
             }
         }
     }
@@ -55,6 +89,14 @@ ThemedWindow {
     // User-facing information and errors for the query window.
     MessageBox {
         id: messageBox
+    }
+
+    // Problems of the conversations outside a message (database...).
+    Connections {
+        target: agentChat
+        function onErrorOccurred(message) {
+            messageBox.showError(qsTr("Conversation"), message);
+        }
     }
 
     // Set by Stop: the "cancelled" failure that follows is not an error.

@@ -59,6 +59,8 @@ public:
   QString id() const override { return QStringLiteral("pi"); }
   Connection *create(const Profile &profile, QObject *parent) const override;
   std::expected<QStringList, QString> listModels(const Profile &profile) const override;
+  /// Pi's own MCP support reads the user's configuration, not ours.
+  bool supportsMcp() const override { return false; }
 };
 
 } // namespace Agents

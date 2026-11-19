@@ -1,6 +1,9 @@
 #pragma once
 
+#include "metadataresolver.h"
 #include "pagecontext.h"
+
+#include <QHash>
 
 #include <QJsonObject>
 #include <QList>
@@ -22,6 +25,15 @@ namespace CitationFormat {
 QString resolveReferenceTags(const QString &text,
                              const QList<PageContext> &pages,
                              QSet<int> &cited);
+
+/// Replace the citation marks an agent copied from HodeIA's MCP tools
+/// ("[@95f8ed154398:p12]", "[@95f8ed154398]", several in a row or in one
+/// bracket separated by ";" or ",") with author-year citations like
+/// resolveReferenceTags(), and append a Sources section of the cited papers
+/// and pages.  `labels`: full paper hash -> label; an id is a unique hash
+/// prefix of at least 6 characters.  Marks of unknown papers stay as they
+/// are.
+QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> &labels);
 
 /// The "Sources" section appended to an answer: the papers of the `cited`
 /// page contexts (all of them if `cited` is empty, i.e. the model ignored the

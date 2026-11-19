@@ -138,6 +138,38 @@ std::expected<void, QString> migrateV3(SqliteDb &db) {
   return {};
 }
 
+// v4 — Conversations with an agent (Query window, mode agentique): one row
+// per conversation and one per message.  `agent_session` is the agent's own
+// session id, to resume the conversation with the agent.  Messages are
+// deleted with their conversation by ConversationRepository (foreign keys
+// are not enforced on project databases).
+std::expected<void, QString> migrateV4(SqliteDb &db) {
+  if (auto r = db.exec("CREATE TABLE Conversations ("
+                       "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                       "title TEXT NOT NULL DEFAULT '', "
+                       "backend TEXT NOT NULL DEFAULT '', "
+                       "model TEXT NOT NULL DEFAULT '', "
+                       "agent_session TEXT NOT NULL DEFAULT '', "
+                       "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                       "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+      !r)
+    return std::unexpected("Conversations: " + r.error());
+  if (auto r = db.exec("CREATE TABLE ConversationMessages ("
+                       "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                       "conversation_id INTEGER NOT NULL REFERENCES Conversations(id), "
+                       "role TEXT NOT NULL "
+                       "  CHECK (role IN ('user', 'assistant', 'error')), "
+                       "content TEXT NOT NULL, "
+                       "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
+      !r)
+    return std::unexpected("ConversationMessages: " + r.error());
+  if (auto r = db.exec("CREATE INDEX ConversationMessages_conversation "
+                       "ON ConversationMessages (conversation_id, id)");
+      !r)
+    return std::unexpected("ConversationMessages index: " + r.error());
+  return {};
+}
+
 /// A consistent copy of the open database (WAL content included) at `dest`.
 std::expected<void, QString> backupTo(SqliteDb &db, const QString &dest) {
   QFile::remove(dest);
@@ -192,6 +224,7 @@ const QList<Migration> &migrations() {
       {1, QStringLiteral("initial schema"), migrateV1},
       {2, QStringLiteral("Zotero connector"), migrateV2},
       {3, QStringLiteral("re-embed the chunks for search"), migrateV3},
+      {4, QStringLiteral("agent conversations"), migrateV4},
   };
   return kMigrations;
 }
