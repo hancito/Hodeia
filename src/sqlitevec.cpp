@@ -8,6 +8,8 @@
 #include <QDebug>
 #include <QFile>
 #include <QMutexLocker>
+#include <Sqlite3/sqlite3.h>
+#include <algorithm>
 #include <atomic>
 #include <expected>
 #include <mutex>
@@ -374,7 +376,8 @@ int SqliteVecManager::insertChunks(SqliteDb &db,
 /* ── Search ──────────────────────────────────────────────────── */
 
 QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
-                                                  const QString &query, int k) {
+                                                  const QString &query, int k,
+                                                  const QStringList &paperHashes) {
   if (!m_ready && !initialize())
     return {};
   if (!m_ready)
@@ -388,44 +391,64 @@ QList<ChunkSearchResult> SqliteVecManager::search(SqliteDb &db,
       reinterpret_cast<const char *>(queryEmbedding.constData()),
       m_dim * sizeof(float));
 
-  QString sql =
-      QString("SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
-              "clean_title, page_metadata, distance "
-              "FROM chunks WHERE embedding MATCH vec_f32(?) "
-              "LIMIT %1")
-          .arg(k);
-
-  SqliteStatement stmt = db.prepare(sql);
-  if (!stmt.isValid())
-    return {};
-
-  auto bindResult = stmt.bind(1, queryBlob);
-  if (!bindResult) {
-    qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-    return {};
-  }
-
+  // One KNN query per paper (vec0 filters on a metadata column with '='),
+  // merged by distance.
+  const QStringList filters = paperHashes.isEmpty() ? QStringList{QString()}
+                                                    : paperHashes;
   QList<ChunkSearchResult> results;
-  while (true) {
-    auto stepResult = stmt.step();
-    if (!stepResult) {
-      qCritical() << "[SqliteVec] Step failed:" << stepResult.error();
-      break;
+  for (const QString &hash : filters) {
+    QString sql =
+        QString("SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
+                "clean_title, page_metadata, distance "
+                "FROM chunks WHERE embedding MATCH vec_f32(?)%1 "
+                "LIMIT %2")
+            .arg(hash.isEmpty() ? QString() : QStringLiteral(" AND paper_hash = ?"))
+            .arg(k);
+
+    SqliteStatement stmt = db.prepare(sql);
+    if (!stmt.isValid()) {
+      qCritical() << "[SqliteVec] Prepare failed:"
+                  << QString::fromUtf8(sqlite3_errmsg(db.handle()));
+      return {};
     }
-    if (!*stepResult)
-      break;
-    ChunkSearchResult r;
-    r.paperHash = stmt.columnText(0);
-    r.page = stmt.columnInt(1);
-    r.chunkIdx = stmt.columnInt(2);
-    r.text = stmt.columnText(3);
-    r.citation = stmt.columnText(4);
-    r.cleanTitle = stmt.columnText(5);
-    r.pageMetadata = stmt.columnText(6);
-    r.distance = stmt.columnDouble(7);
-    results.append(r);
+
+    auto bindResult = stmt.bind(1, queryBlob);
+    if (bindResult && !hash.isEmpty())
+      bindResult = stmt.bind(2, hash);
+    if (!bindResult) {
+      qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
+      return {};
+    }
+
+    while (true) {
+      auto stepResult = stmt.step();
+      if (!stepResult) {
+        qCritical() << "[SqliteVec] Step failed:" << stepResult.error();
+        break;
+      }
+      if (!*stepResult)
+        break;
+      ChunkSearchResult r;
+      r.paperHash = stmt.columnText(0);
+      r.page = stmt.columnInt(1);
+      r.chunkIdx = stmt.columnInt(2);
+      r.text = stmt.columnText(3);
+      r.citation = stmt.columnText(4);
+      r.cleanTitle = stmt.columnText(5);
+      r.pageMetadata = stmt.columnText(6);
+      r.distance = stmt.columnDouble(7);
+      results.append(r);
+    }
   }
 
+  if (filters.size() > 1) {
+    std::stable_sort(results.begin(), results.end(),
+                     [](const ChunkSearchResult &a, const ChunkSearchResult &b) {
+                       return a.distance < b.distance;
+                     });
+    if (results.size() > k)
+      results.resize(k);
+  }
   return results;
 }
 

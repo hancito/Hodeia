@@ -24,6 +24,7 @@ namespace {
 
 constexpr int kDefaultResults = 8;
 constexpr int kMaxResults = 30;
+constexpr int kMaxPapers = 20; // papers a search can be restricted to
 // Token budget the search fills before keeping the best pages: room for
 // kMaxResults pages of a few chunks each.
 constexpr int kSearchBudgetTokens = 24000;
@@ -45,6 +46,13 @@ QJsonObject intProp(const QString &description, int min, int max) {
           {"description", description},
           {"minimum", min},
           {"maximum", max}};
+}
+
+QJsonObject stringArrayProp(const QString &description, int maxItems) {
+  return {{"type", "array"},
+          {"description", description},
+          {"items", QJsonObject{{"type", "string"}}},
+          {"maxItems", maxItems}};
 }
 
 const QString kPaperIdHelp = QStringLiteral(
@@ -186,6 +194,25 @@ McpLibrary::searchLibrary(const QJsonObject &args) {
   if (auto r = openActiveProject(); !r)
     return std::unexpected(r.error());
 
+  // Optional restriction to some papers, checked before loading the model.
+  Retriever::Options options;
+  const QJsonValue papersArg = args.value("papers");
+  if (!papersArg.isUndefined() && !papersArg.isNull()) {
+    if (!papersArg.isArray())
+      return std::unexpected(QStringLiteral("papers must be a list of paper ids."));
+    const QJsonArray ids = papersArg.toArray();
+    if (ids.size() > kMaxPapers)
+      return std::unexpected(
+          QString("papers: at most %1 papers at once.").arg(kMaxPapers));
+    for (const QJsonValue &id : ids) {
+      const auto hash = resolvePaper(id.toString());
+      if (!hash)
+        return std::unexpected(hash.error());
+      if (!options.papers.contains(*hash))
+        options.papers.append(*hash);
+    }
+  }
+
   if (!m_modelLoaded) {
     if (m_paths.embeddingModel.isEmpty())
       return std::unexpected(QStringLiteral(
@@ -197,20 +224,23 @@ McpLibrary::searchLibrary(const QJsonObject &args) {
     m_modelLoaded = true;
   }
 
-  Retriever::Options options;
   options.budgetTokens = kSearchBudgetTokens;
   QList<PageContext> pages =
       Retriever(m_db, *m_embeddings).retrieve(query, options);
   if (pages.size() > k)
     pages.resize(k);
   MetadataResolver::attachZotero(pages, zoteroMeta());
+  const QString scope =
+      options.papers.isEmpty()
+          ? QStringLiteral("the library")
+          : QString("%1 paper(s)").arg(options.papers.size());
   if (pages.isEmpty())
-    return QString("No passage of the library matches \"%1\".").arg(query);
+    return QString("No passage of %1 matches \"%2\".").arg(scope, query);
 
-  QString out = QString("%1 page(s) of the library for \"%2\", most "
+  QString out = QString("%1 page(s) of %2 for \"%3\", most "
                         "relevant first. Cite them with their mark.\n")
                     .arg(pages.size())
-                    .arg(query);
+                    .arg(scope, query);
   for (const PageContext &pc : pages) {
     out += "\n" + CitationFormat::pageMark(pc.paperHash, pc.displayPage()) +
            " " + MetadataResolver::paperLabel(pc).sourceForm() + ", p. " +
@@ -422,7 +452,12 @@ void McpLibrary::registerTools(McpServer &server) {
        "title, and the matching passages. Cite what you use with the marks.",
        schema({{"query", stringProp("What to look for, in natural language.")},
                {"k", intProp("Number of pages to return (default 8).", 1,
-                             kMaxResults)}},
+                             kMaxResults)},
+               {"papers",
+                stringArrayProp("Optional: search only these papers (ids as "
+                                "for get_summary). Omit to search the whole "
+                                "library.",
+                                kMaxPapers)}},
               {"query"}),
        bind(&McpLibrary::searchLibrary)});
   server.addTool(

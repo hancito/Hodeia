@@ -313,6 +313,20 @@ void TestMcpLibrary::search() {
            qPrintable(*out));
   QVERIFY(!out->contains("central bank"));
   QVERIFY(!lib.searchLibrary({}).has_value()); // query is required
+
+  // Restricted to the other paper: its page comes back, however far.
+  const QString question =
+      "Are employees absent from work more often when their co-workers are absent?";
+  const auto only = lib.searchLibrary(
+      {{"query", question}, {"papers", QJsonArray{QString(kIngested).left(8)}}});
+  QVERIFY2(only.has_value(), qPrintable(only ? QString() : only.error()));
+  QVERIFY2(only->contains("1 paper(s)") && only->contains("central bank"),
+           qPrintable(*only));
+  QVERIFY(!only->contains("Peer absence"));
+  // An unknown paper, or not a list: an error for the agent.
+  QVERIFY(!lib.searchLibrary({{"query", question}, {"papers", QJsonArray{"ffffff"}}})
+               .has_value());
+  QVERIFY(!lib.searchLibrary({{"query", question}, {"papers", "abc"}}).has_value());
 }
 
 QTEST_GUILESS_MAIN(TestMcpLibrary)

@@ -57,9 +57,11 @@ public:
   int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks,
                    const std::atomic<bool> *cancel = nullptr);
 
-  // Search chunks by query text; returns top-k nearest neighbors
+  // Search chunks by query text; returns the top-k nearest neighbors, nearest
+  // first.  With `paperHashes`, only the chunks of those papers.
   QList<ChunkSearchResult> search(SqliteDb &db, const QString &query,
-                                  int k = 10);
+                                  int k = 10,
+                                  const QStringList &paperHashes = {});
 
   // Retrieve all chunks belonging to a paper by its MD5 hash.
   // Returns ChunkSearchResult items (distance is set to 0.0f).

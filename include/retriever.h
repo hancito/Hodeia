@@ -17,6 +17,7 @@ public:
     int budgetTokens = 0; ///< tokens available for the page contexts
     bool useVisual = false; ///< attach page images (within MaxImages)
     QString imageDir; ///< folder of the page PNGs (hash_page_NNN.png)
+    QStringList papers; ///< search only these papers (full hashes); all if empty
   };
 
   // Chunks farther than (best distance + margin) from the query are dropped,
