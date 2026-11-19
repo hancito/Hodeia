@@ -35,6 +35,7 @@ private slots:
   void readPrefsFromProfile();
   void findDataDirOrder();
   void findDataDirNone();
+  void dbSignature();
 };
 
 void TestZoteroLocator::parsePrefs() {
@@ -44,8 +45,14 @@ void TestZoteroLocator::parsePrefs() {
       "user_pref(\"extensions.zotero.useDataDir\", true);\n"
       "user_pref(\"extensions.zotero.baseAttachmentPath\", \"D:\\\\Papers\");\n"
       "user_pref(\"extensions.zotero.sync.server.username\", \"x\");\n");
+  // Windows separators become '/' only on Windows, where Zotero writes them.
+#ifdef Q_OS_WIN
   QCOMPARE(prefs.dataDir, QString("C:/Users/me/Zotero"));
   QCOMPARE(prefs.baseAttachmentPath, QString("D:/Papers"));
+#else
+  QCOMPARE(prefs.dataDir, QString("C:\\Users\\me\\Zotero"));
+  QCOMPARE(prefs.baseAttachmentPath, QString("D:\\Papers"));
+#endif
 }
 
 void TestZoteroLocator::parsePrefsIgnoresUnusedDataDir() {
@@ -87,6 +94,21 @@ void TestZoteroLocator::findDataDirNone() {
   QTemporaryDir root;
   QVERIFY(ZoteroLocator::findDataDir(root.path(), {}, {root.path()}).isEmpty());
   QVERIFY(!ZoteroLocator::isDataDir({}));
+}
+
+void TestZoteroLocator::dbSignature() {
+  QTemporaryDir root;
+  QVERIFY(ZoteroLocator::dbSignature(root.path()).isEmpty());
+  const QString dir = makeDataDir(root, "z");
+  const QString first = ZoteroLocator::dbSignature(dir);
+  QVERIFY(!first.isEmpty());
+  QCOMPARE(ZoteroLocator::dbSignature(dir), first);
+  // Zotero writes to its WAL: the signature changes.
+  writeFile(dir + "/zotero.sqlite-wal", "frame");
+  const QString withWal = ZoteroLocator::dbSignature(dir);
+  QVERIFY(withWal != first);
+  writeFile(dir + "/zotero.sqlite-wal", "two frames");
+  QVERIFY(ZoteroLocator::dbSignature(dir) != withWal);
 }
 
 QTEST_GUILESS_MAIN(TestZoteroLocator)

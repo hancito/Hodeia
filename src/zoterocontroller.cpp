@@ -10,7 +10,9 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QFileInfo>
 #include <QFutureWatcher>
+#include <QTimer>
 #include <QUrl>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -18,18 +20,103 @@ ZoteroController::ZoteroController(ConfigManager *config,
                                    DatabaseManager *database,
                                    EngineController *engine, QObject *parent)
     : QObject(parent), m_config(config), m_database(database), m_engine(engine) {
-  // Our import is over: mark what made it into the project.
+  connect(m_engine, &EngineController::ingestionStarted, this,
+          [this]() { m_ingesting = true; });
   connect(m_engine, &EngineController::ingestionFinished, this, [this]() {
+    m_ingesting = false;
     if (m_importing) {
+      // Our import is over: mark what made it into the project.
       m_importing = false;
       refresh();
+    } else if (m_autoPending) {
+      autoRefresh();
+    } else if (!m_snapshot.libraries.isEmpty()) {
+      // PDFs added by hand may be proposed ones: stop proposing them.
+      rebuildView();
+      emit stateChanged();
     }
   });
   // Another project: its own followed collections and PDFs.
   connect(m_database, &DatabaseManager::databaseSwitched, this, [this]() {
-    if (!m_snapshot.libraries.isEmpty() || m_busy)
+    m_announced.clear();
+    m_proposals.clear();
+    m_missingCount = 0;
+    emit stateChanged();
+    if (followsCollections() || !m_snapshot.libraries.isEmpty() || m_busy)
+      refresh();
+    else
+      updateWatch();
+  });
+
+  // Zotero writes in bursts (an item, its attachment, the sync): wait until
+  // it has been quiet for a while.  The poll catches what the watcher misses.
+  m_settle.setSingleShot(true);
+  m_settle.setInterval(3000);
+  m_poll.setInterval(60000);
+  connect(&m_settle, &QTimer::timeout, this, &ZoteroController::autoRefresh);
+  connect(&m_poll, &QTimer::timeout, this, &ZoteroController::autoRefresh);
+  connect(&m_watcher, &QFileSystemWatcher::fileChanged, this,
+          [this]() { m_settle.start(); });
+  // The WAL comes and goes with Zotero: watch it again when it is back.
+  connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this]() {
+    updateWatch();
+    m_settle.start();
+  });
+
+  // The project opened at startup: announce what Zotero has new for it.
+  QTimer::singleShot(2000, this, [this]() {
+    if (m_database->isOpen() && followsCollections())
       refresh();
   });
+}
+
+bool ZoteroController::followsCollections() const {
+  return m_database->isOpen() &&
+         !ZoteroRepository(m_database->db()).followedCollections().isEmpty();
+}
+
+void ZoteroController::updateWatch() {
+  QStringList wanted;
+  if (!m_dataDir.isEmpty() && followsCollections()) {
+    wanted << m_dataDir;
+    for (const char *suffix : {"", "-wal"})
+      if (const QString file = m_dataDir + "/zotero.sqlite" + suffix;
+          QFileInfo::exists(file))
+        wanted << file;
+  }
+  const QStringList watched = m_watcher.files() + m_watcher.directories();
+  QStringList gone;
+  for (const QString &path : watched)
+    if (!wanted.contains(path))
+      gone << path;
+  if (!gone.isEmpty())
+    m_watcher.removePaths(gone);
+  QStringList added;
+  for (const QString &path : wanted)
+    if (!watched.contains(path))
+      added << path;
+  if (!added.isEmpty())
+    m_watcher.addPaths(added);
+
+  if (wanted.isEmpty()) {
+    m_poll.stop();
+    m_settle.stop();
+    m_autoPending = false;
+  } else if (!m_poll.isActive()) {
+    m_poll.start();
+  }
+}
+
+void ZoteroController::autoRefresh() {
+  if (m_busy || m_ingesting) {
+    m_autoPending = true;
+    return;
+  }
+  m_autoPending = false;
+  if (m_dataDir.isEmpty() || ZoteroLocator::dbSignature(m_dataDir) == m_signature)
+    return;
+  qInfo() << "[Zotero] the database changed, reading it again";
+  refresh();
 }
 
 void ZoteroController::setBusy(bool busy) {
@@ -63,6 +150,7 @@ void ZoteroController::refresh() {
   if (m_dataDir.isEmpty()) {
     m_snapshot = {};
     m_error.clear();
+    updateWatch();
     emit stateChanged(); // the window asks for the folder
     return;
   }
@@ -75,6 +163,8 @@ void ZoteroController::refresh() {
 
   m_error.clear();
   setBusy(true);
+  // Taken before the copy: a write during the read triggers another one.
+  m_signature = ZoteroLocator::dbSignature(m_dataDir);
   ZoteroRepository repo(m_database->db());
   m_loadedDbPath = m_database->databasePath();
   auto *watcher = new QFutureWatcher<Loaded>(this);
@@ -113,6 +203,7 @@ void ZoteroController::apply(const Loaded &loaded) {
   }
   if (!loaded.error.isEmpty()) {
     fail(tr("Cannot read Zotero: %1").arg(loaded.error));
+    updateWatch(); // try again at the next write
     return;
   }
   m_snapshot = loaded.snapshot;
@@ -141,15 +232,27 @@ void ZoteroController::apply(const Loaded &loaded) {
           << plan.missing.size() << "not downloaded";
   m_missingCount = int(plan.missing.size());
   rebuildView();
+  updateWatch();
+
+  // Announce the proposals not announced yet; forget those that went away.
+  QSet<int> proposed;
+  for (const QVariant &p : std::as_const(m_proposals))
+    proposed.insert(p.toMap().value("id").toInt());
+  const int fresh = int((proposed - m_announced).size());
+  m_announced = proposed;
   // New or corrected Zotero metadata: the paper list names papers with them.
   if (m_config->zoteroPriority() && !plan.store.isEmpty())
     m_database->reloadModels();
   setBusy(false);
   emit stateChanged();
+  if (fresh > 0)
+    emit newProposals(fresh);
 
   if (m_refreshAgain) {
     m_refreshAgain = false;
     refresh();
+  } else if (m_autoPending) {
+    autoRefresh();
   }
 }
 
@@ -223,6 +326,11 @@ void ZoteroController::importProposals(const QVariantList &ids) {
       files.append(QUrl::fromLocalFile(paths.value(ZoteroSync::pdfId(r))));
   if (files.isEmpty())
     return;
+  if (m_ingesting) {
+    m_error = tr("Another import is running: import these PDFs once it has finished.");
+    emit stateChanged();
+    return;
+  }
 
   m_importing = true;
   const QString project = m_config->lastProject();

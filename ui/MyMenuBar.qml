@@ -80,7 +80,9 @@ MenuBar {
         }
         StyledMenuSeparator {}
         StyledMenuItem {
-            text: qsTr("Zotero...")
+            text: zoteroController.proposals.length > 0
+                  ? qsTr("Zotero... (%1 new)").arg(zoteroController.proposals.length)
+                  : qsTr("Zotero...")
             onTriggered: menuBar.requestZotero()
         }
         StyledMenuSeparator {}

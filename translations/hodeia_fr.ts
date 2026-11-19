@@ -942,33 +942,33 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Échec de l&apos;indexation</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="526"/>
+        <location filename="../ui/Main.qml" line="535"/>
         <source>Add Local Model</source>
         <translation>Ajouter un modèle local</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="538"/>
+        <location filename="../ui/Main.qml" line="547"/>
         <source>Model:</source>
         <translation>Modèle :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="544"/>
+        <location filename="../ui/Main.qml" line="553"/>
         <source>Select a .gguf model file...</source>
         <translation>Sélectionnez un fichier de modèle .gguf...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="548"/>
-        <location filename="../ui/Main.qml" line="568"/>
+        <location filename="../ui/Main.qml" line="557"/>
+        <location filename="../ui/Main.qml" line="577"/>
         <source>Browse...</source>
         <translation>Parcourir...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="558"/>
+        <location filename="../ui/Main.qml" line="567"/>
         <source>MMProj:</source>
         <translation>MMProj :</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="564"/>
+        <location filename="../ui/Main.qml" line="573"/>
         <source>Select a .gguf mmproj file...</source>
         <translation>Sélectionnez un fichier mmproj .gguf...</translation>
     </message>
@@ -980,53 +980,61 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <source>The mmproj file is optional. Leave empty to skip.</source>
         <translation type="vanished">Le fichier mmproj est facultatif. Laisser vide pour passer.</translation>
     </message>
+    <message numerus="yes">
+        <location filename="../ui/Main.qml" line="527"/>
+        <source>Zotero: %n new PDF(s) to import (Project &gt; Zotero...)</source>
+        <translation>
+            <numerusform>Zotero : %n nouveau PDF à importer (Projet › Zotero…)</numerusform>
+            <numerusform>Zotero : %n nouveaux PDF à importer (Projet › Zotero…)</numerusform>
+        </translation>
+    </message>
     <message>
-        <location filename="../ui/Main.qml" line="597"/>
+        <location filename="../ui/Main.qml" line="606"/>
         <source>Select GGUF Model File</source>
         <translation>Sélectionner le fichier de modèle GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="608"/>
+        <location filename="../ui/Main.qml" line="617"/>
         <source>Select MMProj GGUF File</source>
         <translation>Sélectionner le fichier MMProj GGUF</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="632"/>
+        <location filename="../ui/Main.qml" line="641"/>
         <source>Adding Model</source>
         <translation>Ajout du modèle</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="642"/>
+        <location filename="../ui/Main.qml" line="651"/>
         <source>Preparing the copy...</source>
         <translation>Préparation de la copie...</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="642"/>
+        <location filename="../ui/Main.qml" line="651"/>
         <source>Copying %1</source>
         <translation>Copie de %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="653"/>
+        <location filename="../ui/Main.qml" line="662"/>
         <source>%1% — please wait, large models can take a few minutes.</source>
         <translation>%1 % — veuillez patienter, la copie d&apos;un gros modèle peut prendre quelques minutes.</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="666"/>
+        <location filename="../ui/Main.qml" line="675"/>
         <source>Copying model: %1 — %2%</source>
         <translation>Copie du modèle : %1 — %2 %</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="671"/>
+        <location filename="../ui/Main.qml" line="680"/>
         <source>Model copied: %1</source>
         <translation>Modèle copié : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="672"/>
+        <location filename="../ui/Main.qml" line="681"/>
         <source>Model Added</source>
         <translation>Modèle ajouté</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="672"/>
+        <location filename="../ui/Main.qml" line="681"/>
         <source>The model was added and can now be selected in the toolbar.
 
 %1</source>
@@ -1035,38 +1043,46 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="674"/>
+        <location filename="../ui/Main.qml" line="683"/>
         <source>Copy failed: %1</source>
         <translation>Échec de la copie : %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="675"/>
+        <location filename="../ui/Main.qml" line="684"/>
         <source>Model Copy Failed</source>
         <translation>Échec de la copie du modèle</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="675"/>
+        <location filename="../ui/Main.qml" line="684"/>
         <source>The model could not be added:
 %1</source>
         <translation>Le modèle n&apos;a pas pu être ajouté :
 %1</translation>
     </message>
     <message>
-        <location filename="../ui/Main.qml" line="683"/>
-        <location filename="../ui/Main.qml" line="684"/>
+        <location filename="../ui/Main.qml" line="692"/>
+        <location filename="../ui/Main.qml" line="693"/>
         <source>%1 -- Ready</source>
         <translation>%1 -- Prêt</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../ui/Main.qml" line="696"/>
+        <source>Zotero: %n new PDF(s)</source>
+        <translation>
+            <numerusform>Zotero : %n nouveau PDF</numerusform>
+            <numerusform>Zotero : %n nouveaux PDF</numerusform>
+        </translation>
     </message>
 </context>
 <context>
     <name>MyMenuBar</name>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="217"/>
+        <location filename="../ui/MyMenuBar.qml" line="219"/>
         <source>Help</source>
         <translation>Aide</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="219"/>
+        <location filename="../ui/MyMenuBar.qml" line="221"/>
         <source>About HodeIA...</source>
         <translation>À propos de HodeIA...</translation>
     </message>
@@ -1087,8 +1103,8 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Supprimer un projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="110"/>
-        <location filename="../ui/MyMenuBar.qml" line="167"/>
+        <location filename="../ui/MyMenuBar.qml" line="112"/>
+        <location filename="../ui/MyMenuBar.qml" line="169"/>
         <source>Delete Selected</source>
         <translation>Supprimer la sélection</translation>
     </message>
@@ -1101,7 +1117,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="176"/>
+        <location filename="../ui/MyMenuBar.qml" line="178"/>
         <source>Settings</source>
         <translation>Paramètres</translation>
     </message>
@@ -1129,72 +1145,77 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Ouvrir un projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="83"/>
+        <location filename="../ui/MyMenuBar.qml" line="84"/>
+        <source>Zotero... (%1 new)</source>
+        <translation>Zotero… (%1 à importer)</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="85"/>
         <source>Zotero...</source>
         <translation>Zotero…</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="88"/>
+        <location filename="../ui/MyMenuBar.qml" line="90"/>
         <source>Clear Project Data...</source>
         <translation>Vider le projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="93"/>
+        <location filename="../ui/MyMenuBar.qml" line="95"/>
         <source>Delete Projects</source>
         <translation>Supprimer des projets</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="118"/>
+        <location filename="../ui/MyMenuBar.qml" line="120"/>
         <source>Quit</source>
         <translation>Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="124"/>
+        <location filename="../ui/MyMenuBar.qml" line="126"/>
         <source>Models</source>
         <translation>Modèles</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="141"/>
+        <location filename="../ui/MyMenuBar.qml" line="143"/>
         <source>Manage Backends...</source>
         <translation>Gérer les backends...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="146"/>
+        <location filename="../ui/MyMenuBar.qml" line="148"/>
         <source>Add Local Model...</source>
         <translation>Ajouter un modèle local...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="150"/>
+        <location filename="../ui/MyMenuBar.qml" line="152"/>
         <source>Delete Local Models</source>
         <translation>Supprimer des modèles locaux</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="178"/>
+        <location filename="../ui/MyMenuBar.qml" line="180"/>
         <source>Theme</source>
         <translation>Thème</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="195"/>
+        <location filename="../ui/MyMenuBar.qml" line="197"/>
         <source>Language</source>
         <translation>Langue</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="197"/>
+        <location filename="../ui/MyMenuBar.qml" line="199"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="203"/>
+        <location filename="../ui/MyMenuBar.qml" line="205"/>
         <source>Français</source>
         <translation>Français</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="211"/>
+        <location filename="../ui/MyMenuBar.qml" line="213"/>
         <source>OpenAlex API Key...</source>
         <translation>Clé API OpenAlex...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="126"/>
+        <location filename="../ui/MyMenuBar.qml" line="128"/>
         <source>Backend</source>
         <translation>Backend</translation>
     </message>
@@ -2138,30 +2159,35 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>ZoteroController</name>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="72"/>
+        <location filename="../src/zoterocontroller.cpp" line="160"/>
         <source>No project is open.</source>
         <translation>Aucun projet n&apos;est ouvert.</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="115"/>
+        <location filename="../src/zoterocontroller.cpp" line="205"/>
         <source>Cannot read Zotero: %1</source>
         <translation>Impossible de lire Zotero : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="137"/>
-        <location filename="../src/zoterocontroller.cpp" line="239"/>
+        <location filename="../src/zoterocontroller.cpp" line="228"/>
+        <location filename="../src/zoterocontroller.cpp" line="347"/>
         <source>Cannot update the project: %1</source>
         <translation>Impossible de mettre à jour le projet : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="190"/>
+        <location filename="../src/zoterocontroller.cpp" line="293"/>
         <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
         <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="204"/>
+        <location filename="../src/zoterocontroller.cpp" line="307"/>
         <source>Cannot save the collections: %1</source>
         <translation>Impossible d&apos;enregistrer les collections : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/zoterocontroller.cpp" line="330"/>
+        <source>Another import is running: import these PDFs once it has finished.</source>
+        <translation>Une autre importation est en cours : importez ces PDF une fois qu’elle sera terminée.</translation>
     </message>
 </context>
 <context>

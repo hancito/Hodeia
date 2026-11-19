@@ -519,6 +519,15 @@ ThemedWindow {
         id: zoteroDialog
     }
 
+    // Zotero has new PDFs in the followed collections: say so once.
+    Connections {
+        target: zoteroController
+        function onNewProposals(count) {
+            if (!zoteroDialog.opened)
+                footerLabel.text = qsTr("Zotero: %n new PDF(s) to import (Project > Zotero...)", "", count);
+        }
+    }
+
     // Dialog for adding a local GGUF model (+ optional mmproj)
     StyledDialog {
         id: localModelDialog
@@ -682,5 +691,9 @@ ThemedWindow {
         id: footerLabel
         text: qsTr("%1 -- Ready").arg(activeProject)
         Component.onCompleted: text = qsTr("%1 -- Ready").arg(activeProject)
+        // Zotero PDFs waiting to be imported or ignored: opens the Zotero window.
+        actionText: zoteroController.proposals.length > 0
+                    ? qsTr("Zotero: %n new PDF(s)", "", zoteroController.proposals.length) : ""
+        onActionClicked: zoteroDialog.open()
     }
 }

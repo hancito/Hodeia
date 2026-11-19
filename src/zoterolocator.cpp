@@ -3,7 +3,9 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QDateTime>
 #include <QRegularExpression>
+#include <QTimeZone>
 
 namespace ZoteroLocator {
 
@@ -84,6 +86,19 @@ QStringList defaultDataDirs() {
 
 bool isDataDir(const QString &dir) {
   return !dir.isEmpty() && QFileInfo(dir + "/zotero.sqlite").isFile();
+}
+
+QString dbSignature(const QString &dataDir) {
+  if (!isDataDir(dataDir))
+    return {};
+  QString signature;
+  for (const char *suffix : {"", "-wal"}) {
+    const QFileInfo info(dataDir + "/zotero.sqlite" + suffix);
+    signature += info.exists() ? QString("%1@%2;").arg(info.size()).arg(
+                                     info.lastModified(QTimeZone::UTC).toMSecsSinceEpoch())
+                               : QStringLiteral("-;");
+  }
+  return signature;
 }
 
 QString findDataDir(const QString &savedDir, const Prefs &prefs,

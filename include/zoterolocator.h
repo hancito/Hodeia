@@ -29,6 +29,11 @@ QStringList defaultDataDirs();
 /// True if `dir` holds a zotero.sqlite.
 bool isDataDir(const QString &dir);
 
+/// Size and modification time of zotero.sqlite and of its WAL, as a string:
+/// it changes whenever Zotero writes to its database.  Empty when there is
+/// no database in `dataDir`.
+QString dbSignature(const QString &dataDir);
+
 /// The data folder: `savedDir` if it is still valid, else the one declared
 /// in the profile, else a default one; empty if none holds a zotero.sqlite
 /// (the UI then asks the user for the folder).

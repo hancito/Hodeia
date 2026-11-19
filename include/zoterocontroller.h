@@ -4,7 +4,10 @@
 #include "zoterorepository.h"
 #include "zoterosource.h"
 
+#include <QFileSystemWatcher>
 #include <QObject>
+#include <QSet>
+#include <QTimer>
 #include <QVariantList>
 
 class ConfigManager;
@@ -18,6 +21,11 @@ class EngineController;
 ///
 /// Reading Zotero and hashing the new PDFs run on a worker thread; the
 /// project database is written on the GUI thread, like the rest of the app.
+///
+/// While the project follows collections, Zotero's database is watched: when
+/// Zotero writes to it, Zotero is read again once the writes have settled,
+/// and newProposals() announces the PDFs not announced yet.  Nothing is
+/// imported without the user.
 class ZoteroController : public QObject {
   Q_OBJECT
   Q_PROPERTY(ZoteroCollectionModel *collections READ collections CONSTANT)
@@ -56,6 +64,9 @@ public:
 
 signals:
   void stateChanged();
+  /// A read found `count` PDFs to propose that had not been announced yet
+  /// (at startup, after a project switch, or when Zotero changed).
+  void newProposals(int count);
 
 private:
   struct Loaded {
@@ -74,6 +85,12 @@ private:
   void apply(const Loaded &loaded);
   void rebuildView();
   QSet<QString> indexedHashes() const;
+  bool followsCollections() const;
+  /// Watch Zotero's files while the project follows collections.
+  void updateWatch();
+  /// Read Zotero again if it wrote to its database since the last read;
+  /// later if a read or an ingestion is running.
+  void autoRefresh();
 
   ConfigManager *m_config;
   DatabaseManager *m_database;
@@ -84,9 +101,17 @@ private:
   bool m_busy = false;
   bool m_refreshAgain = false; ///< a refresh was asked while one was running
   bool m_importing = false;    ///< an import of ours is running
+  bool m_ingesting = false;    ///< any ingestion is running
+  bool m_autoPending = false;  ///< Zotero changed during a read or an ingestion
   QString m_error;
   QString m_loadedDbPath; ///< project the running load was started for
   ZoteroSnapshot m_snapshot;
   QVariantList m_proposals;
   int m_missingCount = 0;
+
+  QFileSystemWatcher m_watcher;
+  QTimer m_settle; ///< restarted by each write: Zotero writes in bursts
+  QTimer m_poll;   ///< safety net: Windows may report WAL writes late
+  QString m_signature; ///< ZoteroLocator::dbSignature() when last read
+  QSet<int> m_announced; ///< proposals already announced
 };
