@@ -29,8 +29,11 @@ public:
   std::expected<bool, QString> bind(int index, const QDateTime &dt);
   std::expected<bool, QString> bind(int index, const QByteArray &blob);
 
+  /// One step: true for a row, false when done.  Any other SQLite result
+  /// (a broken constraint, a locked database, an I/O error) is an error.
   std::expected<bool, QString> step();
-  // Execute a statement that returns no rows (INSERT, UPDATE, DELETE)
+  /// Execute a statement that returns no rows (INSERT, UPDATE, DELETE):
+  /// true, or an error as for step().
   std::expected<bool, QString> exec();
   void reset();
   void resetAndClearBindings();

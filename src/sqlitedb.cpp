@@ -95,28 +95,26 @@ std::expected<bool, QString> SqliteStatement::bind(int index,
   return true;
 }
 
+// Anything but SQLITE_ROW or SQLITE_DONE is a failure: not only
+// SQLITE_ERROR, but also a broken constraint (SQLITE_CONSTRAINT_*), a locked
+// database (SQLITE_BUSY), a full disk, an I/O error...
 std::expected<bool, QString> SqliteStatement::step() {
   if (!m_stmt)
     return std::unexpected{m_errorMsg};
-  int rc = sqlite3_step(m_stmt);
-  if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
-    m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
-        sqlite3_errmsg(sqlite3_db_handle(m_stmt))));
-    return std::unexpected{m_errorMsg};
-  }
-  return rc == SQLITE_ROW;
+  const int rc = sqlite3_step(m_stmt);
+  if (rc == SQLITE_ROW)
+    return true;
+  if (rc == SQLITE_DONE)
+    return false;
+  m_errorMsg = QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(m_stmt)));
+  return std::unexpected{m_errorMsg};
 }
 
 std::expected<bool, QString> SqliteStatement::exec() {
-  if (!m_stmt)
-    return std::unexpected{m_errorMsg};
-  int rc = sqlite3_step(m_stmt);
-  if (rc == SQLITE_ERROR || rc == SQLITE_MISUSE) {
-    m_errorMsg = QString::fromUtf8(reinterpret_cast<const char *>(
-        sqlite3_errmsg(sqlite3_db_handle(m_stmt))));
-    return std::unexpected{m_errorMsg};
-  }
-  return rc == SQLITE_DONE;
+  auto r = step();
+  if (!r)
+    return r;
+  return true; // ran to completion, or returned a row that nobody reads
 }
 
 void SqliteStatement::reset() {

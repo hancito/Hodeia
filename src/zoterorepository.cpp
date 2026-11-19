@@ -18,15 +18,10 @@ QString lastError(const SqliteStatement &stmt) {
   return QString::fromUtf8(sqlite3_errmsg(sqlite3_db_handle(stmt.handle())));
 }
 
-/// Run a statement that returns no rows.  SqliteStatement::exec() reports
-/// only SQLITE_ERROR/MISUSE as errors: a broken constraint (a duplicate key,
-/// a bad status) comes back as `false`, and is an error here too.
+/// Run a statement that returns no rows.
 std::expected<void, QString> run(SqliteStatement &stmt) {
-  auto r = stmt.exec();
-  if (!r)
+  if (auto r = stmt.exec(); !r)
     return Error(r.error());
-  if (!*r)
-    return Error(lastError(stmt));
   return {};
 }
 
@@ -204,7 +199,7 @@ std::expected<int, QString> ZoteroRepository::upsertItem(const ZoteroItemRow &ro
   auto step = stmt.step();
   if (!step)
     return Error(step.error());
-  if (!*step) // a broken constraint: no row
+  if (!*step) // RETURNING always yields the row
     return Error(lastError(stmt));
   return stmt.columnInt(0);
 }
