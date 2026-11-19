@@ -40,6 +40,7 @@ ZoteroController::ZoteroController(ConfigManager *config,
   connect(m_database, &DatabaseManager::databaseSwitched, this, [this]() {
     m_announced.clear();
     m_proposals.clear();
+    m_ignored.clear();
     m_missingCount = 0;
     emit stateChanged();
     if (followsCollections() || !m_snapshot.libraries.isEmpty() || m_busy)
@@ -274,15 +275,20 @@ void ZoteroController::rebuildView() {
       pdfCollections[ZoteroSync::pdfId(p)].append(
           collectionNames.value(ZoteroSync::collectionId(p.libraryId, key)));
 
-  m_proposals.clear();
-  for (const ZoteroItemRow &r : ZoteroSync::proposals(rows, indexed))
-    m_proposals.append(QVariantMap{
-        {"id", r.id},
-        {"title", r.meta.title},
-        {"authors", r.meta.authors.join(", ")},
-        {"year", r.meta.year},
-        {"journal", r.meta.journal},
-        {"collections", pdfCollections.value(ZoteroSync::pdfId(r)).join(", ")}});
+  const auto toList = [&](const QList<ZoteroItemRow> &list) {
+    QVariantList out;
+    for (const ZoteroItemRow &r : list)
+      out.append(QVariantMap{
+          {"id", r.id},
+          {"title", r.meta.title},
+          {"authors", r.meta.authors.join(", ")},
+          {"year", r.meta.year},
+          {"journal", r.meta.journal},
+          {"collections", pdfCollections.value(ZoteroSync::pdfId(r)).join(", ")}});
+    return out;
+  };
+  m_proposals = toList(ZoteroSync::proposals(rows, indexed));
+  m_ignored = toList(ZoteroSync::ignored(rows, indexed));
 }
 
 QString ZoteroController::setDataDir(const QString &pathOrUrl) {
@@ -339,14 +345,26 @@ void ZoteroController::importProposals(const QVariantList &ids) {
 }
 
 void ZoteroController::ignoreProposals(const QVariantList &ids) {
+  setStatus(ids, ZoteroStatus::Ignored);
+}
+
+void ZoteroController::restoreIgnored(const QVariantList &ids) {
+  setStatus(ids, ZoteroStatus::Pending);
+}
+
+void ZoteroController::setStatus(const QVariantList &ids, ZoteroStatus status) {
+  if (!m_database->isOpen())
+    return;
   QList<int> list;
   for (const QVariant &v : ids)
     list.append(v.toInt());
-  if (auto r = ZoteroRepository(m_database->db()).setStatus(list, ZoteroStatus::Ignored);
-      !r) {
+  if (auto r = ZoteroRepository(m_database->db()).setStatus(list, status); !r) {
     fail(tr("Cannot update the project: %1").arg(r.error()));
     return;
   }
   rebuildView();
+  // The user just chose: these proposals need no announcement.
+  for (const QVariant &p : std::as_const(m_proposals))
+    m_announced.insert(p.toMap().value("id").toInt());
   emit stateChanged();
 }

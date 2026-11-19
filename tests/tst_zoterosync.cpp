@@ -64,6 +64,7 @@ private slots:
   void removedAndBack();
   void notDownloadedIsNotRemoved();
   void proposalsFilter();
+  void ignoredFilter();
   void counts();
 };
 
@@ -185,6 +186,21 @@ void TestZoteroSync::proposalsFilter() {
                              {"hc"});
   QCOMPARE(out.size(), 1);
   QCOMPARE(out[0].id, 1);
+}
+
+void TestZoteroSync::ignoredFilter() {
+  const ZoteroPdf p1 = pdf("A", {}), p2 = pdf("B", {}), p3 = pdf("C", {}),
+                  p4 = pdf("D", {});
+  auto removed = known(4, p4, "hd", ZoteroStatus::Ignored);
+  removed.removedAt = QDateTime::currentDateTimeUtc();
+  // Pending (1), ignored but in the project since (3), gone from Zotero (4):
+  // not listed.
+  const auto out = ignored({known(1, p1, "ha", ZoteroStatus::Pending),
+                            known(2, p2, "hb", ZoteroStatus::Ignored),
+                            known(3, p3, "hc", ZoteroStatus::Ignored), removed},
+                           {"hc"});
+  QCOMPARE(out.size(), 1);
+  QCOMPARE(out[0].id, 2);
 }
 
 void TestZoteroSync::counts() {

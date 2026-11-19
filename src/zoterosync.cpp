@@ -126,6 +126,16 @@ QList<ZoteroItemRow> proposals(const QList<ZoteroItemRow> &rows,
   return out;
 }
 
+QList<ZoteroItemRow> ignored(const QList<ZoteroItemRow> &rows,
+                             const QSet<QString> &indexed) {
+  QList<ZoteroItemRow> out;
+  for (const ZoteroItemRow &r : rows)
+    if (r.status == ZoteroStatus::Ignored && !r.removedAt.isValid() &&
+        !indexed.contains(r.paperHash))
+      out.append(r);
+  return out;
+}
+
 QHash<QString, CollectionCounts>
 countByCollection(const ZoteroSnapshot &snapshot,
                   const QList<ZoteroItemRow> &known, const QSet<QString> &indexed) {

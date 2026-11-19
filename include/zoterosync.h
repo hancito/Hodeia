@@ -59,6 +59,11 @@ Plan plan(const QList<ZoteroPdf> &followed, const QList<ZoteroItemRow> &known,
 QList<ZoteroItemRow> proposals(const QList<ZoteroItemRow> &rows,
                                const QSet<QString> &indexed);
 
+/// The PDFs the user ignored that could be proposed again: still in the
+/// followed collections, not in the project.
+QList<ZoteroItemRow> ignored(const QList<ZoteroItemRow> &rows,
+                             const QSet<QString> &indexed);
+
 struct CollectionCounts {
   int pdfs = 0;      ///< PDF attachments held directly
   int onDisk = 0;    ///< of which downloaded

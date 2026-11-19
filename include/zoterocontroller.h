@@ -36,6 +36,8 @@ class ZoteroController : public QObject {
   Q_PROPERTY(QString error READ error NOTIFY stateChanged)
   /// PDFs to propose: {id, title, authors, year, journal, collections}.
   Q_PROPERTY(QVariantList proposals READ proposals NOTIFY stateChanged)
+  /// PDFs the user ignored, still in the followed collections: same fields.
+  Q_PROPERTY(QVariantList ignored READ ignored NOTIFY stateChanged)
   /// PDFs of the followed collections that Zotero has not downloaded.
   Q_PROPERTY(int missingCount READ missingCount NOTIFY stateChanged)
 
@@ -48,6 +50,7 @@ public:
   bool busy() const { return m_busy; }
   QString error() const { return m_error; }
   QVariantList proposals() const { return m_proposals; }
+  QVariantList ignored() const { return m_ignored; }
   int missingCount() const { return m_missingCount; }
 
   /// Read Zotero again and bring the project up to date.
@@ -61,6 +64,8 @@ public:
   Q_INVOKABLE void importProposals(const QVariantList &ids);
   /// Never propose these PDFs again.
   Q_INVOKABLE void ignoreProposals(const QVariantList &ids);
+  /// Propose ignored PDFs (ZoteroItems ids) again.
+  Q_INVOKABLE void restoreIgnored(const QVariantList &ids);
 
 signals:
   void stateChanged();
@@ -76,6 +81,8 @@ private:
   };
 
   void setBusy(bool busy);
+  /// Set the status of the rows `ids` and show the result.
+  void setStatus(const QVariantList &ids, ZoteroStatus status);
   void fail(const QString &message);
   /// Worker-thread part of refresh(): read Zotero, hash the new PDFs.
   static Loaded load(const QString &dataDir, const QString &baseAttachmentPath,
@@ -107,6 +114,7 @@ private:
   QString m_loadedDbPath; ///< project the running load was started for
   ZoteroSnapshot m_snapshot;
   QVariantList m_proposals;
+  QVariantList m_ignored;
   int m_missingCount = 0;
 
   QFileSystemWatcher m_watcher;

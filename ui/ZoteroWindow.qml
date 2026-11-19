@@ -15,17 +15,23 @@ StyledDialog {
     title: qsTr("Zotero")
     standardButtons: Dialog.Close
 
-    // Proposal ids the user has unticked (all are ticked by default).
+    // The list shows the ignored PDFs instead of the new ones.
+    property bool showIgnored: false
+    readonly property var shownList: showIgnored ? zoteroController.ignored
+                                                 : zoteroController.proposals
+    onShowIgnoredChanged: unticked = {}
+    // Ids of the shown list the user has unticked (all are ticked by default).
     property var unticked: ({})
     readonly property var selectedIds: {
         const ids = [];
-        for (const p of zoteroController.proposals)
+        for (const p of shownList)
             if (!unticked[p.id])
                 ids.push(p.id);
         return ids;
     }
 
     onOpened: {
+        showIgnored = false;
         unticked = {};
         folderError.text = "";
         zoteroController.refresh();
@@ -181,7 +187,9 @@ StyledDialog {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.preferredHeight: 4
-            title: qsTr("New PDFs (%1)").arg(zoteroController.proposals.length)
+            title: zoteroWindow.showIgnored
+                   ? qsTr("Ignored PDFs (%1)").arg(zoteroController.ignored.length)
+                   : qsTr("New PDFs (%1)").arg(zoteroController.proposals.length)
             enabled: !zoteroController.busy
 
             ColumnLayout {
@@ -190,7 +198,7 @@ StyledDialog {
 
                 Label {
                     Layout.fillWidth: true
-                    visible: zoteroController.missingCount > 0
+                    visible: !zoteroWindow.showIgnored && zoteroController.missingCount > 0
                     wrapMode: Text.WordWrap
                     color: Colors.overlay1
                     text: qsTr("%n PDF(s) of the followed collections are not on this computer. Download them in Zotero: they will be proposed here once downloaded.",
@@ -198,19 +206,21 @@ StyledDialog {
                 }
                 Label {
                     Layout.fillWidth: true
-                    visible: zoteroController.proposals.length === 0
+                    visible: zoteroWindow.shownList.length === 0
                     color: Colors.overlay1
                     wrapMode: Text.WordWrap
-                    text: zoteroController.collections.followedCount === 0
-                          ? qsTr("Follow collections above to have their PDFs proposed.")
-                          : qsTr("Nothing new: every downloaded PDF of the followed collections is in the project or ignored.")
+                    text: zoteroWindow.showIgnored
+                          ? qsTr("No ignored PDF.")
+                          : zoteroController.collections.followedCount === 0
+                            ? qsTr("Follow collections above to have their PDFs proposed.")
+                            : qsTr("Nothing new: every downloaded PDF of the followed collections is in the project or ignored.")
                 }
 
                 ListView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
-                    model: zoteroController.proposals
+                    model: zoteroWindow.shownList
                     ScrollBar.vertical: StyledScrollBar {}
 
                     delegate: ItemDelegate {
@@ -267,15 +277,15 @@ StyledDialog {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    visible: zoteroController.proposals.length > 0
                     spacing: 8
                     StyledButton {
-                        text: zoteroWindow.selectedIds.length === zoteroController.proposals.length
+                        visible: zoteroWindow.shownList.length > 0
+                        text: zoteroWindow.selectedIds.length === zoteroWindow.shownList.length
                               ? qsTr("Untick All") : qsTr("Tick All")
                         onClicked: {
-                            if (zoteroWindow.selectedIds.length === zoteroController.proposals.length) {
+                            if (zoteroWindow.selectedIds.length === zoteroWindow.shownList.length) {
                                 const u = {};
-                                for (const p of zoteroController.proposals)
+                                for (const p of zoteroWindow.shownList)
                                     u[p.id] = true;
                                 zoteroWindow.unticked = u;
                             } else {
@@ -283,14 +293,32 @@ StyledDialog {
                             }
                         }
                     }
+                    // Switch between the new PDFs and the ignored ones.
+                    StyledButton {
+                        visible: zoteroWindow.showIgnored || zoteroController.ignored.length > 0
+                        text: zoteroWindow.showIgnored
+                              ? qsTr("Back to New PDFs")
+                              : qsTr("Ignored (%1)").arg(zoteroController.ignored.length)
+                        onClicked: zoteroWindow.showIgnored = !zoteroWindow.showIgnored
+                    }
                     Item { Layout.fillWidth: true }
                     StyledButton {
+                        visible: zoteroWindow.showIgnored
+                        text: qsTr("Propose Again (%1)").arg(zoteroWindow.selectedIds.length)
+                        toolTip: qsTr("Put the ticked PDFs back among the new PDFs")
+                        emphasized: true
+                        enabled: zoteroWindow.selectedIds.length > 0
+                        onClicked: zoteroController.restoreIgnored(zoteroWindow.selectedIds)
+                    }
+                    StyledButton {
+                        visible: !zoteroWindow.showIgnored && zoteroWindow.shownList.length > 0
                         text: qsTr("Ignore")
                         toolTip: qsTr("Never propose the ticked PDFs again")
                         enabled: zoteroWindow.selectedIds.length > 0
                         onClicked: zoteroController.ignoreProposals(zoteroWindow.selectedIds)
                     }
                     StyledButton {
+                        visible: !zoteroWindow.showIgnored && zoteroWindow.shownList.length > 0
                         text: qsTr("Import (%1)").arg(zoteroWindow.selectedIds.length)
                         emphasized: true
                         enabled: zoteroWindow.selectedIds.length > 0
