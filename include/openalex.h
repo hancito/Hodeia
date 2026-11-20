@@ -34,11 +34,12 @@ class QUrlQuery;
 ///     Within a paper, the two citation lists (cites / cited_by) are fetched
 ///     IN PARALLEL, each with its own buffer; the paper is finished when both
 ///     lists are done.
-///   * It never touches SQLite from its own thread.  Every read (scan) and
-///     write (work_id, lists, lookup status) is posted to the main thread
-///     with m_database as context, where DatabaseManager owns the
-///     connection.  Writes carry the DB path they were scanned from and are
-///     dropped if the project changed in between.
+///   * It never touches SQLite from its own thread, and its SQL is in
+///     CitationRepository.  Every read (scan) and write (work_id, lists,
+///     lookup status) is posted to the main thread with m_database as
+///     context, where DatabaseManager owns the connection.  Writes carry the
+///     DB path they were scanned from and are dropped if the project changed
+///     in between.
 ///   * DatabaseManager::databaseSwitched() -> onDatabaseSwitched(): the queue
 ///     is flushed, the in-flight request aborted and the new DB rescanned.
 ///     m_generation invalidates any late reply / retry timer.

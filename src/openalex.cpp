@@ -1,12 +1,8 @@
 #include "openalex.h"
+#include "citationrepository.h"
 #include "configmanager.h"
 #include "database.h"
-#include "metadataresolver.h"
 #include "notifier.h"
-#include "sqlitedb.h"
-
-#include <QDateTime>
-#include <Sqlite3/sqlite3.h>
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -95,7 +91,7 @@ void OpenAlexClient::appendPage(QUrlQuery &query, int page) const {
     query.addQueryItem("page", QString::number(page));
 }
 
-/* ── DB access — main thread only ───────────────────────────── */
+/* ── DB access (CitationRepository) — main thread only ──────── */
 
 void OpenAlexClient::onMainThreadForJob(const Job &job,
                                         std::function<void()> fn) {
@@ -119,81 +115,23 @@ OpenAlexClient::dbLoadPendingJobs(const QString &apiKey) const {
   QList<Job> jobs;
   if (!m_database->isOpen())
     return jobs;
-
-  // Rows missing at least one list, skipping papers OpenAlex recently could
-  // not match.  Metadata comes from Summaries (LLM-extracted); the DOI from
-  // Zotero (a PDF still in Zotero first).
-  auto &db = m_database->db();
-  // The Zotero row of each paper: one with a DOI, still in Zotero, first.
-  SqliteStatement stmt = db.prepare(
-      QString("SELECT c.paper_hash, c.work_id, c.cites = '', c.cited_by = '', "
-              "COALESCE(NULLIF(s.title, ''), c.clean_title), s.authors, "
-              "s.year, s.journal, COALESCE(z.doi, ''), "
-              "COALESCE(s.summary_json, '') <> '', "
-              "COALESCE(z.title, ''), COALESCE(z.authors, '[]'), "
-              "COALESCE(z.year, ''), COALESCE(z.journal, '') "
-              "FROM (SELECT Citations.*, "
-              "  (SELECT zz.id FROM ZoteroItems zz WHERE zz.paper_hash = Citations.paper_hash "
-              "   ORDER BY zz.doi = '', zz.removed_at IS NOT NULL, zz.id LIMIT 1) AS zid "
-              "  FROM Citations) c "
-              "LEFT JOIN ZoteroItems z ON z.id = c.zid "
-              "LEFT JOIN Summaries s ON s.paper_hash = c.paper_hash "
-              "WHERE (c.cites = '' OR c.cited_by = '') "
-              "AND NOT (c.lookup_at > datetime('now', '-%1 days') "
-              "  AND (c.lookup_status = 'not_found_doi' "
-              "    OR (c.lookup_status = 'not_found' AND COALESCE(z.doi, '') = '')))")
-          .arg(kNotFoundRetryDays));
-  if (!stmt.isValid()) {
-    // Zotero's tables unusable: never let them stop the citations.  The same
-    // scan without Zotero (empty DOI and metadata columns).
-    qWarning() << "[OpenAlex] Scan with Zotero's DOIs failed:"
-               << QString::fromUtf8(sqlite3_errmsg(db.handle())) << "— scanning without them";
-    stmt = db.prepare(
-        QString("SELECT c.paper_hash, c.work_id, c.cites = '', c.cited_by = '', "
-                "COALESCE(NULLIF(s.title, ''), c.clean_title), s.authors, "
-                "s.year, s.journal, '', 1, '', '[]', '', '' "
-                "FROM Citations c "
-                "LEFT JOIN Summaries s ON s.paper_hash = c.paper_hash "
-                "WHERE (c.cites = '' OR c.cited_by = '') "
-                "AND NOT (c.lookup_status IN ('not_found', 'not_found_doi') "
-                "AND c.lookup_at > datetime('now', '-%1 days'))")
-            .arg(kNotFoundRetryDays));
-  }
-  if (!stmt.isValid()) {
-    qWarning() << "[OpenAlex] Scan: prepare failed (old schema? delete the "
-                  "project DB to recreate the Citations table)";
+  const auto pending = CitationRepository(m_database->db()).pending(kNotFoundRetryDays);
+  if (!pending) {
+    qWarning() << "[OpenAlex] Scan failed:" << pending.error();
     return jobs;
   }
-
   const QString dbPath = m_database->databasePath();
-  while (true) {
-    auto step = stmt.step();
-    if (!step || !*step)
-      break;
+  for (const PendingCitation &p : *pending) {
     Job job;
-    job.paperHash = stmt.columnText(0);
-    job.workId = stmt.columnText(1).trimmed();
-    job.needCites = stmt.columnInt(2) != 0;
-    job.needCitedBy = stmt.columnInt(3) != 0;
-    job.meta.cleanTitle = stmt.columnText(4).trimmed();
-    for (const QString &a : stmt.columnText(5).split(';', Qt::SkipEmptyParts))
-      if (!a.trimmed().isEmpty())
-        job.meta.authors << a.trimmed();
-    job.meta.year = stmt.columnText(6).trimmed().toInt();
-    job.meta.journal = stmt.columnText(7).trimmed();
-    job.doi = normalizeDoi(stmt.columnText(8));
-    // Not summarized: the title is a file name and there are no authors —
-    // Zotero's metadata is better for the search (when the DOI fails).
-    const bool summarized = stmt.columnInt(9) != 0;
-    const QString zoteroTitle = stmt.columnText(10).trimmed();
-    if (!summarized && !zoteroTitle.isEmpty()) {
-      job.meta.cleanTitle = zoteroTitle;
-      job.meta.authors.clear();
-      for (const QJsonValue &a : QJsonDocument::fromJson(stmt.columnText(11).toUtf8()).array())
-        job.meta.authors << MetadataResolver::displayName(a.toString());
-      job.meta.year = stmt.columnText(12).trimmed().toInt();
-      job.meta.journal = stmt.columnText(13).trimmed();
-    }
+    job.paperHash = p.paperHash;
+    job.workId = p.workId;
+    job.needCites = p.needCites;
+    job.needCitedBy = p.needCitedBy;
+    job.meta.cleanTitle = p.title;
+    job.meta.authors = p.authors;
+    job.meta.year = p.year;
+    job.meta.journal = p.journal;
+    job.doi = normalizeDoi(p.doi);
     job.dbPath = dbPath;
     job.apiKey = apiKey;
     jobs << job;
@@ -204,49 +142,27 @@ OpenAlexClient::dbLoadPendingJobs(const QString &apiKey) const {
 int OpenAlexClient::dbRegisterDoiPapers() const {
   if (!m_database->isOpen())
     return 0;
-  // Papers of the project (a Summaries row is made at import) with a DOI in
-  // Zotero, not in Citations yet: Zotero's title until a summary replaces it.
-  auto r = m_database->db().exec(
-      "INSERT INTO Citations (paper_hash, clean_title) "
-      "SELECT z.paper_hash, MAX(z.title) FROM ZoteroItems z "
-      "WHERE z.doi <> '' "
-      "AND EXISTS (SELECT 1 FROM Summaries s WHERE s.paper_hash = z.paper_hash) "
-      "AND NOT EXISTS (SELECT 1 FROM Citations c WHERE c.paper_hash = z.paper_hash) "
-      "GROUP BY z.paper_hash");
-  if (!r) {
-    qWarning() << "[OpenAlex] Registering the papers with a DOI failed:" << r.error();
+  const auto added = CitationRepository(m_database->db()).registerDoiPapers();
+  if (!added) {
+    qWarning() << "[OpenAlex] Registering the papers with a DOI failed:" << added.error();
     return 0;
   }
-  return int(sqlite3_changes(m_database->db().handle()));
+  return *added;
 }
 
 void OpenAlexClient::dbSaveWorkId(const Job &job, const QString &workId) {
   onMainThreadForJob(job, [this, hash = job.paperHash, workId]() {
-    SqliteStatement stmt = m_database->db().prepare(
-        "UPDATE Citations SET work_id = ?, lookup_status = 'matched', "
-        "lookup_at = CURRENT_TIMESTAMP WHERE paper_hash = ?");
-    if (!stmt.isValid())
-      return;
-    (void)stmt.bind(1, workId);
-    (void)stmt.bind(2, hash);
-    (void)stmt.exec();
+    if (auto r = CitationRepository(m_database->db()).saveWorkId(hash, workId); !r)
+      qWarning() << "[OpenAlex] Saving the work id of" << hash.left(12)
+                 << "failed:" << r.error();
   });
 }
 
 void OpenAlexClient::dbMarkNotFound(const Job &job) {
-  // 'not_found_doi': the DOI was tried too, nothing new to try before the
-  // retry delay.
-  const QString status = job.doi.isEmpty() ? QStringLiteral("not_found")
-                                           : QStringLiteral("not_found_doi");
-  onMainThreadForJob(job, [this, hash = job.paperHash, status]() {
-    SqliteStatement stmt = m_database->db().prepare(
-        "UPDATE Citations SET lookup_status = ?, "
-        "lookup_at = CURRENT_TIMESTAMP WHERE paper_hash = ?");
-    if (!stmt.isValid())
-      return;
-    (void)stmt.bind(1, status);
-    (void)stmt.bind(2, hash);
-    (void)stmt.exec();
+  onMainThreadForJob(job, [this, hash = job.paperHash, doiTried = !job.doi.isEmpty()]() {
+    if (auto r = CitationRepository(m_database->db()).markNotFound(hash, doiTried); !r)
+      qWarning() << "[OpenAlex] Marking" << hash.left(12)
+                 << "not found failed:" << r.error();
   });
 }
 
@@ -254,19 +170,16 @@ void OpenAlexClient::dbSaveList(const Job &job, RefKind kind,
                                 const QString &itemsJson, int total) {
   onMainThreadForJob(job, [this, hash = job.paperHash, kind, itemsJson,
                            total]() {
-    const char *col = (kind == RefKind::Cites) ? "cites" : "cited_by";
-    const char *countCol =
-        (kind == RefKind::Cites) ? "cites_count" : "cited_by_count";
-    SqliteStatement stmt = m_database->db().prepare(
-        QString("UPDATE Citations SET %1 = ?, %2 = ? WHERE paper_hash = ?")
-            .arg(QLatin1String(col), QLatin1String(countCol)));
-    if (!stmt.isValid())
-      return;
-    (void)stmt.bind(1, itemsJson);
-    (void)stmt.bind(2, total);
-    (void)stmt.bind(3, hash);
-    if (stmt.exec())
-      qInfo() << "[OpenAlex] Saved" << itemsJson.size() << "bytes of" << col
+    const CitationList list =
+        kind == RefKind::Cites ? CitationList::Cites : CitationList::CitedBy;
+    const char *name = kind == RefKind::Cites ? "cites" : "cited_by";
+    if (auto r = CitationRepository(m_database->db())
+                     .saveList(hash, list, itemsJson, total);
+        !r)
+      qWarning() << "[OpenAlex] Saving" << name << "of" << hash.left(12)
+                 << "failed:" << r.error();
+    else
+      qInfo() << "[OpenAlex] Saved" << itemsJson.size() << "bytes of" << name
               << "(total" << total << ") for" << hash.left(12);
   });
 }

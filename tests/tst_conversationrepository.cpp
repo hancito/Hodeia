@@ -1,5 +1,5 @@
 // Unit tests for ConversationRepository: the conversation tables of a
-// project database (schema v4).
+// project database.
 
 #include "conversationrepository.h"
 #include "projectstore.h"

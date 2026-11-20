@@ -42,7 +42,7 @@ struct ZoteroItemRow {
   QDateTime removedAt;  ///< invalid while the PDF is still in Zotero
 };
 
-/// SQL access to the Zotero tables of an open project database (schema v2).
+/// SQL access to the Zotero tables of an open project database.
 /// No Qt Quick: usable from any thread holding the (FULLMUTEX) connection.
 class ZoteroRepository {
 public:

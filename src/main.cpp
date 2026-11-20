@@ -443,8 +443,8 @@ int main(int argc, char *argv[]) {
   // Startup catch-up: fetch references for papers summarized in prior sessions
   QTimer::singleShot(0, &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 
-  // Re-embedding of the chunks after a change in how they are embedded
-  // (migration v3), in the background.
+  // Re-embedding of the chunks of a 0.99rc project (embedded without E5's
+  // special tokens; task recorded by the migration), in the background.
   ReindexController reindexController(&databaseManager, &engineController,
                                       embeddings);
 

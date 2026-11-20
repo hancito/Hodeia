@@ -1,5 +1,5 @@
 // Unit tests for Reindexer: embedding again the chunks of a project, batch
-// by batch, resumable, as recorded by migration v3.
+// by batch, resumable, as recorded by the migration.
 
 #include "projectstore.h"
 #include "reindexer.h"
@@ -39,7 +39,7 @@ void TestReindexer::reembedInBatches() {
   QVERIFY(ProjectStore::open(db, dir.filePath("P.db")).has_value());
 
   // Three chunks with zero vectors, as if embedded the old way, and the task
-  // that migration v3 records for them.
+  // that the migration records for them.
   const QStringList texts{
       "Absenteeism and peer effects: employees are absent from work more "
       "often when their co-workers are often absent.",

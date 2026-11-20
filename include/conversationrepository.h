@@ -33,9 +33,8 @@ struct ConversationMessage {
 
 QString conversationRoleName(ConversationMessage::Role role);
 
-/// SQL access to the conversation tables of an open project database
-/// (schema v4).  No Qt Quick: usable from any thread holding the
-/// (FULLMUTEX) connection.
+/// SQL access to the conversation tables of an open project database.
+/// No Qt Quick: usable from any thread holding the (FULLMUTEX) connection.
 class ConversationRepository {
 public:
   explicit ConversationRepository(SqliteDb &db);
