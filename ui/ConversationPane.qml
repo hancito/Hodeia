@@ -14,16 +14,15 @@ Rectangle {
     radius: Style.radiusLarge
     color: Colors.surface0
 
-    readonly property var backends: agentChat.agentBackends
     readonly property bool newConversation: agentChat.currentId === 0
 
     function sendMessage() {
         const text = input.text.trim();
         if (text === "" || agentChat.busy)
             return;
-        // A new conversation takes the agent and model chosen above.
-        if (conversationPane.newConversation && agentCombo.currentIndex >= 0)
-            agentChat.newConversation(backends[agentCombo.currentIndex].name, modelField.text.trim());
+        // A new conversation takes the active backend and model (toolbar).
+        if (conversationPane.newConversation)
+            agentChat.newConversation(configManager.activeBackend, configManager.activeModel);
         agentChat.send(text);
         input.text = "";
     }
@@ -33,45 +32,14 @@ Rectangle {
         anchors.margins: Style.paneMargin
         spacing: Style.spacing
 
-        // ── Agent and model ──
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-            Label {
-                text: qsTr("Agent")
-            }
-            StyledComboBox {
-                id: agentCombo
-                Layout.fillWidth: true
-                visible: conversationPane.newConversation
-                enabled: !agentChat.busy
-                model: conversationPane.backends.map(b => b.name)
-                currentIndex: Math.max(0, conversationPane.backends.findIndex(b => b.name === agentChat.backend))
-                onActivated: modelField.text = conversationPane.backends[currentIndex].model || ""
-            }
-            StyledTextField {
-                id: modelField
-                Layout.preferredWidth: 160
-                visible: conversationPane.newConversation
-                enabled: !agentChat.busy
-                placeholderText: qsTr("Model (default)")
-                text: agentChat.model
-            }
-            Label {
-                Layout.fillWidth: true
-                visible: !conversationPane.newConversation
-                elide: Text.ElideRight
-                color: Colors.overlay1
-                text: agentChat.backend + (agentChat.model ? " · " + agentChat.model : "")
-            }
-        }
-
+        // ── The agent: the conversation's, or the active one for a new one ──
         Label {
             Layout.fillWidth: true
-            visible: conversationPane.backends.length === 0
-            wrapMode: Text.WordWrap
-            color: Colors.red
-            text: qsTr("No agent can search the library yet: add Claude Code (or another agent that supports MCP) in the Backends window.")
+            elide: Text.ElideRight
+            color: Colors.overlay1
+            text: conversationPane.newConversation
+                  ? qsTr("New conversation with %1").arg(configManager.activeBackend + (configManager.activeModel ? " · " + configManager.activeModel : ""))
+                  : qsTr("Conversation with %1").arg(agentChat.backend + (agentChat.model ? " · " + agentChat.model : ""))
         }
 
         // ── The thread ──
@@ -83,7 +51,51 @@ Rectangle {
             spacing: 10
             model: agentChat.messages
             ScrollBar.vertical: StyledScrollBar {}
-            onCountChanged: Qt.callLater(thread.positionViewAtEnd)
+            // Follow the end of the thread unless the user scrolled up to read.
+            property bool follow: true
+            onMovementEnded: follow = atYEnd
+            onCountChanged: {
+                follow = true;
+                Qt.callLater(thread.positionViewAtEnd);
+            }
+            Connections {
+                target: agentChat
+                function onLiveTextChanged() {
+                    if (thread.follow)
+                        Qt.callLater(thread.positionViewAtEnd);
+                }
+            }
+
+            // The answer being written, below the stored messages.
+            footer: Item {
+                width: ListView.view.width
+                height: agentChat.liveText !== "" ? liveBubble.height + 10 : 0
+                Rectangle {
+                    id: liveBubble
+                    y: 10
+                    visible: agentChat.liveText !== ""
+                    width: parent.width - 12
+                    height: liveBody.implicitHeight + 16
+                    radius: Style.radiusSmall
+                    color: Colors.base
+                    border.width: 1
+                    border.color: Colors.surface1
+                    TextEdit {
+                        id: liveBody
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        readOnly: true
+                        selectByMouse: true
+                        wrapMode: TextEdit.Wrap
+                        color: Colors.text
+                        font.family: Fonts.text
+                        font.pixelSize: Style.fontReading
+                        font.hintingPreference: Font.PreferNoHinting
+                        textFormat: TextEdit.RichText
+                        text: agentChat.liveText !== "" ? helpers.markdownToHtml(agentChat.liveText) : ""
+                    }
+                }
+            }
 
             delegate: Rectangle {
                 id: bubble
@@ -156,7 +168,7 @@ Rectangle {
                     color: Colors.text
                     placeholderText: qsTr("Message the agent (Enter to send, Shift+Enter for a new line)")
                     placeholderTextColor: Colors.overlay1
-                    enabled: conversationPane.backends.length > 0
+                    enabled: agentChat.agentAvailable || !conversationPane.newConversation
                     background: Rectangle {
                         radius: Style.radiusSmall
                         color: Colors.base
@@ -176,7 +188,7 @@ Rectangle {
                 text: agentChat.busy ? qsTr("Stop") : qsTr("Send")
                 highlighted: true
                 destructive: agentChat.busy
-                enabled: agentChat.busy || (input.text.trim() !== "" && conversationPane.backends.length > 0)
+                enabled: agentChat.busy || (input.text.trim() !== "" && (agentChat.agentAvailable || !conversationPane.newConversation))
                 onClicked: agentChat.busy ? agentChat.stop() : conversationPane.sendMessage()
             }
         }

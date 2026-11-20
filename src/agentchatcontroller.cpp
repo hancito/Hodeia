@@ -20,6 +20,8 @@ const QStringList kTools{"search_library", "list_papers", "get_summary", "get_pa
 constexpr const char *kServer = "hodeia";
 /// Title of a new conversation: the start of its first message.
 constexpr int kTitleLength = 60;
+/// The streamed answer is shown again at most this often.
+constexpr int kLiveIntervalMs = 120;
 
 } // namespace
 
@@ -36,6 +38,33 @@ AgentChatController::AgentChatController(ConfigManager *config, DatabaseManager 
   });
   connect(m_config, &ConfigManager::backendListChanged, this,
           &AgentChatController::agentBackendsChanged);
+  connect(m_config, &ConfigManager::activeBackendChanged, this,
+          &AgentChatController::agentBackendsChanged);
+  connect(m_config, &ConfigManager::activeModelChanged, this,
+          &AgentChatController::agentBackendsChanged);
+  m_liveTimer.setSingleShot(true);
+  m_liveTimer.setInterval(kLiveIntervalMs);
+  connect(&m_liveTimer, &QTimer::timeout, this, &AgentChatController::renderLive);
+}
+
+void AgentChatController::renderLive() {
+  // Marks still being written ("[@95f8") stay as they are until complete;
+  // the Sources come with the stored answer, once it is complete.
+  const QString rendered =
+      CitationFormat::resolvePaperMarks(m_liveText, m_liveLabels, /*withSources=*/false);
+  if (rendered != m_liveRendered) {
+    m_liveRendered = rendered;
+    emit liveTextChanged();
+  }
+}
+
+void AgentChatController::clearLive() {
+  m_liveTimer.stop();
+  m_liveText.clear();
+  if (!m_liveRendered.isEmpty()) {
+    m_liveRendered.clear();
+    emit liveTextChanged();
+  }
 }
 
 AgentChatController::~AgentChatController() { dropConnection(); }
@@ -110,6 +139,14 @@ QVariantList AgentChatController::agentBackends() const {
         {"model", name == m_config->activeBackend() ? m_config->activeModel() : QString()}});
   }
   return list;
+}
+
+bool AgentChatController::agentAvailable() const {
+  const QString active = m_config->activeBackend();
+  for (const QVariant &b : agentBackends())
+    if (b.toMap().value("name").toString() == active)
+      return true;
+  return false;
 }
 
 void AgentChatController::setBusy(bool busy) {
@@ -187,6 +224,7 @@ void AgentChatController::closeAgent() {
 }
 
 void AgentChatController::dropConnection() {
+  clearLive();
   if (m_connection) {
     m_connection->disconnect(this);
     m_connection->close();
@@ -293,6 +331,8 @@ void AgentChatController::startTurn(const QString &text) {
       m_needsTranscript = false;
     }
     setStatus(tr("The agent is working..."));
+    clearLive();
+    m_liveLabels = paperLabels();
     m_connection->prompt({Agents::PromptPart::textPart(prompt)});
     return;
   }
@@ -328,6 +368,7 @@ void AgentChatController::startTurn(const QString &text) {
   for (const QString &tool : kTools)
     options.allowedTools.append(QString(kServer) + "/" + tool);
   options.resumeSessionId = stored ? stored->agentSession : QString();
+  options.stream = true;
   m_resuming = !options.resumeSessionId.isEmpty();
   setStatus(tr("Starting the agent..."));
   c->open(options);
@@ -379,6 +420,9 @@ void AgentChatController::onEvent(const Agents::Event &event) {
     break;
   case Agents::Event::Kind::Text:
     setStatus(tr("Writing the answer..."));
+    m_liveText += event.text;
+    if (!m_liveTimer.isActive())
+      m_liveTimer.start();
     break;
   case Agents::Event::Kind::Notice:
     if (!event.text.isEmpty())
@@ -389,6 +433,7 @@ void AgentChatController::onEvent(const Agents::Event &event) {
 
 void AgentChatController::onTurnFinished(const Agents::TurnResult &result) {
   using Stop = Agents::TurnResult::Stop;
+  clearLive();
   // Some agents (Claude Code) only fail to resume at the first message.
   if (result.stop == Stop::Error && !m_firstTurn.isEmpty() && !m_stopped) {
     retryWithoutResume(m_firstTurn, result.error);
@@ -421,6 +466,7 @@ void AgentChatController::onTurnFinished(const Agents::TurnResult &result) {
 }
 
 void AgentChatController::onFailed(const QString &error) {
+  clearLive();
   // The stored session could not be resumed: forget it and start a new one
   // (it gets the conversation so far).
   if (m_resuming && m_busy && !(m_pendingText.isEmpty() && m_firstTurn.isEmpty())) {

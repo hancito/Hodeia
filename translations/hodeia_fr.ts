@@ -96,93 +96,93 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>AgentChatController</name>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="244"/>
+        <location filename="../src/agentchatcontroller.cpp" line="280"/>
         <source>The message could not be saved: %1</source>
         <translation>Le message n’a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="256"/>
+        <location filename="../src/agentchatcontroller.cpp" line="292"/>
         <source>No agent can search the library: add Claude Code or another agent in the Backends window.</source>
         <translation>Aucun agent ne peut chercher dans la bibliothèque : ajoutez Claude Code ou un autre agent dans la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="271"/>
+        <location filename="../src/agentchatcontroller.cpp" line="307"/>
         <source>The conversation could not be created: %1</source>
         <translation>La conversation n’a pas pu être créée : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="295"/>
+        <location filename="../src/agentchatcontroller.cpp" line="331"/>
         <source>The agent is working...</source>
         <translation>L’agent travaille…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="308"/>
+        <location filename="../src/agentchatcontroller.cpp" line="346"/>
         <source>The agent backend &quot;%1&quot; is not available: check the Backends window.</source>
         <translation>Le backend d’agent « %1 » n’est pas disponible : vérifiez la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="332"/>
+        <location filename="../src/agentchatcontroller.cpp" line="371"/>
         <source>Starting the agent...</source>
         <translation>Démarrage de l’agent…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="364"/>
+        <location filename="../src/agentchatcontroller.cpp" line="403"/>
         <source>Searching the library...</source>
         <translation>Recherche dans la bibliothèque…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="366"/>
+        <location filename="../src/agentchatcontroller.cpp" line="405"/>
         <source>Reading a page...</source>
         <translation>Lecture d’une page…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="368"/>
+        <location filename="../src/agentchatcontroller.cpp" line="407"/>
         <source>Reading a summary...</source>
         <translation>Lecture d’un résumé…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="370"/>
+        <location filename="../src/agentchatcontroller.cpp" line="409"/>
         <source>Listing the papers...</source>
         <translation>Liste des articles…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="372"/>
+        <location filename="../src/agentchatcontroller.cpp" line="411"/>
         <source>Looking at the citations...</source>
         <translation>Examen des citations…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="374"/>
+        <location filename="../src/agentchatcontroller.cpp" line="413"/>
         <source>Using %1...</source>
         <translation>Utilisation de %1…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="378"/>
+        <location filename="../src/agentchatcontroller.cpp" line="417"/>
         <source>Thinking...</source>
         <translation>Réflexion…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="381"/>
+        <location filename="../src/agentchatcontroller.cpp" line="420"/>
         <source>Writing the answer...</source>
         <translation>Rédaction de la réponse…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="411"/>
+        <location filename="../src/agentchatcontroller.cpp" line="454"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="415"/>
+        <location filename="../src/agentchatcontroller.cpp" line="458"/>
         <source>(stopped)</source>
         <translation>(arrêté)</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="418"/>
-        <location filename="../src/agentchatcontroller.cpp" line="450"/>
+        <location filename="../src/agentchatcontroller.cpp" line="461"/>
+        <location filename="../src/agentchatcontroller.cpp" line="494"/>
         <source>Stopped before answering.</source>
         <translation>Arrêté avant de répondre.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="454"/>
+        <location filename="../src/agentchatcontroller.cpp" line="498"/>
         <source>Stopping...</source>
         <translation>Arrêt…</translation>
     </message>
@@ -287,12 +287,12 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation type="vanished">Installez-le avec : %1</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="114"/>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="117"/>
         <source>No open session.</source>
         <translation>Aucune session ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="172"/>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="200"/>
         <source>Claude usage limit reached.</source>
         <translation>Limite d’utilisation de Claude atteinte.</translation>
     </message>
@@ -733,37 +733,44 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>ConversationPane</name>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="41"/>
         <source>Agent</source>
-        <translation>Agent</translation>
+        <translation type="vanished">Agent</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="57"/>
         <source>Model (default)</source>
-        <translation>Modèle (par défaut)</translation>
+        <translation type="vanished">Modèle (par défaut)</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="74"/>
         <source>No agent can search the library yet: add Claude Code (or another agent that supports MCP) in the Backends window.</source>
-        <translation>Aucun agent ne peut encore chercher dans la bibliothèque : ajoutez Claude Code (ou un autre agent compatible MCP) dans la fenêtre Backends.</translation>
+        <translation type="vanished">Aucun agent ne peut encore chercher dans la bibliothèque : ajoutez Claude Code (ou un autre agent compatible MCP) dans la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="126"/>
+        <location filename="../ui/ConversationPane.qml" line="41"/>
+        <source>New conversation with %1</source>
+        <translation>Nouvelle conversation avec %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/ConversationPane.qml" line="42"/>
+        <source>Conversation with %1</source>
+        <translation>Conversation avec %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/ConversationPane.qml" line="138"/>
         <source>Ask a question: the agent searches your library, answers with citations and suggests ways to take the research further.</source>
         <translation>Posez une question : l’agent cherche dans votre bibliothèque, répond avec des citations et propose des pistes pour poursuivre la recherche.</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="157"/>
+        <location filename="../ui/ConversationPane.qml" line="169"/>
         <source>Message the agent (Enter to send, Shift+Enter for a new line)</source>
         <translation>Message à l’agent (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="176"/>
+        <location filename="../ui/ConversationPane.qml" line="188"/>
         <source>Stop</source>
         <translation>Arrêter</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationPane.qml" line="176"/>
+        <location filename="../ui/ConversationPane.qml" line="188"/>
         <source>Send</source>
         <translation>Envoyer</translation>
     </message>
@@ -2217,53 +2224,66 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>HodeIA</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="35"/>
         <source>Questions</source>
-        <translation>Questions</translation>
+        <translation type="vanished">Questions</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="38"/>
         <source>Conversation with an Agent</source>
-        <translation>Conversation avec un agent</translation>
+        <translation type="vanished">Conversation avec un agent</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="86"/>
+        <location filename="../ui/RagWindow.qml" line="50"/>
+        <source>Agent mode</source>
+        <translation>Mode agentique</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="53"/>
+        <source>Converse with %1: it searches your library itself and suggests ways to take the research further.</source>
+        <translation>Conversez avec %1 : il cherche lui-même dans votre bibliothèque et propose des pistes pour poursuivre la recherche.</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="54"/>
+        <source>Choose an agent backend (Claude Code, Qwen Code...) in the toolbar of the main window to use the agent mode.</source>
+        <translation>Choisissez un backend Agent (Claude Code, Qwen Code…) dans la barre d’outils de la fenêtre principale pour utiliser le mode agentique.</translation>
+    </message>
+    <message>
+        <location filename="../ui/RagWindow.qml" line="114"/>
         <source>Ready</source>
         <translation>Prêt</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="98"/>
+        <location filename="../ui/RagWindow.qml" line="126"/>
         <source>Conversation</source>
         <translation>Conversation</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="110"/>
+        <location filename="../ui/RagWindow.qml" line="138"/>
         <source>Querying...</source>
         <translation>Interrogation...</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="114"/>
+        <location filename="../ui/RagWindow.qml" line="142"/>
         <source>Query completed</source>
         <translation>Requête terminée</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="117"/>
+        <location filename="../ui/RagWindow.qml" line="145"/>
         <source>Query Not Saved</source>
         <translation>Requête non enregistrée</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="121"/>
+        <location filename="../ui/RagWindow.qml" line="149"/>
         <source>Query failed: %1</source>
         <translation>Requête échouée : %1</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="122"/>
+        <location filename="../ui/RagWindow.qml" line="150"/>
         <source>Query Failed</source>
         <translation>Échec de la requête</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="119"/>
-        <location filename="../ui/RagWindow.qml" line="127"/>
+        <location filename="../ui/RagWindow.qml" line="147"/>
+        <location filename="../ui/RagWindow.qml" line="155"/>
         <source>Query stopped</source>
         <translation>Requête arrêtée</translation>
     </message>

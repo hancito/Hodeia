@@ -39,7 +39,7 @@ Rectangle {
             text: qsTr("New Conversation")
             emphasized: true
             enabled: !agentChat.busy
-            onClicked: agentChat.newConversation(agentChat.backend, agentChat.model)
+            onClicked: agentChat.newConversation(configManager.activeBackend, configManager.activeModel)
         }
 
         ListView {

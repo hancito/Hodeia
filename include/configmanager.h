@@ -41,6 +41,9 @@ class ConfigManager : public QObject {
   /// wherever a paper is named (field by field, when Zotero has a value).
   Q_PROPERTY(bool zoteroPriority READ zoteroPriority WRITE setZoteroPriority
                  NOTIFY zoteroPriorityChanged)
+  /// The query window opens in the agent mode (when the active backend is
+  /// an agent): the user's last choice of the switch.
+  Q_PROPERTY(bool agentMode READ agentMode WRITE setAgentMode NOTIFY agentModeChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -59,6 +62,7 @@ public:
   int queryContextTokens() const { return m_queryContextTokens; }
   QString zoteroDataDir() const { return m_zoteroDataDir; }
   bool zoteroPriority() const { return m_zoteroPriority; }
+  bool agentMode() const { return m_agentMode; }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -77,6 +81,7 @@ public:
   void setQueryContextTokens(int tokens);
   void setZoteroDataDir(const QString &dir);
   void setZoteroPriority(bool priority);
+  void setAgentMode(bool agentMode);
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
   bool useVisualContext() const;
@@ -144,6 +149,7 @@ signals:
   void openAlexApiKeyChanged();
   void zoteroDataDirChanged();
   void zoteroPriorityChanged();
+  void agentModeChanged();
   void backendListChanged();
 
   void visualModeChanged();
@@ -184,4 +190,5 @@ private:
   int m_queryContextTokens = 0; // 0 = auto
   QString m_zoteroDataDir;
   bool m_zoteroPriority = false;
+  bool m_agentMode = false;
 };

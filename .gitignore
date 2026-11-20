@@ -97,3 +97,6 @@ vcpkg-overlay/ports/gumbo/source-stamp.txt
 
 # Packaged installers (scripts/Windows/package-app.ps1)
 /dist/
+
+# Left by cmake --system-information
+/__cmake_systeminformation/

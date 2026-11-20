@@ -21,28 +21,60 @@ ThemedWindow {
         ragwindow.destroy(); // Free memory
     }
 
+    // Mode agentique: only with an agent backend (Claude Code...); back to
+    // the classic mode as soon as the active backend is not one.
+    readonly property bool agentMode: modeSwitch.checked && agentChat.agentAvailable
+
+    // Two modes, two panes each: the query history and the answer (classic),
+    // or the conversations and the thread with the agent (agentique).
+    header: ToolBar {
+        leftPadding: Style.paneMargin
+        rightPadding: Style.paneMargin
+        topPadding: 4
+        bottomPadding: 4
+        background: Rectangle {
+            color: Colors.mantle
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: Colors.surface0
+            }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            spacing: 10
+            StyledSwitch {
+                id: modeSwitch
+                text: qsTr("Agent mode")
+                // The last choice, kept in the settings; shown on only while
+                // an agent backend is active.
+                checked: configManager.agentMode && agentChat.agentAvailable
+                onToggled: configManager.agentMode = checked
+                enabled: agentChat.agentAvailable && !agentChat.busy && !queryPaneItem.querying
+                toolTip: agentChat.agentAvailable
+                         ? qsTr("Converse with %1: it searches your library itself and suggests ways to take the research further.").arg(configManager.activeBackend)
+                         : qsTr("Choose an agent backend (Claude Code, Qwen Code...) in the toolbar of the main window to use the agent mode.")
+            }
+            Label {
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                color: Colors.overlay1
+                text: configManager.activeBackend + (configManager.activeModel ? " · " + configManager.activeModel : "")
+            }
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: Style.paneMargin
         spacing: Style.spacing
 
-        // Two modes: questions answered from the library (classic), or a
-        // conversation with an agent that searches it itself (agentique).
-        StyledTabBar {
-            id: modeBar
-            Layout.fillWidth: true
-            StyledTabButton {
-                text: qsTr("Questions")
-            }
-            StyledTabButton {
-                text: qsTr("Conversation with an Agent")
-            }
-        }
-
         StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: modeBar.currentIndex
+            currentIndex: ragwindow.agentMode ? 1 : 0
 
             SplitView {
                 id: secondSplitView
@@ -89,6 +121,15 @@ ThemedWindow {
     // User-facing information and errors for the query window.
     MessageBox {
         id: messageBox
+    }
+
+    // The switch follows the setting and the backend (a toggle breaks its
+    // binding): off without an agent backend, the user's choice with one.
+    Connections {
+        target: agentChat
+        function onAgentBackendsChanged() {
+            modeSwitch.checked = configManager.agentMode && agentChat.agentAvailable;
+        }
     }
 
     // Problems of the conversations outside a message (database...).

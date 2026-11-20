@@ -121,7 +121,8 @@ QString resolveReferenceTags(const QString &text,
   return out;
 }
 
-QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> &labels) {
+QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> &labels,
+                          bool withSources) {
   // A run of bracketed marks, each bracket holding one or more "@id[:pN]".
   static const QRegularExpression run(QStringLiteral(
       "(?:\\[\\s*@[0-9a-fA-F]{6,}(?::p\\d+)?(?:\\s*[;,]\\s*@[0-9a-fA-F]{6,}(?::p\\d+)?)*\\s*\\]\\s*)+"));
@@ -197,7 +198,7 @@ QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> 
     out += "(" + parts.join("; ") + ")";
   }
   out += text.mid(last);
-  if (citedOrder.isEmpty())
+  if (citedOrder.isEmpty() || !withSources)
     return out;
 
   QStringList lines;

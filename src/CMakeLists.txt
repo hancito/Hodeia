@@ -258,7 +258,7 @@ set(_QML_FILES
     Colors.qml Fonts.qml Main.qml MyMenuBar.qml DisplayPane.qml
     SummaryDbPane.qml RagWindow.qml RagDbPane.qml QueryPane.qml
     BackendWindow.qml MyToolBar.qml ZoteroWindow.qml
-    ConversationListPane.qml ConversationPane.qml
+    ConversationListPane.qml ConversationPane.qml StyledSwitch.qml
     # Shared styled components (see Style.qml)
     Style.qml PopupBackground.qml CheckIndicator.qml StyledButton.qml
     StyledCheckBox.qml StyledComboBox.qml StyledTextField.qml StyledSpinBox.qml
@@ -290,6 +290,7 @@ qt_add_qml_module(Hodeia
         ${CMAKE_SOURCE_DIR}/ui/ZoteroWindow.qml
         ${CMAKE_SOURCE_DIR}/ui/ConversationListPane.qml
         ${CMAKE_SOURCE_DIR}/ui/ConversationPane.qml
+        ${CMAKE_SOURCE_DIR}/ui/StyledSwitch.qml
         ${CMAKE_SOURCE_DIR}/ui/Style.qml
         ${CMAKE_SOURCE_DIR}/ui/PopupBackground.qml
         ${CMAKE_SOURCE_DIR}/ui/CheckIndicator.qml

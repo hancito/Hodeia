@@ -63,6 +63,9 @@ struct SessionOptions {
   /// connection).  When it cannot be resumed a new session opens:
   /// sessionId() then differs.
   QString resumeSessionId;
+  /// Send the answer as it is written (Event::Kind::Text pieces), not only
+  /// once each message is complete.  TurnResult::text is the same either way.
+  bool stream = false;
 };
 
 /// Something the agent did during a turn.

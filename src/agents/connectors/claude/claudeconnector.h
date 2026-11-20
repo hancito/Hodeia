@@ -49,6 +49,8 @@ private:
   bool m_cancelled = false;
   bool m_closed = false;
   bool m_resumed = false;
+  bool m_stream = false;     ///< text comes as stream_event deltas
+  bool m_streamed = false;   ///< some text was streamed in this turn
   QTimer m_killTimer;
   int m_controlId = 0;
 };

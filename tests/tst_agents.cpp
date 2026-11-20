@@ -117,6 +117,7 @@ private slots:
   void claudeLimit();
   void claudeCancel();
   void claudeCancelKills();
+  void claudeStream();
 
   // Pi (RPC)
   void piArguments();
@@ -439,6 +440,24 @@ void TestAgents::claudeCancelKills() {
   const TurnResult r = promptSync(*c, ask("HANG"), 30000);
   QCOMPARE(r.stop, TurnResult::Stop::Cancelled);
   QVERIFY(t.elapsed() < 15000);
+}
+
+// Streaming: the text comes in pieces; the turn's text is the same.
+void TestAgents::claudeStream() {
+  std::unique_ptr<Connection> c(Registry::instance().create(profile("claude", FAKE_CLAUDE)));
+  SessionOptions o = classic(m_dir->path());
+  o.stream = true;
+  QVERIFY(openSync(*c, o, 20000));
+  QStringList pieces;
+  connect(c.get(), &Connection::event, this, [&](const Event &e) {
+    if (e.kind == Event::Kind::Text)
+      pieces.append(e.text);
+  });
+  const TurnResult r = promptSync(*c, ask("Hello stream"), 20000);
+  QCOMPARE(r.text, QString("Echo: Hello stream"));
+  QVERIFY2(pieces.size() >= 3, qPrintable(pieces.join('|')));
+  QCOMPARE(pieces.join(""), r.text); // no doubled text from the full message
+  QVERIFY(loggedArgs(m_log).contains("--include-partial-messages"));
 }
 
 /* ── Pi ────────────────────────────────────────────────────────── */

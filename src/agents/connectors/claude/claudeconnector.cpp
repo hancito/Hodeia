@@ -52,6 +52,8 @@ QStringList ClaudeConnection::arguments(const SessionOptions &options) {
     args << "--tools" << "" << "--setting-sources" << "";
   if (!options.resumeSessionId.isEmpty())
     args << "--resume" << options.resumeSessionId;
+  if (options.stream)
+    args << "--include-partial-messages";
   if (!options.allowedTools.isEmpty()) {
     QStringList tools; // "server/tool" -> "mcp__server__tool"
     for (const QString &t : options.allowedTools)
@@ -98,6 +100,7 @@ void ClaudeConnection::open(const SessionOptions &options) {
   // resume a session it exits with an error instead (failed()).
   m_sessionId = options.resumeSessionId;
   m_resumed = !options.resumeSessionId.isEmpty();
+  m_stream = options.stream;
   if (!m_process.start(m_profile.command, arguments(options), options.workDir,
                        m_profile.env)) {
     const QString error = startFailureMessage(m_profile, m_process.lastError());
@@ -115,6 +118,7 @@ void ClaudeConnection::prompt(const Prompt &prompt) {
     return;
   }
   m_answer.clear();
+  m_streamed = false;
   m_notice.clear();
   m_cancelled = false;
   m_inTurn = true;
@@ -156,14 +160,38 @@ void ClaudeConnection::handle(const QJsonObject &msg) {
       const QJsonObject block = v.toObject();
       const QString kind = block.value("type").toString();
       if (kind == "text") {
+        // The complete text of this message (the answer); with streaming,
+        // its pieces were already sent as deltas.  Messages of one turn are
+        // separated by a blank line (text before and after tool calls).
         const QString text = block.value("text").toString();
-        m_answer += text;
-        emit event({Event::Kind::Text, text, {}, {}});
+        const QString separator = m_answer.isEmpty() ? QString() : QStringLiteral("\n\n");
+        m_answer += separator + text;
+        if (!m_stream)
+          emit event({Event::Kind::Text, separator + text, {}, {}});
       } else if (kind == "thinking") {
-        emit event({Event::Kind::Thought, block.value("thinking").toString(), {}, {}});
+        if (!m_stream)
+          emit event({Event::Kind::Thought, block.value("thinking").toString(), {}, {}});
       } else if (kind == "tool_use") {
         emit event({Event::Kind::ToolCall, block.value("name").toString(),
                     block.value("id").toString(), QStringLiteral("in_progress")});
+      }
+    }
+  } else if (type == "stream_event") {
+    const QJsonObject e = msg.value("event").toObject();
+    const QString kind = e.value("type").toString();
+    if (kind == "content_block_start" &&
+        e.value("content_block").toObject().value("type").toString() == "text" &&
+        m_streamed) {
+      emit event({Event::Kind::Text, QStringLiteral("\n\n"), {}, {}}); // same as m_answer
+    } else if (kind == "content_block_delta") {
+      const QJsonObject delta = e.value("delta").toObject();
+      const QString deltaType = delta.value("type").toString();
+      if (deltaType == "text_delta") {
+        const QString text = delta.value("text").toString();
+        m_streamed = m_streamed || !text.isEmpty();
+        emit event({Event::Kind::Text, text, {}, {}});
+      } else if (deltaType == "thinking_delta") {
+        emit event({Event::Kind::Thought, delta.value("thinking").toString(), {}, {}});
       }
     }
   } else if (type == "rate_limit_event") {

@@ -39,7 +39,26 @@ void send(const QJsonObject &msg) {
   std::fflush(stdout);
 }
 
+bool g_stream = false; // --include-partial-messages
+
+/// With --include-partial-messages, the text first as stream_event deltas
+/// (three pieces), as Claude Code sends it.
+void deltas(const QString &text) {
+  if (!g_stream)
+    return;
+  send({{"type", "stream_event"},
+        {"event", QJsonObject{{"type", "content_block_start"},
+                              {"content_block", QJsonObject{{"type", "text"}, {"text", ""}}}}}});
+  const qsizetype third = qMax<qsizetype>(1, text.size() / 3);
+  for (qsizetype i = 0; i < text.size(); i += third)
+    send({{"type", "stream_event"},
+          {"event", QJsonObject{{"type", "content_block_delta"},
+                                {"delta", QJsonObject{{"type", "text_delta"},
+                                                      {"text", text.mid(i, third)}}}}}});
+}
+
 void assistant(const QString &text) {
+  deltas(text);
   send({{"type", "assistant"},
         {"message", QJsonObject{{"role", "assistant"},
                                 {"content", QJsonArray{QJsonObject{{"type", "text"},
@@ -75,6 +94,7 @@ int main(int argc, char **argv) {
   for (int i = 1; i < argc; ++i)
     args << QString::fromLocal8Bit(argv[i]);
   log(QJsonDocument(QJsonArray::fromStringList(args)).toJson(QJsonDocument::Compact));
+  g_stream = args.contains("--include-partial-messages");
 
   if (qgetenv("FAKE_CLAUDE_RESUME_FAIL") == "1" && args.contains("--resume")) {
     std::fputs("No conversation found with session ID\n", stderr);

@@ -163,6 +163,11 @@ void TestCitationFormat::paperMarks() {
   QVERIFY(out.contains("- **Walker & Ben-Akiva (2002)** — p. 2"));
   // Smith first: cited first.
   QVERIFY(out.indexOf("**Smith (2020)**") < out.indexOf("**Walker"));
+
+  // An answer still being written: citations, but no Sources yet.
+  const QString live = CitationFormat::resolvePaperMarks(text, markLabels(), false);
+  QVERIFY(live.startsWith("Absence spreads (Smith, 2020, pp. 4, 7)"));
+  QVERIFY(!live.contains("Sources"));
 }
 
 // Unknown or ambiguous ids, and text without marks, stay as they are.

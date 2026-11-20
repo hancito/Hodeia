@@ -32,8 +32,10 @@ QString resolveReferenceTags(const QString &text,
 /// resolveReferenceTags(), and append a Sources section of the cited papers
 /// and pages.  `labels`: full paper hash -> label; an id is a unique hash
 /// prefix of at least 6 characters.  Marks of unknown papers stay as they
-/// are.
-QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> &labels);
+/// are.  `withSources` false: no Sources section (an answer still being
+/// written).
+QString resolvePaperMarks(const QString &text, const QHash<QString, PaperLabel> &labels,
+                          bool withSources = true);
 
 /// The "Sources" section appended to an answer: the papers of the `cited`
 /// page contexts (all of them if `cited` is empty, i.e. the model ignored the

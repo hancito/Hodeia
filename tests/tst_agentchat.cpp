@@ -137,6 +137,9 @@ void TestAgentChat::conversation() {
            QString("--mcp"));
   QVERIFY(args.at(args.indexOf("--system-prompt") + 1).contains("[@95f8ed154398:p12]"));
 
+  QVERIFY(args.contains("--include-partial-messages")); // streamed
+  QVERIFY(m_chat->liveText().isEmpty());
+
   // A second message goes to the same agent process.
   sendAndWait("And then?");
   QCOMPARE(m_chat->messages().size(), 4);
@@ -204,6 +207,7 @@ void TestAgentChat::citations() {
   const QString answer = m_chat->messages().last().toMap().value("text").toString();
   QVERIFY2(answer.startsWith("Echo: Rate (Smith, 2020, p. 4)"), qPrintable(answer));
   QVERIFY(answer.contains("**Sources**"));
+  QVERIFY(m_chat->liveText().isEmpty());
 }
 
 void TestAgentChat::errorsAndStop() {
@@ -215,10 +219,13 @@ void TestAgentChat::errorsAndStop() {
 
   m_chat->send("SLOW");
   QTRY_VERIFY_WITH_TIMEOUT(m_chat->status().contains("Writing"), 10000);
+  // The answer shows while it is written.
+  QTRY_COMPARE_WITH_TIMEOUT(m_chat->liveText(), QString("Partial"), 10000);
   m_chat->stop();
   QTRY_VERIFY_WITH_TIMEOUT(!m_chat->busy(), 20000);
   const QString last = m_chat->messages().last().toMap().value("text").toString();
   QVERIFY2(last.startsWith("Partial") && last.contains("stopped"), qPrintable(last));
+  QVERIFY(m_chat->liveText().isEmpty()); // now a stored message
 
   // An agent backend that does not exist any more: an error message, at once.
   m_chat->newConversation("Gone", "");
@@ -234,6 +241,16 @@ void TestAgentChat::backends() {
     names << b.toMap().value("name").toString();
   QVERIFY(names.contains("Fake Claude"));
   QVERIFY(!names.contains("Fake Pi"));
+
+  // The agent mode needs an active agent backend that reaches the MCP.
+  QSignalSpy changed(m_chat, &AgentChatController::agentBackendsChanged);
+  m_config->setActiveBackend("Fake Claude");
+  QVERIFY(m_chat->agentAvailable());
+  QVERIFY(!changed.isEmpty()); // QML re-reads it
+  m_config->setActiveBackend("Fake Pi");
+  QVERIFY(!m_chat->agentAvailable());
+  m_config->setActiveBackend("Llama.cpp");
+  QVERIFY(!m_chat->agentAvailable());
 }
 
 // An agent backend read back from the settings file (a restart) still knows
@@ -248,6 +265,9 @@ void TestAgentChat::agentBackendSurvivesRestart() {
   QVERIFY(b.value("url").toString().contains("fake_claude"));
   QCOMPARE(b.value("models").toStringList(), (QStringList{"default", "haiku"}));
   QCOMPARE(restarted.activeBackend(), QString("Fake Claude"));
+  // The agent mode of the query window is remembered.
+  m_config->setAgentMode(true);
+  QVERIFY(ConfigManager().agentMode());
   // Remote backends keep their fields too.
   restarted.setBackend("Remote", "http://localhost:11434/v1", "key", "anthropic");
   ConfigManager again;

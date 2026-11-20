@@ -6,11 +6,12 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
+#include <QTimer>
 #include <QVariantList>
 
 class ConfigManager;
 class DatabaseManager;
-struct PaperLabel;
+#include "metadataresolver.h" // PaperLabel
 
 /// The mode agentique of the Query window (exposed to QML as agentChat):
 /// conversations with a coding agent (Claude Code, Qwen Code...) that
@@ -34,12 +35,18 @@ class AgentChatController : public QObject {
   Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
   /// Agent backends that can search the library ({name, agent, model}).
   Q_PROPERTY(QVariantList agentBackends READ agentBackends NOTIFY agentBackendsChanged)
+  /// The active backend (toolbar) is an agent that can search the library:
+  /// the mode agentique can be used, and new conversations use it.
+  Q_PROPERTY(bool agentAvailable READ agentAvailable NOTIFY agentBackendsChanged)
   /// Backend and model of the open conversation (or of the next new one).
   Q_PROPERTY(QString backend READ backend NOTIFY currentChanged)
   Q_PROPERTY(QString model READ model NOTIFY currentChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
   /// What the agent is doing ("Searching the library..."), while busy.
   Q_PROPERTY(QString status READ status NOTIFY statusChanged)
+  /// The answer being written (Markdown, citations resolved, no Sources
+  /// section yet), while busy; empty once it is stored in `messages`.
+  Q_PROPERTY(QString liveText READ liveText NOTIFY liveTextChanged)
 
 public:
   AgentChatController(ConfigManager *config, DatabaseManager *database,
@@ -50,10 +57,12 @@ public:
   int currentId() const { return m_currentId; }
   QVariantList messages() const;
   QVariantList agentBackends() const;
+  bool agentAvailable() const;
   QString backend() const { return m_backend; }
   QString model() const { return m_model; }
   bool busy() const { return m_busy; }
   QString status() const { return m_status; }
+  QString liveText() const { return m_liveRendered; }
 
   /// Start a new conversation with this agent backend and model.
   Q_INVOKABLE void newConversation(const QString &backend, const QString &model);
@@ -82,6 +91,7 @@ signals:
   void agentBackendsChanged();
   void busyChanged();
   void statusChanged();
+  void liveTextChanged();
   /// Something went wrong outside a message (database...).
   void errorOccurred(const QString &message);
 
@@ -114,4 +124,12 @@ private:
   bool m_resuming = false;      ///< the connection opens a stored session
   QString m_firstTurn;          ///< first message after a resume, to retry it
   bool m_stopped = false;
+  /// The answer as the agent streams it.  Rendered (citations) at most every
+  /// kLiveIntervalMs, with the labels read when the turn started.
+  QString m_liveText;
+  QString m_liveRendered;
+  QHash<QString, PaperLabel> m_liveLabels;
+  QTimer m_liveTimer;
+  void renderLive();
+  void clearLive();
 };

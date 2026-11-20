@@ -96,6 +96,7 @@ void ConfigManager::loadConfig() {
     m_queryContextTokens = qMax(0, obj.value("queryContextTokens").toInt(0));
     m_zoteroDataDir = obj.value("zoteroDataDir").toString();
     m_zoteroPriority = obj.value("zoteroPriority").toBool(false);
+    m_agentMode = obj.value("agentMode").toBool(false);
     // Support string "visualMode", old int "visualMode", and legacy
     // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
@@ -153,6 +154,7 @@ void ConfigManager::saveConfig() {
   obj["queryContextTokens"] = m_queryContextTokens;
   obj["zoteroDataDir"] = m_zoteroDataDir;
   obj["zoteroPriority"] = m_zoteroPriority;
+  obj["agentMode"] = m_agentMode;
 
   // Save backend list as JSON array of objects, every key kept: besides
   // name, url and api_key, "api" ("openai", "anthropic", "agent"), and for
@@ -231,6 +233,14 @@ void ConfigManager::setZoteroPriority(bool priority) {
   if (m_zoteroPriority != priority) {
     m_zoteroPriority = priority;
     emit zoteroPriorityChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setAgentMode(bool agentMode) {
+  if (m_agentMode != agentMode) {
+    m_agentMode = agentMode;
+    emit agentModeChanged();
     saveConfig();
   }
 }
