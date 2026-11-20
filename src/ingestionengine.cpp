@@ -1,6 +1,7 @@
 #include "ingestionengine.h"
 #include "libraryrepository.h"
 #include "notifier.h"
+#include "systemmemory.h"
 #include "sqlitedb.h"
 #include "sqlitevec.h"
 
@@ -95,9 +96,9 @@ QString PdfWorker::extractTextFromStextPage(fz_stext_page *textPage) const {
 // ============================================================================
 //  OCR fallback  (Tesseract via direct API — not through MuPDF)
 //
-//  Each QtConcurrent worker thread keeps one TessBaseAPI (cached per
-//  thread in a hash protected by a mutex).  The pool is bounded to the
-//  CPU core count, so memory usage is bounded.
+//  Each extraction thread keeps one TessBaseAPI (cached per thread in a
+//  hash protected by a mutex).  The pool is bounded by
+//  PdfWorker::extractThreadCount(), so memory usage is bounded.
 //  api->Clear() frees per-page results; the model stays cached for reuse.
 //
 //  After each batch, cleanupOcrApi() destroys every cached API sequentially
@@ -427,6 +428,10 @@ QString PdfWorker::computeFileHash(const QUrl &fileUrl) const {
 PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
                      QObject *parent)
     : QObject(parent), m_vecManager(vecManager), m_config(config) {
+  // Sized for each batch (processPDF).  Keep the threads for the whole
+  // import: each one caches its Tesseract instance (keyed by thread) until
+  // cleanupOcrApi() at the end of a batch.
+  m_extractPool.setExpiryTimeout(-1);
   if (m_vecManager) {
     // Emitted from this worker's thread (ingestChunks): a direct call.
     connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
@@ -476,8 +481,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
                     tr("%n paper(s) already in the library", "", alreadyKnown));
 
-  // Process in small batches to bound memory and provide incremental progress.
-  const int batchSize = 10;
+  // Batches: each one is extracted, saved and indexed before the next, so a
+  // cancel or a failed indexing only drops the papers of one batch.  Their
+  // size follows the extraction threads (batchSizeFor()).
   int savedCount = 0;
   int errorCount = 0;
   QStringList failedTitles; // papers dropped because indexing failed
@@ -485,25 +491,40 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   QString indexError;       // why indexing failed, when known
   bool cancelled = false;
   int total = urlsToProcess.size();
-  const int batchCount = (total + batchSize - 1) / batchSize;
+  int batchNo = 0;
 
   m_extractDone = 0;
   m_extractTotal = total;
   emit papersProgress(0, total);
   emit stepProgress(QStringLiteral("extract"), 0, total, QString());
 
-  for (int i = 0; i < total; i += batchSize) {
+  for (int start = 0; start < total;) {
     if (m_stopFlag.load()) {
       cancelled = true;
       break;
     }
-    int end = qMin(i + batchSize, total);
-    QList<QUrl> batchUrls(urlsToProcess.mid(i, end - i));
+    // Sized for each batch: the memory left changes during an import (a
+    // summary loading a local LLM, other applications).
+    const int threads = extractThreadCount();
+    const int batchSize = batchSizeFor(threads);
+    const int end = qMin(start + batchSize, total);
+    ++batchNo;
+    // Batches in all, if the next ones keep this size.
+    const int batchCount = batchNo + (total - end + batchSize - 1) / batchSize;
+    QList<QUrl> batchUrls(urlsToProcess.mid(start, end - start));
+    start = end;
+    qInfo() << "[PdfWorker] Batch" << batchNo << ":" << batchUrls.size()
+            << "file(s) on" << threads << "thread(s) — available memory"
+            << (SystemMemory::availableBytes() >> 20) << "MiB";
 
-    message = tr("Extracting %1-%2/%3").arg(i + 1).arg(end).arg(total);
+    message = tr("Extracting %1-%2/%3")
+                  .arg(end - batchUrls.size() + 1)
+                  .arg(end)
+                  .arg(total);
     emit status(message);
 
-    QList<ExtractionResult> extractions = parallelExtract(batchUrls, imgPath);
+    QList<ExtractionResult> extractions =
+        parallelExtract(batchUrls, imgPath, threads);
     // Stopped during the extraction: drop this batch, nothing is saved yet.
     if (m_stopFlag.load()) {
       cleanupOcrApi();
@@ -568,7 +589,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       QString statusMsg = tr("Embedding %1 chunks...").arg(allChunks.size());
       emit status(statusMsg);
       m_embedDetail =
-          tr("Batch %1/%2").arg(i / batchSize + 1).arg(batchCount);
+          tr("Batch %1/%2").arg(batchNo).arg(batchCount);
       emit stepProgress(QStringLiteral("embed"), 0, allChunks.size(),
                         m_embedDetail);
 
@@ -606,8 +627,11 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
     }
 
     // Free Tesseract APIs from the thread pool after each batch so that
-    // memory is released incrementally rather than held until process exit.
+    // memory is released incrementally rather than held until process exit,
+    // and give what the extraction threads freed back to the system (the
+    // next batch is sized on the memory available).
     cleanupOcrApi();
+    SystemMemory::releaseFreed();
 
     message = tr("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
     emit status(message);
@@ -869,6 +893,11 @@ PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
 /// to PageImage::kModelMaxPixels.  ~650 KB per page (150 DPI: ~370 KB).
 static constexpr float kPageImageDpi = 200.0f;
 
+/// Cache of each MuPDF context (one per file being extracted).  Pages are
+/// read once, in order: a small cache costs nothing, and several files are
+/// extracted at once (MuPDF's default is 256 MB each).
+static constexpr size_t kMuPdfStoreBytes = size_t(64) << 20;
+
 ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                                         const QString &imgPath) {
   QString localPath = fileUrl.toLocalFile();
@@ -885,7 +914,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   fz_context *ctx = nullptr;
   fz_document *doc = nullptr;
 
-  ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
+  ctx = fz_new_context(nullptr, nullptr, kMuPdfStoreBytes);
   if (!ctx) {
     result.error = tr("PDF reader initialisation failed");
     return result;
@@ -931,7 +960,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
       break;
     // Scanned pages go through OCR and can take seconds each: report pages,
     // not just files, so long documents visibly progress.
-    emit stepProgress(QStringLiteral("extract"), m_extractDone, m_extractTotal,
+    emit stepProgress(QStringLiteral("extract"), m_extractDone.load(), m_extractTotal,
                       tr("%1 — page %2/%3")
                           .arg(result.fileName)
                           .arg(i + 1)
@@ -1124,19 +1153,51 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
 //  Parallel dispatch
 // ============================================================================
 
+/// Memory one extraction thread may take at its peak: a MuPDF context (cache
+/// capped at kMuPdfStoreBytes), a Tesseract instance (~100 MB with eng+fra,
+/// single-threaded) and the page images being made (200 DPI RGB and 300 DPI
+/// gray for OCR).  ~45 MB measured on text PDFs; OCR adds ~110 MB.
+static constexpr qint64 kExtractBytesPerThread = qint64(256) << 20;
+/// Share of the available memory the extraction may take: the rest stays
+/// for the embedding model, a local LLM and the other applications.
+static constexpr double kExtractMemoryShare = 0.5;
+
+/// Files extracted at once: as many as fit in kExtractMemoryShare of the
+/// memory available now, at most half the logical cores (OCR and rendering
+/// are CPU-bound; hyper-threads add little).  Memory unknown: 2.
+int PdfWorker::extractThreadCount() {
+  return SystemMemory::tasksThatFit(SystemMemory::availableBytes(),
+                                    kExtractBytesPerThread, kExtractMemoryShare,
+                                    QThread::idealThreadCount() / 2,
+                                    /*fallback=*/2);
+}
+
+/// Files per batch for `threads` extraction threads: three files per thread,
+/// so that a long file (a book, a scan) does not leave the other threads
+/// idle until the end of the batch; at least 10.  A batch keeps only the
+/// text and chunks of its files (a few MB each) until they are indexed.
+int PdfWorker::batchSizeFor(int threads) { return qMax(10, 3 * threads); }
+
 QList<ExtractionResult>
 PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
-                           const QString &imgPath) {
-  QList<ExtractionResult> results;
-  for (const auto &url : filePaths) {
-    if (m_stopFlag.load())
-      break;
-    results.append(extractText(url, imgPath));
-    if (m_stopFlag.load())
-      break;
-    ++m_extractDone;
-    emit stepProgress(QStringLiteral("extract"), m_extractDone, m_extractTotal,
-                      results.last().fileName);
-  }
-  return results;
+                           const QString &imgPath, int threads) {
+  // Load the embedding model here, once: the chunking of every thread asks
+  // it for token counts, and its lazy loading is not safe to race.
+  if (m_vecManager)
+    (void)m_vecManager->maxChunkTokens();
+
+  m_extractPool.setMaxThreadCount(threads);
+  // Results in the order of filePaths.  Once stopped, the files not started
+  // are skipped and those in progress end at their next page: the caller
+  // drops the whole batch.
+  return QtConcurrent::blockingMapped<QList<ExtractionResult>>(
+      &m_extractPool, filePaths, [this, &imgPath](const QUrl &url) {
+        if (m_stopFlag.load())
+          return ExtractionResult{};
+        ExtractionResult result = extractText(url, imgPath);
+        if (!m_stopFlag.load())
+          emit stepProgress(QStringLiteral("extract"), ++m_extractDone,
+                            m_extractTotal, result.fileName);
+        return result;
+      });
 }

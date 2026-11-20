@@ -1,5 +1,6 @@
 #include "enginemanager.h"
 #include "ingestionengine.h"
+#include "systemmemory.h"
 #include <QDebug>
 #include <QDirIterator>
 
@@ -67,11 +68,15 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
             thisWorker->processPDF(files, img, db);
           });
 
-  // When done: quit thread, then delete objects in the main thread's event loop
+  // When done: quit the thread.  The worker is deleted in its own thread as
+  // it ends (connected to the worker: the thread runs this deleteLater()
+  // before stopping).  A deleteLater() from the main thread's handler below
+  // would come after the thread has stopped and never run: the worker, its
+  // extraction pool and their threads would stay alive.
   connect(thisWorker, &PdfWorker::finished, thisThread, &QThread::quit);
+  connect(thisThread, &QThread::finished, thisWorker, &QObject::deleteLater);
   connect(thisThread, &QThread::finished, this,
           [this, thisThread, thisWorker]() {
-            thisWorker->deleteLater();
             thisThread->deleteLater();
             // Clear the controller's raw pointers to prevent use-after-free
             // if stopEngine() is called again (e.g. from the destructor).
@@ -134,5 +139,6 @@ void EngineController::releaseAndReloadModel() {
   if (!m_vecManager)
     return; // databaseManager already destroyed during shutdown
   m_vecManager->shutdown();
+  SystemMemory::releaseFreed(); // the model's and the extraction's memory
   emit ingestionFinished();
 }

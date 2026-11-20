@@ -63,6 +63,7 @@ add_library(HodeiaEngine STATIC
     ../include/querycontroller.h
     ../include/openalex.h
     ../include/citationrepository.h
+    ../include/systemmemory.h
     ../include/helpers.h
     ../include/notifier.h
     ../include/pdfexport.h
@@ -105,6 +106,7 @@ add_library(HodeiaEngine STATIC
     summarythreadmanager.cpp
     openalex.cpp
     citationrepository.cpp
+    systemmemory.cpp
     queryworker.cpp
     retriever.cpp
     reindexer.cpp

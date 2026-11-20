@@ -48,8 +48,11 @@ void SummaryController::startSummarize(const QStringList &hashes) {
   // Cleanup runs in the main thread's event loop after the worker thread has
   // fully finished. Capture thread/worker by value so a stale handler from a
   // previous run cannot delete the new run's objects.
+  // The worker is deleted in its own thread as it ends (connected to the
+  // worker); a deleteLater() from the handler below would come after the
+  // thread has stopped and never run.
+  connect(thread, &QThread::finished, worker, &QObject::deleteLater);
   connect(thread, &QThread::finished, this, [this, thread, worker]() {
-    worker->deleteLater();
     thread->deleteLater();
     if (m_thread == thread)
       m_thread = nullptr;

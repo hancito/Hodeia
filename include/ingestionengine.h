@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QObject>
 #include <QString>
+#include <QThreadPool>
 #include <QUrl>
 #include <atomic>
 
@@ -62,8 +63,13 @@ private:
                   const QString &indexError);
 
   QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList);
+  /// Extract the files of a batch, `threads` at a time.
   QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
-                                          const QString &imgPath);
+                                          const QString &imgPath, int threads);
+  /// Extraction threads that fit in the memory available now.
+  static int extractThreadCount();
+  /// Files per batch for that many extraction threads.
+  static int batchSizeFor(int threads);
   void savePapers(const QList<SummaryRow> &rows, const QString &dbPath);
   bool ingestChunks(const QList<TextChunk> &chunks, const QString &dbPath);
   void removePapers(const QList<SummaryRow> &rows, const QString &dbPath);
@@ -79,9 +85,12 @@ private:
   std::atomic<bool> m_stopFlag{false};
   std::atomic<bool> m_userCancelled{false};
 
-  // Progress counters for stepProgress(), touched by the worker thread only.
-  int m_extractDone = 0;  // files whose extraction has finished
-  int m_extractTotal = 0; // files to extract in this import
+  // Progress counters for stepProgress().  m_extractDone is bumped by the
+  // extraction threads; m_extractTotal is set before they start.
+  std::atomic<int> m_extractDone{0}; // files whose extraction has finished
+  int m_extractTotal = 0;            // files to extract in this import
   QString m_embedDetail;  // "Batch n/m", shown while indexing
   ConfigManager *m_config = nullptr;
+  // Extraction threads, sized for the memory (see extractThreadCount()).
+  QThreadPool m_extractPool;
 };
