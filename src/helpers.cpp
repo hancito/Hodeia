@@ -4,6 +4,7 @@
 #include "configmanager.h"
 #include "database.h"
 #include "metadataresolver.h"
+#include "notifier.h"
 #include "pdfexport.h"
 #include "summaryformat.h"
 #include "zoterorepository.h"
@@ -34,7 +35,8 @@ Helpers::Helpers(ConfigManager *config, QObject *parent)
                    &Helpers::loadActiveBackendModels);
 
   refreshLocalModelList();
-  loadActiveBackendModels();
+  // The models of the active backend are loaded by the toolbar when it is
+  // ready (MyToolBar): loading them here too would start an agent twice.
 }
 
 Helpers::~Helpers() = default;
@@ -325,6 +327,23 @@ void Helpers::loadActiveBackendModels() {
   const QVariantMap cfg = m_config->backendConfig(m_config->activeBackend());
   if (cfg.value("api").toString() == QLatin1String("agent")) {
     cancelPendingReply();
+    // Saved by a version that dropped the agent: find it again, and save it.
+    if (cfg.value("agent").toString().isEmpty()) {
+      const QString agent = AgentBackend::guessAgent(cfg.value("name").toString());
+      if (!agent.isEmpty()) {
+        qInfo() << "[Helpers] backend" << cfg.value("name").toString() << "repaired: agent"
+                << agent;
+        m_config->setAgentBackend(cfg.value("name").toString(), agent,
+                                  cfg.value("url").toString());
+        loadActiveBackendModels();
+        return;
+      }
+    }
+    // The last list at once (an agent may take seconds to start), then the
+    // agent's current one.
+    const QStringList known = cfg.value("models").toStringList();
+    if (!known.isEmpty())
+      emit modelsChecked(true, known, QString());
     fetchAgentModels(cfg, QString());
     return;
   }
@@ -361,16 +380,33 @@ void Helpers::fetchAgentModels(const QVariantMap &config, const QString &saveAs)
         [this, models, config, saveAs, request] {
           if (request != m_modelsRequest)
             return; // another listing was asked meanwhile
+          const QString name = saveAs.isEmpty() && m_config ? m_config->activeBackend() : saveAs;
           if (!models) {
+            qWarning() << "[Helpers] agent models not listed:" << models.error();
+            if (saveAs.isEmpty() && m_config) {
+              // At startup: keep the backend usable with the last list, or
+              // at least the saved model, and say why it is not refreshed.
+              QStringList fallback = config.value("models").toStringList();
+              if (fallback.isEmpty() && !m_config->activeModel().isEmpty())
+                fallback.append(m_config->activeModel());
+              if (!fallback.isEmpty())
+                emit modelsChecked(true, fallback, QString());
+              Notifier::post(QStringLiteral("agent-models"), tr("Agent Not Available"),
+                             tr("The models of %1 could not be listed:\n%2").arg(name, models.error()));
+              return;
+            }
             emit modelsChecked(false, {}, models.error());
             return;
           }
-          emit modelsChecked(true, *models, QString());
           if (!saveAs.isEmpty() && m_config) {
             m_config->setAgentBackend(saveAs, config.value("agent").toString(),
                                       config.value("url").toString());
             m_config->setActiveBackend(saveAs);
           }
+          if (m_config)
+            m_config->setBackendModels(name, *models);
+          if (*models != config.value("models").toStringList() || !saveAs.isEmpty())
+            emit modelsChecked(true, *models, QString());
         },
         Qt::QueuedConnection);
   });

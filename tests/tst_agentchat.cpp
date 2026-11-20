@@ -55,6 +55,7 @@ private slots:
   void citations();
   void errorsAndStop();
   void backends();
+  void agentBackendSurvivesRestart();
 
 private:
   /// Send and wait for the end of the turn.
@@ -233,6 +234,25 @@ void TestAgentChat::backends() {
     names << b.toMap().value("name").toString();
   QVERIFY(names.contains("Fake Claude"));
   QVERIFY(!names.contains("Fake Pi"));
+}
+
+// An agent backend read back from the settings file (a restart) still knows
+// its agent and its last models.
+void TestAgentChat::agentBackendSurvivesRestart() {
+  m_config->setBackendModels("Fake Claude", {"default", "haiku"});
+  m_config->setActiveBackend("Fake Claude");
+  ConfigManager restarted;
+  const QVariantMap b = restarted.backendConfig("Fake Claude");
+  QCOMPARE(b.value("api").toString(), QString("agent"));
+  QCOMPARE(b.value("agent").toString(), QString("claude"));
+  QVERIFY(b.value("url").toString().contains("fake_claude"));
+  QCOMPARE(b.value("models").toStringList(), (QStringList{"default", "haiku"}));
+  QCOMPARE(restarted.activeBackend(), QString("Fake Claude"));
+  // Remote backends keep their fields too.
+  restarted.setBackend("Remote", "http://localhost:11434/v1", "key", "anthropic");
+  ConfigManager again;
+  QCOMPARE(again.backendConfig("Remote").value("api").toString(), QString("anthropic"));
+  QCOMPARE(again.backendConfig("Remote").value("api_key").toString(), QString("key"));
 }
 
 QTEST_GUILESS_MAIN(TestAgentChat)

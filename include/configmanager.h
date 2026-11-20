@@ -96,6 +96,9 @@ public:
   /// AgentBackend): `command` replaces the profile's when not empty.
   Q_INVOKABLE void setAgentBackend(const QString &name, const QString &agentId,
                                    const QString &command);
+  /// Remember the models last listed for a backend (shown at once at the
+  /// next start, before the agent answers).
+  void setBackendModels(const QString &name, const QStringList &models);
   Q_INVOKABLE void removeBackend(const QString &name);
 
   // Project Operations (on disk + lastProject only).  QML goes through

@@ -75,12 +75,16 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation>L’agent a refusé la demande.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="152"/>
-        <source>Unknown agent &quot;%1&quot;.</source>
-        <translation>Agent inconnu « %1 ».</translation>
+        <location filename="../src/agentbackend.cpp" line="167"/>
+        <source>The backend &quot;%1&quot; does not say which agent it uses: choose the agent again in the Backends window and check the connection.</source>
+        <translation>Le backend « %1 » n’indique pas quel agent il utilise : choisissez de nouveau l’agent dans la fenêtre Backends et vérifiez la connexion.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="156"/>
+        <source>Unknown agent &quot;%1&quot;.</source>
+        <translation type="vanished">Agent inconnu « %1 ».</translation>
+    </message>
+    <message>
+        <location filename="../src/agentbackend.cpp" line="175"/>
         <source>No connector &quot;%1&quot;.</source>
         <translation>Aucun connecteur « %1 ».</translation>
     </message>
@@ -544,12 +548,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="182"/>
+        <location filename="../src/configmanager.cpp" line="181"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="183"/>
+        <location filename="../src/configmanager.cpp" line="182"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -564,88 +568,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="253"/>
-        <location filename="../src/configmanager.cpp" line="262"/>
-        <location filename="../src/configmanager.cpp" line="268"/>
+        <location filename="../src/configmanager.cpp" line="252"/>
+        <location filename="../src/configmanager.cpp" line="261"/>
+        <location filename="../src/configmanager.cpp" line="267"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="255"/>
-        <location filename="../src/configmanager.cpp" line="263"/>
-        <location filename="../src/configmanager.cpp" line="270"/>
+        <location filename="../src/configmanager.cpp" line="254"/>
+        <location filename="../src/configmanager.cpp" line="262"/>
+        <location filename="../src/configmanager.cpp" line="269"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="257"/>
-        <location filename="../src/configmanager.cpp" line="262"/>
+        <location filename="../src/configmanager.cpp" line="256"/>
+        <location filename="../src/configmanager.cpp" line="261"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="401"/>
-        <location filename="../src/configmanager.cpp" line="438"/>
+        <location filename="../src/configmanager.cpp" line="414"/>
+        <location filename="../src/configmanager.cpp" line="451"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="409"/>
+        <location filename="../src/configmanager.cpp" line="422"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="422"/>
+        <location filename="../src/configmanager.cpp" line="435"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="444"/>
+        <location filename="../src/configmanager.cpp" line="457"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="454"/>
+        <location filename="../src/configmanager.cpp" line="467"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="510"/>
+        <location filename="../src/configmanager.cpp" line="523"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="515"/>
+        <location filename="../src/configmanager.cpp" line="528"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="524"/>
+        <location filename="../src/configmanager.cpp" line="537"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="532"/>
+        <location filename="../src/configmanager.cpp" line="545"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="550"/>
+        <location filename="../src/configmanager.cpp" line="563"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="562"/>
+        <location filename="../src/configmanager.cpp" line="575"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="625"/>
+        <location filename="../src/configmanager.cpp" line="638"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="626"/>
+        <location filename="../src/configmanager.cpp" line="639"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -660,7 +664,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="720"/>
+        <location filename="../src/configmanager.cpp" line="733"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -1029,55 +1033,67 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation type="vanished">Paramètres invalides</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="315"/>
+        <location filename="../src/helpers.cpp" line="317"/>
         <source>URL is empty</source>
         <translation>L&apos;URL est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="435"/>
+        <location filename="../src/helpers.cpp" line="394"/>
+        <source>Agent Not Available</source>
+        <translation>Agent indisponible</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="395"/>
+        <source>The models of %1 could not be listed:
+%2</source>
+        <translation>Les modèles de %1 n’ont pas pu être listés :
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/helpers.cpp" line="471"/>
         <source>Invalid JSON</source>
         <translation>JSON invalide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="268"/>
+        <location filename="../src/helpers.cpp" line="270"/>
         <source>Model file does not exist: %1</source>
         <translation>Le fichier de modèle n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="176"/>
+        <location filename="../src/helpers.cpp" line="178"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="192"/>
+        <location filename="../src/helpers.cpp" line="194"/>
         <source>These models could not be fully deleted (a file may still be in use, e.g. by a running summary or query):</source>
         <translation>Ces modèles n&apos;ont pas pu être entièrement supprimés (un fichier est peut-être encore utilisé, par exemple par un résumé ou une requête en cours) :</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="219"/>
-        <location filename="../src/helpers.cpp" line="237"/>
+        <location filename="../src/helpers.cpp" line="221"/>
+        <location filename="../src/helpers.cpp" line="239"/>
         <source>Cannot read %1: %2</source>
         <translation>Impossible de lire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="222"/>
+        <location filename="../src/helpers.cpp" line="224"/>
         <source>%1 is empty</source>
         <translation>%1 est vide</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="227"/>
-        <location filename="../src/helpers.cpp" line="239"/>
-        <location filename="../src/helpers.cpp" line="255"/>
+        <location filename="../src/helpers.cpp" line="229"/>
+        <location filename="../src/helpers.cpp" line="241"/>
+        <location filename="../src/helpers.cpp" line="257"/>
         <source>Cannot write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="273"/>
+        <location filename="../src/helpers.cpp" line="275"/>
         <source>MMProj file does not exist: %1</source>
         <translation>Le fichier MMProj n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/helpers.cpp" line="281"/>
+        <location filename="../src/helpers.cpp" line="283"/>
         <source>Cannot create folder %1</source>
         <translation>Impossible de créer le dossier %1</translation>
     </message>

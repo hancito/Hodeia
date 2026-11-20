@@ -132,8 +132,22 @@ QVariantList profiles() {
   return list;
 }
 
+QString guessAgent(const QString &backendName) {
+  // The profile whose id appears in the name ("Claude Code" -> claude,
+  // "Qwen" -> qwen); the longest id wins ("claude-acp" over "claude").
+  const QString name = backendName.toLower();
+  QString best;
+  for (const Agents::Profile &p : Agents::Registry::instance().profiles())
+    if (name.contains(p.id) && p.id.size() > best.size())
+      best = p.id;
+  return best;
+}
+
 std::optional<Agents::Profile> profileOf(const QVariantMap &config) {
-  auto profile = Agents::Registry::instance().profile(config.value("agent").toString());
+  QString agent = config.value("agent").toString();
+  if (agent.isEmpty()) // saved by a version that lost the key
+    agent = guessAgent(config.value("name").toString());
+  auto profile = Agents::Registry::instance().profile(agent);
   const QString command = config.value("url").toString().trimmed();
   if (profile && !command.isEmpty())
     profile->command = command;
@@ -149,7 +163,12 @@ QString workDir() {
 std::expected<QStringList, QString> listModels(const QVariantMap &config) {
   const auto profile = profileOf(config);
   if (!profile)
-    return std::unexpected(QCoreApplication::translate("AgentBackend", "Unknown agent \"%1\".").arg(config.value("agent").toString()));
+    return std::unexpected(
+        QCoreApplication::translate("AgentBackend",
+                                    "The backend \"%1\" does not say which agent it uses: "
+                                    "choose the agent again in the Backends window and check "
+                                    "the connection.")
+            .arg(config.value("name").toString()));
   const Agents::Connector *connector =
       Agents::Registry::instance().connector(profile->connector);
   if (!connector)

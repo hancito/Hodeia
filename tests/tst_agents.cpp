@@ -129,6 +129,7 @@ private slots:
   void backendPrompt();
   void backendGenerate();
   void backendUnknownAgent();
+  void guessAgent();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -528,6 +529,17 @@ void TestAgents::backendUnknownAgent() {
                        ->generate(PromptPayload{}, {}, nullptr);
   QVERIFY(!out);
   QVERIFY(out.error().detail.contains("nope"));
+}
+
+// Backends saved without their agent (older version): found from the name.
+void TestAgents::guessAgent() {
+  QCOMPARE(AgentBackend::guessAgent("Claude Code"), QString("claude"));
+  QCOMPARE(AgentBackend::guessAgent("Qwen"), QString("qwen"));
+  QCOMPARE(AgentBackend::guessAgent("my claude-acp"), QString("claude-acp"));
+  QCOMPARE(AgentBackend::guessAgent("Remote"), QString());
+  const auto p = AgentBackend::profileOf({{"name", "Claude Code"}, {"api", "agent"}});
+  QVERIFY(p);
+  QCOMPARE(p->id, QString("claude"));
 }
 
 QTEST_GUILESS_MAIN(TestAgents)

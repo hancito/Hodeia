@@ -26,6 +26,10 @@ namespace AgentBackend {
 /// missingRuntimes ("Node.js"), install}; the ones that can start first.
 QVariantList profiles();
 
+/// The profile id that a backend name designates ("Claude Code" -> claude),
+/// for backends saved without their "agent" key; empty if none.
+QString guessAgent(const QString &backendName);
+
 /// The profile of a backend config, with its command override.
 std::optional<Agents::Profile> profileOf(const QVariantMap &config);
 

@@ -154,17 +154,16 @@ void ConfigManager::saveConfig() {
   obj["zoteroDataDir"] = m_zoteroDataDir;
   obj["zoteroPriority"] = m_zoteroPriority;
 
-  // Save backend list as JSON array of objects
+  // Save backend list as JSON array of objects, every key kept: besides
+  // name, url and api_key, "api" ("openai", "anthropic", "agent"), and for
+  // an agent backend "agent" (its profile) and "models" (last listed).
   QJsonArray backendArray;
   for (const auto &entry : m_backendList) {
-    QJsonObject backendObj;
-    QVariantMap map = entry.toMap();
+    const QVariantMap map = entry.toMap();
+    QJsonObject backendObj = QJsonObject::fromVariantMap(map);
     backendObj["name"] = map.value("name").toString();
     backendObj["url"] = map.value("url").toString();
     backendObj["api_key"] = map.value("api_key").toString();
-    // "openai" (OpenAI-compatible, the default) or "anthropic".
-    if (map.contains("api"))
-      backendObj["api"] = map.value("api").toString();
     backendArray.append(backendObj);
   }
   obj["backendList"] = backendArray;
@@ -362,6 +361,20 @@ void ConfigManager::setBackend(const QString &name, const QString &url,
   m_backendList.append(newBackend);
   emit backendListChanged();
   saveConfig();
+}
+
+void ConfigManager::setBackendModels(const QString &name, const QStringList &models) {
+  for (int i = 0; i < m_backendList.size(); ++i) {
+    QVariantMap map = m_backendList[i].toMap();
+    if (map.value("name").toString() != name)
+      continue;
+    if (map.value("models").toStringList() == models)
+      return;
+    map["models"] = models;
+    m_backendList[i] = map;
+    saveConfig(); // no backendListChanged: nothing the lists show changed
+    return;
+  }
 }
 
 void ConfigManager::setAgentBackend(const QString &name, const QString &agentId,
