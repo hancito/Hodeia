@@ -1791,22 +1791,22 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>OpenAlexClient</name>
     <message>
-        <location filename="../src/openalex.cpp" line="376"/>
+        <location filename="../src/openalex.cpp" line="433"/>
         <source>OpenAlex Access Refused</source>
         <translation>Accès OpenAlex refusé</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="377"/>
+        <location filename="../src/openalex.cpp" line="434"/>
         <source>OpenAlex refused the request (HTTP %1), so citations cannot be fetched. The API key is probably invalid or expired: check it in the OpenAlex API Key menu.</source>
         <translation>OpenAlex a refusé la requête (HTTP %1) : les citations ne peuvent pas être récupérées. La clé API est probablement invalide ou expirée : vérifiez-la dans le menu Clé API OpenAlex.</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="383"/>
+        <location filename="../src/openalex.cpp" line="440"/>
         <source>OpenAlex Limit Reached</source>
         <translation>Limite OpenAlex atteinte</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="384"/>
+        <location filename="../src/openalex.cpp" line="441"/>
         <source>OpenAlex limits the number of requests and the limit is reached, so some citations could not be fetched. They will be fetched again at a later start. An OpenAlex API key raises the limit.</source>
         <translation>OpenAlex limite le nombre de requêtes et cette limite est atteinte : certaines citations n&apos;ont pas pu être récupérées. Elles le seront lors d&apos;un prochain démarrage. Une clé API OpenAlex augmente la limite.</translation>
     </message>
@@ -2712,22 +2712,22 @@ Nouvel essai au prochain démarrage.</translation>
     </message>
     <message>
         <location filename="../src/zoterocontroller.cpp" line="229"/>
-        <location filename="../src/zoterocontroller.cpp" line="362"/>
+        <location filename="../src/zoterocontroller.cpp" line="364"/>
         <source>Cannot update the project: %1</source>
         <translation>Impossible de mettre à jour le projet : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="299"/>
+        <location filename="../src/zoterocontroller.cpp" line="301"/>
         <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
         <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="313"/>
+        <location filename="../src/zoterocontroller.cpp" line="315"/>
         <source>Cannot save the collections: %1</source>
         <translation>Impossible d&apos;enregistrer les collections : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="336"/>
+        <location filename="../src/zoterocontroller.cpp" line="338"/>
         <source>Another import is running: import these PDFs once it has finished.</source>
         <translation>Une autre importation est en cours : importez ces PDF une fois qu’elle sera terminée.</translation>
     </message>
