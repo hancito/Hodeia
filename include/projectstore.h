@@ -15,8 +15,8 @@ class SqliteDb;
 /// released; a schema change is a new migration appended to the list.
 ///
 /// Version 0 is a database with no version: a new, empty file, or a project
-/// created before the migrations existed (its schema is that of migration 1,
-/// which only creates what is missing).
+/// of HodeIA 0.99rc, created before the migrations existed (migration 1
+/// only creates what is missing).
 namespace ProjectStore {
 
 struct Migration {

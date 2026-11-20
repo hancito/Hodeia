@@ -11,10 +11,12 @@ namespace {
 /* ── Migrations ─────────────────────────────────────────────────────
    Never edit a released migration: append a new one. */
 
-// v1 — the schema of the projects created before versioning (HodeIA
-// 0.99rc).  IF NOT EXISTS: it creates a new project and leaves an existing
-// one as it is.
+// v1 — the first versioned schema.  Version 0 is a new file or a project of
+// HodeIA 0.99rc, whose tables (Summaries, Queries, Citations, chunks) are
+// created here with IF NOT EXISTS: an existing project keeps them as they
+// are, the tables added since are created.
 std::expected<void, QString> migrateV1(SqliteDb &db) {
+  /* Tables of HodeIA 0.99rc. */
   if (auto r = db.exec("CREATE TABLE IF NOT EXISTS Summaries ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                        "paper_hash TEXT NOT NULL UNIQUE, "
@@ -69,14 +71,11 @@ std::expected<void, QString> migrateV1(SqliteDb &db) {
       !r)
     return std::unexpected("chunks: " + r.error());
 
-  return {};
-}
-
-// v2 — Zotero connector: the collections a project follows and one row per
-// PDF of Zotero known to the project (proposed, imported or refused).
-// Linked to the other tables by paper_hash (MD5 of the file, as at import).
-std::expected<void, QString> migrateV2(SqliteDb &db) {
-  if (auto r = db.exec("CREATE TABLE ZoteroCollections ("
+  /* Zotero connector: the collections a project follows and one row per
+     PDF of Zotero known to the project (proposed, imported or refused).
+     Linked to the other tables by paper_hash (MD5 of the file, as at
+     import). */
+  if (auto r = db.exec("CREATE TABLE IF NOT EXISTS ZoteroCollections ("
                        "library_id INTEGER NOT NULL, "
                        "collection_key TEXT NOT NULL, "
                        "name TEXT NOT NULL, "
@@ -88,7 +87,7 @@ std::expected<void, QString> migrateV2(SqliteDb &db) {
   // survive syncs.  The same file in two libraries gives two rows with the
   // same paper_hash.  authors and tags are JSON arrays.
   if (auto r = db.exec(
-          "CREATE TABLE ZoteroItems ("
+          "CREATE TABLE IF NOT EXISTS ZoteroItems ("
           "id INTEGER PRIMARY KEY AUTOINCREMENT, "
           "library_id INTEGER NOT NULL, "
           "item_key TEXT NOT NULL, "
@@ -112,39 +111,33 @@ std::expected<void, QString> migrateV2(SqliteDb &db) {
       !r)
     return std::unexpected("ZoteroItems: " + r.error());
 
-  if (auto r = db.exec("CREATE INDEX ZoteroItems_paper_hash "
+  if (auto r = db.exec("CREATE INDEX IF NOT EXISTS ZoteroItems_paper_hash "
                        "ON ZoteroItems (paper_hash)");
       !r)
     return std::unexpected("ZoteroItems index: " + r.error());
-  return {};
-}
 
-// v3 — The E5 embeddings are now computed with the model's special tokens,
-// which makes the search much more accurate (titles find their paper).  The
-// chunks already stored must be embedded again: too long to do here, so this
-// only records the work, and Reindexer does it in the background (resumable:
-// `progress` is the last chunk rowid done).  A project with no chunks has
-// nothing to redo.
-std::expected<void, QString> migrateV3(SqliteDb &db) {
-  if (auto r = db.exec("CREATE TABLE Maintenance ("
+  /* Background maintenance tasks (`progress` is the last chunk rowid
+     done, so a task resumes where it stopped).  The chunks of a 0.99rc
+     project were embedded without E5's special tokens, which makes the
+     search much less accurate: they must be embedded again, which is too
+     long to do here — Reindexer does it in the background.  A project with
+     no chunks has nothing to redo. */
+  if (auto r = db.exec("CREATE TABLE IF NOT EXISTS Maintenance ("
                        "task TEXT PRIMARY KEY, "
                        "progress INTEGER NOT NULL DEFAULT 0)");
       !r)
     return std::unexpected("Maintenance: " + r.error());
-  if (auto r = db.exec("INSERT INTO Maintenance (task) "
+  if (auto r = db.exec("INSERT OR IGNORE INTO Maintenance (task) "
                        "SELECT 'reembed' WHERE EXISTS (SELECT 1 FROM chunks)");
       !r)
     return std::unexpected("Maintenance task: " + r.error());
-  return {};
-}
 
-// v4 — Conversations with an agent (Query window, mode agentique): one row
-// per conversation and one per message.  `agent_session` is the agent's own
-// session id, to resume the conversation with the agent.  Messages are
-// deleted with their conversation by ConversationRepository (foreign keys
-// are not enforced on project databases).
-std::expected<void, QString> migrateV4(SqliteDb &db) {
-  if (auto r = db.exec("CREATE TABLE Conversations ("
+  /* Conversations with an agent (Query window, agentic mode): one row per
+     conversation and one per message.  `agent_session` is the agent's own
+     session id, to resume the conversation with the agent.  Messages are
+     deleted with their conversation by ConversationRepository (foreign
+     keys are not enforced on project databases). */
+  if (auto r = db.exec("CREATE TABLE IF NOT EXISTS Conversations ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                        "title TEXT NOT NULL DEFAULT '', "
                        "backend TEXT NOT NULL DEFAULT '', "
@@ -154,7 +147,7 @@ std::expected<void, QString> migrateV4(SqliteDb &db) {
                        "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
       !r)
     return std::unexpected("Conversations: " + r.error());
-  if (auto r = db.exec("CREATE TABLE ConversationMessages ("
+  if (auto r = db.exec("CREATE TABLE IF NOT EXISTS ConversationMessages ("
                        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                        "conversation_id INTEGER NOT NULL REFERENCES Conversations(id), "
                        "role TEXT NOT NULL "
@@ -163,104 +156,10 @@ std::expected<void, QString> migrateV4(SqliteDb &db) {
                        "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)");
       !r)
     return std::unexpected("ConversationMessages: " + r.error());
-  if (auto r = db.exec("CREATE INDEX ConversationMessages_conversation "
+  if (auto r = db.exec("CREATE INDEX IF NOT EXISTS ConversationMessages_conversation "
                        "ON ConversationMessages (conversation_id, id)");
       !r)
     return std::unexpected("ConversationMessages index: " + r.error());
-  return {};
-}
-
-// v5 — Repair: projects that went through a pre-release build of the Zotero
-// connector got a different ZoteroItems (no `id`, attachment_key as primary
-// key, unique paper_hash...), which the code cannot use.  Such a table is
-// rebuilt with the v2 schema, keeping the columns it has (defaults for the
-// others).  A table with the v2 schema is left alone.  The v2 statement is
-// repeated here on purpose: a migration is a frozen snapshot.
-std::expected<void, QString> migrateV5(SqliteDb &db) {
-  QStringList columns;
-  {
-    SqliteStatement info = db.prepare("PRAGMA table_info(ZoteroItems)");
-    while (true) {
-      auto step = info.step();
-      if (!step)
-        return std::unexpected("ZoteroItems columns: " + step.error());
-      if (!*step)
-        break;
-      columns.append(info.columnText(1));
-    }
-  }
-  if (columns.isEmpty() || columns.contains("id"))
-    return {}; // no table (cannot happen after v2), or the v2 schema
-
-  if (auto r = db.exec("ALTER TABLE ZoteroItems RENAME TO ZoteroItems_prerelease"); !r)
-    return std::unexpected("ZoteroItems rename: " + r.error());
-  if (auto r = db.exec(
-          "CREATE TABLE ZoteroItems ("
-          "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-          "library_id INTEGER NOT NULL, "
-          "item_key TEXT NOT NULL, "
-          "attachment_key TEXT NOT NULL, "
-          "paper_hash TEXT NOT NULL, "
-          "title TEXT NOT NULL DEFAULT '', "
-          "authors TEXT NOT NULL DEFAULT '[]', "
-          "year TEXT NOT NULL DEFAULT '', "
-          "journal TEXT NOT NULL DEFAULT '', "
-          "doi TEXT NOT NULL DEFAULT '', "
-          "item_type TEXT NOT NULL DEFAULT '', "
-          "tags TEXT NOT NULL DEFAULT '[]', "
-          "date_modified TEXT NOT NULL DEFAULT '', "
-          "status TEXT NOT NULL DEFAULT 'pending' "
-          "  CHECK (status IN ('pending', 'ingested', 'ignored')), "
-          "removed_at DATETIME, "
-          "added_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
-          "UNIQUE (library_id, attachment_key))");
-      !r)
-    return std::unexpected("ZoteroItems: " + r.error());
-
-  // Each column of the new table from the old one when it has it.  Rows
-  // without their keys or hash cannot be used: they are dropped (Zotero is
-  // read again at the next refresh anyway).
-  struct Column {
-    const char *name;
-    const char *fallback;
-  };
-  const Column copied[] = {
-      {"library_id", "1"},     {"item_key", "''"},       {"attachment_key", "''"},
-      {"paper_hash", "''"},    {"title", "''"},          {"authors", "'[]'"},
-      {"year", "''"},          {"journal", "''"},        {"doi", "''"},
-      {"item_type", "''"},     {"tags", "'[]'"},         {"date_modified", "''"},
-      {"status", "'pending'"}, {"removed_at", "NULL"}};
-  QStringList names, values;
-  for (const Column &c : copied) {
-    names.append(c.name);
-    const QString name = QString::fromLatin1(c.name);
-    if (!columns.contains(name))
-      values.append(c.fallback);
-    else if (name == "status")
-      values.append("CASE WHEN status IN ('pending', 'ingested', 'ignored') THEN status "
-                    "ELSE 'pending' END");
-    else if (name == "removed_at")
-      values.append(name);
-    else
-      values.append(QString("COALESCE(CAST(%1 AS TEXT), %2)").arg(name, c.fallback));
-  }
-  QStringList required;
-  for (const char *c : {"attachment_key", "item_key", "paper_hash"})
-    if (columns.contains(QString::fromLatin1(c)))
-      required.append(QString("COALESCE(%1, '') <> ''").arg(c));
-  if (auto r = db.exec(QString("INSERT OR IGNORE INTO ZoteroItems (%1) SELECT %2 FROM "
-                               "ZoteroItems_prerelease%3")
-                           .arg(names.join(", "), values.join(", "),
-                                required.isEmpty() ? QString()
-                                                   : " WHERE " + required.join(" AND ")));
-      !r)
-    return std::unexpected("ZoteroItems copy: " + r.error());
-  if (auto r = db.exec("DROP TABLE ZoteroItems_prerelease"); !r)
-    return std::unexpected("ZoteroItems drop: " + r.error());
-  if (auto r = db.exec("CREATE INDEX IF NOT EXISTS ZoteroItems_paper_hash "
-                       "ON ZoteroItems (paper_hash)");
-      !r)
-    return std::unexpected("ZoteroItems index: " + r.error());
   return {};
 }
 
@@ -316,10 +215,6 @@ namespace ProjectStore {
 const QList<Migration> &migrations() {
   static const QList<Migration> kMigrations = {
       {1, QStringLiteral("initial schema"), migrateV1},
-      {2, QStringLiteral("Zotero connector"), migrateV2},
-      {3, QStringLiteral("re-embed the chunks for search"), migrateV3},
-      {4, QStringLiteral("agent conversations"), migrateV4},
-      {5, QStringLiteral("repair a pre-release Zotero table"), migrateV5},
   };
   return kMigrations;
 }

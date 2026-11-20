@@ -30,6 +30,47 @@ void addQuery(SqliteDb &db) {
                   "VALUES ('q', 'r', 'm')"));
 }
 
+// A project of HodeIA 0.99rc: its tables as that release created them,
+// no version, one query and, if asked, one chunk.
+void makeRcProject(const QString &path, bool withChunk) {
+  SqliteDb db;
+  QVERIFY(db.open(path).has_value());
+  QVERIFY(db.exec("CREATE TABLE Summaries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "paper_hash TEXT NOT NULL UNIQUE, title TEXT, authors TEXT, "
+                  "pages_num INTEGER NOT NULL, journal TEXT, year TEXT, topics TEXT, "
+                  "llmodel TEXT, summary_json TEXT, date DATETIME)"));
+  QVERIFY(db.exec("CREATE TABLE Queries (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "query TEXT NOT NULL, response TEXT NOT NULL, "
+                  "date DATETIME DEFAULT CURRENT_TIMESTAMP, llmodel TEXT NOT NULL)"));
+  QVERIFY(db.exec("CREATE TABLE Citations (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                  "paper_hash TEXT NOT NULL UNIQUE, clean_title TEXT NOT NULL, "
+                  "work_id TEXT NOT NULL DEFAULT '', cites TEXT NOT NULL DEFAULT '', "
+                  "cited_by TEXT NOT NULL DEFAULT '', "
+                  "cites_count INTEGER NOT NULL DEFAULT 0, "
+                  "cited_by_count INTEGER NOT NULL DEFAULT 0, "
+                  "lookup_status TEXT NOT NULL DEFAULT 'pending', lookup_at DATETIME)"));
+  QVERIFY(db.exec("CREATE VIRTUAL TABLE chunks USING vec0(embedding float[384], "
+                  "paper_hash text, page integer, chunk_idx integer, chunk_text text, "
+                  "citation text, clean_title text, page_metadata text)"));
+  addQuery(db);
+  if (withChunk) {
+    // vec0 metadata columns take no NULL: every column is given.
+    SqliteStatement insert = db.prepare(
+        "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, "
+        "chunk_text, citation, clean_title, page_metadata) "
+        "VALUES (vec_f32(?), 'h', 1, 0, 'text', '', '', '')");
+    (void)insert.bind(1, QByteArray(384 * sizeof(float), '\0'));
+    const auto r = insert.exec();
+    QVERIFY2(r.has_value(), r ? "" : qPrintable(r.error()));
+  }
+  QCOMPARE(ProjectStore::schemaVersion(db), 0);
+}
+
+const char *const kTables[] = {"Summaries",          "Queries",     "Citations",
+                               "chunks",             "ZoteroItems", "ZoteroCollections",
+                               "Maintenance",        "Conversations",
+                               "ConversationMessages"};
+
 // The version after this build's, used by the tests: one more table.
 int nextVersion() { return ProjectStore::currentVersion() + 1; }
 
@@ -52,11 +93,7 @@ private slots:
   void failedMigrationRollsBack();
   void tooNew();
   void openFailed();
-  void v1ToV2();
-  void v2ToV3();
-  void v3ToV4();
-  void v4ToV5RepairsPrereleaseZotero();
-  void v4ToV5KeepsZotero();
+  void zoteroItemsRules();
 };
 
 void TestProjectStore::newDatabase() {
@@ -66,29 +103,33 @@ void TestProjectStore::newDatabase() {
   QVERIFY(ProjectStore::open(db, path).has_value());
   QVERIFY(db.isOpen());
   QCOMPARE(ProjectStore::schemaVersion(db), ProjectStore::currentVersion());
-  for (const char *t : {"Summaries", "Queries", "Citations", "chunks"})
+  for (const char *t : kTables)
     QVERIFY2(hasTable(db, t), t);
+  QCOMPARE(countRows(db, "Maintenance"), 0); // nothing to re-embed
   QVERIFY(!QFile::exists(ProjectStore::backupPath(path, 0)));
 }
 
-// A project from before the migrations: schema of v1, user_version 0,
-// data.  Brought to the current version, data intact, no backup (v1 only
-// creates what is missing).
+// A project of HodeIA 0.99rc (version 0) gains the tables added since; its
+// data is intact, no backup is made (v1 only creates what is missing), and
+// its chunks are queued for re-embedding (none queued without chunks).
 void TestProjectStore::unversionedProject() {
   QTemporaryDir dir;
-  const QString path = dir.filePath("Old.db");
-  {
+  for (const bool withChunk : {true, false}) {
+    const QString path = dir.filePath(withChunk ? "Full.db" : "Empty.db");
+    makeRcProject(path, withChunk);
+    if (QTest::currentTestFailed())
+      return;
     SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 1))
-                .has_value());
-    addQuery(db);
-    QVERIFY(db.exec("PRAGMA user_version = 0"));
+    QVERIFY(ProjectStore::open(db, path).has_value());
+    QCOMPARE(ProjectStore::schemaVersion(db), ProjectStore::currentVersion());
+    for (const char *t : kTables)
+      QVERIFY2(hasTable(db, t), t);
+    QCOMPARE(countRows(db, "Queries"), 1);
+    QCOMPARE(countRows(db, "chunks"), withChunk ? 1 : 0);
+    QCOMPARE(countRows(db, "Maintenance WHERE task = 'reembed' AND progress = 0"),
+             withChunk ? 1 : 0);
+    QVERIFY(!QFile::exists(ProjectStore::backupPath(path, 0)));
   }
-  SqliteDb db;
-  QVERIFY(ProjectStore::open(db, path).has_value());
-  QCOMPARE(ProjectStore::schemaVersion(db), ProjectStore::currentVersion());
-  QCOMPARE(countRows(db, "Queries"), 1);
-  QVERIFY(!QFile::exists(ProjectStore::backupPath(path, 0)));
 }
 
 void TestProjectStore::upToDate() {
@@ -193,141 +234,19 @@ void TestProjectStore::openFailed() {
   QVERIFY(!db.isOpen());
 }
 
-// A project of HodeIA 0.99rc (version 1) gains the Zotero tables; its data
-// and a v1 copy are kept.
-void TestProjectStore::v1ToV2() {
+// ZoteroItems: a status outside the three known ones is refused, one row
+// per attachment of a library, and the same PDF may be in two libraries.
+void TestProjectStore::zoteroItemsRules() {
   QTemporaryDir dir;
-  const QString path = dir.filePath("P.db");
-  {
-    SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 1))
-                .has_value());
-    addQuery(db);
-    QCOMPARE(ProjectStore::schemaVersion(db), 1);
-  }
   SqliteDb db;
-  QVERIFY(ProjectStore::open(db, path).has_value());
-  QVERIFY(ProjectStore::schemaVersion(db) >= 2);
-  QVERIFY(hasTable(db, "ZoteroItems"));
-  QVERIFY(hasTable(db, "ZoteroCollections"));
-  QCOMPARE(countRows(db, "Queries"), 1);
-  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 1)));
-
-  // A status outside the three known ones is refused.
+  QVERIFY(ProjectStore::open(db, dir.filePath("P.db")).has_value());
   QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
                   "attachment_key, paper_hash) VALUES (1, 'I', 'A', 'h')"));
   QVERIFY(!db.exec("UPDATE ZoteroItems SET status = 'lost'"));
-  // One row per attachment of a library.
   QVERIFY(!db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
                    "attachment_key, paper_hash) VALUES (1, 'I', 'A', 'h')"));
-}
-
-// v3 records a re-embedding for a project with chunks, none for an empty one.
-void TestProjectStore::v2ToV3() {
-  QTemporaryDir dir;
-  for (const bool withChunks : {true, false}) {
-    const QString path = dir.filePath(withChunks ? "Full.db" : "Empty.db");
-    {
-      SqliteDb db;
-      QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 2))
-                  .has_value());
-      if (withChunks) {
-        // vec0 metadata columns take no NULL: every column is given.
-        SqliteStatement insert = db.prepare(
-            "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, "
-            "chunk_text, citation, clean_title, page_metadata) "
-            "VALUES (vec_f32(?), 'h', 1, 0, 'text', '', '', '')");
-        (void)insert.bind(1, QByteArray(384 * sizeof(float), '\0'));
-        const auto r = insert.exec();
-        QVERIFY2(r.has_value(), r ? "" : qPrintable(r.error()));
-      }
-    }
-    SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path).has_value());
-    QVERIFY(ProjectStore::schemaVersion(db) >= 3);
-    QVERIFY(hasTable(db, "Maintenance"));
-    QCOMPARE(countRows(db, "Maintenance WHERE task = 'reembed' AND progress = 0"),
-             withChunks ? 1 : 0);
-  }
-  // A new project has nothing to redo.
-  SqliteDb db;
-  QVERIFY(ProjectStore::open(db, dir.filePath("New.db")).has_value());
-  QCOMPARE(countRows(db, "Maintenance"), 0);
-}
-
-void TestProjectStore::v3ToV4() {
-  QTemporaryDir dir;
-  const QString path = dir.filePath("P.db");
-  {
-    SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 3)).has_value());
-    addQuery(db);
-  }
-  SqliteDb db;
-  QVERIFY(ProjectStore::open(db, path).has_value());
-  QVERIFY(ProjectStore::schemaVersion(db) >= 4);
-  QVERIFY(hasTable(db, "Conversations"));
-  QVERIFY(hasTable(db, "ConversationMessages"));
-  QCOMPARE(countRows(db, "Queries"), 1);
-  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 3)));
-}
-
-// A ZoteroItems made by a pre-release build (as found in a real project):
-// rebuilt with the v2 schema, usable rows kept.
-void TestProjectStore::v4ToV5RepairsPrereleaseZotero() {
-  QTemporaryDir dir;
-  const QString path = dir.filePath("P.db");
-  {
-    SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 4)).has_value());
-    QVERIFY(db.exec("DROP TABLE ZoteroItems"));
-    QVERIFY(db.exec("CREATE TABLE ZoteroItems (attachment_key TEXT PRIMARY KEY, "
-                    "library_id INTEGER NOT NULL, item_key TEXT NOT NULL, paper_hash TEXT "
-                    "NOT NULL UNIQUE, title TEXT, authors TEXT, year INTEGER, journal TEXT, "
-                    "doi TEXT, item_type TEXT, tags TEXT, date_modified DATETIME, status "
-                    "TEXT NOT NULL DEFAULT 'pending', removed_at DATETIME)"));
-    QVERIFY(db.exec("INSERT INTO ZoteroItems (attachment_key, library_id, item_key, "
-                    "paper_hash, title, authors, year, doi, status) VALUES ('A1', 1, 'I1', "
-                    "'hash1', 'Entry deterrence', '[\"Dixit, Avinash\"]', 1980, "
-                    "'10.2307/2231592', 'ingested'), ('A2', 1, 'I2', '', 'No hash', NULL, "
-                    "NULL, NULL, 'weird')"));
-  }
-  SqliteDb db;
-  QVERIFY(ProjectStore::open(db, path).has_value());
-  QVERIFY(ProjectStore::schemaVersion(db) >= 5);
-  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 4)));
-  QCOMPARE(countRows(db, "ZoteroItems"), 1); // the row without a hash is dropped
-  SqliteStatement s = db.prepare("SELECT id, title, authors, year, doi, status, added_at "
-                                 "FROM ZoteroItems");
-  auto step = s.step();
-  QVERIFY(step && *step);
-  QVERIFY(s.columnInt(0) > 0);
-  QCOMPARE(s.columnText(1), QString("Entry deterrence"));
-  QCOMPARE(s.columnText(2), QString("[\"Dixit, Avinash\"]"));
-  QCOMPARE(s.columnText(3), QString("1980"));
-  QCOMPARE(s.columnText(4), QString("10.2307/2231592"));
-  QCOMPARE(s.columnText(5), QString("ingested"));
-  QVERIFY(!s.columnText(6).isEmpty());
-  QVERIFY(!hasTable(db, "ZoteroItems_prerelease"));
-  // The v2 rules hold again: two PDFs may share a hash, a bad status is refused.
-  QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, attachment_key, "
-                  "paper_hash) VALUES (2, 'I3', 'A3', 'hash1')"));
-  QVERIFY(!db.exec("UPDATE ZoteroItems SET status = 'lost'"));
-}
-
-// A ZoteroItems with the v2 schema is left as it is.
-void TestProjectStore::v4ToV5KeepsZotero() {
-  QTemporaryDir dir;
-  const QString path = dir.filePath("P.db");
-  {
-    SqliteDb db;
-    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 4)).has_value());
-    QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, attachment_key, "
-                    "paper_hash, doi) VALUES (1, 'I', 'A', 'h', '10.1/x')"));
-  }
-  SqliteDb db;
-  QVERIFY(ProjectStore::open(db, path).has_value());
-  QCOMPARE(countRows(db, "ZoteroItems WHERE id = 1 AND doi = '10.1/x'"), 1);
+  QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, "
+                  "attachment_key, paper_hash) VALUES (2, 'I', 'A', 'h')"));
 }
 
 QTEST_GUILESS_MAIN(TestProjectStore)
