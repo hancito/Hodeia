@@ -72,6 +72,9 @@ signals:
   /// A read found `count` PDFs to propose that had not been announced yet
   /// (at startup, after a project switch, or when Zotero changed).
   void newProposals(int count);
+  /// Zotero PDFs were stored or became part of the project (new DOIs and
+  /// metadata, imports): the OpenAlex lookup can start for them.
+  void itemsUpdated();
 
 private:
   struct Loaded {

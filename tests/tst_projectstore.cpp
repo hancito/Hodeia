@@ -55,6 +55,8 @@ private slots:
   void v1ToV2();
   void v2ToV3();
   void v3ToV4();
+  void v4ToV5RepairsPrereleaseZotero();
+  void v4ToV5KeepsZotero();
 };
 
 void TestProjectStore::newDatabase() {
@@ -268,6 +270,64 @@ void TestProjectStore::v3ToV4() {
   QVERIFY(hasTable(db, "ConversationMessages"));
   QCOMPARE(countRows(db, "Queries"), 1);
   QVERIFY(QFile::exists(ProjectStore::backupPath(path, 3)));
+}
+
+// A ZoteroItems made by a pre-release build (as found in a real project):
+// rebuilt with the v2 schema, usable rows kept.
+void TestProjectStore::v4ToV5RepairsPrereleaseZotero() {
+  QTemporaryDir dir;
+  const QString path = dir.filePath("P.db");
+  {
+    SqliteDb db;
+    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 4)).has_value());
+    QVERIFY(db.exec("DROP TABLE ZoteroItems"));
+    QVERIFY(db.exec("CREATE TABLE ZoteroItems (attachment_key TEXT PRIMARY KEY, "
+                    "library_id INTEGER NOT NULL, item_key TEXT NOT NULL, paper_hash TEXT "
+                    "NOT NULL UNIQUE, title TEXT, authors TEXT, year INTEGER, journal TEXT, "
+                    "doi TEXT, item_type TEXT, tags TEXT, date_modified DATETIME, status "
+                    "TEXT NOT NULL DEFAULT 'pending', removed_at DATETIME)"));
+    QVERIFY(db.exec("INSERT INTO ZoteroItems (attachment_key, library_id, item_key, "
+                    "paper_hash, title, authors, year, doi, status) VALUES ('A1', 1, 'I1', "
+                    "'hash1', 'Entry deterrence', '[\"Dixit, Avinash\"]', 1980, "
+                    "'10.2307/2231592', 'ingested'), ('A2', 1, 'I2', '', 'No hash', NULL, "
+                    "NULL, NULL, 'weird')"));
+  }
+  SqliteDb db;
+  QVERIFY(ProjectStore::open(db, path).has_value());
+  QVERIFY(ProjectStore::schemaVersion(db) >= 5);
+  QVERIFY(QFile::exists(ProjectStore::backupPath(path, 4)));
+  QCOMPARE(countRows(db, "ZoteroItems"), 1); // the row without a hash is dropped
+  SqliteStatement s = db.prepare("SELECT id, title, authors, year, doi, status, added_at "
+                                 "FROM ZoteroItems");
+  auto step = s.step();
+  QVERIFY(step && *step);
+  QVERIFY(s.columnInt(0) > 0);
+  QCOMPARE(s.columnText(1), QString("Entry deterrence"));
+  QCOMPARE(s.columnText(2), QString("[\"Dixit, Avinash\"]"));
+  QCOMPARE(s.columnText(3), QString("1980"));
+  QCOMPARE(s.columnText(4), QString("10.2307/2231592"));
+  QCOMPARE(s.columnText(5), QString("ingested"));
+  QVERIFY(!s.columnText(6).isEmpty());
+  QVERIFY(!hasTable(db, "ZoteroItems_prerelease"));
+  // The v2 rules hold again: two PDFs may share a hash, a bad status is refused.
+  QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, attachment_key, "
+                  "paper_hash) VALUES (2, 'I3', 'A3', 'hash1')"));
+  QVERIFY(!db.exec("UPDATE ZoteroItems SET status = 'lost'"));
+}
+
+// A ZoteroItems with the v2 schema is left as it is.
+void TestProjectStore::v4ToV5KeepsZotero() {
+  QTemporaryDir dir;
+  const QString path = dir.filePath("P.db");
+  {
+    SqliteDb db;
+    QVERIFY(ProjectStore::open(db, path, ProjectStore::migrations().mid(0, 4)).has_value());
+    QVERIFY(db.exec("INSERT INTO ZoteroItems (library_id, item_key, attachment_key, "
+                    "paper_hash, doi) VALUES (1, 'I', 'A', 'h', '10.1/x')"));
+  }
+  SqliteDb db;
+  QVERIFY(ProjectStore::open(db, path).has_value());
+  QCOMPARE(countRows(db, "ZoteroItems WHERE id = 1 AND doi = '10.1/x'"), 1);
 }
 
 QTEST_GUILESS_MAIN(TestProjectStore)

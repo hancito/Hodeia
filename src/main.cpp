@@ -454,6 +454,10 @@ int main(int argc, char *argv[]) {
   // Zotero connector (reads Zotero, imports through the ingestion)
   ZoteroController zoteroController(&configManager, &databaseManager,
                                     &engineController);
+  // Zotero PDFs stored or imported: papers with a DOI get their citations
+  // without waiting for a summary.
+  QObject::connect(&zoteroController, &ZoteroController::itemsUpdated,
+                   &openAlexClient, &OpenAlexClient::checkEmptyReferences);
   // Zotero's metadata first, or not: the paper list shows the other names.
   QObject::connect(&configManager, &ConfigManager::zoteroPriorityChanged,
                    &databaseManager, &DatabaseManager::reloadModels);

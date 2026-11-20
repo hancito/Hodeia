@@ -248,6 +248,8 @@ void ZoteroController::apply(const Loaded &loaded) {
   emit stateChanged();
   if (fresh > 0)
     emit newProposals(fresh);
+  if (!plan.store.isEmpty() || !plan.ingestedIds.isEmpty())
+    emit itemsUpdated();
 
   if (m_refreshAgain) {
     m_refreshAgain = false;

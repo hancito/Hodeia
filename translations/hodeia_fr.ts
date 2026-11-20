@@ -96,93 +96,93 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>AgentChatController</name>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="280"/>
+        <location filename="../src/agentchatcontroller.cpp" line="282"/>
         <source>The message could not be saved: %1</source>
         <translation>Le message n’a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="292"/>
+        <location filename="../src/agentchatcontroller.cpp" line="294"/>
         <source>No agent can search the library: add Claude Code or another agent in the Backends window.</source>
         <translation>Aucun agent ne peut chercher dans la bibliothèque : ajoutez Claude Code ou un autre agent dans la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="307"/>
+        <location filename="../src/agentchatcontroller.cpp" line="309"/>
         <source>The conversation could not be created: %1</source>
         <translation>La conversation n’a pas pu être créée : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="331"/>
+        <location filename="../src/agentchatcontroller.cpp" line="333"/>
         <source>The agent is working...</source>
         <translation>L’agent travaille…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="346"/>
+        <location filename="../src/agentchatcontroller.cpp" line="348"/>
         <source>The agent backend &quot;%1&quot; is not available: check the Backends window.</source>
         <translation>Le backend d’agent « %1 » n’est pas disponible : vérifiez la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="371"/>
+        <location filename="../src/agentchatcontroller.cpp" line="373"/>
         <source>Starting the agent...</source>
         <translation>Démarrage de l’agent…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="403"/>
+        <location filename="../src/agentchatcontroller.cpp" line="405"/>
         <source>Searching the library...</source>
         <translation>Recherche dans la bibliothèque…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="405"/>
+        <location filename="../src/agentchatcontroller.cpp" line="407"/>
         <source>Reading a page...</source>
         <translation>Lecture d’une page…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="407"/>
+        <location filename="../src/agentchatcontroller.cpp" line="409"/>
         <source>Reading a summary...</source>
         <translation>Lecture d’un résumé…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="409"/>
+        <location filename="../src/agentchatcontroller.cpp" line="411"/>
         <source>Listing the papers...</source>
         <translation>Liste des articles…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="411"/>
+        <location filename="../src/agentchatcontroller.cpp" line="413"/>
         <source>Looking at the citations...</source>
         <translation>Examen des citations…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="413"/>
+        <location filename="../src/agentchatcontroller.cpp" line="415"/>
         <source>Using %1...</source>
         <translation>Utilisation de %1…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="417"/>
+        <location filename="../src/agentchatcontroller.cpp" line="419"/>
         <source>Thinking...</source>
         <translation>Réflexion…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="420"/>
+        <location filename="../src/agentchatcontroller.cpp" line="422"/>
         <source>Writing the answer...</source>
         <translation>Rédaction de la réponse…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="454"/>
+        <location filename="../src/agentchatcontroller.cpp" line="456"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="458"/>
+        <location filename="../src/agentchatcontroller.cpp" line="460"/>
         <source>(stopped)</source>
         <translation>(arrêté)</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="461"/>
-        <location filename="../src/agentchatcontroller.cpp" line="494"/>
+        <location filename="../src/agentchatcontroller.cpp" line="463"/>
+        <location filename="../src/agentchatcontroller.cpp" line="496"/>
         <source>Stopped before answering.</source>
         <translation>Arrêté avant de répondre.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="498"/>
+        <location filename="../src/agentchatcontroller.cpp" line="500"/>
         <source>Stopping...</source>
         <translation>Arrêt…</translation>
     </message>
@@ -548,12 +548,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="181"/>
+        <location filename="../src/configmanager.cpp" line="183"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="182"/>
+        <location filename="../src/configmanager.cpp" line="184"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -568,88 +568,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="252"/>
-        <location filename="../src/configmanager.cpp" line="261"/>
-        <location filename="../src/configmanager.cpp" line="267"/>
+        <location filename="../src/configmanager.cpp" line="262"/>
+        <location filename="../src/configmanager.cpp" line="271"/>
+        <location filename="../src/configmanager.cpp" line="277"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="254"/>
-        <location filename="../src/configmanager.cpp" line="262"/>
-        <location filename="../src/configmanager.cpp" line="269"/>
+        <location filename="../src/configmanager.cpp" line="264"/>
+        <location filename="../src/configmanager.cpp" line="272"/>
+        <location filename="../src/configmanager.cpp" line="279"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="256"/>
-        <location filename="../src/configmanager.cpp" line="261"/>
+        <location filename="../src/configmanager.cpp" line="266"/>
+        <location filename="../src/configmanager.cpp" line="271"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="414"/>
-        <location filename="../src/configmanager.cpp" line="451"/>
+        <location filename="../src/configmanager.cpp" line="424"/>
+        <location filename="../src/configmanager.cpp" line="461"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="422"/>
+        <location filename="../src/configmanager.cpp" line="432"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="435"/>
+        <location filename="../src/configmanager.cpp" line="445"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="457"/>
+        <location filename="../src/configmanager.cpp" line="467"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="467"/>
+        <location filename="../src/configmanager.cpp" line="477"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="523"/>
+        <location filename="../src/configmanager.cpp" line="533"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="528"/>
+        <location filename="../src/configmanager.cpp" line="538"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="537"/>
+        <location filename="../src/configmanager.cpp" line="547"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="545"/>
+        <location filename="../src/configmanager.cpp" line="555"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="563"/>
+        <location filename="../src/configmanager.cpp" line="573"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="575"/>
+        <location filename="../src/configmanager.cpp" line="585"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="638"/>
+        <location filename="../src/configmanager.cpp" line="648"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="639"/>
+        <location filename="../src/configmanager.cpp" line="649"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -664,7 +664,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="733"/>
+        <location filename="../src/configmanager.cpp" line="743"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -1791,22 +1791,22 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>OpenAlexClient</name>
     <message>
-        <location filename="../src/openalex.cpp" line="359"/>
+        <location filename="../src/openalex.cpp" line="376"/>
         <source>OpenAlex Access Refused</source>
         <translation>Accès OpenAlex refusé</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="360"/>
+        <location filename="../src/openalex.cpp" line="377"/>
         <source>OpenAlex refused the request (HTTP %1), so citations cannot be fetched. The API key is probably invalid or expired: check it in the OpenAlex API Key menu.</source>
         <translation>OpenAlex a refusé la requête (HTTP %1) : les citations ne peuvent pas être récupérées. La clé API est probablement invalide ou expirée : vérifiez-la dans le menu Clé API OpenAlex.</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="366"/>
+        <location filename="../src/openalex.cpp" line="383"/>
         <source>OpenAlex Limit Reached</source>
         <translation>Limite OpenAlex atteinte</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="367"/>
+        <location filename="../src/openalex.cpp" line="384"/>
         <source>OpenAlex limits the number of requests and the limit is reached, so some citations could not be fetched. They will be fetched again at a later start. An OpenAlex API key raises the limit.</source>
         <translation>OpenAlex limite le nombre de requêtes et cette limite est atteinte : certaines citations n&apos;ont pas pu être récupérées. Elles le seront lors d&apos;un prochain démarrage. Une clé API OpenAlex augmente la limite.</translation>
     </message>
@@ -2237,53 +2237,53 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Mode agentique</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="53"/>
+        <location filename="../ui/RagWindow.qml" line="57"/>
         <source>Converse with %1: it searches your library itself and suggests ways to take the research further.</source>
         <translation>Conversez avec %1 : il cherche lui-même dans votre bibliothèque et propose des pistes pour poursuivre la recherche.</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="54"/>
+        <location filename="../ui/RagWindow.qml" line="58"/>
         <source>Choose an agent backend (Claude Code, Qwen Code...) in the toolbar of the main window to use the agent mode.</source>
         <translation>Choisissez un backend Agent (Claude Code, Qwen Code…) dans la barre d’outils de la fenêtre principale pour utiliser le mode agentique.</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="114"/>
+        <location filename="../ui/RagWindow.qml" line="118"/>
         <source>Ready</source>
         <translation>Prêt</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="126"/>
+        <location filename="../ui/RagWindow.qml" line="139"/>
         <source>Conversation</source>
         <translation>Conversation</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="138"/>
+        <location filename="../ui/RagWindow.qml" line="151"/>
         <source>Querying...</source>
         <translation>Interrogation...</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="142"/>
+        <location filename="../ui/RagWindow.qml" line="155"/>
         <source>Query completed</source>
         <translation>Requête terminée</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="145"/>
+        <location filename="../ui/RagWindow.qml" line="158"/>
         <source>Query Not Saved</source>
         <translation>Requête non enregistrée</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="149"/>
+        <location filename="../ui/RagWindow.qml" line="162"/>
         <source>Query failed: %1</source>
         <translation>Requête échouée : %1</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="150"/>
+        <location filename="../ui/RagWindow.qml" line="163"/>
         <source>Query Failed</source>
         <translation>Échec de la requête</translation>
     </message>
     <message>
-        <location filename="../ui/RagWindow.qml" line="147"/>
-        <location filename="../ui/RagWindow.qml" line="155"/>
+        <location filename="../ui/RagWindow.qml" line="160"/>
+        <location filename="../ui/RagWindow.qml" line="168"/>
         <source>Query stopped</source>
         <translation>Requête arrêtée</translation>
     </message>

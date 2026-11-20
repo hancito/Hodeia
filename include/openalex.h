@@ -20,9 +20,11 @@ class QUrlQuery;
 /// OpenAlex API and stores it in the Citations table.
 ///
 /// For each paper it:
-///   1. Finds the OpenAlex work by a 3-tier search — exact title, then
-///      semantic, then author — disambiguated against the local metadata
-///      (work_id).  Skipped when the work_id is already known.
+///   1. Finds the OpenAlex work: by the DOI Zotero has for the paper, when
+///      there is one; else (or when OpenAlex does not know that DOI) by a
+///      3-tier search — exact title, then semantic, then author —
+///      disambiguated against the local metadata (work_id).  Skipped when
+///      the work_id is already known.
 ///   2. Fetches the works it cites (its references)  -> Citations.cites
 ///   3. Fetches the works that cite it (citing papers) -> Citations.cited_by
 ///
@@ -41,8 +43,14 @@ class QUrlQuery;
 ///     is flushed, the in-flight request aborted and the new DB rescanned.
 ///     m_generation invalidates any late reply / retry timer.
 ///
+/// A paper enters the Citations table when it is summarized, or — when Zotero
+/// has its DOI — at the next scan, without waiting for a summary (which may
+/// never be made); an unsummarized paper is then searched with Zotero's
+/// metadata.
+///
 /// Triggered by:
 ///   - SummaryController::summaryFinished()  (after a summarization batch)
+///   - ZoteroController::itemsUpdated()      (Zotero PDFs stored or imported)
 ///   - checkEmptyReferences() on app startup (catch-up scan)
 ///   - a project switch (onDatabaseSwitched)
 class OpenAlexClient : public QObject {
@@ -70,6 +78,12 @@ public:
   /// the caller uses it to stop the search cascade early.
   static int bestCandidate(const QJsonArray &results, const PaperMeta &meta,
                            bool *exactTitleRejected = nullptr);
+
+  /// A DOI as OpenAlex looks it up: "10.xxx/yyy", lowercase, without
+  /// "https://doi.org/" or "doi:"; empty if it is not a DOI.
+  static QString normalizeDoi(const QString &doi);
+  /// The work id ("W123...") of a /works/<id> reply, empty if none.
+  static QString workIdOf(const QByteArray &body);
 
   /// Scan the Citations table for rows missing citation data and queue them.
   /// Safe to call from any thread (the DB read runs on the main thread).
@@ -105,6 +119,7 @@ private:
     QString apiKey; // snapshot of the config (read on the main thread)
     PaperMeta meta;
     QString workId; // already known -> skip the search
+    QString doi;    // from Zotero, normalised; empty if none
     bool needCites = true;
     bool needCitedBy = true;
   };
@@ -125,6 +140,7 @@ private:
   // --- Search tiers ---
   void runSearchTier(const QUrlQuery &query, const QString &label,
                      std::function<void()> next);
+  void searchByDoi();    // Zotero's DOI -> searchByTitle on failure
   void searchByTitle();  // tier 1 -> semanticSearch
   void semanticSearch(); // tier 2 -> searchByAuthor
   void searchByAuthor(); // tier 3 (last)
@@ -147,6 +163,9 @@ private:
 
   // --- DB (always executed on the main thread) ---
   QList<Job> dbLoadPendingJobs(const QString &apiKey) const;
+  /// Give a Citations row to the project's papers that have a DOI in Zotero
+  /// and none yet; how many were added.
+  int dbRegisterDoiPapers() const;
   void dbSaveWorkId(const Job &job, const QString &workId);
   void dbSaveList(const Job &job, RefKind kind, const QString &itemsJson,
                   int total);
