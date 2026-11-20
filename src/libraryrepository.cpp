@@ -118,7 +118,64 @@ QString LibraryRepository::summaryTitle(const QString &paperHash) const {
   return stmt.columnText(0).trimmed();
 }
 
+std::expected<QStringList, QString> LibraryRepository::paperHashes() const {
+  SqliteStatement stmt = m_db.prepare("SELECT paper_hash FROM Summaries");
+  if (!stmt.isValid())
+    return std::unexpected(prepareFailed());
+  QStringList hashes;
+  while (true) {
+    auto step = stmt.step();
+    if (!step)
+      return std::unexpected(step.error());
+    if (!*step)
+      break;
+    hashes << stmt.columnText(0);
+  }
+  return hashes;
+}
+
 /* ── Writes ─────────────────────────────────────────────────────── */
+
+std::expected<void, QString>
+LibraryRepository::addPapers(const QList<SummaryRow> &rows) {
+  if (rows.isEmpty())
+    return {};
+  if (auto r = m_db.transaction(); !r)
+    return std::unexpected(r.error());
+  auto fail = [this](const QString &error) {
+    (void)m_db.rollback();
+    return std::unexpected(error);
+  };
+
+  SqliteStatement stmt = m_db.prepare(
+      "INSERT INTO Summaries (paper_hash, title, authors, pages_num, journal, "
+      "year, topics, llmodel, summary_json, date) "
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  if (!stmt.isValid())
+    return fail(prepareFailed());
+  for (const SummaryRow &row : rows) {
+    std::expected<bool, QString> r = stmt.bind(1, row.paperHash);
+    if (r) r = stmt.bind(2, row.title);
+    if (r) r = stmt.bind(3, row.authors);
+    if (r) r = stmt.bind(4, row.pagesNum);
+    if (r) r = stmt.bind(5, row.journal);
+    if (r) r = stmt.bind(6, row.year);
+    if (r) r = stmt.bind(7, row.topics);
+    if (r) r = stmt.bind(8, row.llmodel);
+    if (r) r = stmt.bind(9, row.summaryJson.toByteArray());
+    if (r) r = stmt.bind(10, row.date);
+    if (r) r = stmt.exec();
+    if (!r) {
+      qCritical() << "[LibraryRepository] Adding paper" << row.title
+                  << "failed:" << r.error();
+      return fail(r.error());
+    }
+    stmt.resetAndClearBindings();
+  }
+  if (auto r = m_db.commit(); !r)
+    return fail(r.error());
+  return {};
+}
 
 std::expected<void, QString>
 LibraryRepository::saveSummary(const QString &paperHash,

@@ -61,6 +61,8 @@ private slots:
   void removePapers();
   void removeQueries();
   void indexedPapers();
+  void addPapers();
+  void addPapersAllOrNone();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -189,6 +191,44 @@ void TestLibraryRepository::indexedPapers() {
   QCOMPARE(papers[0].paperHash, QString("h1"));
   QCOMPARE(papers[0].cleanTitle, QString("file.pdf"));
   QCOMPARE(papers[0].pages, 1);
+}
+
+namespace {
+
+SummaryRow importedRow(const QString &hash, const QString &title) {
+  SummaryRow row;
+  row.paperHash = hash;
+  row.title = title;
+  row.pagesNum = 12;
+  row.date = QDateTime::currentDateTimeUtc();
+  return row;
+}
+
+} // namespace
+
+// The papers of an import get their row, found again by their hash.
+void TestLibraryRepository::addPapers() {
+  LibraryRepository repo(m_db);
+  QVERIFY(repo.addPapers({importedRow("h1", "a.pdf"), importedRow("h2", "b.pdf")}));
+  QVERIFY(repo.addPapers({}));
+  auto hashes = repo.paperHashes();
+  QVERIFY(hashes);
+  hashes->sort();
+  QCOMPARE(*hashes, QStringList({"h1", "h2"}));
+  const auto rows = repo.summaries();
+  QCOMPARE(rows.size(), 2);
+  QCOMPARE(rows[0].title, QString("a.pdf"));
+  QCOMPARE(rows[0].pagesNum, 12);
+}
+
+// One paper that cannot be added (already there): none of the batch is.
+void TestLibraryRepository::addPapersAllOrNone() {
+  LibraryRepository repo(m_db);
+  QVERIFY(repo.addPapers({importedRow("h1", "a.pdf")}));
+  QVERIFY(!repo.addPapers({importedRow("h2", "b.pdf"), importedRow("h1", "again.pdf")}));
+  QCOMPARE(*repo.paperHashes(), QStringList({"h1"}));
+  // The connection is usable again (no transaction left open).
+  QVERIFY(repo.addPapers({importedRow("h3", "c.pdf")}));
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

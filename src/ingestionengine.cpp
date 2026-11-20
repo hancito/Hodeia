@@ -1,4 +1,5 @@
 #include "ingestionengine.h"
+#include "libraryrepository.h"
 #include "notifier.h"
 #include "sqlitedb.h"
 #include "sqlitevec.h"
@@ -734,8 +735,8 @@ bool PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
   return true;
 }
 
-/// Delete the Summaries rows of papers whose indexing failed, so that a
-/// later import does not skip them as already known.
+/// Remove the papers whose indexing failed, so that a later import does not
+/// skip them as already known.
 void PdfWorker::removePapers(const QList<SummaryRow> &rows,
                              const QString &dbPath) {
   if (rows.isEmpty())
@@ -749,23 +750,18 @@ void PdfWorker::removePapers(const QList<SummaryRow> &rows,
     return;
   }
 
-  SqliteStatement stmt =
-      db.prepare("DELETE FROM Summaries WHERE paper_hash = ?");
-  if (!stmt.isValid()) {
-    qCritical() << "[PdfWorker] Prepare failed for paper removal";
+  QStringList hashes;
+  for (const auto &row : rows)
+    hashes << row.paperHash;
+  const BatchResult result = LibraryRepository(db).removePapers(hashes);
+  if (!result.ok()) {
+    qCritical() << "[PdfWorker] Failed to remove" << result.failed << "of"
+                << hashes.size() << "unindexed paper(s):" << result.lastError;
     return;
   }
-  for (const auto &row : rows) {
-    auto bindResult = stmt.bind(1, row.paperHash);
-    auto execResult = bindResult ? stmt.exec() : bindResult;
-    if (!execResult)
-      qCritical() << "[PdfWorker] Failed to remove paper" << row.title << ":"
-                  << execResult.error();
-    else
-      qWarning() << "[PdfWorker] Removed unindexed paper:"
-                 << row.paperHash.left(12) << row.title;
-    stmt.resetAndClearBindings();
-  }
+  for (const auto &row : rows)
+    qWarning() << "[PdfWorker] Removed unindexed paper:"
+               << row.paperHash.left(12) << row.title;
 }
 
 void PdfWorker::savePapers(const QList<SummaryRow> &rows,
@@ -781,75 +777,9 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
     return;
   }
 
-  auto txResult = db.transaction();
-  if (!txResult) {
-    qCritical() << "[PdfWorker] Failed to start transaction:"
-                << txResult.error();
+  if (auto r = LibraryRepository(db).addPapers(rows); !r) {
+    qCritical() << "[PdfWorker] Saving the papers failed:" << r.error();
     return;
-  }
-
-  SqliteStatement stmt =
-      db.prepare("INSERT INTO Summaries (paper_hash, title, "
-                 "authors, "
-                 "pages_num, journal, year, topics, llmodel, "
-                 "summary_json, date) "
-                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-  for (const auto &row : rows) {
-    auto b1 = stmt.bind(1, row.paperHash);
-    auto b2 = stmt.bind(2, row.title);
-    auto b3 = stmt.bind(3, row.authors);
-    auto b4 = stmt.bind(4, row.pagesNum);
-    auto b5 = stmt.bind(5, row.journal);
-    auto b6 = stmt.bind(6, row.year);
-    auto b7 = stmt.bind(7, row.topics);
-    auto b8 = stmt.bind(8, row.llmodel);
-    auto b9 = stmt.bind(9, row.summaryJson.toByteArray());
-    auto b10 = stmt.bind(10, row.date);
-
-    if (!b1 || !b2 || !b3 || !b4 || !b5 || !b6 || !b7 || !b8 || !b9 || !b10) {
-      QString errMsg;
-      if (!b1)
-        errMsg = b1.error();
-      else if (!b2)
-        errMsg = b2.error();
-      else if (!b3)
-        errMsg = b3.error();
-      else if (!b4)
-        errMsg = b4.error();
-      else if (!b5)
-        errMsg = b5.error();
-      else if (!b6)
-        errMsg = b6.error();
-      else if (!b7)
-        errMsg = b7.error();
-      else if (!b8)
-        errMsg = b8.error();
-      else if (!b9)
-        errMsg = b9.error();
-      else
-        errMsg = b10.error();
-      qCritical() << "[PdfWorker] Error binding params for paper" << row.title
-                  << ":" << errMsg;
-      (void)db.rollback();
-      return;
-    }
-
-    auto execResult = stmt.exec();
-    if (!execResult) {
-      qCritical() << "[PdfWorker] Error inserting paper" << row.title << ":"
-                  << execResult.error();
-      (void)db.rollback();
-      return;
-    }
-    stmt.resetAndClearBindings();
-  }
-
-  auto commitResult = db.commit();
-  if (!commitResult) {
-    qCritical() << "[PdfWorker] Transaction commit failed:"
-                << commitResult.error();
-    (void)db.rollback();
   }
 
   auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
@@ -863,29 +793,19 @@ void PdfWorker::savePapers(const QList<SummaryRow> &rows,
 // ============================================================================
 
 QStringList PdfWorker::getAllPaperHashes(const QString &dbPath) const {
-  QStringList hashes;
-
   SqliteDb db;
   auto openResult = db.open(dbPath);
   if (!openResult) {
     qCritical() << "[PdfWorker] Failed to open database for reading:"
                 << openResult.error();
-    return hashes;
+    return {};
   }
-
-  SqliteStatement stmt = db.prepare("SELECT paper_hash FROM Summaries");
-  while (true) {
-    auto stepResult = stmt.step();
-    if (!stepResult) {
-      qCritical() << "[PdfWorker] Error reading paper hashes:"
-                  << stepResult.error();
-      break;
-    }
-    if (!stepResult.value())
-      break;
-    hashes << stmt.columnText(0);
+  auto hashes = LibraryRepository(db).paperHashes();
+  if (!hashes) {
+    qCritical() << "[PdfWorker] Error reading paper hashes:" << hashes.error();
+    return {};
   }
-  return hashes;
+  return *hashes;
 }
 
 QMap<QString, QUrl>

@@ -70,8 +70,6 @@ struct BatchResult {
 /// show, what the workers save, what the user deletes.  No Qt Quick, no
 /// models: usable from any thread holding the (FULLMUTEX) connection, and
 /// headless (MCP server).
-///
-/// The OpenAlex client and the ingestion keep their own SQL for now.
 class LibraryRepository {
 public:
   explicit LibraryRepository(SqliteDb &db);
@@ -88,8 +86,14 @@ public:
   QList<IndexedPaper> indexedPapers() const;
   /// Title of a summarized paper, empty if none.
   QString summaryTitle(const QString &paperHash) const;
+  /// Hash of every paper of the project (a Summaries row is made at import).
+  std::expected<QStringList, QString> paperHashes() const;
 
   /* ── Writes ── */
+
+  /// Add the papers of an import (their Summaries rows, before any summary),
+  /// all or none: in one transaction, which the caller must not have open.
+  std::expected<void, QString> addPapers(const QList<SummaryRow> &rows);
 
   /// Store (or replace) the summary of a paper, then give its chunks the
   /// summary's title and "Authors (year)" citation, and register the paper
