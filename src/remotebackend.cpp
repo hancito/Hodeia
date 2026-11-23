@@ -1,4 +1,5 @@
 #include "remotebackend.h"
+#include "prompts.h"
 
 #include <utility>
 #include <QBuffer>
@@ -206,9 +207,10 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
 
   if (!hasImages) {
     // Text-only: concatenate all page text
-    QString fullText = payload.userMessage + "\n\n## DOCUMENT\n\n";
+    QString fullText =
+        payload.userMessage + "\n\n" + Prompts::documentHeading() + "\n\n";
     for (const auto &pb : payload.pageBlocks)
-      fullText += QString("## Page %1\n%2\n\n").arg(pb.pageNumber).arg(pb.text);
+      fullText += Prompts::pageHeading(pb.pageNumber) + "\n" + pb.text + "\n\n";
 
     QJsonArray messages;
     if (!systemPrompt.isEmpty())
@@ -231,7 +233,8 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
   {
     QJsonObject part;
     part["type"] = "text";
-    part["text"] = payload.userMessage + "\n\n## DOCUMENT\n\n";
+    part["text"] =
+        payload.userMessage + "\n\n" + Prompts::documentHeading() + "\n\n";
     contentParts.append(part);
   }
 
@@ -244,7 +247,7 @@ void RemoteBackend::generateInterleaved(const QString &systemPrompt,
       QJsonObject part;
       part["type"] = "text";
       part["text"] =
-          QString("## Page %1\n%2\n\n").arg(pb.pageNumber).arg(pb.text);
+          Prompts::pageHeading(pb.pageNumber) + "\n" + pb.text + "\n\n";
       contentParts.append(part);
     }
   }

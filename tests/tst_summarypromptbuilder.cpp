@@ -2,6 +2,7 @@
 // visual mode, and the choice of the system prompt.
 
 #include "summarypromptbuilder.h"
+#include "prompts.h"
 
 #include <QImage>
 #include <QTemporaryDir>
@@ -40,7 +41,7 @@ private slots:
 void TestSummaryPrompt::noChunks() {
   const PromptPayload p =
       SummaryPrompt::build("h", {}, VisualMode::Full, QString());
-  QCOMPARE(p.userMessage, SummaryPrompt::userPrompt());
+  QCOMPARE(p.userMessage, Prompts::summaryUser());
   QVERIFY(p.pageBlocks.empty());
 }
 
@@ -56,7 +57,7 @@ void TestSummaryPrompt::pagesFromChunks() {
   QCOMPARE(p.pageBlocks[0].text, QString("A1. A2."));
   QCOMPARE(p.pageBlocks[1].pageNumber, 2);
   QCOMPARE(p.pageBlocks[1].text, QString("B1. B2."));
-  QCOMPARE(p.systemPrompt, SummaryPrompt::textSystemPrompt());
+  QCOMPARE(p.systemPrompt, Prompts::summarySystem(false, "en"));
   QVERIFY(p.textOnlySystemPrompt.isEmpty());
   QCOMPARE(p.userMessage, QString("Summarize this paper:"));
 }
@@ -131,10 +132,10 @@ void TestSummaryPrompt::imagesByMode() {
   }
   // The visual prompt only when images made it into the payload, with the
   // text prompt as the fallback for backends that cannot pass them.
-  QCOMPARE(p.systemPrompt, any ? SummaryPrompt::visualSystemPrompt()
-                               : SummaryPrompt::textSystemPrompt());
+  QCOMPARE(p.systemPrompt, any ? Prompts::summarySystem(true, "en")
+                               : Prompts::summarySystem(false, "en"));
   QCOMPARE(p.textOnlySystemPrompt,
-           any ? SummaryPrompt::textSystemPrompt() : QString());
+           any ? Prompts::summarySystem(false, "en") : QString());
 }
 
 void TestSummaryPrompt::missingImageFallsBackToText() {
@@ -142,7 +143,7 @@ void TestSummaryPrompt::missingImageFallsBackToText() {
   const PromptPayload p = SummaryPrompt::build("h", {chunk(0, "p1")},
                                                VisualMode::Full, dir.path());
   QVERIFY(p.pageBlocks[0].visualContext.data.empty());
-  QCOMPARE(p.systemPrompt, SummaryPrompt::textSystemPrompt());
+  QCOMPARE(p.systemPrompt, Prompts::summarySystem(false, "en"));
 }
 
 QTEST_GUILESS_MAIN(TestSummaryPrompt)

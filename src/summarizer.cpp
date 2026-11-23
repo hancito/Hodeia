@@ -1,4 +1,5 @@
 #include "summarizer.h"
+#include "prompts.h"
 #include "configmanager.h"
 #include "database.h"
 #include "libraryrepository.h"
@@ -183,7 +184,7 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
   if (!m_database || !m_database->isOpen()) {
     qWarning() << "[Summarizer] database not open";
     PromptPayload payload;
-    payload.userMessage = SummaryPrompt::userPrompt();
+    payload.userMessage = Prompts::summaryUser();
     return payload;
   }
   const QList<ChunkSearchResult> chunks =
@@ -192,7 +193,8 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     qDebug() << "[Summarizer] no chunks for hash:" << paperHash;
   return SummaryPrompt::build(
       paperHash, chunks, m_config->visualModeEnum(),
-      m_config->projectImgPath(m_config->lastProject()));
+      m_config->projectImgPath(m_config->lastProject()),
+      m_config->outputLanguage());
 }
 
 void Summarizer::stop() {

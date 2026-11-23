@@ -93,6 +93,9 @@ void ConfigManager::loadConfig() {
     m_activeModel = obj.value("activeModel").toString("");
     m_openAlexApiKey = obj.value("openAlexApiKey").toString("");
     m_language = obj.value("language").toString("en");
+    m_outputLanguage = obj.value("outputLanguage").toString(Prompts::kDefaultLanguage);
+    if (!Prompts::outputLanguages().contains(m_outputLanguage))
+      m_outputLanguage = Prompts::kDefaultLanguage;
     m_queryContextTokens = qMax(0, obj.value("queryContextTokens").toInt(0));
     m_zoteroDataDir = obj.value("zoteroDataDir").toString();
     m_zoteroPriority = obj.value("zoteroPriority").toBool(false);
@@ -151,6 +154,7 @@ void ConfigManager::saveConfig() {
   obj["openAlexApiKey"] = m_openAlexApiKey;
   obj["visualMode"] = m_visualModeIndex;
   obj["language"] = m_language;
+  obj["outputLanguage"] = m_outputLanguage;
   obj["queryContextTokens"] = m_queryContextTokens;
   obj["zoteroDataDir"] = m_zoteroDataDir;
   obj["zoteroPriority"] = m_zoteroPriority;
@@ -288,6 +292,22 @@ void ConfigManager::setVisualMode(const QString &mode) {
 }
 
 QString ConfigManager::language() const { return m_language; }
+
+QVariantList ConfigManager::outputLanguages() const {
+  QVariantList list;
+  for (const QString &code : Prompts::outputLanguages())
+    list.append(QVariantMap{{"code", code}, {"name", Prompts::nativeName(code)}});
+  return list;
+}
+
+void ConfigManager::setOutputLanguage(const QString &language) {
+  if (!Prompts::outputLanguages().contains(language) ||
+      m_outputLanguage == language)
+    return;
+  m_outputLanguage = language;
+  emit outputLanguageChanged();
+  saveConfig();
+}
 
 void ConfigManager::setQueryContextTokens(int tokens) {
   tokens = qMax(0, tokens);

@@ -1,4 +1,5 @@
 #include "localprompt.h"
+#include "prompts.h"
 
 #include "common/chat.h"
 
@@ -53,12 +54,13 @@ QString buildUserPrompt(const PromptPayload &payload, const QString &marker,
       budget = 256;
   }
 
-  QString userPrompt = payload.userMessage + "\n\n## DOCUMENT\n\n";
+  QString userPrompt =
+      payload.userMessage + "\n\n" + Prompts::documentHeading() + "\n\n";
 
   // ── Interleaved path (pageBlocks non-empty) ──
   if (!payload.pageBlocks.empty()) {
     for (const auto &pb : payload.pageBlocks) {
-      userPrompt += QString("## Page %1\n").arg(pb.pageNumber);
+      userPrompt += Prompts::pageHeading(pb.pageNumber) + "\n";
       if (!marker.isEmpty() && !pb.visualContext.data.empty())
         userPrompt += marker + "\n";
       userPrompt += pb.text + "\n\n";
@@ -72,7 +74,7 @@ QString buildUserPrompt(const PromptPayload &payload, const QString &marker,
             break;
           }
         }
-        userPrompt += "\n\n... [truncated]";
+        userPrompt += "\n\n" + Prompts::truncatedMark();
         break;
       }
     }
@@ -80,16 +82,16 @@ QString buildUserPrompt(const PromptPayload &payload, const QString &marker,
   // ── Legacy path (textContext + visualContext) ──
   else {
     if (!marker.isEmpty() && !payload.visualContext.empty()) {
-      userPrompt += "## VISUAL CONTEXT\n";
+      userPrompt += Prompts::visualContextHeading() + "\n";
       for (size_t i = 0; i < payload.visualContext.size(); ++i)
         userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
       userPrompt += "\n";
     }
     // userMessage is already at the top of the prompt — don't repeat it.
-    userPrompt += "## TEXT CONTEXT\n\n";
+    userPrompt += Prompts::textContextHeading() + "\n\n";
     QString ctx = payload.textContext;
     if (budget > 0 && ctx.length() > budget) {
-      ctx = ctx.left(budget) + "\n\n... [truncated]";
+      ctx = ctx.left(budget) + "\n\n" + Prompts::truncatedMark();
     }
     userPrompt += ctx;
   }

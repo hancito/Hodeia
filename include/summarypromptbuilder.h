@@ -12,14 +12,6 @@
 /// page by page, with page images depending on the visual mode.
 namespace SummaryPrompt {
 
-/// System prompt when page images are sent.
-const QString &visualSystemPrompt();
-/// System prompt for text only (also the fallback of a backend that cannot
-/// pass the images).
-const QString &textSystemPrompt();
-/// The user message.
-const QString &userPrompt();
-
 /// Length of the text `next` repeats from the end of `previous`: the
 /// overlap the ingestion carries from one chunk to the next (whole
 /// sentences joined by spaces, so it starts and ends at a space or at the
@@ -35,9 +27,11 @@ QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks);
 /// `mode` decides which pages get their image: all (Full), those whose
 /// metadata reports a figure, vector graphics or a table (Reduced), none
 /// (TextOnly).  Images are read from `imageDir` (hash_page_NNN.png); a
-/// missing one leaves its page text-only.
+/// missing one leaves its page text-only.  The texts are written in
+/// `language` (Prompts); the system prompt is Prompts::summarySystem().
 PromptPayload build(const QString &paperHash,
                     const QList<ChunkSearchResult> &chunks, VisualMode mode,
-                    const QString &imageDir);
+                    const QString &imageDir,
+                    const QString &language = Prompts::kDefaultLanguage);
 
 } // namespace SummaryPrompt

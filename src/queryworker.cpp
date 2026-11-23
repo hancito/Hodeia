@@ -56,7 +56,8 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
   if (m_database && m_database->isOpen()) {
     const Retriever retriever(m_database->db(), m_database->vecManager());
     const int fixedTokens =
-        retriever.countTokens(QueryPrompt::fixedText(queryText)) + 64;
+        retriever.countTokens(
+            QueryPrompt::fixedText(queryText, m_config->outputLanguage())) + 64;
     Retriever::Options options;
     options.budgetTokens = qMax(1024, contextTokens - fixedTokens);
     options.useVisual = m_config->useVisualContext();
@@ -91,7 +92,8 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
   // 3. Build prompt (the embedding model stays loaded: vector search is
   // done, and a query is a single generation).
   PromptPayload payload =
-      QueryPrompt::build(pages, queryText, m_config->useVisualContext());
+      QueryPrompt::build(pages, queryText, m_config->useVisualContext(),
+                         m_config->outputLanguage());
   qDebug() << "[QueryWorker] Prompt built — text context:"
            << payload.textContext.length()
            << "chars, visuals:" << payload.visualContext.size();

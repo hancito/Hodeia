@@ -1,4 +1,6 @@
 #include "summaryformat.h"
+
+#include <QCoreApplication>
 #include "textformat.h"
 
 #include <algorithm>
@@ -262,6 +264,16 @@ PaperSummary parseJson(const QString &raw) {
   return tryParseJson(raw).value_or(PaperSummary{});
 }
 
+/// A heading of the rendered summary, in the interface's language (the
+/// summary's own text stays in the language it was written in).
+static QString label(const char *text) {
+  return QCoreApplication::translate("SummaryFormat", text);
+}
+
+static QString heading(const QString &text) {
+  return QStringLiteral("<h3>%1</h3>").arg(escapeHtml(text));
+}
+
 QString toHtml(const PaperSummary &s) {
   QString title = s.title;
   if (!title.isEmpty())
@@ -273,20 +285,21 @@ QString toHtml(const PaperSummary &s) {
   html += QStringLiteral("<h2>%1</h2>").arg(escapeHtml(title));
   html += QStringLiteral("<h4>%1 (%2)</h4>")
               .arg(escapeHtml(authors), QString::number(s.year));
-  html += QStringLiteral("<h4><em>Journal: %1</em></h4>")
-              .arg(escapeHtml(s.journal));
+  html += QStringLiteral("<h4><em>%1</em></h4>")
+              .arg(escapeHtml(label(QT_TRANSLATE_NOOP("SummaryFormat", "Journal: %1")).arg(s.journal)));
   if (!topics.isEmpty())
     html +=
-        QStringLiteral("<h4><em>Topics: %1</em></h4>").arg(escapeHtml(topics));
-  html += QStringLiteral("<h3>Research objective</h3>");
+        QStringLiteral("<h4><em>%1</em></h4>")
+            .arg(escapeHtml(label(QT_TRANSLATE_NOOP("SummaryFormat", "Topics: %1")).arg(topics)));
+  html += heading(label(QT_TRANSLATE_NOOP("SummaryFormat", "Research objective")));
   html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.researchObjective));
-  html += QStringLiteral("<h3>Methodology</h3>");
+  html += heading(label(QT_TRANSLATE_NOOP("SummaryFormat", "Methodology")));
   html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.methodology));
-  html += QStringLiteral("<h3>Core findings and significance</h3>");
+  html += heading(label(QT_TRANSLATE_NOOP("SummaryFormat", "Core findings and significance")));
   html += toHtmlList(s.coreFindingsAndSignificance);
-  html += QStringLiteral("<h3>Critical Limitations</h3>");
+  html += heading(label(QT_TRANSLATE_NOOP("SummaryFormat", "Critical limitations")));
   html += toHtmlList(s.criticalLimitations);
-  html += QStringLiteral("<h3>Citable summary</h3>");
+  html += heading(label(QT_TRANSLATE_NOOP("SummaryFormat", "Citable summary")));
   html += QStringLiteral("<p>%1</p>").arg(escapeHtml(s.citableSummary));
   return html;
 }
@@ -294,8 +307,8 @@ QString toHtml(const PaperSummary &s) {
 QString reportToHtml(const QList<PaperSummary> &papers) {
   QString html;
   if (papers.size() > 1)
-    html += QStringLiteral(
-        "<h1 class=\"center\">Research Summary Report</h1><hr>");
+    html += QStringLiteral("<h1 class=\"center\">%1</h1><hr>")
+                .arg(escapeHtml(label(QT_TRANSLATE_NOOP("SummaryFormat", "Research Summary Report"))));
   QStringList sections;
   for (const PaperSummary &paper : papers)
     sections.append(toHtml(paper));

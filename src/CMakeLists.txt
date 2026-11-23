@@ -37,6 +37,7 @@ add_library(HodeiaEngine STATIC
     ../include/ingestionengine.h
     ../include/ingestionpipeline.h
     ../include/pdfextractor.h
+    ../include/prompts.h
     ../include/enginemanager.h
     ../include/sqlitedb.h
     ../include/sqlitevec.h
@@ -96,6 +97,7 @@ add_library(HodeiaEngine STATIC
     ingestionengine.cpp
     ingestionpipeline.cpp
     pdfextractor.cpp
+    prompts.cpp
     enginemanager.cpp
     sqlitedb.cpp
     sqlitevec.cpp

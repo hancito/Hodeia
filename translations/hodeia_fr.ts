@@ -96,98 +96,98 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>AgentChatController</name>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="288"/>
+        <location filename="../src/agentchatcontroller.cpp" line="266"/>
         <source>The message could not be saved: %1</source>
         <translation>Le message n’a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="300"/>
+        <location filename="../src/agentchatcontroller.cpp" line="278"/>
         <source>No agent can search the library: add Claude Code or another agent in the Backends window.</source>
         <translation>Aucun agent ne peut chercher dans la bibliothèque : ajoutez Claude Code ou un autre agent dans la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="315"/>
+        <location filename="../src/agentchatcontroller.cpp" line="293"/>
         <source>The conversation could not be created: %1</source>
         <translation>La conversation n’a pas pu être créée : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="339"/>
+        <location filename="../src/agentchatcontroller.cpp" line="317"/>
         <source>The agent is working...</source>
         <translation>L’agent travaille…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="354"/>
+        <location filename="../src/agentchatcontroller.cpp" line="332"/>
         <source>The agent backend &quot;%1&quot; is not available: check the Backends window.</source>
         <translation>Le backend d’agent « %1 » n’est pas disponible : vérifiez la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="379"/>
+        <location filename="../src/agentchatcontroller.cpp" line="357"/>
         <source>Starting the agent...</source>
         <translation>Démarrage de l’agent…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="411"/>
+        <location filename="../src/agentchatcontroller.cpp" line="389"/>
         <source>Searching the library...</source>
         <translation>Recherche dans la bibliothèque…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="413"/>
+        <location filename="../src/agentchatcontroller.cpp" line="391"/>
         <source>Reading a page...</source>
         <translation>Lecture d’une page…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="415"/>
+        <location filename="../src/agentchatcontroller.cpp" line="393"/>
         <source>Reading a summary...</source>
         <translation>Lecture d’un résumé…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="417"/>
+        <location filename="../src/agentchatcontroller.cpp" line="395"/>
         <source>Listing the papers...</source>
         <translation>Liste des articles…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="419"/>
+        <location filename="../src/agentchatcontroller.cpp" line="397"/>
         <source>Looking at the citations...</source>
         <translation>Examen des citations…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="421"/>
+        <location filename="../src/agentchatcontroller.cpp" line="399"/>
         <source>Saving a summary...</source>
-        <translation>Enregistrement d'un résumé...</translation>
+        <translation>Enregistrement d&apos;un résumé...</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="423"/>
+        <location filename="../src/agentchatcontroller.cpp" line="401"/>
         <source>Using %1...</source>
         <translation>Utilisation de %1…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="427"/>
+        <location filename="../src/agentchatcontroller.cpp" line="405"/>
         <source>Thinking...</source>
         <translation>Réflexion…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="430"/>
+        <location filename="../src/agentchatcontroller.cpp" line="408"/>
         <source>Writing the answer...</source>
         <translation>Rédaction de la réponse…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="464"/>
+        <location filename="../src/agentchatcontroller.cpp" line="442"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="468"/>
+        <location filename="../src/agentchatcontroller.cpp" line="446"/>
         <source>(stopped)</source>
         <translation>(arrêté)</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="471"/>
-        <location filename="../src/agentchatcontroller.cpp" line="504"/>
+        <location filename="../src/agentchatcontroller.cpp" line="449"/>
+        <location filename="../src/agentchatcontroller.cpp" line="482"/>
         <source>Stopped before answering.</source>
         <translation>Arrêté avant de répondre.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="508"/>
+        <location filename="../src/agentchatcontroller.cpp" line="486"/>
         <source>Stopping...</source>
         <translation>Arrêt…</translation>
     </message>
@@ -317,22 +317,22 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>AnthropicApi</name>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="96"/>
+        <location filename="../src/anthropicapi.cpp" line="98"/>
         <source>HTTP error %1</source>
         <translation>Erreur HTTP %1</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="98"/>
+        <location filename="../src/anthropicapi.cpp" line="100"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d’analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="117"/>
+        <location filename="../src/anthropicapi.cpp" line="119"/>
         <source>The model declined the request (%1)</source>
         <translation>Le modèle a refusé la requête (%1)</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="132"/>
+        <location filename="../src/anthropicapi.cpp" line="134"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
@@ -553,12 +553,12 @@ Une copie du fichier endommagé a été conservée :
 %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="183"/>
+        <location filename="../src/configmanager.cpp" line="187"/>
         <source>Settings Not Saved</source>
         <translation>Réglages non enregistrés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="184"/>
+        <location filename="../src/configmanager.cpp" line="188"/>
         <source>Your settings could not be saved, so changes (backends, API key, theme, active project...) will be lost when HodeIA closes.
 
 %1
@@ -573,88 +573,88 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="262"/>
-        <location filename="../src/configmanager.cpp" line="271"/>
-        <location filename="../src/configmanager.cpp" line="277"/>
+        <location filename="../src/configmanager.cpp" line="266"/>
+        <location filename="../src/configmanager.cpp" line="275"/>
+        <location filename="../src/configmanager.cpp" line="281"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="264"/>
-        <location filename="../src/configmanager.cpp" line="272"/>
-        <location filename="../src/configmanager.cpp" line="279"/>
+        <location filename="../src/configmanager.cpp" line="268"/>
+        <location filename="../src/configmanager.cpp" line="276"/>
+        <location filename="../src/configmanager.cpp" line="283"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="266"/>
-        <location filename="../src/configmanager.cpp" line="271"/>
+        <location filename="../src/configmanager.cpp" line="270"/>
+        <location filename="../src/configmanager.cpp" line="275"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="424"/>
-        <location filename="../src/configmanager.cpp" line="461"/>
+        <location filename="../src/configmanager.cpp" line="444"/>
+        <location filename="../src/configmanager.cpp" line="481"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="432"/>
+        <location filename="../src/configmanager.cpp" line="452"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="445"/>
+        <location filename="../src/configmanager.cpp" line="465"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="467"/>
+        <location filename="../src/configmanager.cpp" line="487"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="477"/>
+        <location filename="../src/configmanager.cpp" line="497"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="533"/>
+        <location filename="../src/configmanager.cpp" line="553"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="538"/>
+        <location filename="../src/configmanager.cpp" line="558"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="547"/>
+        <location filename="../src/configmanager.cpp" line="567"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="555"/>
+        <location filename="../src/configmanager.cpp" line="575"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="573"/>
+        <location filename="../src/configmanager.cpp" line="593"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="585"/>
+        <location filename="../src/configmanager.cpp" line="605"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="648"/>
+        <location filename="../src/configmanager.cpp" line="668"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="649"/>
+        <location filename="../src/configmanager.cpp" line="669"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -669,7 +669,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="743"/>
+        <location filename="../src/configmanager.cpp" line="763"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -1589,12 +1589,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>MyMenuBar</name>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="219"/>
+        <location filename="../ui/MyMenuBar.qml" line="234"/>
         <source>Help</source>
         <translation>Aide</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="221"/>
+        <location filename="../ui/MyMenuBar.qml" line="236"/>
         <source>About HodeIA...</source>
         <translation>À propos de HodeIA...</translation>
     </message>
@@ -1722,7 +1722,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Français</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="213"/>
+        <location filename="../ui/MyMenuBar.qml" line="214"/>
+        <source>Answer Language</source>
+        <translation>Langue des réponses</translation>
+    </message>
+    <message>
+        <location filename="../ui/MyMenuBar.qml" line="228"/>
         <source>OpenAlex API Key...</source>
         <translation>Clé API OpenAlex...</translation>
     </message>
@@ -2134,57 +2139,57 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Requête vide</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="78"/>
+        <location filename="../src/queryworker.cpp" line="79"/>
         <source>No relevant information found in the library.</source>
         <translation>Aucune information pertinente trouvée dans la bibliothèque.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="80"/>
+        <location filename="../src/queryworker.cpp" line="81"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="83"/>
+        <location filename="../src/queryworker.cpp" line="84"/>
         <source>The library cannot be searched: %1</source>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="106"/>
+        <location filename="../src/queryworker.cpp" line="108"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="112"/>
+        <location filename="../src/queryworker.cpp" line="114"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="131"/>
+        <location filename="../src/queryworker.cpp" line="133"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="168"/>
+        <location filename="../src/queryworker.cpp" line="170"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="170"/>
+        <location filename="../src/queryworker.cpp" line="172"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="172"/>
+        <location filename="../src/queryworker.cpp" line="174"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="177"/>
+        <location filename="../src/queryworker.cpp" line="179"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="203"/>
+        <location filename="../src/queryworker.cpp" line="205"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
@@ -2359,39 +2364,39 @@ Nouvel essai au prochain démarrage.</translation>
 <context>
     <name>RemoteBackend</name>
     <message>
-        <location filename="../src/remotebackend.cpp" line="23"/>
+        <location filename="../src/remotebackend.cpp" line="24"/>
         <source>SSL error: %1</source>
         <translation>Erreur SSL : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="65"/>
+        <location filename="../src/remotebackend.cpp" line="66"/>
         <source>Sending request to %1</source>
         <translation>Envoi de la requête vers %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="159"/>
-        <location filename="../src/remotebackend.cpp" line="179"/>
-        <location filename="../src/remotebackend.cpp" line="202"/>
+        <location filename="../src/remotebackend.cpp" line="160"/>
+        <location filename="../src/remotebackend.cpp" line="180"/>
+        <location filename="../src/remotebackend.cpp" line="203"/>
         <source>Backend not configured (URL or model missing)</source>
         <translation>Backend non configuré (URL ou modèle manquant)</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="314"/>
+        <location filename="../src/remotebackend.cpp" line="317"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d&apos;analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="324"/>
+        <location filename="../src/remotebackend.cpp" line="327"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="343"/>
+        <location filename="../src/remotebackend.cpp" line="346"/>
         <source>Empty content in response</source>
         <translation>Contenu vide dans la réponse</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="347"/>
+        <location filename="../src/remotebackend.cpp" line="350"/>
         <source>Response received (%1 chars)</source>
         <translation>Réponse reçue (%1 caractères)</translation>
     </message>
@@ -2434,47 +2439,47 @@ Nouvel essai au prochain démarrage.</translation>
 <context>
     <name>Summarizer</name>
     <message>
-        <location filename="../src/summarizer.cpp" line="62"/>
+        <location filename="../src/summarizer.cpp" line="63"/>
         <source>The project database is not open</source>
         <translation>La base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="74"/>
+        <location filename="../src/summarizer.cpp" line="75"/>
         <source>Cancelled</source>
         <translation>Annulé</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="84"/>
+        <location filename="../src/summarizer.cpp" line="85"/>
         <source>The model returned an empty response</source>
         <translation>Le modèle a renvoyé une réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="91"/>
+        <location filename="../src/summarizer.cpp" line="92"/>
         <source>The model&apos;s response is not a readable summary</source>
         <translation>La réponse du modèle n&apos;est pas un résumé lisible</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="100"/>
+        <location filename="../src/summarizer.cpp" line="101"/>
         <source>The summary could not be saved: %1</source>
         <translation>Le résumé n&apos;a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="168"/>
+        <location filename="../src/summarizer.cpp" line="169"/>
         <source>No model file found for &quot;%1&quot;. Check the selected model.</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 ». Vérifiez le modèle sélectionné.</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="172"/>
+        <location filename="../src/summarizer.cpp" line="173"/>
         <source>The model could not be loaded: %1</source>
         <translation>Le modèle n&apos;a pas pu être chargé : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="177"/>
+        <location filename="../src/summarizer.cpp" line="178"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="226"/>
+        <location filename="../src/summarizer.cpp" line="228"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
@@ -2487,7 +2492,7 @@ Nouvel essai au prochain démarrage.</translation>
         <translation type="vanished">Réponse vide</translation>
     </message>
     <message>
-        <location filename="../src/summarizer.cpp" line="108"/>
+        <location filename="../src/summarizer.cpp" line="109"/>
         <source>Summary generated and saved (%1 chars)</source>
         <translation>Résumé généré et enregistré (%1 caractères)</translation>
     </message>
@@ -2741,6 +2746,49 @@ Nouvel essai au prochain démarrage.</translation>
         <location filename="../ui/SummaryDbPane.qml" line="600"/>
         <source>Deletion cancelled</source>
         <translation>Suppression annulée</translation>
+    </message>
+</context>
+<context>
+    <name>SummaryFormat</name>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="289"/>
+        <source>Journal: %1</source>
+        <translation>Revue : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="293"/>
+        <source>Topics: %1</source>
+        <translation>Thèmes : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="294"/>
+        <source>Research objective</source>
+        <translation>Objectif de recherche</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="296"/>
+        <source>Methodology</source>
+        <translation>Méthodologie</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="298"/>
+        <source>Core findings and significance</source>
+        <translation>Principaux résultats et portée</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="300"/>
+        <source>Critical limitations</source>
+        <translation>Limites</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="302"/>
+        <source>Citable summary</source>
+        <translation>Résumé citable</translation>
+    </message>
+    <message>
+        <location filename="../src/summaryformat.cpp" line="311"/>
+        <source>Research Summary Report</source>
+        <translation>Rapport de synthèse</translation>
     </message>
 </context>
 <context>

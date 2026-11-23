@@ -1,5 +1,7 @@
 #include "summarypromptbuilder.h"
 
+#include "prompts.h"
+
 #include <QDebug>
 #include <QDir>
 #include <QImage>
@@ -9,70 +11,9 @@
 #include <QSet>
 #include <algorithm>
 
-namespace {
-
-const QString s_systemPromptVisual = []() {
-  return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
-  1. The document is provided page by page. Each page's image (when available) precedes its extracted text.
-  2. Use the images to gather broader context and verify data, tables, and figures alongside the OCR text.
-  3. And respond with high details following this structured schema in english and don't put icons:
-  4. Use mathematical description when pertinent
-{
-  "title": "The full title of the paper",
-  "authors": [A list of author names],
-  "journal": "journal or conference name",
-  "year": "The publication year as an integer",
-  "topics": [A list the 5 most relevant topics or keywords from the paper.],
-  "researchObjective": "Identify the primary question or hypothesis in 1 sentence",
-  "methodology": "Describe the study design, sample size, and key variables. Use a paragraph",
-  "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
-  "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
-  "citableSummary": "A two-sentence summary suitable for a literature review"
-}
-For mathematics, do NOT use LaTeX or markdown. Write formulas as plain
-Unicode text so they render directly: use Greek letters (α β γ θ μ σ π),
-superscripts/subscripts (x², xᵢ, aⱼ), and symbols (√, ², ³, ±, ×, ÷, ≤, ≥,
-≈, ∑, ∫, →, ∞, Δ). Prefer a flat, readable form (e.g. "x² + y² = r²",
-"μ = 5.2, σ = 1.3") over stacked fractions — write fractions as "a/b".
-Don't use markdown formatting. Return only valid JSON.)";
-}();
-
-const QString s_systemPromptText = []() {
-  return R"(You are Senior Research Analyst. Your task is to analyze academic papers with extreme precision. When asked to summarize a paper you will:
-  1. Read the provided text context extracted from the paper, organized page by page.
-  2. And respond with high details following this structured schema in english and don't put icons:
-  3. Use mathematical description when pertinent
-{
-  "title": "The full title of the paper",
-  "authors": [A list of author names],
-  "journal": "journal or conference name",
-  "year": "The publication year as an integer",
-  "topics": [A list the 5 most relevant topics or keywords from the paper.],
-  "researchObjective": "Identify the primary question or hypothesis in 1 sentence",
-  "methodology": "Describe the study design, sample size, and key variables. Use a paragraph",
-  "coreFindingsAndSignificance": ["Highlight the most statistically or theoretically significant results. Use a bulleted list"],
-  "criticalLimitations": ["Identify a list of internal or external validity threats mentioned or observed.",]
-  "citableSummary": "A two-sentence summary suitable for a literature review"
-}
-For mathematics, do NOT use LaTeX or markdown. Write formulas as plain
-Unicode text so they render directly: use Greek letters (α β γ θ μ σ π),
-superscripts/subscripts (x², xᵢ, aⱼ), and symbols (√, ², ³, ±, ×, ÷, ≤, ≥,
-≈, ∑, ∫, →, ∞, Δ). Prefer a flat, readable form (e.g. "x² + y² = r²",
-"μ = 5.2, σ = 1.3") over stacked fractions — write fractions as "a/b".
-Don't use markdown formatting. Return only valid JSON.)";
-}();
-
-const QString s_userPrompt = []() {
-  return R"(Summarize this paper:)";
-}();
-
-} // namespace
 
 namespace SummaryPrompt {
 
-const QString &visualSystemPrompt() { return s_systemPromptVisual; }
-const QString &textSystemPrompt() { return s_systemPromptText; }
-const QString &userPrompt() { return s_userPrompt; }
 
 qsizetype chunkOverlap(QStringView previous, QStringView next) {
   // The longest common end/start, at a sentence boundary on both sides
@@ -110,9 +51,9 @@ QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks) {
 
 PromptPayload build(const QString &paperHash,
                     const QList<ChunkSearchResult> &chunks, VisualMode mode,
-                    const QString &imageDir) {
+                    const QString &imageDir, const QString &language) {
   PromptPayload payload;
-  payload.userMessage = s_userPrompt;
+  payload.userMessage = Prompts::summaryUser();
   if (chunks.isEmpty())
     return payload;
 
@@ -176,9 +117,9 @@ PromptPayload build(const QString &paperHash,
     if (!pb.visualContext.data.empty())
       ++imgCount;
   const bool visual = mode != VisualMode::TextOnly && imgCount > 0;
-  payload.systemPrompt = visual ? s_systemPromptVisual : s_systemPromptText;
+  payload.systemPrompt = Prompts::summarySystem(visual, language);
   if (visual)
-    payload.textOnlySystemPrompt = s_systemPromptText;
+    payload.textOnlySystemPrompt = Prompts::summarySystem(false, language);
 
   const char *modeName = mode == VisualMode::Full      ? "FULL"
                          : mode == VisualMode::Reduced ? "REDUCED"

@@ -1,4 +1,5 @@
 #include "anthropicapi.h"
+#include "prompts.h"
 
 #include <QBuffer>
 #include <QCoreApplication>
@@ -60,12 +61,13 @@ QJsonObject buildBody(const PromptPayload &payload, const QString &model) {
   if (!payload.pageBlocks.empty()) {
     // Same layout as RemoteBackend::generateInterleaved: instructions, then
     // per page its image (when any) before its text.
-    content.append(textBlock(payload.userMessage + "\n\n## DOCUMENT\n\n"));
+    content.append(textBlock(payload.userMessage + "\n\n" +
+                             Prompts::documentHeading() + "\n\n"));
     for (const auto &pb : payload.pageBlocks) {
       if (!pb.visualContext.data.empty())
         content.append(imageBlock(pb.visualContext));
       content.append(textBlock(
-          QString("## Page %1\n%2\n\n").arg(pb.pageNumber).arg(pb.text)));
+          Prompts::pageHeading(pb.pageNumber) + "\n" + pb.text + "\n\n"));
     }
   } else {
     content.append(

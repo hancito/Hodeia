@@ -78,7 +78,7 @@ public:
   Q_INVOKABLE void closeAgent();
 
   /// The instructions given to the agent in mode agentique.
-  static QString systemPrompt();
+  static QString systemPrompt(const QString &language);
   /// HodeIA's MCP server, as given to the agent.
   static Agents::McpServer hodeiaMcpServer();
   /// The conversation so far, for an agent that could not resume it.

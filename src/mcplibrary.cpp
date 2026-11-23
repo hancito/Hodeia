@@ -6,6 +6,7 @@
 #include "mcpserver.h"
 #include "metadataresolver.h"
 #include "projectstore.h"
+#include "prompts.h"
 #include "retriever.h"
 #include "sqlitevec.h"
 #include "summaryformat.h"
@@ -90,6 +91,18 @@ McpLibrary::McpLibrary(Paths paths)
 McpLibrary::~McpLibrary() = default;
 
 /* ── Project ────────────────────────────────────────────────────── */
+
+QString McpLibrary::outputLanguage() const {
+  QFile file(m_paths.configFile);
+  if (!file.open(QIODevice::ReadOnly))
+    return Prompts::kDefaultLanguage;
+  const QString code = QJsonDocument::fromJson(file.readAll())
+                           .object()
+                           .value("outputLanguage")
+                           .toString(Prompts::kDefaultLanguage);
+  return Prompts::outputLanguages().contains(code) ? code
+                                                   : Prompts::kDefaultLanguage;
+}
 
 std::expected<void, QString> McpLibrary::openActiveProject() {
   QFile file(m_paths.configFile);
@@ -675,10 +688,12 @@ void McpLibrary::registerTools(McpServer &server) {
          "Store the structured summary you wrote for a paper of the library, "
          "as HodeIA's own summaries: HodeIA lists it, shows it, exports it, "
          "and looks the paper up on OpenAlex. Read the whole paper first "
-         "(get_page for each page). Write in English, with precision and "
-         "detail, from the paper only; no Markdown, no LaTeX: write formulas "
-         "in plain Unicode (α, x², ≤, ∑, a/b). A paper that already has a "
-         "summary keeps it unless replace is true.",
+         "(get_page for each page). Write with precision and detail, from the "
+         "paper only; no Markdown, no LaTeX: write formulas in plain Unicode "
+         "(α, x², ≤, ∑, a/b). " +
+             Prompts::summaryLanguageRule(outputLanguage()) +
+             " If the user asked for another language, use it instead. A paper "
+             "that already has a summary keeps it unless replace is true.",
          schema({{"paper", stringProp(kPaperIdHelp)},
                  {"summary", summarySchema},
                  {"model", stringProp("Your model's name, shown as the "

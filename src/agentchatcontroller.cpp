@@ -1,4 +1,5 @@
 #include "agentchatcontroller.h"
+#include "prompts.h"
 
 #include "agentbackend.h"
 #include "agentregistry.h"
@@ -239,29 +240,8 @@ void AgentChatController::dropConnection() {
 
 /* ── A turn ────────────────────────────────────────────────────── */
 
-QString AgentChatController::systemPrompt() {
-  return QStringLiteral(
-      "You are the research assistant of HodeIA, an app for scientific literature. "
-      "The user's library of papers (the project open in HodeIA) is available through "
-      "the tools of the \"hodeia\" server: search_library (semantic search over the full "
-      "text of every paper, optionally restricted to some papers), list_papers, "
-      "get_summary (a paper's structured summary), get_page (the text of one page), "
-      "get_citations (references and citing works) and save_summary (store a summary "
-      "you wrote for a paper).\n\n"
-      "- Answer from the library: search it before answering, read summaries and pages "
-      "when needed, and say so when the library does not answer the question. Never "
-      "invent content.\n"
-      "- Cite every claim with the marks the tools return, exactly as written, e.g. "
-      "[@95f8ed154398:p12] for a page or [@95f8ed154398] for a paper. Never invent or "
-      "alter a mark; HodeIA turns them into citations.\n"
-      "- Answer in the language of the user, in Markdown, concisely.\n"
-      "- When the user asks you to summarize papers of the library, read each one "
-      "fully with get_page, then store the summary with save_summary. Replace an "
-      "existing summary only if the user asked to redo it.\n"
-      "- End every answer with a short section titled in the user's language (\"Pistes "
-      "de recherche\" in French, \"Next steps\" in English) suggesting two to four "
-      "concrete ways to take the research further: questions to explore, papers of the "
-      "library to read, gaps or contradictions to examine.");
+QString AgentChatController::systemPrompt(const QString &language) {
+  return Prompts::agentSystem(language);
 }
 
 Agents::McpServer AgentChatController::hodeiaMcpServer() {
@@ -269,17 +249,15 @@ Agents::McpServer AgentChatController::hodeiaMcpServer() {
 }
 
 QString AgentChatController::transcript(const QList<ConversationMessage> &messages) {
-  QStringList lines;
+  QStringList turns;
   for (const ConversationMessage &m : messages) {
     if (m.role == ConversationMessage::Role::Error)
       continue;
-    lines.append((m.role == ConversationMessage::Role::User ? "User: " : "Assistant: ") +
-                 m.content);
+    turns.append(m.role == ConversationMessage::Role::User
+                     ? Prompts::agentUserTurn(m.content)
+                     : Prompts::agentAssistantTurn(m.content));
   }
-  if (lines.isEmpty())
-    return {};
-  return "Our conversation so far (continue it):\n\n" + lines.join("\n\n") +
-         "\n\n---\n\nNew message:\n\n";
+  return Prompts::agentTranscript(turns);
 }
 
 void AgentChatController::addMessage(ConversationMessage::Role role, const QString &content) {
@@ -367,7 +345,7 @@ void AgentChatController::startTurn(const QString &text) {
   const auto stored = ConversationRepository(m_database->db()).conversation(m_currentId);
   Agents::SessionOptions options;
   options.workDir = AgentBackend::workDir();
-  options.systemPrompt = systemPrompt();
+  options.systemPrompt = systemPrompt(m_config->outputLanguage());
   options.model = m_model;
   options.tools = false;
   options.mcpServers = {hodeiaMcpServer()};

@@ -53,6 +53,8 @@ public:
   std::expected<QString, QString> saveSummary(const QJsonObject &args);
 
 private:
+  /// HodeIA's output language (config.json), for the summaries.
+  QString outputLanguage() const;
   /// Open the database of the project active in HodeIA (reopened when it
   /// changed since the last call).
   std::expected<void, QString> openActiveProject();

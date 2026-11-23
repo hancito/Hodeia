@@ -1,6 +1,7 @@
 // Unit tests for QueryPrompt: the exact layout of a query prompt.
 
 #include "querypromptbuilder.h"
+#include "prompts.h"
 
 #include <QImage>
 #include <QTemporaryDir>
@@ -37,7 +38,7 @@ void TestQueryPrompt::textLayout() {
       page("bbb", 0, {"other"}, "", "Bull - 1984 - Equilibrium")};
   const PromptPayload p = QueryPrompt::build(pages, "What is it?", false);
 
-  QCOMPARE(p.systemPrompt, QueryPrompt::systemPrompt());
+  QCOMPARE(p.systemPrompt, Prompts::querySystem("en"));
   QVERIFY(p.systemPrompt.startsWith("You are an expert academic research"));
   QVERIFY(p.textOnlySystemPrompt.isEmpty());
 
@@ -57,14 +58,13 @@ void TestQueryPrompt::textLayout() {
   QVERIFY(p.visualContext.empty());
 
   QCOMPARE(p.userMessage,
-           "Core Task Query: What is it?\n\n" + QueryPrompt::formatReminder() +
+           "Core Task Query: What is it?\n\n" + Prompts::queryReminder("en") +
                "\n\nSynthesize your final cross-paper response now:");
 }
 
 void TestQueryPrompt::fixedText() {
-  QCOMPARE(QueryPrompt::fixedText("Q"), QueryPrompt::systemPrompt() +
-                                            QueryPrompt::formatReminder() +
-                                            "Q");
+  QCOMPARE(QueryPrompt::fixedText("Q", "fr"),
+           Prompts::querySystem("fr") + Prompts::queryUserMessage("Q", "fr"));
 }
 
 void TestQueryPrompt::images() {

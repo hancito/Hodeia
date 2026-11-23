@@ -208,6 +208,21 @@ MenuBar {
                 onTriggered: configManager.language = "fr"
             }
         }
+        // Language of the summaries, and of the answers when the question
+        // does not tell (a question is answered in its own language).
+        StyledMenu {
+            title: qsTr("Answer Language")
+            Repeater {
+                model: configManager.outputLanguages
+                delegate: StyledMenuItem {
+                    required property var modelData
+                    text: modelData.name
+                    checkable: true
+                    checked: configManager.outputLanguage === modelData.code
+                    onTriggered: configManager.outputLanguage = modelData.code
+                }
+            }
+        }
         StyledMenuSeparator {}
         StyledMenuItem {
             text: qsTr("OpenAlex API Key...")

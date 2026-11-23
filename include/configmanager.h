@@ -1,4 +1,6 @@
 #pragma once
+
+#include "prompts.h"
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -31,6 +33,12 @@ class ConfigManager : public QObject {
                  visualModeChanged)
   Q_PROPERTY(
       QString language READ language WRITE setLanguage NOTIFY languageChanged)
+  /// Language of the models' summaries, and of their answers when the
+  /// question does not tell (Prompts::outputLanguages() code).
+  Q_PROPERTY(QString outputLanguage READ outputLanguage WRITE setOutputLanguage
+                 NOTIFY outputLanguageChanged)
+  /// The output languages offered: {code, name} maps, name in its language.
+  Q_PROPERTY(QVariantList outputLanguages READ outputLanguages CONSTANT)
   /// Prompt budget for library queries, in tokens; 0 = auto.
   Q_PROPERTY(int queryContextTokens READ queryContextTokens WRITE
                  setQueryContextTokens NOTIFY queryContextTokensChanged)
@@ -59,6 +67,8 @@ public:
   QStringList projectList() const { return m_projectList; }
   QString visualMode() const;
   QString language() const;
+  QString outputLanguage() const { return m_outputLanguage; }
+  QVariantList outputLanguages() const;
   int queryContextTokens() const { return m_queryContextTokens; }
   QString zoteroDataDir() const { return m_zoteroDataDir; }
   bool zoteroPriority() const { return m_zoteroPriority; }
@@ -78,6 +88,7 @@ public:
   void setOpenAlexApiKey(const QString &key);
   void setVisualMode(const QString &mode);
   void setLanguage(const QString &lang);
+  void setOutputLanguage(const QString &language);
   void setQueryContextTokens(int tokens);
   void setZoteroDataDir(const QString &dir);
   void setZoteroPriority(bool priority);
@@ -154,6 +165,7 @@ signals:
 
   void visualModeChanged();
   void languageChanged();
+  void outputLanguageChanged();
   void queryContextTokensChanged();
 
 private:
@@ -187,6 +199,7 @@ private:
   QStringList m_projectList;
   int m_visualModeIndex = 0; // 0=TextOnly (default), 1=Reduced, 2=Full
   QString m_language = QStringLiteral("en");
+  QString m_outputLanguage = Prompts::kDefaultLanguage;
   int m_queryContextTokens = 0; // 0 = auto
   QString m_zoteroDataDir;
   bool m_zoteroPriority = false;
