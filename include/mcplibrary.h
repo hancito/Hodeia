@@ -8,6 +8,7 @@
 #include <QString>
 #include <expected>
 #include <memory>
+#include <optional>
 
 class McpServer;
 class SqliteVecManager;
@@ -56,9 +57,14 @@ private:
   std::expected<QString, QString> resolvePaper(const QString &id);
   /// "Authors (year) — Title" of a paper.
   QString label(const QString &paperHash);
+  /// The same from the title and citation its chunks carry.
+  QString label(const QString &paperHash, const QString &cleanTitle,
+                const QString &citation);
   /// Zotero's metadata by paper hash when they take precedence
   /// (zoteroPriority), else empty.
   QHash<QString, ZoteroMeta> zoteroMeta();
+  /// The same for one paper (nullopt: none, or not taking precedence).
+  std::optional<ZoteroMeta> zoteroMeta(const QString &paperHash);
 
   Paths m_paths;
   SqliteDb m_db;

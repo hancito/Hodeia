@@ -20,15 +20,17 @@ LibraryRepository::LibraryRepository(SqliteDb &db) : m_db(db) {}
 
 /* ── Reads ──────────────────────────────────────────────────────── */
 
-QList<SummaryRow> LibraryRepository::summaries() const {
+namespace {
+
+// LEFT JOIN so papers without citation data still appear (cites_count 0).
+const char *const kSummarySelect =
+    "SELECT s.id, s.paper_hash, s.title, s.authors, s.pages_num, s.journal, "
+    "s.year, s.topics, s.llmodel, s.summary_json, s.date, "
+    "COALESCE(c.cites_count, 0) "
+    "FROM Summaries s LEFT JOIN Citations c ON c.paper_hash = s.paper_hash ";
+
+QList<SummaryRow> readSummaries(SqliteStatement &stmt) {
   QList<SummaryRow> rows;
-  // LEFT JOIN so papers without citation data still appear (cites_count 0).
-  SqliteStatement stmt = m_db.prepare(
-      "SELECT s.id, s.paper_hash, s.title, s.authors, s.pages_num, s.journal, "
-      "s.year, s.topics, s.llmodel, s.summary_json, s.date, "
-      "COALESCE(c.cites_count, 0) "
-      "FROM Summaries s LEFT JOIN Citations c ON c.paper_hash = s.paper_hash "
-      "ORDER BY s.id");
   while (true) {
     auto step = stmt.step();
     if (!step || !*step)
@@ -51,6 +53,73 @@ QList<SummaryRow> LibraryRepository::summaries() const {
   return rows;
 }
 
+// Only summarized papers (joined to Summaries), matching the paper list.
+const char *const kCitationSelect =
+    "SELECT c.paper_hash, c.cites, c.cited_by, c.cites_count, "
+    "c.cited_by_count FROM Citations c JOIN Summaries s "
+    "ON s.paper_hash = c.paper_hash ";
+
+QList<CitationRow> readCitations(SqliteStatement &stmt) {
+  QList<CitationRow> rows;
+  while (true) {
+    auto step = stmt.step();
+    if (!step || !*step)
+      break;
+    CitationRow row;
+    row.paperHash = stmt.columnText(0);
+    row.cites = stmt.columnText(1);
+    row.citedBy = stmt.columnText(2);
+    row.citesCount = stmt.columnInt(3);
+    row.citedByCount = stmt.columnInt(4);
+    rows.append(row);
+  }
+  return rows;
+}
+
+const char *const kIndexedSelect =
+    "SELECT paper_hash, MAX(clean_title), MAX(citation), MAX(page) + 1 "
+    "FROM chunks ";
+
+QList<IndexedPaper> readIndexed(SqliteStatement &stmt) {
+  QList<IndexedPaper> rows;
+  while (true) {
+    auto step = stmt.step();
+    if (!step || !*step)
+      break;
+    rows.append({stmt.columnText(0), stmt.columnText(1), stmt.columnText(2),
+                 stmt.columnInt(3)});
+  }
+  return rows;
+}
+
+/// The first row of `select` + `where` for `paperHash`, if any.
+template <typename Row, typename Read>
+std::optional<Row> oneRow(SqliteDb &db, const QString &sql,
+                          const QString &paperHash, Read read) {
+  SqliteStatement stmt = db.prepare(sql);
+  if (!stmt.isValid() || !stmt.bind(1, paperHash))
+    return std::nullopt;
+  const QList<Row> rows = read(stmt);
+  if (rows.isEmpty())
+    return std::nullopt;
+  return rows.first();
+}
+
+} // namespace
+
+QList<SummaryRow> LibraryRepository::summaries() const {
+  SqliteStatement stmt =
+      m_db.prepare(QString(kSummarySelect) + "ORDER BY s.id");
+  return readSummaries(stmt);
+}
+
+std::optional<SummaryRow>
+LibraryRepository::summary(const QString &paperHash) const {
+  return oneRow<SummaryRow>(m_db,
+                            QString(kSummarySelect) + "WHERE s.paper_hash = ?",
+                            paperHash, readSummaries);
+}
+
 QList<QueryRow> LibraryRepository::queries() const {
   QList<QueryRow> rows;
   SqliteStatement stmt = m_db.prepare(
@@ -71,40 +140,49 @@ QList<QueryRow> LibraryRepository::queries() const {
 }
 
 QList<CitationRow> LibraryRepository::citations() const {
-  QList<CitationRow> rows;
-  // Only summarized papers (joined to Summaries), matching the paper list.
   SqliteStatement stmt =
-      m_db.prepare("SELECT c.paper_hash, c.cites, c.cited_by, c.cites_count, "
-                   "c.cited_by_count FROM Citations c JOIN Summaries s "
-                   "ON s.paper_hash = c.paper_hash ORDER BY c.paper_hash");
-  while (true) {
-    auto step = stmt.step();
-    if (!step || !*step)
-      break;
-    CitationRow row;
-    row.paperHash = stmt.columnText(0);
-    row.cites = stmt.columnText(1);
-    row.citedBy = stmt.columnText(2);
-    row.citesCount = stmt.columnInt(3);
-    row.citedByCount = stmt.columnInt(4);
-    rows.append(row);
-  }
-  return rows;
+      m_db.prepare(QString(kCitationSelect) + "ORDER BY c.paper_hash");
+  return readCitations(stmt);
+}
+
+std::optional<CitationRow>
+LibraryRepository::citation(const QString &paperHash) const {
+  return oneRow<CitationRow>(
+      m_db, QString(kCitationSelect) + "WHERE c.paper_hash = ?", paperHash,
+      readCitations);
 }
 
 QList<IndexedPaper> LibraryRepository::indexedPapers() const {
-  QList<IndexedPaper> rows;
   SqliteStatement stmt = m_db.prepare(
-      "SELECT paper_hash, MAX(clean_title), MAX(citation), MAX(page) + 1 "
-      "FROM chunks GROUP BY paper_hash ORDER BY paper_hash");
+      QString(kIndexedSelect) + "GROUP BY paper_hash ORDER BY paper_hash");
+  return readIndexed(stmt);
+}
+
+std::optional<IndexedPaper>
+LibraryRepository::indexedPaper(const QString &paperHash) const {
+  // GROUP BY: no row (not an aggregate of nothing) for an unknown paper.
+  return oneRow<IndexedPaper>(
+      m_db, QString(kIndexedSelect) + "WHERE paper_hash = ? GROUP BY paper_hash",
+      paperHash, readIndexed);
+}
+
+QStringList
+LibraryRepository::paperHashesStartingWith(const QString &prefix) const {
+  if (prefix.isEmpty())
+    return {};
+  SqliteStatement stmt = m_db.prepare(
+      "SELECT paper_hash FROM Summaries "
+      "WHERE substr(paper_hash, 1, length(?1)) = ?1 ORDER BY paper_hash");
+  if (!stmt.isValid() || !stmt.bind(1, prefix))
+    return {};
+  QStringList hashes;
   while (true) {
     auto step = stmt.step();
     if (!step || !*step)
       break;
-    rows.append({stmt.columnText(0), stmt.columnText(1), stmt.columnText(2),
-                 stmt.columnInt(3)});
+    hashes << stmt.columnText(0);
   }
-  return rows;
+  return hashes;
 }
 
 QString LibraryRepository::summaryTitle(const QString &paperHash) const {

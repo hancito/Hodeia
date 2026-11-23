@@ -57,6 +57,7 @@ private slots:
   void addIndexedPaperAllOrNothing();
   void nearestChunks();
   void chunksOfPaper();
+  void onePaper();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -319,6 +320,41 @@ void TestLibraryRepository::chunksOfPaper() {
   QCOMPARE(list[0].distance, 0.0f);
   QVERIFY(repo.chunks("unknown").isEmpty());
   QVERIFY(repo.chunks(QString()).isEmpty());
+}
+
+// The reads of one paper give what the full lists give for it.
+void TestLibraryRepository::onePaper() {
+  LibraryRepository repo(m_db);
+  QVERIFY(repo.addIndexedPaper(importedRow("abc123", "a.pdf"),
+                               {chunkAt("abc123", 0, 0, "x"),
+                                chunkAt("abc123", 4, 1, "y")},
+                               {kEmbedding, kEmbedding}));
+  QVERIFY(repo.addIndexedPaper(importedRow("abd456", "b.pdf"),
+                               {chunkAt("abd456", 0, 0, "z")}, {kEmbedding}));
+  QVERIFY(repo.saveSummary("abc123", summary("Hybrid Choice"), "{}", "m"));
+
+  const auto s = repo.summary("abc123");
+  QVERIFY(s);
+  QCOMPARE(s->title, QString("Hybrid Choice"));
+  QCOMPARE(s->pagesNum, 12); // kept from the import
+  QVERIFY(!repo.summary("nope"));
+
+  const auto c = repo.citation("abc123"); // registered by saveSummary
+  QVERIFY(c);
+  QCOMPARE(c->paperHash, QString("abc123"));
+  QVERIFY(!repo.citation("abd456")); // never summarized
+
+  const auto p = repo.indexedPaper("abc123");
+  QVERIFY(p);
+  QCOMPARE(p->pages, 5);
+  QCOMPARE(p->cleanTitle, QString("Hybrid Choice"));
+  QVERIFY(!repo.indexedPaper("nope"));
+
+  QCOMPARE(repo.paperHashesStartingWith("ab"),
+           QStringList({"abc123", "abd456"}));
+  QCOMPARE(repo.paperHashesStartingWith("abc"), QStringList({"abc123"}));
+  QVERIFY(repo.paperHashesStartingWith("x").isEmpty());
+  QVERIFY(repo.paperHashesStartingWith("").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

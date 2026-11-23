@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QVariant>
 #include <expected>
+#include <optional>
 
 class SqliteDb;
 
@@ -79,12 +80,22 @@ public:
 
   /// Every summarized paper, in insertion order.
   QList<SummaryRow> summaries() const;
+  /// The Summaries row of one paper (made at import), if any.
+  std::optional<SummaryRow> summary(const QString &paperHash) const;
   /// The query history, oldest first.
   QList<QueryRow> queries() const;
   /// Citation data of the summarized papers, by hash.
   QList<CitationRow> citations() const;
+  /// Citation data of one summarized paper, if any.
+  std::optional<CitationRow> citation(const QString &paperHash) const;
   /// Every ingested paper (in the chunks table), by hash.
   QList<IndexedPaper> indexedPapers() const;
+  /// One paper as indexedPapers() lists it, if it has chunks.  Still a scan
+  /// of the chunks table (vec0 has no index on paper_hash), but of one paper's
+  /// rows only.
+  std::optional<IndexedPaper> indexedPaper(const QString &paperHash) const;
+  /// Hashes of the papers (Summaries rows) that start with `prefix`.
+  QStringList paperHashesStartingWith(const QString &prefix) const;
   /// Title of a summarized paper, empty if none.
   QString summaryTitle(const QString &paperHash) const;
   /// Hash of every paper of the project (a Summaries row is made at import).
