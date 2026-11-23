@@ -10,10 +10,6 @@
 #include <QUrl>
 #include <atomic>
 
-extern "C" {
-#include <mupdf/fitz.h>
-}
-
 class PdfWorker : public QObject {
   Q_OBJECT
 public:
@@ -49,14 +45,6 @@ signals:
   void report(const QString &title, const QString &message, bool isError);
 
 private:
-  /// Extract the text of one file (its hash computed beforehand).
-  ExtractionResult extractText(const IngestionJob &job, const QString &imgPath);
-  QString extractTextFromStextPage(fz_stext_page *textPage) const;
-  QList<TextChunk>
-  chunkDocumentText(const QString &fullText, const QVector<quint16> &pageMap,
-                    const QString &paperHash,
-                    const QVector<PageMetadata> &pageMeta) const;
-  QString computeFileHash(const QUrl &fileUrl) const;
   void emitCancelReport(int added);
   void emitReport(int selected, int alreadyKnown, int added,
                   const QStringList &unreadable, const QStringList &unindexed,
@@ -99,9 +87,6 @@ private:
   QList<IngestionJob> newJobs(const QMap<QString, QUrl> &hashesToProcess,
                               const QString &dbPath) const;
 
-  // Chunk size limit (tokens) when the embedding model can't be loaded to
-  // provide its own; otherwise chunks follow SqliteVecManager::maxChunkTokens.
-  static constexpr int FallbackMaxChunkTokens = 480;
   // Papers extracted (or being extracted) ahead of the indexer, per
   // extraction thread: the rest wait, unopened.
   static constexpr int kQueuePerThread = 2;

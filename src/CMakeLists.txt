@@ -36,6 +36,7 @@ add_library(HodeiaEngine STATIC
     ../include/citationsmodel.h
     ../include/ingestionengine.h
     ../include/ingestionpipeline.h
+    ../include/pdfextractor.h
     ../include/enginemanager.h
     ../include/sqlitedb.h
     ../include/sqlitevec.h
@@ -94,6 +95,7 @@ add_library(HodeiaEngine STATIC
     citationsmodel.cpp
     ingestionengine.cpp
     ingestionpipeline.cpp
+    pdfextractor.cpp
     enginemanager.cpp
     sqlitedb.cpp
     sqlitevec.cpp
@@ -138,7 +140,7 @@ set_source_files_properties(${EXTERNAL}/sqlite3/sqlite3.c PROPERTIES LANGUAGE C)
 # every access from our code.  Disable only the alignment check, only in the
 # file that walks MuPDF structures.
 if(HODEIA_SANITIZE MATCHES "undefined")
-  set_source_files_properties(ingestionengine.cpp PROPERTIES
+  set_source_files_properties(pdfextractor.cpp PROPERTIES
       COMPILE_OPTIONS "-fno-sanitize=alignment")
 endif()
 
@@ -219,7 +221,7 @@ target_link_libraries(HodeiaEngine
 )
 
 # OCR (Tesseract/Leptonica): Linux/macOS link the in-tree static libs (set by
-# the platform cmake); Windows links the vcpkg targets.  ingestionengine.cpp
+# the platform cmake); Windows links the vcpkg targets.  pdfextractor.cpp
 # uses the OCR path on all platforms, so this must not be Windows-only.
 if(TESS_LEPTO_TARGETS)
   target_link_libraries(HodeiaEngine PRIVATE ${TESS_LEPTO_TARGETS})

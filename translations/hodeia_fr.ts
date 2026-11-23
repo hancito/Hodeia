@@ -1820,14 +1820,14 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     </message>
 </context>
 <context>
-    <name>PdfWorker</name>
+    <name>PdfExtractor</name>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="143"/>
+        <location filename="../src/pdfextractor.cpp" line="142"/>
         <source>Text Recognition Unavailable</source>
         <translation>Reconnaissance de texte indisponible</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="144"/>
+        <location filename="../src/pdfextractor.cpp" line="143"/>
         <source>The OCR engine could not start, so scanned pages (images without text) cannot be read. Papers with selectable text are not affected.
 
 The language data may be missing from:
@@ -1842,22 +1842,64 @@ Les données de langue manquent peut-être dans :
 Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="445"/>
+        <location filename="../src/pdfextractor.cpp" line="468"/>
+        <source>invalid path</source>
+        <translation>chemin invalide</translation>
+    </message>
+    <message>
+        <location filename="../src/pdfextractor.cpp" line="477"/>
+        <location filename="../src/pdfextractor.cpp" line="484"/>
+        <source>PDF reader initialisation failed</source>
+        <translation>échec de l&apos;initialisation du lecteur PDF</translation>
+    </message>
+    <message>
+        <location filename="../src/pdfextractor.cpp" line="491"/>
+        <source>the file cannot be opened (damaged or not a PDF?)</source>
+        <translation>le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
+    </message>
+    <message>
+        <location filename="../src/pdfextractor.cpp" line="503"/>
+        <source>the pages cannot be read (damaged file?)</source>
+        <translation>les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
+    </message>
+</context>
+<context>
+    <name>PdfWorker</name>
+    <message>
+        <source>Text Recognition Unavailable</source>
+        <translation type="vanished">Reconnaissance de texte indisponible</translation>
+    </message>
+    <message>
+        <source>The OCR engine could not start, so scanned pages (images without text) cannot be read. Papers with selectable text are not affected.
+
+The language data may be missing from:
+%1
+
+Reinstalling HodeIA should fix it.</source>
+        <translation type="vanished">Le moteur OCR n&apos;a pas pu démarrer : les pages numérisées (images sans texte) ne peuvent pas être lues. Les articles dont le texte est sélectionnable ne sont pas concernés.
+
+Les données de langue manquent peut-être dans :
+%1
+
+Réinstaller HodeIA devrait corriger le problème.</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="31"/>
         <source>%1/%2 passages</source>
         <translation>%1/%2 passages</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="469"/>
+        <location filename="../src/ingestionengine.cpp" line="55"/>
         <source>Started with %1 files</source>
         <translation>Démarré avec %1 fichier(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="483"/>
+        <location filename="../src/ingestionengine.cpp" line="69"/>
         <source>Skipped %1 papers</source>
         <translation>%1 article(s) ignoré(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="537"/>
+        <location filename="../src/ingestionengine.cpp" line="133"/>
         <source>Ingestion cancelled</source>
         <translation>Importation annulée</translation>
     </message>
@@ -1866,12 +1908,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Extraction %1-%2/%3</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="480"/>
+        <location filename="../src/ingestionengine.cpp" line="66"/>
         <source>Checking which papers are already in the library...</source>
         <translation>Recherche des articles déjà présents dans la bibliothèque...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="485"/>
+        <location filename="../src/ingestionengine.cpp" line="71"/>
         <source>%n paper(s) already in the library</source>
         <translation>
             <numerusform>%n article déjà dans la bibliothèque</numerusform>
@@ -1879,12 +1921,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="559"/>
+        <location filename="../src/ingestionengine.cpp" line="155"/>
         <source>no text could be extracted</source>
         <translation>aucun texte n&apos;a pu être extrait</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="599"/>
+        <location filename="../src/ingestionengine.cpp" line="195"/>
         <source>Embedding %1 chunks...</source>
         <translation>Embedding de %1 fragments...</translation>
     </message>
@@ -1893,7 +1935,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Lot %1/%2</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="639"/>
+        <location filename="../src/ingestionengine.cpp" line="235"/>
         <source>%n paper(s) were added to the library before the import was cancelled.</source>
         <translation>
             <numerusform>%n article a été ajouté à la bibliothèque avant l&apos;annulation de l&apos;import.</numerusform>
@@ -1901,27 +1943,27 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="642"/>
+        <location filename="../src/ingestionengine.cpp" line="238"/>
         <source>To import the remaining files, add them again: the papers already in the library will be skipped.</source>
         <translation>Pour importer les fichiers restants, ajoutez-les à nouveau : les articles déjà présents dans la bibliothèque seront ignorés.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="645"/>
+        <location filename="../src/ingestionengine.cpp" line="241"/>
         <source>Import Cancelled</source>
         <translation>Import annulé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="653"/>
+        <location filename="../src/ingestionengine.cpp" line="249"/>
         <source>Nothing to Import</source>
         <translation>Rien à importer</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="654"/>
+        <location filename="../src/ingestionengine.cpp" line="250"/>
         <source>No PDF file was found in the selection.</source>
         <translation>Aucun fichier PDF n&apos;a été trouvé dans la sélection.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="659"/>
+        <location filename="../src/ingestionengine.cpp" line="255"/>
         <source>%n paper(s) added to the library.</source>
         <translation>
             <numerusform>%n article ajouté à la bibliothèque.</numerusform>
@@ -1929,7 +1971,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="661"/>
+        <location filename="../src/ingestionengine.cpp" line="257"/>
         <source>%n file(s) skipped: already in the library.</source>
         <translation>
             <numerusform>%n fichier ignoré : déjà dans la bibliothèque.</numerusform>
@@ -1937,7 +1979,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="664"/>
+        <location filename="../src/ingestionengine.cpp" line="260"/>
         <source>%n file(s) could not be read:</source>
         <translation>
             <numerusform>%n fichier n&apos;a pas pu être lu :</numerusform>
@@ -1945,12 +1987,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="669"/>
+        <location filename="../src/ingestionengine.cpp" line="265"/>
         <source>The embedding model could not process their text. See the log for details.</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu traiter leur texte. Consultez le journal pour plus de détails.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="672"/>
+        <location filename="../src/ingestionengine.cpp" line="268"/>
         <source>%n paper(s) could not be indexed for search and were not added:</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être indexé pour la recherche et n&apos;a pas été ajouté :</numerusform>
@@ -1958,48 +2000,43 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="676"/>
+        <location filename="../src/ingestionengine.cpp" line="272"/>
         <source>Add the files again once the problem is fixed.</source>
         <translation>Ajoutez à nouveau les fichiers une fois le problème corrigé.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="680"/>
+        <location filename="../src/ingestionengine.cpp" line="276"/>
         <source>Import Complete</source>
         <translation>Import terminé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="682"/>
+        <location filename="../src/ingestionengine.cpp" line="278"/>
         <source>Import Partly Failed</source>
         <translation>Import partiellement échoué</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="682"/>
+        <location filename="../src/ingestionengine.cpp" line="278"/>
         <source>Import Failed</source>
         <translation>Échec de l&apos;import</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="843"/>
         <source>invalid path</source>
-        <translation>chemin invalide</translation>
+        <translation type="vanished">chemin invalide</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="852"/>
-        <location filename="../src/ingestionengine.cpp" line="859"/>
         <source>PDF reader initialisation failed</source>
-        <translation>échec de l&apos;initialisation du lecteur PDF</translation>
+        <translation type="vanished">échec de l&apos;initialisation du lecteur PDF</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="866"/>
         <source>the file cannot be opened (damaged or not a PDF?)</source>
-        <translation>le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
+        <translation type="vanished">le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="878"/>
         <source>the pages cannot be read (damaged file?)</source>
-        <translation>les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
+        <translation type="vanished">les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="898"/>
+        <location filename="../src/ingestionengine.cpp" line="108"/>
         <source>%1 — page %2/%3</source>
         <translation>%1 — page %2/%3</translation>
     </message>
@@ -2016,7 +2053,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Attention : modèle d&apos;embedding non chargé, stockage vectoriel ignoré</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="579"/>
+        <location filename="../src/ingestionengine.cpp" line="175"/>
         <source>Saved %1/%2 papers</source>
         <translation>%1/%2 articles enregistrés</translation>
     </message>
