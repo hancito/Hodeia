@@ -1,6 +1,7 @@
 #pragma once
 
 #include "summaryformat.h"
+#include "textchunk.h"
 
 #include <QDateTime>
 #include <QList>
@@ -91,9 +92,17 @@ public:
 
   /* ── Writes ── */
 
-  /// Add the papers of an import (their Summaries rows, before any summary),
-  /// all or none: in one transaction, which the caller must not have open.
-  std::expected<void, QString> addPapers(const QList<SummaryRow> &rows);
+  /// Add an imported paper: its Summaries row (before any summary) and its
+  /// chunks, with one embedding (float32 blob) per chunk.  All or nothing, in
+  /// one transaction, which the caller must not have open: a paper is either
+  /// fully indexed or absent, so a later import does not skip it.
+  std::expected<void, QString>
+  addIndexedPaper(const SummaryRow &row, const QList<TextChunk> &chunks,
+                  const QList<QByteArray> &embeddings);
+
+  /// Add chunks with one embedding each, in the caller's transaction if any.
+  std::expected<void, QString> addChunks(const QList<TextChunk> &chunks,
+                                         const QList<QByteArray> &embeddings);
 
   /// Store (or replace) the summary of a paper, then give its chunks the
   /// summary's title and "Authors (year)" citation, and register the paper

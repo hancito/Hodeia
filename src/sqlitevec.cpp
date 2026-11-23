@@ -6,6 +6,7 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QMutexLocker>
 #include <Sqlite3/sqlite3.h>
@@ -278,109 +279,52 @@ int SqliteVecManager::maxChunkTokens() {
 
 /* ── Chunk insertion ─────────────────────────────────────────── */
 
-int SqliteVecManager::insertChunks(SqliteDb &db,
-                                   const QList<TextChunk> &chunks,
-                                   const std::atomic<bool> *cancel) {
+QList<QByteArray>
+SqliteVecManager::embedPassages(const QList<TextChunk> &chunks,
+                                const std::atomic<bool> *cancel) {
   if (chunks.isEmpty())
-    return 0;
+    return {};
   if (!m_ready && !initialize())
-    return -1;
+    return {};
   if (!m_ready)
-    return -1;
+    return {};
 
-  int totalInserted = 0;
-
-  SqliteStatement stmt = db.prepare(
-      "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, chunk_text, "
-      "citation, clean_title, page_metadata) "
-      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?, ?)");
-  if (!stmt.isValid()) {
-    qCritical() << "[SqliteVec] Prepare failed";
-    return -1;
-  }
+  QElapsedTimer timer; // for the log at the end
+  timer.start();
+  QList<QByteArray> embeddings;
+  embeddings.reserve(chunks.size());
 
   for (int start = 0; start < chunks.size(); start += BatchSize) {
     if (cancel && cancel->load()) {
-      qInfo() << "[SqliteVec] insertChunks cancelled";
-      return -1;
+      qInfo() << "[SqliteVec] embedPassages cancelled";
+      return {};
     }
-    int end = qMin(start + BatchSize, chunks.size());
+    const int end = qMin(start + BatchSize, chunks.size());
 
     QStringList batchTexts;
     batchTexts.reserve(end - start);
     for (int j = start; j < end; ++j)
       batchTexts.append(chunks[j].text);
 
-    QVector<float> allEmbeddings = embed(batchTexts, EmbedMode::Passage);
-    if (allEmbeddings.isEmpty()) {
-      qWarning() << "[SqliteVec] Empty embeddings for batch starting at"
-                 << start << ", skipping";
-      return -1;
+    const QVector<float> batch = embed(batchTexts, EmbedMode::Passage);
+    if (batch.size() != (end - start) * m_dim) {
+      qWarning() << "[SqliteVec] Embedding failed for the batch starting at"
+                 << start;
+      return {};
     }
+    for (int i = 0; i < end - start; ++i)
+      embeddings.append(
+          QByteArray(reinterpret_cast<const char *>(batch.constData() +
+                                                    i * m_dim),
+                     m_dim * qsizetype(sizeof(float))));
 
     emit embeddingProgress(end, chunks.size());
-
-    for (int i = 0; i < end - start; ++i) {
-      const TextChunk &c = chunks[start + i];
-      const float *rowPtr = allEmbeddings.constData() + i * m_dim;
-      QByteArray blob(reinterpret_cast<const char *>(rowPtr),
-                      m_dim * sizeof(float));
-
-      auto bindResult = stmt.bind(1, blob);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(2, c.paperHash);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(3, c.page);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(4, c.chunkIdx);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(5, c.text);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(6, c.citation);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(7, c.cleanTitle);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-      bindResult = stmt.bind(8, c.pageMetadata);
-      if (!bindResult) {
-        qCritical() << "[SqliteVec] Bind failed:" << bindResult.error();
-        return -1;
-      }
-
-      auto execResult = stmt.exec();
-      if (!execResult) {
-        qCritical() << "[SqliteVec] Insert failed:" << execResult.error();
-        return -1;
-      }
-      stmt.resetAndClearBindings();
-      totalInserted++;
-    }
   }
 
-  qDebug() << "[SqliteVec] insertChunks: inserted" << totalInserted << "/"
-           << chunks.size() << "chunks";
-
-  return totalInserted;
+  qInfo().noquote() << QString("[SqliteVec] Embedded %1 chunks in %2 ms")
+                           .arg(chunks.size())
+                           .arg(timer.elapsed());
+  return embeddings;
 }
 
 /* ── Search ──────────────────────────────────────────────────── */

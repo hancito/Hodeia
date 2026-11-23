@@ -45,6 +45,7 @@ struct Plan {
   QList<ZoteroItemRow> store;
   QList<int> ingestedIds; ///< known rows whose file is now in the project
   QList<int> pendingIds;  ///< imported rows whose file Zotero replaced
+  QList<int> ignoredIds;  ///< imported rows deleted from the project since
   QList<int> removedIds;  ///< known rows no longer in the followed collections
   QList<ZoteroPdf> missing; ///< followed PDFs not on disk (not downloaded)
 };

@@ -3,7 +3,7 @@
 #include <QString>
 
 /// A piece of a paper's text to embed and store in the chunks table
-/// (produced by the ingestion, stored by SqliteVecManager::insertChunks).
+/// (produced by the ingestion, stored by LibraryRepository::addChunks).
 struct TextChunk {
   QString text;
   QString paperHash;

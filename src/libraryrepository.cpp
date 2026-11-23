@@ -137,9 +137,42 @@ std::expected<QStringList, QString> LibraryRepository::paperHashes() const {
 /* ── Writes ─────────────────────────────────────────────────────── */
 
 std::expected<void, QString>
-LibraryRepository::addPapers(const QList<SummaryRow> &rows) {
-  if (rows.isEmpty())
+LibraryRepository::addChunks(const QList<TextChunk> &chunks,
+                             const QList<QByteArray> &embeddings) {
+  if (chunks.size() != embeddings.size())
+    return std::unexpected(QStringLiteral("%1 embeddings for %2 chunks")
+                               .arg(embeddings.size())
+                               .arg(chunks.size()));
+  if (chunks.isEmpty())
     return {};
+  SqliteStatement stmt = m_db.prepare(
+      "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, chunk_text, "
+      "citation, clean_title, page_metadata) "
+      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?, ?)");
+  if (!stmt.isValid())
+    return std::unexpected(prepareFailed());
+  for (qsizetype i = 0; i < chunks.size(); ++i) {
+    const TextChunk &c = chunks[i];
+    std::expected<bool, QString> r = stmt.bind(1, embeddings[i]);
+    if (r) r = stmt.bind(2, c.paperHash);
+    if (r) r = stmt.bind(3, c.page);
+    if (r) r = stmt.bind(4, c.chunkIdx);
+    if (r) r = stmt.bind(5, c.text);
+    if (r) r = stmt.bind(6, c.citation);
+    if (r) r = stmt.bind(7, c.cleanTitle);
+    if (r) r = stmt.bind(8, c.pageMetadata);
+    if (r) r = stmt.exec();
+    if (!r)
+      return std::unexpected(r.error());
+    stmt.resetAndClearBindings();
+  }
+  return {};
+}
+
+std::expected<void, QString>
+LibraryRepository::addIndexedPaper(const SummaryRow &row,
+                                   const QList<TextChunk> &chunks,
+                                   const QList<QByteArray> &embeddings) {
   if (auto r = m_db.transaction(); !r)
     return std::unexpected(r.error());
   auto fail = [this](const QString &error) {
@@ -153,27 +186,24 @@ LibraryRepository::addPapers(const QList<SummaryRow> &rows) {
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   if (!stmt.isValid())
     return fail(prepareFailed());
-  for (const SummaryRow &row : rows) {
-    std::expected<bool, QString> r = stmt.bind(1, row.paperHash);
-    if (r) r = stmt.bind(2, row.title);
-    if (r) r = stmt.bind(3, row.authors);
-    if (r) r = stmt.bind(4, row.pagesNum);
-    if (r) r = stmt.bind(5, row.journal);
-    if (r) r = stmt.bind(6, row.year);
-    if (r) r = stmt.bind(7, row.topics);
-    if (r) r = stmt.bind(8, row.llmodel);
-    if (r) r = stmt.bind(9, row.summaryJson.toByteArray());
-    if (r) r = stmt.bind(10, row.date);
-    if (r) r = stmt.exec();
-    if (!r) {
-      qCritical() << "[LibraryRepository] Adding paper" << row.title
-                  << "failed:" << r.error();
-      return fail(r.error());
-    }
-    stmt.resetAndClearBindings();
-  }
-  if (auto r = m_db.commit(); !r)
+  std::expected<bool, QString> r = stmt.bind(1, row.paperHash);
+  if (r) r = stmt.bind(2, row.title);
+  if (r) r = stmt.bind(3, row.authors);
+  if (r) r = stmt.bind(4, row.pagesNum);
+  if (r) r = stmt.bind(5, row.journal);
+  if (r) r = stmt.bind(6, row.year);
+  if (r) r = stmt.bind(7, row.topics);
+  if (r) r = stmt.bind(8, row.llmodel);
+  if (r) r = stmt.bind(9, row.summaryJson.toByteArray());
+  if (r) r = stmt.bind(10, row.date);
+  if (r) r = stmt.exec();
+  if (!r)
     return fail(r.error());
+
+  if (auto c = addChunks(chunks, embeddings); !c)
+    return fail(c.error());
+  if (auto c = m_db.commit(); !c)
+    return fail(c.error());
   return {};
 }
 

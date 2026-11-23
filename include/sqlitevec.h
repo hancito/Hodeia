@@ -52,10 +52,11 @@ public:
   // safety margin.  0 if the model can't be loaded.
   int maxChunkTokens();
 
-  // Insert chunks into the vec0 table. Returns count of inserted rows, or -1
+  // Embed the chunks' texts as passages, without touching any database: one
+  // float32 blob per chunk, in order (what LibraryRepository stores).  Empty
   // on failure or when `cancel` becomes true (checked between batches).
-  int insertChunks(SqliteDb &db, const QList<TextChunk> &chunks,
-                   const std::atomic<bool> *cancel = nullptr);
+  QList<QByteArray> embedPassages(const QList<TextChunk> &chunks,
+                                  const std::atomic<bool> *cancel = nullptr);
 
   // Search chunks by query text; returns the top-k nearest neighbors, nearest
   // first.  With `paperHashes`, only the chunks of those papers.

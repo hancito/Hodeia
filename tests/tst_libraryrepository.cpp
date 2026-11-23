@@ -20,23 +20,14 @@ PaperSummary summary(const QString &title) {
   return s;
 }
 
+const QByteArray kEmbedding(384 * int(sizeof(float)), '\0');
+
+TextChunk chunk(const QString &hash, int idx = 0) {
+  return TextChunk{"text", hash, 0, idx, "file.pdf", "file.pdf", QString()};
+}
+
 void addChunk(SqliteDb &db, const QString &hash) {
-  // Same statement as SqliteVecManager::insertChunks().
-  SqliteStatement stmt = db.prepare(
-      "INSERT INTO chunks (embedding, paper_hash, page, chunk_idx, "
-      "chunk_text, citation, clean_title, page_metadata) "
-      "VALUES (vec_f32(?), ?, ?, ?, ?, ?, ?, ?)");
-  QVERIFY(stmt.isValid());
-  const QByteArray embedding(384 * int(sizeof(float)), '\0');
-  (void)stmt.bind(1, embedding);
-  (void)stmt.bind(2, hash);
-  (void)stmt.bind(3, 0);
-  (void)stmt.bind(4, 0);
-  (void)stmt.bind(5, QString("text"));
-  (void)stmt.bind(6, QString("file.pdf"));
-  (void)stmt.bind(7, QString("file.pdf"));
-  (void)stmt.bind(8, QString());
-  auto r = stmt.exec();
+  auto r = LibraryRepository(db).addChunks({chunk(hash)}, {kEmbedding});
   QVERIFY2(r.has_value(), qPrintable(r ? QString() : r.error()));
 }
 
@@ -61,8 +52,8 @@ private slots:
   void removePapers();
   void removeQueries();
   void indexedPapers();
-  void addPapers();
-  void addPapersAllOrNone();
+  void addIndexedPaper();
+  void addIndexedPaperAllOrNothing();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -206,11 +197,14 @@ SummaryRow importedRow(const QString &hash, const QString &title) {
 
 } // namespace
 
-// The papers of an import get their row, found again by their hash.
-void TestLibraryRepository::addPapers() {
+// An imported paper gets its row and its chunks, found again by its hash.
+void TestLibraryRepository::addIndexedPaper() {
   LibraryRepository repo(m_db);
-  QVERIFY(repo.addPapers({importedRow("h1", "a.pdf"), importedRow("h2", "b.pdf")}));
-  QVERIFY(repo.addPapers({}));
+  QVERIFY(repo.addIndexedPaper(importedRow("h1", "a.pdf"),
+                               {chunk("h1", 0), chunk("h1", 1)},
+                               {kEmbedding, kEmbedding}));
+  QVERIFY(repo.addIndexedPaper(importedRow("h2", "b.pdf"), {chunk("h2")},
+                               {kEmbedding}));
   auto hashes = repo.paperHashes();
   QVERIFY(hashes);
   hashes->sort();
@@ -219,16 +213,37 @@ void TestLibraryRepository::addPapers() {
   QCOMPARE(rows.size(), 2);
   QCOMPARE(rows[0].title, QString("a.pdf"));
   QCOMPARE(rows[0].pagesNum, 12);
+  QCOMPARE(count(m_db, "SELECT COUNT(*) FROM chunks WHERE paper_hash = 'h1'"),
+           2);
+  QCOMPARE(repo.indexedPapers().size(), 2);
 }
 
-// One paper that cannot be added (already there): none of the batch is.
-void TestLibraryRepository::addPapersAllOrNone() {
+// A paper whose row or chunks cannot be stored leaves nothing behind, and
+// the connection is usable again (no transaction left open).
+void TestLibraryRepository::addIndexedPaperAllOrNothing() {
   LibraryRepository repo(m_db);
-  QVERIFY(repo.addPapers({importedRow("h1", "a.pdf")}));
-  QVERIFY(!repo.addPapers({importedRow("h2", "b.pdf"), importedRow("h1", "again.pdf")}));
+  QVERIFY(repo.addIndexedPaper(importedRow("h1", "a.pdf"), {chunk("h1")},
+                               {kEmbedding}));
+
+  // Already there: neither the row nor the chunks are added again.
+  QVERIFY(!repo.addIndexedPaper(importedRow("h1", "again.pdf"), {chunk("h1")},
+                                {kEmbedding}));
+  QCOMPARE(count(m_db, "SELECT COUNT(*) FROM chunks"), 1);
+
+  // A chunk that cannot be stored (wrong embedding size): no row either.
+  QVERIFY(!repo.addIndexedPaper(importedRow("h2", "b.pdf"),
+                                {chunk("h2", 0), chunk("h2", 1)},
+                                {kEmbedding, QByteArray(8, '\0')}));
+  // Fewer embeddings than chunks: refused, no row.
+  QVERIFY(!repo.addIndexedPaper(importedRow("h3", "c.pdf"),
+                                {chunk("h3", 0), chunk("h3", 1)},
+                                {kEmbedding}));
   QCOMPARE(*repo.paperHashes(), QStringList({"h1"}));
-  // The connection is usable again (no transaction left open).
-  QVERIFY(repo.addPapers({importedRow("h3", "c.pdf")}));
+  QCOMPARE(count(m_db, "SELECT COUNT(*) FROM chunks"), 1);
+
+  QVERIFY(repo.addIndexedPaper(importedRow("h4", "d.pdf"), {chunk("h4")},
+                               {kEmbedding}));
+  QCOMPARE(count(m_db, "SELECT COUNT(*) FROM chunks"), 2);
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

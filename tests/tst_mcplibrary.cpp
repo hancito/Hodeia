@@ -301,7 +301,9 @@ void TestMcpLibrary::search() {
                 "rate by half a point to bring inflation back to its target, "
                 "and bond yields rose across the euro area.",
                 kIngested, 0, 0, "Monetary policy", "Jones (2019)", ""};
-    QCOMPARE(embeddings.insertChunks(db, {a, b}), 2);
+    const QList<QByteArray> vectors = embeddings.embedPassages({a, b});
+    QCOMPARE(vectors.size(), 2);
+    QVERIFY(LibraryRepository(db).addChunks({a, b}, vectors));
   }
   McpLibrary lib({dir + "/config.json", dir + "/Projects", model});
   const auto out =

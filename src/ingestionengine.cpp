@@ -9,6 +9,7 @@
 #include <QCryptographicHash>
 #include <QDebug>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -433,7 +434,7 @@ PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
   // cleanupOcrApi() at the end of a batch.
   m_extractPool.setExpiryTimeout(-1);
   if (m_vecManager) {
-    // Emitted from this worker's thread (ingestChunks): a direct call.
+    // Emitted from this worker's thread (embedPassages): a direct call.
     connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
             [this](int current, int total) {
               emit stepProgress(QStringLiteral("embed"), current, total,
@@ -481,9 +482,11 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
                     tr("%n paper(s) already in the library", "", alreadyKnown));
 
-  // Batches: each one is extracted, saved and indexed before the next, so a
-  // cancel or a failed indexing only drops the papers of one batch.  Their
-  // size follows the extraction threads (batchSizeFor()).
+  // Batches: each one is extracted, embedded and saved before the next.  A
+  // paper is saved with its chunks in one transaction, so it is either fully
+  // indexed or absent: a cancel keeps the papers already saved, and a failure
+  // drops only the papers it hit.  Their size follows the extraction threads
+  // (batchSizeFor()).
   int savedCount = 0;
   int errorCount = 0;
   QStringList failedTitles; // papers dropped because indexing failed
@@ -532,7 +535,9 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
       break;
     }
 
-    QList<SummaryRow> rows;
+    // The papers that can be indexed, and all their chunks, embedded at once
+    // (larger batches for the embedding model than paper by paper).
+    QList<ExtractionResult> papers;
     QList<TextChunk> allChunks;
 
     for (auto &extraction : extractions) {
@@ -550,80 +555,59 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
         continue;
       }
 
-      SummaryRow row;
-      row.paperHash = extraction.paperHash;
-      row.title = extraction.title;
-      row.pagesNum = extraction.pageCount;
-      row.date = QDateTime::currentDateTimeUtc();
-      rows.append(row);
-
       // Propagate title as initial cleanTitle and citation on every chunk.
       // The summarizer will overwrite both with proper authors/year later.
       for (auto &tc : extraction.chunks) {
         tc.cleanTitle = extraction.title;
         tc.citation = extraction.title;
       }
-
-      allChunks << std::move(extraction.chunks);
+      allChunks << extraction.chunks;
+      papers.append(std::move(extraction));
     }
+    extractions.clear();
 
-    if (!rows.isEmpty()) {
-      savePapers(rows, dbPath);
-      savedCount += rows.size();
-    }
-
-    if (!allChunks.isEmpty()) {
-      // Debug: chunk distribution per paper
-      QMap<QString, int> chunksByPaper;
-      int totalChunkChars = 0;
-      for (const auto &c : allChunks) {
-        chunksByPaper[c.paperHash]++;
-        totalChunkChars += c.text.length();
-      }
-      qDebug() << "[PdfWorker] Before embedding:" << allChunks.size()
-               << "chunks," << totalChunkChars << "chars total"
-               << "| papers:" << chunksByPaper.size();
-      for (auto it = chunksByPaper.begin(); it != chunksByPaper.end(); ++it)
-        qDebug() << "  " << it.key().left(12) << "→" << it.value() << "chunks";
-
-      QString statusMsg = tr("Embedding %1 chunks...").arg(allChunks.size());
-      emit status(statusMsg);
-      m_embedDetail =
-          tr("Batch %1/%2").arg(batchNo).arg(batchCount);
+    if (!papers.isEmpty()) {
+      emit status(tr("Embedding %1 chunks...").arg(allChunks.size()));
+      m_embedDetail = tr("Batch %1/%2").arg(batchNo).arg(batchCount);
       emit stepProgress(QStringLiteral("embed"), 0, allChunks.size(),
                         m_embedDetail);
 
-      bool indexed = false;
-      if (m_vecManager) {
-        indexed = ingestChunks(allChunks, dbPath);
-      } else {
-        qWarning() << "[PdfWorker] embedding model not loaded, skipping vector "
-                      "storage";
-      }
-      // Stopped during the indexing: the chunks were rolled back, so remove
-      // this batch's papers too (a re-import would skip them otherwise).
-      if (!indexed && m_stopFlag.load()) {
-        removePapers(rows, dbPath);
-        savedCount -= rows.size();
+      // Outside any transaction: nothing is written until a paper's
+      // embeddings are all there.
+      QList<QByteArray> embeddings;
+      if (m_vecManager)
+        embeddings = m_vecManager->embedPassages(allChunks, &m_stopFlag);
+      else
+        qWarning() << "[PdfWorker] embedding model not loaded, the papers "
+                      "cannot be indexed";
+      allChunks.clear();
+      allChunks.squeeze();
+
+      // Stopped during the embedding: nothing of this batch was saved.
+      if (embeddings.isEmpty() && m_stopFlag.load()) {
         cleanupOcrApi();
         cancelled = true;
         break;
       }
-      if (!indexed) {
+      if (embeddings.isEmpty()) {
         if (indexError.isEmpty() && m_vecManager)
           indexError = m_vecManager->lastError();
-        // A paper without chunks can be neither summarized nor queried, and
-        // a re-import would skip it (its hash is already known): remove it
-        // so the user can add it again once the cause is fixed.
-        removePapers(rows, dbPath);
-        savedCount -= rows.size();
-        errorCount += rows.size();
-        for (const auto &row : rows)
-          failedTitles << row.title;
+        errorCount += papers.size();
+        for (const auto &paper : papers)
+          failedTitles << paper.title;
+      } else {
+        const IndexResult r = savePapers(papers, embeddings, dbPath);
+        savedCount += r.saved;
+        errorCount += r.failed.size();
+        failedTitles << r.failed;
+        if (indexError.isEmpty())
+          indexError = r.error;
+        if (r.stopped) {
+          cleanupOcrApi();
+          cancelled = true;
+          break;
+        }
       }
-
-      allChunks.clear();
-      allChunks.squeeze();
     }
 
     // Free Tesseract APIs from the thread pool after each batch so that
@@ -708,108 +692,60 @@ void PdfWorker::emitReport(int selected, int alreadyKnown, int added,
 //  Database writes
 // ============================================================================
 
-/// Embed and store the chunks in one transaction.  Returns false when nothing
-/// was stored (the transaction is rolled back on any failure).
-bool PdfWorker::ingestChunks(const QList<TextChunk> &chunks,
-                             const QString &dbPath) {
-  if (chunks.isEmpty())
-    return true;
-
+/// Store each paper with its chunks in its own transaction, in the order of
+/// `papers`; `embeddings` holds those chunks' embeddings in the same order.
+/// Stops between two papers once m_stopFlag is set: the papers stored so far
+/// stay in the library.
+PdfWorker::IndexResult
+PdfWorker::savePapers(const QList<ExtractionResult> &papers,
+                      const QList<QByteArray> &embeddings,
+                      const QString &dbPath) {
+  IndexResult result;
   SqliteDb db;
-  auto openResult = db.open(dbPath);
-  if (!openResult) {
-    qCritical() << "[PdfWorker] Failed to open database for chunk ingestion:"
-                << openResult.error();
-    return false;
+  if (auto r = db.open(dbPath); !r) {
+    qCritical() << "[PdfWorker] Failed to open the database to save the papers:"
+                << r.error();
+    result.error = r.error();
+    for (const auto &paper : papers)
+      result.failed << paper.title;
+    return result;
   }
 
-  auto txResult = db.transaction();
-  if (!txResult) {
-    qCritical() << "[PdfWorker] Failed to start transaction for chunks:"
-                << txResult.error();
-    return false;
-  }
-
-  int inserted = m_vecManager->insertChunks(db, chunks, &m_stopFlag);
-
-  qDebug() << "[PdfWorker] insertChunks returned:" << inserted << "out of"
-           << chunks.size() << "chunks";
-
-  if (inserted < 0) {
-    auto rbResult = db.rollback();
-    if (!rbResult) {
-      qCritical() << "[PdfWorker] Chunk transaction rollback failed:"
-                  << rbResult.error();
+  LibraryRepository repo(db);
+  QElapsedTimer timer; // for the log at the end
+  timer.start();
+  qsizetype offset = 0;
+  for (const auto &paper : papers) {
+    if (m_stopFlag.load()) {
+      result.stopped = true;
+      break;
     }
-    return false;
+    SummaryRow row;
+    row.paperHash = paper.paperHash;
+    row.title = paper.title;
+    row.pagesNum = paper.pageCount;
+    row.date = QDateTime::currentDateTimeUtc();
+    const qsizetype n = paper.chunks.size();
+    if (auto r = repo.addIndexedPaper(row, paper.chunks,
+                                      embeddings.mid(offset, n));
+        r) {
+      ++result.saved;
+    } else {
+      qCritical() << "[PdfWorker] Saving" << paper.title
+                  << "failed:" << r.error();
+      result.failed << paper.title;
+      if (result.error.isEmpty())
+        result.error = r.error();
+    }
+    offset += n;
   }
+  qInfo().noquote() << QString("[PdfWorker] Saved %1 paper(s) in %2 ms")
+                           .arg(result.saved)
+                           .arg(timer.elapsed());
 
-  auto commitResult = db.commit();
-  if (!commitResult) {
-    qCritical() << "[PdfWorker] Chunk transaction commit failed:"
-                << commitResult.error();
-    (void)db.rollback();
-    return false;
-  }
-
-  auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-  if (!wpResult) {
-    qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
-  }
-  return true;
-}
-
-/// Remove the papers whose indexing failed, so that a later import does not
-/// skip them as already known.
-void PdfWorker::removePapers(const QList<SummaryRow> &rows,
-                             const QString &dbPath) {
-  if (rows.isEmpty())
-    return;
-
-  SqliteDb db;
-  auto openResult = db.open(dbPath);
-  if (!openResult) {
-    qCritical() << "[PdfWorker] Failed to open database to remove papers:"
-                << openResult.error();
-    return;
-  }
-
-  QStringList hashes;
-  for (const auto &row : rows)
-    hashes << row.paperHash;
-  const BatchResult result = LibraryRepository(db).removePapers(hashes);
-  if (!result.ok()) {
-    qCritical() << "[PdfWorker] Failed to remove" << result.failed << "of"
-                << hashes.size() << "unindexed paper(s):" << result.lastError;
-    return;
-  }
-  for (const auto &row : rows)
-    qWarning() << "[PdfWorker] Removed unindexed paper:"
-               << row.paperHash.left(12) << row.title;
-}
-
-void PdfWorker::savePapers(const QList<SummaryRow> &rows,
-                           const QString &dbPath) {
-  if (rows.isEmpty())
-    return;
-
-  SqliteDb db;
-  auto openResult = db.open(dbPath);
-  if (!openResult) {
-    qCritical() << "[PdfWorker] Failed to open database for saving in thread"
-                << QThread::currentThreadId() << ":" << openResult.error();
-    return;
-  }
-
-  if (auto r = LibraryRepository(db).addPapers(rows); !r) {
-    qCritical() << "[PdfWorker] Saving the papers failed:" << r.error();
-    return;
-  }
-
-  auto wpResult = db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
-  if (!wpResult) {
-    qCritical() << "[PdfWorker] WAL checkpoint failed:" << wpResult.error();
-  }
+  if (auto r = db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); !r)
+    qCritical() << "[PdfWorker] WAL checkpoint failed:" << r.error();
+  return result;
 }
 
 // ============================================================================
@@ -900,6 +836,9 @@ static constexpr size_t kMuPdfStoreBytes = size_t(64) << 20;
 
 ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                                         const QString &imgPath) {
+  QElapsedTimer timer; // for the per-file log at the end
+  timer.start();
+  qint64 ocrMs = 0;
   QString localPath = fileUrl.toLocalFile();
   ExtractionResult result;
   result.fileName = QFileInfo(localPath).fileName();
@@ -1082,7 +1021,10 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                         .arg(i + 1)
                         .arg(pageCount)
                         .arg(pageTextStr.trimmed().length());
+        QElapsedTimer ocrTimer;
+        ocrTimer.start();
         pageTextStr = extractTextWithOcr(ctx, doc, i);
+        ocrMs += ocrTimer.elapsed();
         pageMeta.ocrChars = pageTextStr.length();
         qDebug() << QString("[OCR] page %1/%2: %4 chars produced")
                         .arg(i + 1)
@@ -1142,6 +1084,14 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
            << totalPages << "pages with tables," << scannedPages
            << "scanned pages | across" << result.pageMetadata.size()
            << "pages total";
+  qInfo().noquote() << QString("[PdfWorker] Extracted %1: %2 pages (%3 by "
+                               "OCR) in %4 ms, OCR %5 ms, %6 chunks")
+                           .arg(result.fileName)
+                           .arg(result.pageCount)
+                           .arg(scannedPages)
+                           .arg(timer.elapsed())
+                           .arg(ocrMs)
+                           .arg(result.chunks.size());
 
   fz_drop_document(ctx, doc);
   fz_drop_context(ctx);

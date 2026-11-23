@@ -60,7 +60,7 @@ private slots:
   void changedInZotero();
   void importedByHandLater();
   void replacedFile();
-  void deletedFromProjectNotProposedAgain();
+  void deletedFromProjectGoesToIgnored();
   void removedAndBack();
   void notDownloadedIsNotRemoved();
   void proposalsFilter();
@@ -143,12 +143,20 @@ void TestZoteroSync::replacedFile() {
   QCOMPARE(p.store[0].paperHash, QString("new"));
 }
 
-void TestZoteroSync::deletedFromProjectNotProposedAgain() {
+// Deleted from the project: not proposed again, but listed as ignored.
+void TestZoteroSync::deletedFromProjectGoesToIgnored() {
   const ZoteroPdf a = pdf("A", {"C"});
-  const auto p = plan({a}, {known(7, a, "ha", ZoteroStatus::Ingested)},
-                      {{"1:A", "ha"}}, {});
+  const auto row = known(7, a, "ha", ZoteroStatus::Ingested);
+  const auto p = plan({a}, {row}, {{"1:A", "ha"}}, {});
   QVERIFY(p.pendingIds.isEmpty());
+  QCOMPARE(p.ignoredIds, QList<int>({7}));
   QVERIFY(p.store.isEmpty());
+
+  auto ignoredRow = row;
+  ignoredRow.status = ZoteroStatus::Ignored;
+  QCOMPARE(ZoteroSync::ignored({ignoredRow}, {}).size(), 1);
+  // Still in the project: nothing to do.
+  QVERIFY(plan({a}, {row}, {{"1:A", "ha"}}, {"ha"}).ignoredIds.isEmpty());
 }
 
 void TestZoteroSync::removedAndBack() {

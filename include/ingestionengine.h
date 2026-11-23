@@ -70,9 +70,16 @@ private:
   static int extractThreadCount();
   /// Files per batch for that many extraction threads.
   static int batchSizeFor(int threads);
-  void savePapers(const QList<SummaryRow> &rows, const QString &dbPath);
-  bool ingestChunks(const QList<TextChunk> &chunks, const QString &dbPath);
-  void removePapers(const QList<SummaryRow> &rows, const QString &dbPath);
+  /// What savePapers() stored.
+  struct IndexResult {
+    int saved = 0;
+    QStringList failed; ///< titles of the papers that could not be stored
+    QString error;      ///< the first database error, if any
+    bool stopped = false; ///< m_stopFlag was set before the last paper
+  };
+  IndexResult savePapers(const QList<ExtractionResult> &papers,
+                         const QList<QByteArray> &embeddings,
+                         const QString &dbPath);
   QStringList getAllPaperHashes(const QString &dbPath) const;
   QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
                                    const QString &dbPath) const;
