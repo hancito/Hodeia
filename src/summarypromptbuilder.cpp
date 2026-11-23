@@ -74,14 +74,36 @@ const QString &visualSystemPrompt() { return s_systemPromptVisual; }
 const QString &textSystemPrompt() { return s_systemPromptText; }
 const QString &userPrompt() { return s_userPrompt; }
 
+qsizetype chunkOverlap(QStringView previous, QStringView next) {
+  // The longest common end/start, at a sentence boundary on both sides
+  // (the overlap is the previous chunk's last pieces, joined by spaces).
+  // Never the whole next chunk: it always adds something.
+  for (qsizetype n = qMin(previous.size(), next.size() - 1); n > 0; --n) {
+    if ((n < next.size() && next[n] != u' ') ||
+        (n < previous.size() && previous[previous.size() - n - 1] != u' '))
+      continue;
+    if (previous.endsWith(next.first(n)))
+      return n;
+  }
+  return 0;
+}
+
 QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks) {
   QMap<int, QString> pages;
   for (int i = 0; i < chunks.size(); ++i) {
     const auto &c = chunks[i];
-    QString text = c.text;
-    if (i < chunks.size() - 1 && text.length() > ChunkOverlapChars)
-      text = text.left(text.length() - ChunkOverlapChars);
-    pages[c.page] += text;
+    // The overlap stays with the previous chunk (where it comes from).
+    QStringView text(c.text);
+    if (i > 0)
+      text = text.sliced(chunkOverlap(chunks[i - 1].text, text));
+    QString &page = pages[c.page];
+    if (page.isEmpty())
+      text = text.trimmed();
+    // Chunks were cut between sentences: keep them apart.
+    if (!page.isEmpty() && !page.back().isSpace() && !text.isEmpty() &&
+        !text.front().isSpace())
+      page += u' ';
+    page += text;
   }
   return pages;
 }

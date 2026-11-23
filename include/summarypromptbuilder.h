@@ -20,12 +20,15 @@ const QString &textSystemPrompt();
 /// The user message.
 const QString &userPrompt();
 
-/// Chunk overlap trimmed when chunks are joined back into pages; matches the
-/// ingestion's chunk overlap (PdfWorker::m_overlapChars).
-inline constexpr int ChunkOverlapChars = 200;
+/// Length of the text `next` repeats from the end of `previous`: the
+/// overlap the ingestion carries from one chunk to the next (whole
+/// sentences joined by spaces, so it starts and ends at a space or at the
+/// ends of the chunks).  0 if none.
+qsizetype chunkOverlap(QStringView previous, QStringView next);
 
 /// The text of each page (0-based page → text) rebuilt from a paper's
-/// `chunks` (in chunk order), the overlap between chunks trimmed.
+/// `chunks` (in chunk order), each chunk without the overlap it repeats
+/// from the previous one.
 QMap<int, QString> pageTexts(const QList<ChunkSearchResult> &chunks);
 
 /// The prompt for the paper `paperHash` from its `chunks` (in chunk order).

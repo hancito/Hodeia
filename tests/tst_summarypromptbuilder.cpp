@@ -21,7 +21,6 @@ ChunkSearchResult chunk(int page0, const QString &text,
   return c;
 }
 
-const QString kOverlap(SummaryPrompt::ChunkOverlapChars, 'o');
 
 } // namespace
 
@@ -31,6 +30,8 @@ class TestSummaryPrompt : public QObject {
 private slots:
   void noChunks();
   void pagesFromChunks();
+  void chunkOverlap();
+  void pagesRebuildTheText();
   void imagesByMode_data();
   void imagesByMode();
   void missingImageFallsBackToText();
@@ -44,22 +45,52 @@ void TestSummaryPrompt::noChunks() {
 }
 
 void TestSummaryPrompt::pagesFromChunks() {
-  // Every chunk but the last loses its trailing overlap; chunks of a page
-  // are joined; pages come out in page order.
+  // Chunks of a page are joined (apart), pages come out in page order.
   const QList<ChunkSearchResult> chunks = {
-      chunk(1, "B1" + kOverlap), chunk(0, "A1" + kOverlap),
-      chunk(0, "A2" + kOverlap), chunk(1, "B2" + kOverlap)};
+      chunk(1, "B1."), chunk(0, "A1."), chunk(0, "A2."), chunk(1, "B2.")};
   const PromptPayload p =
       SummaryPrompt::build("h", chunks, VisualMode::TextOnly, QString());
 
   QCOMPARE(p.pageBlocks.size(), size_t(2));
   QCOMPARE(p.pageBlocks[0].pageNumber, 1);
-  QCOMPARE(p.pageBlocks[0].text, QString("A1A2"));
+  QCOMPARE(p.pageBlocks[0].text, QString("A1. A2."));
   QCOMPARE(p.pageBlocks[1].pageNumber, 2);
-  QCOMPARE(p.pageBlocks[1].text, "B1B2" + kOverlap);
+  QCOMPARE(p.pageBlocks[1].text, QString("B1. B2."));
   QCOMPARE(p.systemPrompt, SummaryPrompt::textSystemPrompt());
   QVERIFY(p.textOnlySystemPrompt.isEmpty());
   QCOMPARE(p.userMessage, QString("Summarize this paper:"));
+}
+
+void TestSummaryPrompt::chunkOverlap() {
+  using SummaryPrompt::chunkOverlap;
+  // Whole sentences carried over.
+  QCOMPARE(chunkOverlap(u"One. Two. Three.", u"Two. Three. Four."),
+           qsizetype(11));
+  QCOMPARE(chunkOverlap(u"One. Two.", u"Two. Three."), qsizetype(4));
+  // None (dropped when a long sentence follows).
+  QCOMPARE(chunkOverlap(u"One. Two.", u"Three. Four."), qsizetype(0));
+  // A common end/start that is not whole sentences is no overlap.
+  QCOMPARE(chunkOverlap(u"The data.", u"a. Next"), qsizetype(0));
+  QCOMPARE(chunkOverlap(u"x 12", u"12 y"), qsizetype(2));
+  QCOMPARE(chunkOverlap(u"x 123", u"23 y"), qsizetype(0));
+  // Never the whole next chunk.
+  QCOMPARE(chunkOverlap(u"One. Two.", u"Two."), qsizetype(0));
+  QCOMPARE(chunkOverlap(u"", u"Two."), qsizetype(0));
+}
+
+// Chunks as the ingestion cuts them (sentences, overlap of the last ones):
+// the pages give back the text, each sentence once.
+void TestSummaryPrompt::pagesRebuildTheText() {
+  const QList<ChunkSearchResult> chunks = {
+      chunk(0, "S1. S2. S3."),
+      chunk(0, "S3. S4. S5."),        // overlap: S3.
+      chunk(1, "S4. S5. S6. S7."),    // overlap: S4. S5., new text on page 2
+      chunk(1, "S8. S9."),            // no overlap
+      chunk(2, "S9. S10.")};
+  const QMap<int, QString> pages = SummaryPrompt::pageTexts(chunks);
+  QCOMPARE(pages.value(0), QString("S1. S2. S3. S4. S5."));
+  QCOMPARE(pages.value(1), QString("S6. S7. S8. S9."));
+  QCOMPARE(pages.value(2), QString("S10."));
 }
 
 void TestSummaryPrompt::imagesByMode_data() {
