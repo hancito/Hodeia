@@ -3,6 +3,10 @@
 #include <algorithm>
 
 #if defined(Q_OS_WIN)
+// Keep windows.h from defining min/max macros that break std::max/std::clamp.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #elif defined(Q_OS_MACOS)
 #include <mach/mach.h>
