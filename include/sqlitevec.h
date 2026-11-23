@@ -11,17 +11,6 @@
 #include <atomic>
 #include <expected>
 
-struct ChunkSearchResult {
-  QString paperHash;
-  int page;
-  int chunkIdx;
-  QString text;
-  float distance;
-  QString citation;
-  QString cleanTitle;
-  QString pageMetadata; ///< JSON: figures, tables, scanned flags
-};
-
 class ConfigManager;
 
 class SqliteVecManager : public QObject {
@@ -59,16 +48,9 @@ public:
   QList<QByteArray> embedPassages(const QList<TextChunk> &chunks,
                                   const std::atomic<bool> *cancel = nullptr);
 
-  // Search chunks by query text; returns the top-k nearest neighbors, nearest
-  // first.  With `paperHashes`, only the chunks of those papers.
-  QList<ChunkSearchResult> search(SqliteDb &db, const QString &query,
-                                  int k = 10,
-                                  const QStringList &paperHashes = {});
-
-  // Retrieve all chunks belonging to a paper by its MD5 hash.
-  // Returns ChunkSearchResult items (distance is set to 0.0f).
-  QList<ChunkSearchResult> getChunksByHash(SqliteDb &db,
-                                           const QString &paperHash);
+  // Embed a search query (E5 "query: " prefix): a float32 blob, as
+  // LibraryRepository::nearestChunks() takes it.  Empty on failure.
+  QByteArray embedQuery(const QString &query);
 
   // Get embedding dimensionality of the loaded model
   int embeddingDim() const;

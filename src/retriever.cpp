@@ -1,4 +1,5 @@
 #include "retriever.h"
+#include "libraryrepository.h"
 
 #include <QDebug>
 #include <QDir>
@@ -21,7 +22,8 @@ int Retriever::candidateCount(int budgetTokens) {
 QList<PageContext> Retriever::retrieve(const QString &query,
                                        const Options &options) const {
   const int k = candidateCount(options.budgetTokens);
-  const QList<ChunkSearchResult> chunks = m_embeddings.search(m_db, query, k, options.papers);
+  const QList<ChunkSearchResult> chunks = LibraryRepository(m_db).nearestChunks(
+      m_embeddings.embedQuery(query), k, options.papers);
   if (chunks.isEmpty()) {
     qDebug() << "[Retriever] no chunks found for query";
     return {};

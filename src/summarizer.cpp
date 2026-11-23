@@ -187,7 +187,7 @@ PromptPayload Summarizer::buildPrompt(const QString &paperHash) const {
     return payload;
   }
   const QList<ChunkSearchResult> chunks =
-      m_database->vecManager().getChunksByHash(m_database->db(), paperHash);
+      LibraryRepository(m_database->db()).chunks(paperHash);
   if (chunks.isEmpty())
     qDebug() << "[Summarizer] no chunks for hash:" << paperHash;
   return SummaryPrompt::build(

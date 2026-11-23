@@ -89,6 +89,14 @@ public:
   QString summaryTitle(const QString &paperHash) const;
   /// Hash of every paper of the project (a Summaries row is made at import).
   std::expected<QStringList, QString> paperHashes() const;
+  /// The `k` chunks nearest to `queryEmbedding` (a float32 blob, see
+  /// SqliteVecManager::embedQuery), nearest first.  With `paperHashes`, only
+  /// the chunks of those papers.  Empty if the embedding is empty.
+  QList<ChunkSearchResult>
+  nearestChunks(const QByteArray &queryEmbedding, int k,
+                const QStringList &paperHashes = {}) const;
+  /// Every chunk of a paper, by page then position.
+  QList<ChunkSearchResult> chunks(const QString &paperHash) const;
 
   /* ── Writes ── */
 

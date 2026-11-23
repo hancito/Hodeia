@@ -378,7 +378,7 @@ std::expected<QString, QString> McpLibrary::getPage(const QJsonObject &args) {
     return std::unexpected(hash.error());
 
   const QMap<int, QString> pages = SummaryPrompt::pageTexts(
-      m_embeddings->getChunksByHash(m_db, *hash));
+      LibraryRepository(m_db).chunks(*hash));
   if (pages.isEmpty())
     return std::unexpected(QString("%1 has no text in the library.")
                                .arg(CitationFormat::paperMark(*hash)));

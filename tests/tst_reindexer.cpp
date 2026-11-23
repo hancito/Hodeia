@@ -3,6 +3,7 @@
 
 #include "projectstore.h"
 #include "reindexer.h"
+#include "libraryrepository.h"
 #include "sqlitedb.h"
 #include "sqlitevec.h"
 
@@ -81,10 +82,14 @@ void TestReindexer::reembedInBatches() {
   QVERIFY(!Reindexer::status(db));
 
   // The vectors are real now: each question finds its passage.
-  const auto hits = embeddings.search(db, "Why do people cooperate in repeated games?", 3);
+  LibraryRepository repo(db);
+  const auto hits = repo.nearestChunks(
+      embeddings.embedQuery("Why do people cooperate in repeated games?"), 3);
   QVERIFY(!hits.isEmpty());
   QCOMPARE(hits.first().paperHash, QString("hash2"));
-  QCOMPARE(embeddings.search(db, "interest rates and inflation", 1).first().paperHash,
+  QCOMPARE(repo.nearestChunks(embeddings.embedQuery("interest rates and inflation"), 1)
+               .first()
+               .paperHash,
            QString("hash1"));
 }
 

@@ -7,6 +7,7 @@
 
 #include <QTemporaryDir>
 #include <QtTest>
+#include <cmath>
 
 namespace {
 
@@ -54,6 +55,8 @@ private slots:
   void indexedPapers();
   void addIndexedPaper();
   void addIndexedPaperAllOrNothing();
+  void nearestChunks();
+  void chunksOfPaper();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -244,6 +247,78 @@ void TestLibraryRepository::addIndexedPaperAllOrNothing() {
   QVERIFY(repo.addIndexedPaper(importedRow("h4", "d.pdf"), {chunk("h4")},
                                {kEmbedding}));
   QCOMPARE(count(m_db, "SELECT COUNT(*) FROM chunks"), 2);
+}
+
+namespace {
+
+/// A unit vector along `axis`, plus `tilt` along axis 0 (normalized).
+QByteArray direction(int axis, float tilt = 0.0f) {
+  QVector<float> v(384, 0.0f);
+  v[axis] = 1.0f;
+  v[0] += tilt;
+  float norm = 0;
+  for (float x : v)
+    norm += x * x;
+  for (float &x : v)
+    x /= std::sqrt(norm);
+  return QByteArray(reinterpret_cast<const char *>(v.constData()),
+                    v.size() * qsizetype(sizeof(float)));
+}
+
+TextChunk chunkAt(const QString &hash, int page, int idx, const QString &text) {
+  return TextChunk{text, hash, page, idx, "Title " + hash, "Cite " + hash, "{}"};
+}
+
+} // namespace
+
+// Nearest first, at most k, optionally within some papers.
+void TestLibraryRepository::nearestChunks() {
+  LibraryRepository repo(m_db);
+  QVERIFY(repo.addChunks({chunkAt("a", 0, 0, "near"), chunkAt("a", 1, 1, "far"),
+                          chunkAt("b", 0, 0, "middle")},
+                         {direction(1, 0.1f), direction(3), direction(1, 0.8f)}));
+  const QByteArray query = direction(1);
+
+  const auto all = repo.nearestChunks(query, 10);
+  QCOMPARE(all.size(), 3);
+  QCOMPARE(all[0].text, QString("near"));
+  QCOMPARE(all[1].text, QString("middle"));
+  QCOMPARE(all[2].text, QString("far"));
+  QVERIFY(all[0].distance < all[1].distance);
+  QCOMPARE(all[0].citation, QString("Cite a"));
+  QCOMPARE(all[0].cleanTitle, QString("Title a"));
+  QCOMPARE(all[0].pageMetadata, QString("{}"));
+
+  QCOMPARE(repo.nearestChunks(query, 1).size(), 1);
+
+  // Within paper b only, then both papers merged by distance and cut at k.
+  const auto onlyB = repo.nearestChunks(query, 10, {"b"});
+  QCOMPARE(onlyB.size(), 1);
+  QCOMPARE(onlyB[0].text, QString("middle"));
+  const auto both = repo.nearestChunks(query, 2, {"b", "a"});
+  QCOMPARE(both.size(), 2);
+  QCOMPARE(both[0].text, QString("near"));
+  QCOMPARE(both[1].text, QString("middle"));
+
+  QVERIFY(repo.nearestChunks(QByteArray(), 10).isEmpty());
+}
+
+// A paper's chunks by page then position, whatever the insertion order.
+void TestLibraryRepository::chunksOfPaper() {
+  LibraryRepository repo(m_db);
+  QVERIFY(repo.addChunks({chunkAt("a", 1, 2, "p1c2"), chunkAt("a", 0, 0, "p0c0"),
+                          chunkAt("b", 0, 0, "other"), chunkAt("a", 1, 1, "p1c1")},
+                         {kEmbedding, kEmbedding, kEmbedding, kEmbedding}));
+  const auto list = repo.chunks("a");
+  QCOMPARE(list.size(), 3);
+  QCOMPARE(list[0].text, QString("p0c0"));
+  QCOMPARE(list[1].text, QString("p1c1"));
+  QCOMPARE(list[2].text, QString("p1c2"));
+  QCOMPARE(list[2].page, 1);
+  QCOMPARE(list[2].chunkIdx, 2);
+  QCOMPARE(list[0].distance, 0.0f);
+  QVERIFY(repo.chunks("unknown").isEmpty());
+  QVERIFY(repo.chunks(QString()).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

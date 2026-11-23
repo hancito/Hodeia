@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QSet>
+#include <algorithm>
 
 namespace {
 
@@ -132,6 +133,97 @@ std::expected<QStringList, QString> LibraryRepository::paperHashes() const {
     hashes << stmt.columnText(0);
   }
   return hashes;
+}
+
+namespace {
+
+/// Read the chunk columns (paper_hash, page, chunk_idx, chunk_text,
+/// citation, clean_title, page_metadata[, distance]) of each row.
+QList<ChunkSearchResult> readChunks(SqliteStatement &stmt, bool withDistance) {
+  QList<ChunkSearchResult> results;
+  while (true) {
+    auto step = stmt.step();
+    if (!step) {
+      qCritical() << "[LibraryRepository] Reading chunks failed:"
+                  << step.error();
+      break;
+    }
+    if (!*step)
+      break;
+    ChunkSearchResult r;
+    r.paperHash = stmt.columnText(0);
+    r.page = stmt.columnInt(1);
+    r.chunkIdx = stmt.columnInt(2);
+    r.text = stmt.columnText(3);
+    r.citation = stmt.columnText(4);
+    r.cleanTitle = stmt.columnText(5);
+    r.pageMetadata = stmt.columnText(6);
+    if (withDistance)
+      r.distance = float(stmt.columnDouble(7));
+    results.append(r);
+  }
+  return results;
+}
+
+} // namespace
+
+QList<ChunkSearchResult>
+LibraryRepository::nearestChunks(const QByteArray &queryEmbedding, int k,
+                                 const QStringList &paperHashes) const {
+  if (queryEmbedding.isEmpty() || k <= 0)
+    return {};
+  // One KNN query per paper (vec0 filters on a metadata column with '='),
+  // merged by distance.
+  const QStringList filters =
+      paperHashes.isEmpty() ? QStringList{QString()} : paperHashes;
+  QList<ChunkSearchResult> results;
+  for (const QString &hash : filters) {
+    const QString sql =
+        QString("SELECT paper_hash, page, chunk_idx, chunk_text, citation, "
+                "clean_title, page_metadata, distance "
+                "FROM chunks WHERE embedding MATCH vec_f32(?)%1 LIMIT %2")
+            .arg(hash.isEmpty() ? QString() : QStringLiteral(" AND paper_hash = ?"))
+            .arg(k);
+    SqliteStatement stmt = m_db.prepare(sql);
+    if (!stmt.isValid()) {
+      qCritical() << "[LibraryRepository]" << prepareFailed();
+      return {};
+    }
+    auto bound = stmt.bind(1, queryEmbedding);
+    if (bound && !hash.isEmpty())
+      bound = stmt.bind(2, hash);
+    if (!bound) {
+      qCritical() << "[LibraryRepository] Search failed:" << bound.error();
+      return {};
+    }
+    results << readChunks(stmt, /*withDistance=*/true);
+  }
+
+  if (filters.size() > 1) {
+    std::stable_sort(results.begin(), results.end(),
+                     [](const ChunkSearchResult &a, const ChunkSearchResult &b) {
+                       return a.distance < b.distance;
+                     });
+    if (results.size() > k)
+      results.resize(k);
+  }
+  return results;
+}
+
+QList<ChunkSearchResult>
+LibraryRepository::chunks(const QString &paperHash) const {
+  if (paperHash.isEmpty())
+    return {};
+  SqliteStatement stmt = m_db.prepare(
+      "SELECT paper_hash, page, chunk_idx, chunk_text, citation, clean_title, "
+      "page_metadata FROM chunks WHERE paper_hash = ? ORDER BY page, chunk_idx");
+  if (!stmt.isValid())
+    return {};
+  if (auto r = stmt.bind(1, paperHash); !r) {
+    qCritical() << "[LibraryRepository] Reading chunks failed:" << r.error();
+    return {};
+  }
+  return readChunks(stmt, /*withDistance=*/false);
 }
 
 /* ── Writes ─────────────────────────────────────────────────────── */
