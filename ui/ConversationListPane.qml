@@ -128,8 +128,7 @@ Rectangle {
         standardButtons: Dialog.Ok | Dialog.Cancel
         StyledTextField {
             id: renameField
-            anchors.left: parent.left
-            anchors.right: parent.right
+            width: renameDialog.availableWidth
             onAccepted: renameDialog.accept()
         }
         onAccepted: {
@@ -146,8 +145,7 @@ Rectangle {
         title: qsTr("Delete the Conversation")
         standardButtons: Dialog.Yes | Dialog.No
         Label {
-            anchors.left: parent.left
-            anchors.right: parent.right
+            width: deleteDialog.availableWidth
             wrapMode: Text.WordWrap
             text: listPane.current ? qsTr("Delete \"%1\" and its messages?").arg(listPane.current.title) : ""
         }
