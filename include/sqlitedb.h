@@ -81,6 +81,9 @@ public:
   /// Write the WAL back into the database file and truncate it (after a
   /// large write, so the -wal file does not stay large).
   std::expected<void, QString> checkpoint();
+  /// PRAGMA data_version: changes when another connection (another thread's
+  /// or process's) commits to the database; -1 on error.
+  int64_t dataVersion();
 
   // Prepare a statement for repeated use
   SqliteStatement prepare(const QString &sql);

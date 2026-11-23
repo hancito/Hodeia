@@ -8,6 +8,7 @@
 #include "summaryproxymodel.h"
 #include <QAtomicInt>
 #include <QObject>
+#include <QTimer>
 #include <expected>
 #include <functional>
 
@@ -74,6 +75,9 @@ public:
 signals:
   // Emitted after switchDatabase() opened a new project DB.
   void databaseSwitched();
+  // Summaries were written by another process (an agent through the MCP
+  // server); the models are already reloaded.
+  void summariesChangedElsewhere();
   // The active project's file is about to be deleted: background work with
   // its own connection to it must close it before returning.
   void databaseClosing();
@@ -87,6 +91,9 @@ private:
   /// Open a project database through ProjectStore (schema migrations);
   /// a user-facing message on failure.
   std::expected<void, QString> openProjectDb(const QString &path);
+  /// Every few seconds: reload the models when another process wrote
+  /// summaries (cheap when nothing changed: PRAGMA data_version).
+  void checkExternalChanges();
 
   QString m_dbPath;
   SqliteDb m_db;
@@ -99,4 +106,7 @@ private:
   SqliteVecManager &m_vecManager;
   OpenAlexClient *m_openAlexClient = nullptr;
   QAtomicInt m_opsInFlight{0};
+  QTimer *m_externalWatch = nullptr;
+  int64_t m_dataVersion = -1;  ///< at the last check
+  QString m_summariesSignature; ///< at the last reload
 };

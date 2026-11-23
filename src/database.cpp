@@ -24,6 +24,28 @@ DatabaseManager::DatabaseManager(ConfigManager *config,
   m_queryModel->setDatabase(m_db);
   m_citationsModel->setDatabase(m_db);
   initDatabase();
+
+  m_externalWatch = new QTimer(this);
+  m_externalWatch->setInterval(2000);
+  connect(m_externalWatch, &QTimer::timeout, this,
+          &DatabaseManager::checkExternalChanges);
+  m_externalWatch->start();
+}
+
+void DatabaseManager::checkExternalChanges() {
+  if (!m_db.isOpen())
+    return;
+  // Changes with every commit of another connection, including HodeIA's
+  // own workers (an import): then compare the summaries only.
+  const int64_t version = m_db.dataVersion();
+  if (version == m_dataVersion)
+    return;
+  m_dataVersion = version;
+  if (LibraryRepository(m_db).summariesSignature() == m_summariesSignature)
+    return;
+  qInfo() << "[Database] Summaries written by another process: reloading";
+  reloadModels();
+  emit summariesChangedElsewhere();
 }
 
 DatabaseManager::~DatabaseManager() = default;
@@ -52,6 +74,7 @@ bool DatabaseManager::initDatabase() {
   }
 
   // Embedding model is loaded lazily on first use (see SqliteVecManager).
+  m_summariesSignature = LibraryRepository(m_db).summariesSignature();
   m_summaryModel->loadAll();
   m_queryModel->loadAll();
   m_citationsModel->loadAll();
@@ -139,6 +162,7 @@ DatabaseManager::switchDatabase(const QString &dbPath) {
 }
 
 void DatabaseManager::reloadModels() {
+  m_summariesSignature = LibraryRepository(m_db).summariesSignature();
   if (m_config)
     m_summaryModel->setZoteroPriority(m_config->zoteroPriority());
   m_summaryModel->loadAll();

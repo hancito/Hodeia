@@ -94,6 +94,9 @@ public:
   /// of the chunks table (vec0 has no index on paper_hash), but of one paper's
   /// rows only.
   std::optional<IndexedPaper> indexedPaper(const QString &paperHash) const;
+  /// Changes when a summary is added, replaced or removed: to notice the
+  /// summaries another process (the MCP server) wrote.
+  QString summariesSignature() const;
   /// Hashes of the papers (Summaries rows) that start with `prefix`.
   QStringList paperHashesStartingWith(const QString &prefix) const;
   /// Title of a summarized paper, empty if none.

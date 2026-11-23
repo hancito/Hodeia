@@ -14,9 +14,11 @@
 
 namespace {
 
-/// HodeIA's read-only MCP tools (see McpLibrary::registerTools).
+/// HodeIA's MCP tools (see McpLibrary::registerTools): the agent may use them
+/// without asking.  save_summary is the only write; it never replaces a
+/// summary unless asked to.
 const QStringList kTools{"search_library", "list_papers", "get_summary", "get_page",
-                         "get_citations"};
+                         "get_citations", "save_summary"};
 constexpr const char *kServer = "hodeia";
 /// Title of a new conversation: the start of its first message.
 constexpr int kTitleLength = 60;
@@ -243,8 +245,9 @@ QString AgentChatController::systemPrompt() {
       "The user's library of papers (the project open in HodeIA) is available through "
       "the tools of the \"hodeia\" server: search_library (semantic search over the full "
       "text of every paper, optionally restricted to some papers), list_papers, "
-      "get_summary (a paper's structured summary), get_page (the text of one page) and "
-      "get_citations (references and citing works).\n\n"
+      "get_summary (a paper's structured summary), get_page (the text of one page), "
+      "get_citations (references and citing works) and save_summary (store a summary "
+      "you wrote for a paper).\n\n"
       "- Answer from the library: search it before answering, read summaries and pages "
       "when needed, and say so when the library does not answer the question. Never "
       "invent content.\n"
@@ -252,6 +255,9 @@ QString AgentChatController::systemPrompt() {
       "[@95f8ed154398:p12] for a page or [@95f8ed154398] for a paper. Never invent or "
       "alter a mark; HodeIA turns them into citations.\n"
       "- Answer in the language of the user, in Markdown, concisely.\n"
+      "- When the user asks you to summarize papers of the library, read each one "
+      "fully with get_page, then store the summary with save_summary. Replace an "
+      "existing summary only if the user asked to redo it.\n"
       "- End every answer with a short section titled in the user's language (\"Pistes "
       "de recherche\" in French, \"Next steps\" in English) suggesting two to four "
       "concrete ways to take the research further: questions to explore, papers of the "
@@ -411,6 +417,8 @@ void AgentChatController::onEvent(const Agents::Event &event) {
       setStatus(tr("Listing the papers..."));
     else if (tool.contains("get_citations"))
       setStatus(tr("Looking at the citations..."));
+    else if (tool.contains("save_summary"))
+      setStatus(tr("Saving a summary..."));
     else if (!tool.isEmpty())
       setStatus(tr("Using %1...").arg(tool));
     break;

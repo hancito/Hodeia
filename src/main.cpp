@@ -438,6 +438,10 @@ int main(int argc, char *argv[]) {
   QObject::connect(&summaryController, &SummaryController::summaryFinished,
                    &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 
+  // Summaries an agent saved through the MCP server: their citations too.
+  QObject::connect(&databaseManager, &DatabaseManager::summariesChangedElsewhere,
+                   &openAlexClient, &OpenAlexClient::checkEmptyReferences);
+
   // Startup catch-up: fetch references for papers summarized in prior sessions
   QTimer::singleShot(0, &openAlexClient, &OpenAlexClient::checkEmptyReferences);
 

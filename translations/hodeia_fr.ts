@@ -96,93 +96,98 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>AgentChatController</name>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="282"/>
+        <location filename="../src/agentchatcontroller.cpp" line="288"/>
         <source>The message could not be saved: %1</source>
         <translation>Le message n’a pas pu être enregistré : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="294"/>
+        <location filename="../src/agentchatcontroller.cpp" line="300"/>
         <source>No agent can search the library: add Claude Code or another agent in the Backends window.</source>
         <translation>Aucun agent ne peut chercher dans la bibliothèque : ajoutez Claude Code ou un autre agent dans la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="309"/>
+        <location filename="../src/agentchatcontroller.cpp" line="315"/>
         <source>The conversation could not be created: %1</source>
         <translation>La conversation n’a pas pu être créée : %1</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="333"/>
+        <location filename="../src/agentchatcontroller.cpp" line="339"/>
         <source>The agent is working...</source>
         <translation>L’agent travaille…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="348"/>
+        <location filename="../src/agentchatcontroller.cpp" line="354"/>
         <source>The agent backend &quot;%1&quot; is not available: check the Backends window.</source>
         <translation>Le backend d’agent « %1 » n’est pas disponible : vérifiez la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="373"/>
+        <location filename="../src/agentchatcontroller.cpp" line="379"/>
         <source>Starting the agent...</source>
         <translation>Démarrage de l’agent…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="405"/>
+        <location filename="../src/agentchatcontroller.cpp" line="411"/>
         <source>Searching the library...</source>
         <translation>Recherche dans la bibliothèque…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="407"/>
+        <location filename="../src/agentchatcontroller.cpp" line="413"/>
         <source>Reading a page...</source>
         <translation>Lecture d’une page…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="409"/>
+        <location filename="../src/agentchatcontroller.cpp" line="415"/>
         <source>Reading a summary...</source>
         <translation>Lecture d’un résumé…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="411"/>
+        <location filename="../src/agentchatcontroller.cpp" line="417"/>
         <source>Listing the papers...</source>
         <translation>Liste des articles…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="413"/>
+        <location filename="../src/agentchatcontroller.cpp" line="419"/>
         <source>Looking at the citations...</source>
         <translation>Examen des citations…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="415"/>
+        <location filename="../src/agentchatcontroller.cpp" line="421"/>
+        <source>Saving a summary...</source>
+        <translation>Enregistrement d'un résumé...</translation>
+    </message>
+    <message>
+        <location filename="../src/agentchatcontroller.cpp" line="423"/>
         <source>Using %1...</source>
         <translation>Utilisation de %1…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="419"/>
+        <location filename="../src/agentchatcontroller.cpp" line="427"/>
         <source>Thinking...</source>
         <translation>Réflexion…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="422"/>
+        <location filename="../src/agentchatcontroller.cpp" line="430"/>
         <source>Writing the answer...</source>
         <translation>Rédaction de la réponse…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="456"/>
+        <location filename="../src/agentchatcontroller.cpp" line="464"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="460"/>
+        <location filename="../src/agentchatcontroller.cpp" line="468"/>
         <source>(stopped)</source>
         <translation>(arrêté)</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="463"/>
-        <location filename="../src/agentchatcontroller.cpp" line="496"/>
+        <location filename="../src/agentchatcontroller.cpp" line="471"/>
+        <location filename="../src/agentchatcontroller.cpp" line="504"/>
         <source>Stopped before answering.</source>
         <translation>Arrêté avant de répondre.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="500"/>
+        <location filename="../src/agentchatcontroller.cpp" line="508"/>
         <source>Stopping...</source>
         <translation>Arrêt…</translation>
     </message>
@@ -710,22 +715,22 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
         <translation>Renommer la conversation</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationListPane.qml" line="138"/>
+        <location filename="../ui/ConversationListPane.qml" line="137"/>
         <source>Rename Failed</source>
         <translation>Échec du renommage</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationListPane.qml" line="146"/>
+        <location filename="../ui/ConversationListPane.qml" line="145"/>
         <source>Delete the Conversation</source>
         <translation>Supprimer la conversation</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationListPane.qml" line="152"/>
+        <location filename="../ui/ConversationListPane.qml" line="150"/>
         <source>Delete &quot;%1&quot; and its messages?</source>
         <translation>Supprimer « %1 » et ses messages ?</translation>
     </message>
     <message>
-        <location filename="../ui/ConversationListPane.qml" line="157"/>
+        <location filename="../ui/ConversationListPane.qml" line="155"/>
         <source>Deletion Failed</source>
         <translation>Échec de la suppression</translation>
     </message>
@@ -778,22 +783,22 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>DatabaseManager</name>
     <message>
-        <location filename="../src/database.cpp" line="34"/>
+        <location filename="../src/database.cpp" line="56"/>
         <source>No Project Database</source>
         <translation>Aucune base de projet</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="35"/>
+        <location filename="../src/database.cpp" line="57"/>
         <source>No active project could be opened. Create a project from the Project menu.</source>
         <translation>Aucun projet actif n&apos;a pu être ouvert. Créez un projet depuis le menu Projet.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="46"/>
+        <location filename="../src/database.cpp" line="68"/>
         <source>Project Database Unavailable</source>
         <translation>Base du projet indisponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="47"/>
+        <location filename="../src/database.cpp" line="69"/>
         <source>The database of project &quot;%1&quot; could not be opened, so the library is empty.
 
 %2
@@ -826,12 +831,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %2</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="73"/>
+        <location filename="../src/database.cpp" line="96"/>
         <source>This project was saved by a newer version of HodeIA (database version %1; this version reads up to %2). Update HodeIA to open it.</source>
         <translation>Ce projet a été enregistré par une version plus récente de HodeIA (version de base %1 ; cette version lit jusqu&apos;à %2). Mettez HodeIA à jour pour l&apos;ouvrir.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="80"/>
+        <location filename="../src/database.cpp" line="103"/>
         <source>The project database needs an update, but the safety copy made before updating failed, so it was left unchanged: %1</source>
         <translation>La base du projet doit être mise à jour, mais la copie de sécurité préalable a échoué, elle n&apos;a donc pas été modifiée : %1</translation>
     </message>
@@ -844,56 +849,56 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="86"/>
+        <location filename="../src/database.cpp" line="109"/>
         <source>The project database could not be updated to the new version; the failed step was undone.</source>
         <translation>La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="90"/>
+        <location filename="../src/database.cpp" line="113"/>
         <source>A copy from before the update is kept: %1</source>
         <translation>Une copie d&apos;avant la mise à jour est conservée : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="114"/>
-        <location filename="../src/database.cpp" line="200"/>
+        <location filename="../src/database.cpp" line="137"/>
+        <location filename="../src/database.cpp" line="224"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="129"/>
+        <location filename="../src/database.cpp" line="152"/>
         <source>The project database could not be opened: %1</source>
         <translation>La base de données du projet n&apos;a pas pu être ouverte : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="151"/>
-        <location filename="../src/database.cpp" line="196"/>
-        <location filename="../src/database.cpp" line="229"/>
+        <location filename="../src/database.cpp" line="175"/>
+        <location filename="../src/database.cpp" line="220"/>
+        <location filename="../src/database.cpp" line="253"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="168"/>
+        <location filename="../src/database.cpp" line="192"/>
         <source>Cannot delete the active project while an operation is in progress.</source>
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="231"/>
+        <location filename="../src/database.cpp" line="255"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="270"/>
-        <location filename="../src/database.cpp" line="285"/>
+        <location filename="../src/database.cpp" line="294"/>
+        <location filename="../src/database.cpp" line="309"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="274"/>
+        <location filename="../src/database.cpp" line="298"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="276"/>
+        <location filename="../src/database.cpp" line="300"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -901,12 +906,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="293"/>
+        <location filename="../src/database.cpp" line="317"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="297"/>
+        <location filename="../src/database.cpp" line="321"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -1213,7 +1218,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>LibraryRepository</name>
     <message>
-        <location filename="../src/libraryrepository.cpp" line="12"/>
+        <location filename="../src/libraryrepository.cpp" line="13"/>
         <source>database error (prepare failed)</source>
         <translation>erreur de base de données (préparation échouée)</translation>
     </message>
@@ -1842,23 +1847,23 @@ Les données de langue manquent peut-être dans :
 Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
     <message>
-        <location filename="../src/pdfextractor.cpp" line="468"/>
+        <location filename="../src/pdfextractor.cpp" line="472"/>
         <source>invalid path</source>
         <translation>chemin invalide</translation>
     </message>
     <message>
-        <location filename="../src/pdfextractor.cpp" line="477"/>
-        <location filename="../src/pdfextractor.cpp" line="484"/>
+        <location filename="../src/pdfextractor.cpp" line="481"/>
+        <location filename="../src/pdfextractor.cpp" line="488"/>
         <source>PDF reader initialisation failed</source>
         <translation>échec de l&apos;initialisation du lecteur PDF</translation>
     </message>
     <message>
-        <location filename="../src/pdfextractor.cpp" line="491"/>
+        <location filename="../src/pdfextractor.cpp" line="495"/>
         <source>the file cannot be opened (damaged or not a PDF?)</source>
         <translation>le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
     </message>
     <message>
-        <location filename="../src/pdfextractor.cpp" line="503"/>
+        <location filename="../src/pdfextractor.cpp" line="507"/>
         <source>the pages cannot be read (damaged file?)</source>
         <translation>les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
     </message>
@@ -1889,17 +1894,17 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>%1/%2 passages</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="55"/>
+        <location filename="../src/ingestionengine.cpp" line="57"/>
         <source>Started with %1 files</source>
         <translation>Démarré avec %1 fichier(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="69"/>
+        <location filename="../src/ingestionengine.cpp" line="71"/>
         <source>Skipped %1 papers</source>
         <translation>%1 article(s) ignoré(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="133"/>
+        <location filename="../src/ingestionengine.cpp" line="146"/>
         <source>Ingestion cancelled</source>
         <translation>Importation annulée</translation>
     </message>
@@ -1908,12 +1913,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Extraction %1-%2/%3</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="66"/>
+        <location filename="../src/ingestionengine.cpp" line="68"/>
         <source>Checking which papers are already in the library...</source>
         <translation>Recherche des articles déjà présents dans la bibliothèque...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="71"/>
+        <location filename="../src/ingestionengine.cpp" line="73"/>
         <source>%n paper(s) already in the library</source>
         <translation>
             <numerusform>%n article déjà dans la bibliothèque</numerusform>
@@ -1921,12 +1926,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="155"/>
+        <location filename="../src/ingestionengine.cpp" line="168"/>
         <source>no text could be extracted</source>
         <translation>aucun texte n&apos;a pu être extrait</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="195"/>
+        <location filename="../src/ingestionengine.cpp" line="208"/>
         <source>Embedding %1 chunks...</source>
         <translation>Embedding de %1 fragments...</translation>
     </message>
@@ -1935,7 +1940,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Lot %1/%2</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="235"/>
+        <location filename="../src/ingestionengine.cpp" line="248"/>
         <source>%n paper(s) were added to the library before the import was cancelled.</source>
         <translation>
             <numerusform>%n article a été ajouté à la bibliothèque avant l&apos;annulation de l&apos;import.</numerusform>
@@ -1943,27 +1948,27 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="238"/>
+        <location filename="../src/ingestionengine.cpp" line="251"/>
         <source>To import the remaining files, add them again: the papers already in the library will be skipped.</source>
         <translation>Pour importer les fichiers restants, ajoutez-les à nouveau : les articles déjà présents dans la bibliothèque seront ignorés.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="241"/>
+        <location filename="../src/ingestionengine.cpp" line="254"/>
         <source>Import Cancelled</source>
         <translation>Import annulé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="249"/>
+        <location filename="../src/ingestionengine.cpp" line="262"/>
         <source>Nothing to Import</source>
         <translation>Rien à importer</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="250"/>
+        <location filename="../src/ingestionengine.cpp" line="263"/>
         <source>No PDF file was found in the selection.</source>
         <translation>Aucun fichier PDF n&apos;a été trouvé dans la sélection.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="255"/>
+        <location filename="../src/ingestionengine.cpp" line="268"/>
         <source>%n paper(s) added to the library.</source>
         <translation>
             <numerusform>%n article ajouté à la bibliothèque.</numerusform>
@@ -1971,7 +1976,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="257"/>
+        <location filename="../src/ingestionengine.cpp" line="270"/>
         <source>%n file(s) skipped: already in the library.</source>
         <translation>
             <numerusform>%n fichier ignoré : déjà dans la bibliothèque.</numerusform>
@@ -1979,7 +1984,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="260"/>
+        <location filename="../src/ingestionengine.cpp" line="273"/>
         <source>%n file(s) could not be read:</source>
         <translation>
             <numerusform>%n fichier n&apos;a pas pu être lu :</numerusform>
@@ -1987,12 +1992,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="265"/>
+        <location filename="../src/ingestionengine.cpp" line="278"/>
         <source>The embedding model could not process their text. See the log for details.</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu traiter leur texte. Consultez le journal pour plus de détails.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="268"/>
+        <location filename="../src/ingestionengine.cpp" line="281"/>
         <source>%n paper(s) could not be indexed for search and were not added:</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être indexé pour la recherche et n&apos;a pas été ajouté :</numerusform>
@@ -2000,22 +2005,22 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="272"/>
+        <location filename="../src/ingestionengine.cpp" line="285"/>
         <source>Add the files again once the problem is fixed.</source>
         <translation>Ajoutez à nouveau les fichiers une fois le problème corrigé.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="276"/>
+        <location filename="../src/ingestionengine.cpp" line="289"/>
         <source>Import Complete</source>
         <translation>Import terminé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="278"/>
+        <location filename="../src/ingestionengine.cpp" line="291"/>
         <source>Import Partly Failed</source>
         <translation>Import partiellement échoué</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="278"/>
+        <location filename="../src/ingestionengine.cpp" line="291"/>
         <source>Import Failed</source>
         <translation>Échec de l&apos;import</translation>
     </message>
@@ -2036,7 +2041,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="108"/>
+        <location filename="../src/ingestionengine.cpp" line="110"/>
         <source>%1 — page %2/%3</source>
         <translation>%1 — page %2/%3</translation>
     </message>
@@ -2053,7 +2058,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Attention : modèle d&apos;embedding non chargé, stockage vectoriel ignoré</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="175"/>
+        <location filename="../src/ingestionengine.cpp" line="188"/>
         <source>Saved %1/%2 papers</source>
         <translation>%1/%2 articles enregistrés</translation>
     </message>
@@ -2394,34 +2399,34 @@ Nouvel essai au prochain démarrage.</translation>
 <context>
     <name>SqliteVecManager</name>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="64"/>
-        <location filename="../src/sqlitevec.cpp" line="66"/>
+        <location filename="../src/sqlitevec.cpp" line="63"/>
+        <location filename="../src/sqlitevec.cpp" line="65"/>
         <source>Embedding model file not found: %1</source>
         <translation>Fichier du modèle d&apos;embedding introuvable : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="70"/>
+        <location filename="../src/sqlitevec.cpp" line="69"/>
         <source>Loading embedding model: %1</source>
         <translation>Chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="96"/>
-        <location filename="../src/sqlitevec.cpp" line="98"/>
+        <location filename="../src/sqlitevec.cpp" line="95"/>
+        <location filename="../src/sqlitevec.cpp" line="97"/>
         <source>Failed to load embedding model: %1</source>
         <translation>Échec du chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="121"/>
+        <location filename="../src/sqlitevec.cpp" line="120"/>
         <source>The embedding model could not be started (not enough memory?)</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu démarrer (mémoire insuffisante ?)</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="123"/>
+        <location filename="../src/sqlitevec.cpp" line="122"/>
         <source>Failed to create llama context</source>
         <translation>Échec de la création du contexte llama</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="137"/>
+        <location filename="../src/sqlitevec.cpp" line="136"/>
         <source>E5 embedding model loaded (%1 dimensions)</source>
         <translation>Modèle d&apos;embedding E5 chargé (%1 dimensions)</translation>
     </message>

@@ -13,8 +13,9 @@
 class McpServer;
 class SqliteVecManager;
 
-/// The read-only MCP tools over the user's library: search, list, summary,
-/// page text, citations — for the project active in HodeIA.
+/// The MCP tools over the user's library, for the project active in HodeIA:
+/// search, list, summary, page text, citations (read-only), and saving a
+/// summary the agent wrote (the only write).
 ///
 /// Runs in the `Hodeia --mcp` process, next to a possibly open GUI app:
 ///  - the settings are only read (config.json, at every call, so a project
@@ -47,6 +48,9 @@ public:
   std::expected<QString, QString> getSummary(const QJsonObject &args);
   std::expected<QString, QString> getPage(const QJsonObject &args);
   std::expected<QString, QString> getCitations(const QJsonObject &args);
+  /// Store a summary the agent wrote (HodeIA's summary fields).  An existing
+  /// summary is only replaced with "replace": true.
+  std::expected<QString, QString> saveSummary(const QJsonObject &args);
 
 private:
   /// Open the database of the project active in HodeIA (reopened when it

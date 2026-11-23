@@ -307,6 +307,12 @@ std::expected<void, QString> SqliteDb::transaction() {
 }
 std::expected<void, QString> SqliteDb::commit() { return exec("COMMIT"); }
 std::expected<void, QString> SqliteDb::rollback() { return exec("ROLLBACK"); }
+int64_t SqliteDb::dataVersion() {
+  SqliteStatement stmt = prepare("PRAGMA data_version");
+  auto step = stmt.step();
+  return step && *step ? stmt.columnInt64(0) : -1;
+}
+
 std::expected<void, QString> SqliteDb::checkpoint() {
   return exec("PRAGMA wal_checkpoint(TRUNCATE)");
 }

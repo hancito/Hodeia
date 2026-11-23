@@ -58,6 +58,7 @@ private slots:
   void nearestChunks();
   void chunksOfPaper();
   void onePaper();
+  void summariesSignature();
 
 private:
   QTemporaryDir *m_dir = nullptr;
@@ -355,6 +356,34 @@ void TestLibraryRepository::onePaper() {
   QCOMPARE(repo.paperHashesStartingWith("abc"), QStringList({"abc123"}));
   QVERIFY(repo.paperHashesStartingWith("x").isEmpty());
   QVERIFY(repo.paperHashesStartingWith("").isEmpty());
+}
+
+// Changes with a summary, not with an import; another connection's commit
+// changes data_version, the connection's own does not.
+void TestLibraryRepository::summariesSignature() {
+  LibraryRepository repo(m_db);
+  const QString empty = repo.summariesSignature();
+  const int64_t version = m_db.dataVersion();
+  QVERIFY(version >= 0);
+
+  SqliteDb other;
+  QVERIFY(other.open(m_dir->filePath("P.db")).has_value());
+  QVERIFY(LibraryRepository(other).addIndexedPaper(
+      importedRow("h1", "a.pdf"), {chunkAt("h1", 0, 0, "x")}, {kEmbedding}));
+  QVERIFY(m_db.dataVersion() != version);
+  QCOMPARE(repo.summariesSignature(), empty); // an import
+
+  QVERIFY(LibraryRepository(other).saveSummary("h1", summary("T"), "{}", "m"));
+  const QString one = repo.summariesSignature();
+  QVERIFY(one != empty);
+
+  // Replaced within the same second: still noticed.
+  QVERIFY(LibraryRepository(other).saveSummary("h1", summary("T"), "{\"a\":1}", "m"));
+  QVERIFY(repo.summariesSignature() != one);
+
+  const int64_t mine = m_db.dataVersion();
+  QVERIFY(repo.saveSummary("h1", summary("T2"), "{}", "m"));
+  QCOMPARE(m_db.dataVersion(), mine);
 }
 
 QTEST_GUILESS_MAIN(TestLibraryRepository)

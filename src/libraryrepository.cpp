@@ -166,6 +166,20 @@ LibraryRepository::indexedPaper(const QString &paperHash) const {
       paperHash, readIndexed);
 }
 
+QString LibraryRepository::summariesSignature() const {
+  // Rows of an import have no summary JSON: an import does not change it.
+  // Dates are to the second: the total length tells a replacement made in
+  // the same second.
+  SqliteStatement stmt = m_db.prepare(
+      "SELECT COUNT(*), MAX(date), SUM(length(summary_json)) FROM Summaries "
+      "WHERE length(summary_json) > 0");
+  auto step = stmt.step();
+  if (!step || !*step)
+    return {};
+  return stmt.columnText(0) + '|' + stmt.columnText(1) + '|' +
+         stmt.columnText(2);
+}
+
 QStringList
 LibraryRepository::paperHashesStartingWith(const QString &prefix) const {
   if (prefix.isEmpty())
