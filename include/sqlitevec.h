@@ -5,6 +5,7 @@
 #include "textchunk.h"
 #include <QList>
 #include <QMutex>
+#include <QReadWriteLock>
 #include <QString>
 #include <QVector>
 #include <atomic>
@@ -100,6 +101,10 @@ private:
   // this, concurrent llama_encode on one context corrupts the KV cache and
   // llama_free under a live encode is a segfault.
   QMutex m_lock;
+  // Guards the model's lifetime: written by initialize()/shutdown(), read
+  // by embed() (before m_lock) and by countTokens(), which only reads the
+  // model's vocabulary (thread-safe) and so does not take m_lock.
+  QReadWriteLock m_modelLock;
 
   void setLastError(const QString &error);
   QString m_lastError;

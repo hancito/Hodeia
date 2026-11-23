@@ -1108,68 +1108,76 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>IngestionDialog</name>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="50"/>
+        <location filename="../ui/IngestionDialog.qml" line="47"/>
         <source>Reading the selected files</source>
         <translation>Lecture des fichiers sélectionnés</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="51"/>
-        <location filename="../ui/IngestionDialog.qml" line="60"/>
+        <location filename="../ui/IngestionDialog.qml" line="48"/>
+        <location filename="../ui/IngestionDialog.qml" line="57"/>
         <source>files</source>
         <translation>fichiers</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="59"/>
+        <location filename="../ui/IngestionDialog.qml" line="56"/>
         <source>Extracting text</source>
         <translation>Extraction du texte</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="68"/>
         <source>Indexing passages</source>
-        <translation>Indexation des passages</translation>
+        <translation type="vanished">Indexation des passages</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="69"/>
         <source>passages</source>
-        <translation>passages</translation>
+        <translation type="vanished">passages</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="118"/>
+        <location filename="../ui/IngestionDialog.qml" line="65"/>
+        <source>Indexing papers</source>
+        <translation>Indexation des articles</translation>
+    </message>
+    <message>
+        <location filename="../ui/IngestionDialog.qml" line="66"/>
+        <source>papers</source>
+        <translation>articles</translation>
+    </message>
+    <message>
+        <location filename="../ui/IngestionDialog.qml" line="112"/>
         <source>%1h %2m</source>
         <translation>%1 h %2 min</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="123"/>
+        <location filename="../ui/IngestionDialog.qml" line="117"/>
         <source>%1m %2s</source>
         <translation>%1 min %2 s</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="125"/>
+        <location filename="../ui/IngestionDialog.qml" line="119"/>
         <source>%1s</source>
         <translation>%1 s</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="130"/>
+        <location filename="../ui/IngestionDialog.qml" line="124"/>
         <source>Importing PDFs</source>
         <translation>Import de PDF</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="189"/>
+        <location filename="../ui/IngestionDialog.qml" line="179"/>
         <source>Cancelling the import...</source>
         <translation>Annulation de l&apos;import...</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="189"/>
+        <location filename="../ui/IngestionDialog.qml" line="179"/>
         <source>Preparing the import...</source>
         <translation>Préparation de l&apos;import...</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="189"/>
+        <location filename="../ui/IngestionDialog.qml" line="179"/>
         <source>No new paper to import</source>
         <translation>Aucun nouvel article à importer</translation>
     </message>
     <message numerus="yes">
-        <location filename="../ui/IngestionDialog.qml" line="189"/>
+        <location filename="../ui/IngestionDialog.qml" line="179"/>
         <source>Importing %n paper(s) — %1%</source>
         <translation>
             <numerusform>Import de %n article — %1 %</numerusform>
@@ -1177,27 +1185,27 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="282"/>
+        <location filename="../ui/IngestionDialog.qml" line="272"/>
         <source>%1/%2 %3</source>
         <translation>%1/%2 %3</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="311"/>
+        <location filename="../ui/IngestionDialog.qml" line="301"/>
         <source>Stopping after the current page or passage batch. Papers not fully indexed are not kept.</source>
         <translation>Arrêt après la page ou le lot de passages en cours. Les articles qui ne sont pas entièrement indexés ne sont pas conservés.</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="311"/>
+        <location filename="../ui/IngestionDialog.qml" line="301"/>
         <source>Please wait: scanned documents go through text recognition, which can take a while.</source>
         <translation>Veuillez patienter : les documents numérisés passent par la reconnaissance de texte, ce qui peut prendre du temps.</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="317"/>
+        <location filename="../ui/IngestionDialog.qml" line="307"/>
         <source>Cancelling...</source>
         <translation>Annulation...</translation>
     </message>
     <message>
-        <location filename="../ui/IngestionDialog.qml" line="317"/>
+        <location filename="../ui/IngestionDialog.qml" line="307"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
@@ -1791,22 +1799,22 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>OpenAlexClient</name>
     <message>
-        <location filename="../src/openalex.cpp" line="433"/>
+        <location filename="../src/openalex.cpp" line="346"/>
         <source>OpenAlex Access Refused</source>
         <translation>Accès OpenAlex refusé</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="434"/>
+        <location filename="../src/openalex.cpp" line="347"/>
         <source>OpenAlex refused the request (HTTP %1), so citations cannot be fetched. The API key is probably invalid or expired: check it in the OpenAlex API Key menu.</source>
         <translation>OpenAlex a refusé la requête (HTTP %1) : les citations ne peuvent pas être récupérées. La clé API est probablement invalide ou expirée : vérifiez-la dans le menu Clé API OpenAlex.</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="440"/>
+        <location filename="../src/openalex.cpp" line="353"/>
         <source>OpenAlex Limit Reached</source>
         <translation>Limite OpenAlex atteinte</translation>
     </message>
     <message>
-        <location filename="../src/openalex.cpp" line="441"/>
+        <location filename="../src/openalex.cpp" line="354"/>
         <source>OpenAlex limits the number of requests and the limit is reached, so some citations could not be fetched. They will be fetched again at a later start. An OpenAlex API key raises the limit.</source>
         <translation>OpenAlex limite le nombre de requêtes et cette limite est atteinte : certaines citations n&apos;ont pas pu être récupérées. Elles le seront lors d&apos;un prochain démarrage. Une clé API OpenAlex augmente la limite.</translation>
     </message>
@@ -1814,12 +1822,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>PdfWorker</name>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="126"/>
+        <location filename="../src/ingestionengine.cpp" line="143"/>
         <source>Text Recognition Unavailable</source>
         <translation>Reconnaissance de texte indisponible</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="127"/>
+        <location filename="../src/ingestionengine.cpp" line="144"/>
         <source>The OCR engine could not start, so scanned pages (images without text) cannot be read. Papers with selectable text are not affected.
 
 The language data may be missing from:
@@ -1834,32 +1842,36 @@ Les données de langue manquent peut-être dans :
 Réinstaller HodeIA devrait corriger le problème.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="458"/>
+        <location filename="../src/ingestionengine.cpp" line="445"/>
+        <source>%1/%2 passages</source>
+        <translation>%1/%2 passages</translation>
+    </message>
+    <message>
+        <location filename="../src/ingestionengine.cpp" line="469"/>
         <source>Started with %1 files</source>
         <translation>Démarré avec %1 fichier(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="473"/>
+        <location filename="../src/ingestionengine.cpp" line="483"/>
         <source>Skipped %1 papers</source>
         <translation>%1 article(s) ignoré(s)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="622"/>
+        <location filename="../src/ingestionengine.cpp" line="537"/>
         <source>Ingestion cancelled</source>
         <translation>Importation annulée</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="502"/>
         <source>Extracting %1-%2/%3</source>
-        <translation>Extraction %1-%2/%3</translation>
+        <translation type="vanished">Extraction %1-%2/%3</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="470"/>
+        <location filename="../src/ingestionengine.cpp" line="480"/>
         <source>Checking which papers are already in the library...</source>
         <translation>Recherche des articles déjà présents dans la bibliothèque...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="476"/>
+        <location filename="../src/ingestionengine.cpp" line="485"/>
         <source>%n paper(s) already in the library</source>
         <translation>
             <numerusform>%n article déjà dans la bibliothèque</numerusform>
@@ -1867,22 +1879,21 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="523"/>
+        <location filename="../src/ingestionengine.cpp" line="559"/>
         <source>no text could be extracted</source>
         <translation>aucun texte n&apos;a pu être extrait</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="567"/>
+        <location filename="../src/ingestionengine.cpp" line="599"/>
         <source>Embedding %1 chunks...</source>
         <translation>Embedding de %1 fragments...</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="570"/>
         <source>Batch %1/%2</source>
-        <translation>Lot %1/%2</translation>
+        <translation type="vanished">Lot %1/%2</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="635"/>
+        <location filename="../src/ingestionengine.cpp" line="639"/>
         <source>%n paper(s) were added to the library before the import was cancelled.</source>
         <translation>
             <numerusform>%n article a été ajouté à la bibliothèque avant l&apos;annulation de l&apos;import.</numerusform>
@@ -1890,27 +1901,27 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="638"/>
+        <location filename="../src/ingestionengine.cpp" line="642"/>
         <source>To import the remaining files, add them again: the papers already in the library will be skipped.</source>
         <translation>Pour importer les fichiers restants, ajoutez-les à nouveau : les articles déjà présents dans la bibliothèque seront ignorés.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="641"/>
+        <location filename="../src/ingestionengine.cpp" line="645"/>
         <source>Import Cancelled</source>
         <translation>Import annulé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="649"/>
+        <location filename="../src/ingestionengine.cpp" line="653"/>
         <source>Nothing to Import</source>
         <translation>Rien à importer</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="650"/>
+        <location filename="../src/ingestionengine.cpp" line="654"/>
         <source>No PDF file was found in the selection.</source>
         <translation>Aucun fichier PDF n&apos;a été trouvé dans la sélection.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="655"/>
+        <location filename="../src/ingestionengine.cpp" line="659"/>
         <source>%n paper(s) added to the library.</source>
         <translation>
             <numerusform>%n article ajouté à la bibliothèque.</numerusform>
@@ -1918,7 +1929,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="657"/>
+        <location filename="../src/ingestionengine.cpp" line="661"/>
         <source>%n file(s) skipped: already in the library.</source>
         <translation>
             <numerusform>%n fichier ignoré : déjà dans la bibliothèque.</numerusform>
@@ -1926,7 +1937,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="660"/>
+        <location filename="../src/ingestionengine.cpp" line="664"/>
         <source>%n file(s) could not be read:</source>
         <translation>
             <numerusform>%n fichier n&apos;a pas pu être lu :</numerusform>
@@ -1934,12 +1945,12 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="665"/>
+        <location filename="../src/ingestionengine.cpp" line="669"/>
         <source>The embedding model could not process their text. See the log for details.</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu traiter leur texte. Consultez le journal pour plus de détails.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/ingestionengine.cpp" line="668"/>
+        <location filename="../src/ingestionengine.cpp" line="672"/>
         <source>%n paper(s) could not be indexed for search and were not added:</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être indexé pour la recherche et n&apos;a pas été ajouté :</numerusform>
@@ -1947,48 +1958,48 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         </translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="672"/>
+        <location filename="../src/ingestionengine.cpp" line="676"/>
         <source>Add the files again once the problem is fixed.</source>
         <translation>Ajoutez à nouveau les fichiers une fois le problème corrigé.</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="676"/>
+        <location filename="../src/ingestionengine.cpp" line="680"/>
         <source>Import Complete</source>
         <translation>Import terminé</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="678"/>
+        <location filename="../src/ingestionengine.cpp" line="682"/>
         <source>Import Partly Failed</source>
         <translation>Import partiellement échoué</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="678"/>
+        <location filename="../src/ingestionengine.cpp" line="682"/>
         <source>Import Failed</source>
         <translation>Échec de l&apos;import</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="961"/>
+        <location filename="../src/ingestionengine.cpp" line="843"/>
         <source>invalid path</source>
         <translation>chemin invalide</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="970"/>
-        <location filename="../src/ingestionengine.cpp" line="977"/>
+        <location filename="../src/ingestionengine.cpp" line="852"/>
+        <location filename="../src/ingestionengine.cpp" line="859"/>
         <source>PDF reader initialisation failed</source>
         <translation>échec de l&apos;initialisation du lecteur PDF</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="984"/>
+        <location filename="../src/ingestionengine.cpp" line="866"/>
         <source>the file cannot be opened (damaged or not a PDF?)</source>
         <translation>le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="996"/>
+        <location filename="../src/ingestionengine.cpp" line="878"/>
         <source>the pages cannot be read (damaged file?)</source>
         <translation>les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="1015"/>
+        <location filename="../src/ingestionengine.cpp" line="898"/>
         <source>%1 — page %2/%3</source>
         <translation>%1 — page %2/%3</translation>
     </message>
@@ -2005,7 +2016,7 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation type="vanished">Attention : modèle d&apos;embedding non chargé, stockage vectoriel ignoré</translation>
     </message>
     <message>
-        <location filename="../src/ingestionengine.cpp" line="611"/>
+        <location filename="../src/ingestionengine.cpp" line="579"/>
         <source>Saved %1/%2 papers</source>
         <translation>%1/%2 articles enregistrés</translation>
     </message>
@@ -2346,34 +2357,34 @@ Nouvel essai au prochain démarrage.</translation>
 <context>
     <name>SqliteVecManager</name>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="61"/>
-        <location filename="../src/sqlitevec.cpp" line="63"/>
+        <location filename="../src/sqlitevec.cpp" line="64"/>
+        <location filename="../src/sqlitevec.cpp" line="66"/>
         <source>Embedding model file not found: %1</source>
         <translation>Fichier du modèle d&apos;embedding introuvable : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="67"/>
+        <location filename="../src/sqlitevec.cpp" line="70"/>
         <source>Loading embedding model: %1</source>
         <translation>Chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="90"/>
-        <location filename="../src/sqlitevec.cpp" line="92"/>
+        <location filename="../src/sqlitevec.cpp" line="96"/>
+        <location filename="../src/sqlitevec.cpp" line="98"/>
         <source>Failed to load embedding model: %1</source>
         <translation>Échec du chargement du modèle d&apos;embedding : %1</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="115"/>
+        <location filename="../src/sqlitevec.cpp" line="121"/>
         <source>The embedding model could not be started (not enough memory?)</source>
         <translation>Le modèle d&apos;embedding n&apos;a pas pu démarrer (mémoire insuffisante ?)</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="117"/>
+        <location filename="../src/sqlitevec.cpp" line="123"/>
         <source>Failed to create llama context</source>
         <translation>Échec de la création du contexte llama</translation>
     </message>
     <message>
-        <location filename="../src/sqlitevec.cpp" line="131"/>
+        <location filename="../src/sqlitevec.cpp" line="137"/>
         <source>E5 embedding model loaded (%1 dimensions)</source>
         <translation>Modèle d&apos;embedding E5 chargé (%1 dimensions)</translation>
     </message>
@@ -2711,23 +2722,23 @@ Nouvel essai au prochain démarrage.</translation>
         <translation>Impossible de lire Zotero : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="229"/>
-        <location filename="../src/zoterocontroller.cpp" line="364"/>
+        <location filename="../src/zoterocontroller.cpp" line="231"/>
+        <location filename="../src/zoterocontroller.cpp" line="367"/>
         <source>Cannot update the project: %1</source>
         <translation>Impossible de mettre à jour le projet : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="301"/>
+        <location filename="../src/zoterocontroller.cpp" line="304"/>
         <source>No zotero.sqlite in %1: choose Zotero&apos;s data folder (Zotero &gt; Settings &gt; Advanced &gt; Files and Folders).</source>
         <translation>Pas de zotero.sqlite dans %1 : choisissez le dossier de données de Zotero (Zotero &gt; Paramètres &gt; Avancé &gt; Fichiers et dossiers).</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="315"/>
+        <location filename="../src/zoterocontroller.cpp" line="318"/>
         <source>Cannot save the collections: %1</source>
         <translation>Impossible d&apos;enregistrer les collections : %1</translation>
     </message>
     <message>
-        <location filename="../src/zoterocontroller.cpp" line="338"/>
+        <location filename="../src/zoterocontroller.cpp" line="341"/>
         <source>Another import is running: import these PDFs once it has finished.</source>
         <translation>Une autre importation est en cours : importez ces PDF une fois qu’elle sera terminée.</translation>
     </message>

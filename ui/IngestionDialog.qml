@@ -1,7 +1,8 @@
 // Blocking window shown while PDFs are imported: modal, cannot be dismissed
 // (Escape / click outside), only cancelled.  Lists the import's operations —
-// reading the files, extracting their text, indexing the passages — each
-// with its own progress, under the overall progress.
+// reading the files, extracting their text, indexing the papers — each
+// with its own progress, under the overall progress.  Extraction and
+// indexing run at the same time: papers are indexed as soon as extracted.
 // Opens and closes itself from engineController's signals.
 pragma ComponentBehavior: Bound
 import QtQuick
@@ -17,22 +18,19 @@ StyledDialog {
     property int elapsedTenths: 0
     property bool cancelling: false
 
-    // Finer-grained than papersDone (counted per batch of 10): files
-    // extracted so far, and how far the current batch's indexing has gone.
+    // Files extracted so far (papersDone counts the indexed ones).
     property int extractDone: 0
-    property real embedFraction: 0
 
     // Each paper counts half when its text is extracted and half once it is
-    // indexed, so the bar moves with every file, not only at batch ends.
+    // indexed, so the bar moves with every file.
     readonly property real overallProgress: {
         if (papersTotal <= 0)
             return 0;
-        const pending = Math.max(0, extractDone - papersDone);
-        return Math.min(1, (papersDone + pending * (0.5 + 0.5 * embedFraction)) / papersTotal);
+        return Math.min(1, (extractDone + papersDone) / (2 * papersTotal));
     }
 
     // One entry per operation, in pipeline order.  `phase` is "pending",
-    // "running", "paused" (partly done, waiting for its next batch) or "done".
+    // "running" or "done".
     ListModel {
         id: steps
     }
@@ -43,7 +41,6 @@ StyledDialog {
         elapsedTenths = 0;
         cancelling = false;
         extractDone = 0;
-        embedFraction = 0;
         steps.clear();
         steps.append({
             key: "hash",
@@ -65,8 +62,8 @@ StyledDialog {
         });
         steps.append({
             key: "embed",
-            label: qsTr("Indexing passages"),
-            unit: qsTr("passages"),
+            label: qsTr("Indexing papers"),
+            unit: qsTr("papers"),
             phase: "pending",
             current: 0,
             total: 0,
@@ -86,20 +83,17 @@ StyledDialog {
         const idx = indexOf(key);
         if (idx < 0)
             return;
-        // The operation reporting progress is the running one: the earlier
-        // ones are either done or paused until the next batch.
-        for (let i = 0; i < steps.count; ++i) {
-            if (i === idx)
-                continue;
-            const s = steps.get(i);
-            // Indexing runs once per batch: it is only done at the end.
-            if (s.phase === "running")
-                steps.setProperty(i, "phase", s.key !== "embed" && s.total > 0 && s.current >= s.total ? "done" : "paused");
+        // Reading the files is over once the papers are extracted.
+        if (key !== "hash") {
+            const hash = indexOf("hash");
+            if (steps.get(hash).phase === "running")
+                steps.setProperty(hash, "phase", "done");
         }
         steps.setProperty(idx, "current", current);
         steps.setProperty(idx, "total", total);
         steps.setProperty(idx, "detail", detail);
-        steps.setProperty(idx, "phase", "running");
+        // Extraction and indexing run side by side: each is done on its own.
+        steps.setProperty(idx, "phase", key !== "hash" && total > 0 && current >= total ? "done" : "running");
     }
 
     function finishSteps() {
@@ -150,12 +144,8 @@ StyledDialog {
         }
         function onIngestionStepProgress(step, current, total, detail) {
             dialog.updateStep(step, current, total, detail);
-            if (step === "extract") {
+            if (step === "extract")
                 dialog.extractDone = current;
-                dialog.embedFraction = 0; // a new batch is being extracted
-            } else if (step === "embed") {
-                dialog.embedFraction = total > 0 ? current / total : 0;
-            }
         }
         function onIngestionPapersProgress(done, total) {
             dialog.papersDone = done;
@@ -253,13 +243,13 @@ StyledDialog {
                     }
                     Rectangle {
                         anchors.centerIn: parent
-                        visible: stepRow.phase === "pending" || stepRow.phase === "paused"
+                        visible: stepRow.phase === "pending"
                         width: 14
                         height: 14
                         radius: 7
-                        color: stepRow.phase === "paused" ? Style.tint(Colors.primary, 0.35) : "transparent"
+                        color: "transparent"
                         border.width: 2
-                        border.color: stepRow.phase === "paused" ? Colors.primary : Colors.surface2
+                        border.color: Colors.surface2
                     }
                 }
 

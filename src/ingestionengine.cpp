@@ -1,4 +1,5 @@
 #include "ingestionengine.h"
+#include "ingestionpipeline.h"
 #include "libraryrepository.h"
 #include "notifier.h"
 #include "systemmemory.h"
@@ -15,7 +16,6 @@
 #include <QImage>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QMutex>
 #include <QRegularExpression>
 #include <QtConcurrent>
 
@@ -97,26 +97,39 @@ QString PdfWorker::extractTextFromStextPage(fz_stext_page *textPage) const {
 // ============================================================================
 //  OCR fallback  (Tesseract via direct API — not through MuPDF)
 //
-//  Each extraction thread keeps one TessBaseAPI (cached per thread in a
-//  hash protected by a mutex).  The pool is bounded by
-//  PdfWorker::extractThreadCount(), so memory usage is bounded.
-//  api->Clear() frees per-page results; the model stays cached for reuse.
-//
-//  After each batch, cleanupOcrApi() destroys every cached API sequentially
-//  from the caller thread.  Because all pool tasks have finished
-//  (blockingMap returned), no thread accesses its API concurrently.
+//  Each file being extracted gets its own TessBaseAPI, made at its first
+//  scanned page and destroyed with the file (OcrEngine): no cache shared
+//  between threads, nothing to clean up between files.  Making one takes
+//  ~0.3 s, little next to the seconds of OCR per page.
 // ============================================================================
 
-static QMutex g_ocrMutex;
-static QHash<QThread *, tesseract::TessBaseAPI *> g_ocrCache;
+namespace {
 
-static tesseract::TessBaseAPI *ensureOcrApi() {
-  QMutexLocker locker(&g_ocrMutex);
-  QThread *current = QThread::currentThread();
-  tesseract::TessBaseAPI *api = g_ocrCache.value(current, nullptr);
-  if (!api) {
-    api = new tesseract::TessBaseAPI();
+/// The Tesseract instance of one file, made on first use.
+class OcrEngine {
+public:
+  OcrEngine() = default;
+  OcrEngine(const OcrEngine &) = delete;
+  OcrEngine &operator=(const OcrEngine &) = delete;
+  ~OcrEngine() {
+    if (m_api) {
+      m_api->End();
+      delete m_api;
+    }
+  }
 
+  /// nullptr if Tesseract cannot start (tried once per file).
+  tesseract::TessBaseAPI *api() {
+    if (!m_api && !m_failed) {
+      m_api = create();
+      m_failed = !m_api;
+    }
+    return m_api;
+  }
+
+private:
+  static tesseract::TessBaseAPI *create() {
+    auto *api = new tesseract::TessBaseAPI();
     QString tessdata =
         QDir(QCoreApplication::applicationDirPath()).filePath("tessdata");
 
@@ -137,29 +150,17 @@ static tesseract::TessBaseAPI *ensureOcrApi() {
       return nullptr;
     }
     api->SetPageSegMode(tesseract::PageSegMode::PSM_AUTO);
-    g_ocrCache.insert(current, api);
+    return api;
   }
-  return api;
-}
 
-/// Destroy all TessBaseAPI instances sequentially from the caller's thread.
-///  Safe to call after blockingMap/Mapped returns (all pool workers idle).
-static void cleanupOcrApi() {
-  QMutexLocker locker(&g_ocrMutex);
-  for (auto it = g_ocrCache.begin(); it != g_ocrCache.end(); ++it) {
-    tesseract::TessBaseAPI *api = it.value();
-    if (api) {
-      api->End();
-      delete api;
-    }
-  }
-  g_ocrCache.clear();
-  qDebug() << "[OCR] Cleanup complete";
-}
+  tesseract::TessBaseAPI *m_api = nullptr;
+  bool m_failed = false;
+};
 
-QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
-                                      int pageNum) const {
-  tesseract::TessBaseAPI *api = ensureOcrApi();
+/// Text of a page by OCR, empty if it cannot be read.
+QString extractTextWithOcr(OcrEngine &ocr, fz_context *ctx, fz_document *doc,
+                           int pageNum) {
+  tesseract::TessBaseAPI *api = ocr.api();
   if (!api)
     return QString();
 
@@ -184,10 +185,12 @@ QString PdfWorker::extractTextWithOcr(fz_context *ctx, fz_document *doc,
         QRegularExpression("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]"));
   }
 
-  api->Clear(); // free per-page results, keep model cached for reuse
+  api->Clear(); // free per-page results, keep the model for the next page
   fz_drop_pixmap(ctx, pix);
   return result;
 }
+
+} // namespace
 
 // ============================================================================
 //  Chunking
@@ -429,16 +432,16 @@ QString PdfWorker::computeFileHash(const QUrl &fileUrl) const {
 PdfWorker::PdfWorker(ConfigManager *config, SqliteVecManager *vecManager,
                      QObject *parent)
     : QObject(parent), m_vecManager(vecManager), m_config(config) {
-  // Sized for each batch (processPDF).  Keep the threads for the whole
-  // import: each one caches its Tesseract instance (keyed by thread) until
-  // cleanupOcrApi() at the end of a batch.
-  m_extractPool.setExpiryTimeout(-1);
   if (m_vecManager) {
     // Emitted from this worker's thread (embedPassages): a direct call.
+    // The indexing step counts papers; the passages of the group being
+    // embedded go in its detail.
     connect(m_vecManager, &SqliteVecManager::embeddingProgress, this,
             [this](int current, int total) {
-              emit stepProgress(QStringLiteral("embed"), current, total,
-                                m_embedDetail);
+              if (m_tally)
+                emit stepProgress(QStringLiteral("embed"), m_tally->done(),
+                                  m_tally->total,
+                                  tr("%1/%2 passages").arg(current).arg(total));
             });
   }
 }
@@ -462,8 +465,7 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   m_userCancelled.store(false);
   emit started();
 
-  QString message = tr("Started with %1 files").arg(filePath.size());
-  emit status(message);
+  emit status(tr("Started with %1 files").arg(filePath.size()));
 
   emit stepProgress(QStringLiteral("hash"), 0, filePath.size(), QString());
   QMap<QString, QUrl> hashesToProcess = parallelHasher(filePath);
@@ -475,168 +477,160 @@ void PdfWorker::processPDF(const QList<QUrl> &filePath, const QString &imgPath,
   }
   emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
                     tr("Checking which papers are already in the library..."));
-  QList<QUrl> urlsToProcess = filterExistingHashes(hashesToProcess, dbPath);
-  const int alreadyKnown = filePath.size() - urlsToProcess.size();
-  message = tr("Skipped %1 papers").arg(alreadyKnown);
-  emit status(message);
+  const QList<IngestionJob> jobs = newJobs(hashesToProcess, dbPath);
+  const int alreadyKnown = filePath.size() - jobs.size();
+  emit status(tr("Skipped %1 papers").arg(alreadyKnown));
   emit stepProgress(QStringLiteral("hash"), filePath.size(), filePath.size(),
                     tr("%n paper(s) already in the library", "", alreadyKnown));
 
-  // Batches: each one is extracted, embedded and saved before the next.  A
-  // paper is saved with its chunks in one transaction, so it is either fully
-  // indexed or absent: a cancel keeps the papers already saved, and a failure
-  // drops only the papers it hit.  Their size follows the extraction threads
-  // (batchSizeFor()).
-  int savedCount = 0;
-  int errorCount = 0;
-  QStringList failedTitles; // papers dropped because indexing failed
-  QStringList unreadable;   // "file — reason" for files that gave no text
-  QString indexError;       // why indexing failed, when known
-  bool cancelled = false;
-  int total = urlsToProcess.size();
-  int batchNo = 0;
+  // Load the embedding model here, once: the chunking of every extraction
+  // thread asks it for token counts.
+  if (m_vecManager)
+    (void)m_vecManager->maxChunkTokens();
 
+  // A continuous flow, paper by paper (IngestionPipeline): files are
+  // extracted in parallel while the papers already extracted are embedded
+  // and saved here.  Each paper is saved with its chunks in one transaction,
+  // so it is either fully indexed or absent: a cancel keeps the papers
+  // already saved, and a failure drops only the papers it hit.
+  ImportTally tally;
+  tally.total = int(jobs.size());
+  m_tally = &tally;
   m_extractDone = 0;
-  m_extractTotal = total;
-  emit papersProgress(0, total);
-  emit stepProgress(QStringLiteral("extract"), 0, total, QString());
+  m_extractTotal = tally.total;
+  emit papersProgress(0, tally.total);
+  emit stepProgress(QStringLiteral("extract"), 0, tally.total, QString());
+  emit stepProgress(QStringLiteral("embed"), 0, tally.total, QString());
 
-  for (int start = 0; start < total;) {
-    if (m_stopFlag.load()) {
-      cancelled = true;
-      break;
-    }
-    // Sized for each batch: the memory left changes during an import (a
-    // summary loading a local LLM, other applications).
-    const int threads = extractThreadCount();
-    const int batchSize = batchSizeFor(threads);
-    const int end = qMin(start + batchSize, total);
-    ++batchNo;
-    // Batches in all, if the next ones keep this size.
-    const int batchCount = batchNo + (total - end + batchSize - 1) / batchSize;
-    QList<QUrl> batchUrls(urlsToProcess.mid(start, end - start));
-    start = end;
-    qInfo() << "[PdfWorker] Batch" << batchNo << ":" << batchUrls.size()
-            << "file(s) on" << threads << "thread(s) — available memory"
-            << (SystemMemory::availableBytes() >> 20) << "MiB";
+  IngestionPipeline::Options options;
+  options.threadCount = &PdfWorker::extractThreadCount;
+  options.queuePerThread = kQueuePerThread;
+  options.groupChunks = kGroupChunks;
+  IngestionPipeline(&m_extractPool, options)
+      .run(
+          jobs,
+          [this, &imgPath](const IngestionJob &job) {
+            if (m_stopFlag.load())
+              return ExtractionResult{};
+            ExtractionResult result = extractText(job, imgPath);
+            if (!m_stopFlag.load())
+              emit stepProgress(QStringLiteral("extract"), ++m_extractDone,
+                                m_extractTotal, result.fileName);
+            return result;
+          },
+          [this, &tally, &dbPath](QList<ExtractionResult> &group) {
+            indexGroup(group, tally, dbPath);
+          },
+          m_stopFlag);
+  m_tally = nullptr;
+  // Give what the extraction freed back to the system.
+  SystemMemory::releaseFreed();
 
-    message = tr("Extracting %1-%2/%3")
-                  .arg(end - batchUrls.size() + 1)
-                  .arg(end)
-                  .arg(total);
-    emit status(message);
-
-    QList<ExtractionResult> extractions =
-        parallelExtract(batchUrls, imgPath, threads);
-    // Stopped during the extraction: drop this batch, nothing is saved yet.
-    if (m_stopFlag.load()) {
-      cleanupOcrApi();
-      cancelled = true;
-      break;
-    }
-
-    // The papers that can be indexed, and all their chunks, embedded at once
-    // (larger batches for the embedding model than paper by paper).
-    QList<ExtractionResult> papers;
-    QList<TextChunk> allChunks;
-
-    for (auto &extraction : extractions) {
-      // A file that could not be opened, or gave no text at all (not even
-      // through OCR), can be neither summarized nor queried: don't add it.
-      if (!extraction.error.isEmpty() || extraction.paperHash.isEmpty() ||
-          extraction.title.isEmpty() || extraction.chunks.isEmpty()) {
-        const QString reason = !extraction.error.isEmpty()
-                                   ? extraction.error
-                                   : tr("no text could be extracted");
-        qCritical() << "[PdfWorker] Skipping file" << extraction.fileName
-                    << ":" << reason;
-        unreadable << extraction.fileName + " — " + reason;
-        ++errorCount;
-        continue;
-      }
-
-      // Propagate title as initial cleanTitle and citation on every chunk.
-      // The summarizer will overwrite both with proper authors/year later.
-      for (auto &tc : extraction.chunks) {
-        tc.cleanTitle = extraction.title;
-        tc.citation = extraction.title;
-      }
-      allChunks << extraction.chunks;
-      papers.append(std::move(extraction));
-    }
-    extractions.clear();
-
-    if (!papers.isEmpty()) {
-      emit status(tr("Embedding %1 chunks...").arg(allChunks.size()));
-      m_embedDetail = tr("Batch %1/%2").arg(batchNo).arg(batchCount);
-      emit stepProgress(QStringLiteral("embed"), 0, allChunks.size(),
-                        m_embedDetail);
-
-      // Outside any transaction: nothing is written until a paper's
-      // embeddings are all there.
-      QList<QByteArray> embeddings;
-      if (m_vecManager)
-        embeddings = m_vecManager->embedPassages(allChunks, &m_stopFlag);
-      else
-        qWarning() << "[PdfWorker] embedding model not loaded, the papers "
-                      "cannot be indexed";
-      allChunks.clear();
-      allChunks.squeeze();
-
-      // Stopped during the embedding: nothing of this batch was saved.
-      if (embeddings.isEmpty() && m_stopFlag.load()) {
-        cleanupOcrApi();
-        cancelled = true;
-        break;
-      }
-      if (embeddings.isEmpty()) {
-        if (indexError.isEmpty() && m_vecManager)
-          indexError = m_vecManager->lastError();
-        errorCount += papers.size();
-        for (const auto &paper : papers)
-          failedTitles << paper.title;
-      } else {
-        const IndexResult r = savePapers(papers, embeddings, dbPath);
-        savedCount += r.saved;
-        errorCount += r.failed.size();
-        failedTitles << r.failed;
-        if (indexError.isEmpty())
-          indexError = r.error;
-        if (r.stopped) {
-          cleanupOcrApi();
-          cancelled = true;
-          break;
-        }
-      }
-    }
-
-    // Free Tesseract APIs from the thread pool after each batch so that
-    // memory is released incrementally rather than held until process exit,
-    // and give what the extraction threads freed back to the system (the
-    // next batch is sized on the memory available).
-    cleanupOcrApi();
-    SystemMemory::releaseFreed();
-
-    message = tr("Saved %1/%2 papers").arg(savedCount + errorCount).arg(total);
-    emit status(message);
-    emit papersProgress(savedCount + errorCount, total);
-  }
-
-  if (errorCount > 0)
-    qWarning() << "[PdfWorker] Total skipped due to errors:" << errorCount;
+  if (tally.errors > 0)
+    qWarning() << "[PdfWorker] Total skipped due to errors:" << tally.errors;
 
   // No report when the app is closing (stop()), only for the user's cancel.
-  // A cancel that came after the last batch changed nothing: normal report.
+  // A cancel that came after the last paper changed nothing: normal report.
+  const bool cancelled = m_stopFlag.load() && tally.done() < tally.total;
   if (cancelled) {
     emit status(tr("Ingestion cancelled"));
     if (m_userCancelled.load())
-      emitCancelReport(savedCount);
+      emitCancelReport(tally.saved);
   } else if (!m_stopFlag.load() || m_userCancelled.load()) {
-    emitReport(filePath.size(), alreadyKnown, savedCount, unreadable,
-               failedTitles, indexError);
+    emitReport(filePath.size(), alreadyKnown, tally.saved, tally.unreadable,
+               tally.failedTitles, tally.indexError);
   }
 
   emit finished();
+}
+
+void PdfWorker::indexGroup(QList<ExtractionResult> &group, ImportTally &tally,
+                           const QString &dbPath) {
+  // The papers that can be indexed.
+  QList<ExtractionResult> papers;
+  for (auto &extraction : group) {
+    // A file that could not be opened, or gave no text at all (not even
+    // through OCR), can be neither summarized nor queried: don't add it.
+    if (!extraction.error.isEmpty() || extraction.paperHash.isEmpty() ||
+        extraction.title.isEmpty() || extraction.chunks.isEmpty()) {
+      const QString reason = !extraction.error.isEmpty()
+                                 ? extraction.error
+                                 : tr("no text could be extracted");
+      qCritical() << "[PdfWorker] Skipping file" << extraction.fileName << ":"
+                  << reason;
+      tally.unreadable << extraction.fileName + " — " + reason;
+      ++tally.errors;
+      continue;
+    }
+
+    // Propagate title as initial cleanTitle and citation on every chunk.
+    // The summarizer will overwrite both with proper authors/year later.
+    for (auto &tc : extraction.chunks) {
+      tc.cleanTitle = extraction.title;
+      tc.citation = extraction.title;
+    }
+    papers.append(std::move(extraction));
+  }
+  group.clear();
+
+  indexPapers(papers, tally, dbPath);
+
+  emit status(tr("Saved %1/%2 papers").arg(tally.done()).arg(tally.total));
+  emit papersProgress(tally.done(), tally.total);
+  emit stepProgress(QStringLiteral("embed"), tally.done(), tally.total,
+                    QString());
+  // Give what the extraction threads freed back to the system now and then
+  // (the thread count follows the memory available).
+  if (tally.done() - tally.releasedAt >= kReleaseEvery) {
+    tally.releasedAt = tally.done();
+    SystemMemory::releaseFreed();
+  }
+}
+
+void PdfWorker::indexPapers(const QList<ExtractionResult> &papers,
+                            ImportTally &tally, const QString &dbPath) {
+  if (papers.isEmpty() || m_stopFlag.load())
+    return;
+
+  QList<TextChunk> chunks;
+  for (const auto &paper : papers)
+    chunks << paper.chunks;
+  emit status(tr("Embedding %1 chunks...").arg(chunks.size()));
+
+  // Outside any transaction: nothing is written until a paper's embeddings
+  // are all there.
+  QList<QByteArray> embeddings;
+  if (m_vecManager)
+    embeddings = m_vecManager->embedPassages(chunks, &m_stopFlag);
+  else
+    qWarning() << "[PdfWorker] embedding model not loaded, the papers cannot "
+                  "be indexed";
+  chunks.clear();
+
+  if (embeddings.isEmpty()) {
+    if (m_stopFlag.load())
+      return; // cancelled: nothing of this group was saved
+    // One paper the model could not read fails the whole group: try them one
+    // by one, so that only that paper is dropped.
+    if (papers.size() > 1 && m_vecManager && m_vecManager->isReady()) {
+      for (const auto &paper : papers)
+        indexPapers({paper}, tally, dbPath);
+      return;
+    }
+    if (tally.indexError.isEmpty() && m_vecManager)
+      tally.indexError = m_vecManager->lastError();
+    tally.errors += papers.size();
+    for (const auto &paper : papers)
+      tally.failedTitles << paper.title;
+    return;
+  }
+
+  const IndexResult r = savePapers(papers, embeddings, dbPath);
+  tally.saved += r.saved;
+  tally.errors += r.failed.size();
+  tally.failedTitles << r.failed;
+  if (tally.indexError.isEmpty())
+    tally.indexError = r.error;
 }
 
 void PdfWorker::emitCancelReport(int added) {
@@ -716,10 +710,8 @@ PdfWorker::savePapers(const QList<ExtractionResult> &papers,
   timer.start();
   qsizetype offset = 0;
   for (const auto &paper : papers) {
-    if (m_stopFlag.load()) {
-      result.stopped = true;
+    if (m_stopFlag.load())
       break;
-    }
     SummaryRow row;
     row.paperHash = paper.paperHash;
     row.title = paper.title;
@@ -793,20 +785,17 @@ PdfWorker::parallelHasher(const QList<QUrl> &fileList) {
   return hashToUrl;
 }
 
-QList<QUrl>
-PdfWorker::filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
-                                const QString &dbPath) const {
-  QStringList existingHashes = getAllPaperHashes(dbPath);
-  QList<QUrl> urlsToProcess;
-
+QList<IngestionJob>
+PdfWorker::newJobs(const QMap<QString, QUrl> &hashesToProcess,
+                   const QString &dbPath) const {
+  const QStringList known = getAllPaperHashes(dbPath);
+  const QSet<QString> existing(known.cbegin(), known.cend());
+  QList<IngestionJob> jobs;
   for (auto it = hashesToProcess.constBegin(); it != hashesToProcess.constEnd();
-       ++it) {
-    if (!existingHashes.contains(it.key())) {
-      urlsToProcess.append(it.value());
-    }
-  }
-
-  return urlsToProcess;
+       ++it)
+    if (!existing.contains(it.key()))
+      jobs.append({it.value(), it.key()});
+  return jobs;
 }
 
 // ============================================================================
@@ -834,8 +823,10 @@ static constexpr float kPageImageDpi = 200.0f;
 /// extracted at once (MuPDF's default is 256 MB each).
 static constexpr size_t kMuPdfStoreBytes = size_t(64) << 20;
 
-ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
+ExtractionResult PdfWorker::extractText(const IngestionJob &job,
                                         const QString &imgPath) {
+  const QUrl &fileUrl = job.url;
+  OcrEngine ocr; // made at the first scanned page, if any
   QElapsedTimer timer; // for the per-file log at the end
   timer.start();
   qint64 ocrMs = 0;
@@ -886,7 +877,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   }
 
   result.pageCount = pageCount;
-  result.paperHash = computeFileHash(fileUrl);
+  result.paperHash = job.paperHash;
   result.title = QFileInfo(localPath).baseName();
   result.pageMetadata.reserve(pageCount);
 
@@ -894,7 +885,8 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
   QVector<quint16> pageMap; // char offset → page number (compact: 2 bytes)
 
   for (int i = 0; i < pageCount; ++i) {
-    // The caller drops the whole batch once stopped: no need to finish.
+    // The pipeline drops what was not indexed once stopped: no need to
+    // finish.
     if (m_stopFlag.load())
       break;
     // Scanned pages go through OCR and can take seconds each: report pages,
@@ -1023,7 +1015,7 @@ ExtractionResult PdfWorker::extractText(const QUrl &fileUrl,
                         .arg(pageTextStr.trimmed().length());
         QElapsedTimer ocrTimer;
         ocrTimer.start();
-        pageTextStr = extractTextWithOcr(ctx, doc, i);
+        pageTextStr = extractTextWithOcr(ocr, ctx, doc, i);
         ocrMs += ocrTimer.elapsed();
         pageMeta.ocrChars = pageTextStr.length();
         qDebug() << QString("[OCR] page %1/%2: %4 chars produced")
@@ -1120,34 +1112,4 @@ int PdfWorker::extractThreadCount() {
                                     kExtractBytesPerThread, kExtractMemoryShare,
                                     QThread::idealThreadCount() / 2,
                                     /*fallback=*/2);
-}
-
-/// Files per batch for `threads` extraction threads: three files per thread,
-/// so that a long file (a book, a scan) does not leave the other threads
-/// idle until the end of the batch; at least 10.  A batch keeps only the
-/// text and chunks of its files (a few MB each) until they are indexed.
-int PdfWorker::batchSizeFor(int threads) { return qMax(10, 3 * threads); }
-
-QList<ExtractionResult>
-PdfWorker::parallelExtract(const QList<QUrl> &filePaths,
-                           const QString &imgPath, int threads) {
-  // Load the embedding model here, once: the chunking of every thread asks
-  // it for token counts, and its lazy loading is not safe to race.
-  if (m_vecManager)
-    (void)m_vecManager->maxChunkTokens();
-
-  m_extractPool.setMaxThreadCount(threads);
-  // Results in the order of filePaths.  Once stopped, the files not started
-  // are skipped and those in progress end at their next page: the caller
-  // drops the whole batch.
-  return QtConcurrent::blockingMapped<QList<ExtractionResult>>(
-      &m_extractPool, filePaths, [this, &imgPath](const QUrl &url) {
-        if (m_stopFlag.load())
-          return ExtractionResult{};
-        ExtractionResult result = extractText(url, imgPath);
-        if (!m_stopFlag.load())
-          emit stepProgress(QStringLiteral("extract"), ++m_extractDone,
-                            m_extractTotal, result.fileName);
-        return result;
-      });
 }

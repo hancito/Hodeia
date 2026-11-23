@@ -1,4 +1,5 @@
 #pragma once
+#include "ingestionpipeline.h"
 #include "sqlitevec.h"
 #include "summary.h"
 #include <QList>
@@ -48,10 +49,9 @@ signals:
   void report(const QString &title, const QString &message, bool isError);
 
 private:
-  ExtractionResult extractText(const QUrl &fileUrl, const QString &imgPath);
+  /// Extract the text of one file (its hash computed beforehand).
+  ExtractionResult extractText(const IngestionJob &job, const QString &imgPath);
   QString extractTextFromStextPage(fz_stext_page *textPage) const;
-  QString extractTextWithOcr(fz_context *ctx, fz_document *doc,
-                             int pageNum) const;
   QList<TextChunk>
   chunkDocumentText(const QString &fullText, const QVector<quint16> &pageMap,
                     const QString &paperHash,
@@ -63,30 +63,53 @@ private:
                   const QString &indexError);
 
   QMap<QString, QUrl> parallelHasher(const QList<QUrl> &fileList);
-  /// Extract the files of a batch, `threads` at a time.
-  QList<ExtractionResult> parallelExtract(const QList<QUrl> &filePaths,
-                                          const QString &imgPath, int threads);
   /// Extraction threads that fit in the memory available now.
   static int extractThreadCount();
-  /// Files per batch for that many extraction threads.
-  static int batchSizeFor(int threads);
+
+  /// How the import is going, kept by the indexer (processPDF's thread).
+  struct ImportTally {
+    int total = 0;  ///< papers to import (not in the library yet)
+    int saved = 0;  ///< added to the library
+    int errors = 0; ///< unreadable, or could not be indexed
+    QStringList failedTitles; ///< papers dropped because indexing failed
+    QStringList unreadable;   ///< "file — reason" for files that gave no text
+    QString indexError;       ///< why indexing failed, when known
+    int releasedAt = 0;       ///< done() at the last SystemMemory release
+    int done() const { return saved + errors; }
+  };
+  /// Index a group of extracted papers given by the pipeline: skip the
+  /// unreadable ones, embed and save the others, report the progress.
+  void indexGroup(QList<ExtractionResult> &group, ImportTally &tally,
+                  const QString &dbPath);
+  /// Embed and save papers; if the embedding fails, try them one by one.
+  void indexPapers(const QList<ExtractionResult> &papers, ImportTally &tally,
+                   const QString &dbPath);
+
   /// What savePapers() stored.
   struct IndexResult {
     int saved = 0;
     QStringList failed; ///< titles of the papers that could not be stored
     QString error;      ///< the first database error, if any
-    bool stopped = false; ///< m_stopFlag was set before the last paper
   };
   IndexResult savePapers(const QList<ExtractionResult> &papers,
                          const QList<QByteArray> &embeddings,
                          const QString &dbPath);
   QStringList getAllPaperHashes(const QString &dbPath) const;
-  QList<QUrl> filterExistingHashes(const QMap<QString, QUrl> &hashesToProcess,
-                                   const QString &dbPath) const;
+  /// The files of `hashesToProcess` (by hash) not in the library yet.
+  QList<IngestionJob> newJobs(const QMap<QString, QUrl> &hashesToProcess,
+                              const QString &dbPath) const;
 
   // Chunk size limit (tokens) when the embedding model can't be loaded to
   // provide its own; otherwise chunks follow SqliteVecManager::maxChunkTokens.
   static constexpr int FallbackMaxChunkTokens = 480;
+  // Papers extracted (or being extracted) ahead of the indexer, per
+  // extraction thread: the rest wait, unopened.
+  static constexpr int kQueuePerThread = 2;
+  // Chunks embedded together at most (the embedding model works in batches
+  // of 64): small papers share a group, a large one is embedded alone.
+  static constexpr int kGroupChunks = 256;
+  // Papers indexed between two SystemMemory::releaseFreed().
+  static constexpr int kReleaseEvery = 20;
 
   SqliteVecManager *m_vecManager = nullptr;
   std::atomic<bool> m_stopFlag{false};
@@ -96,7 +119,7 @@ private:
   // extraction threads; m_extractTotal is set before they start.
   std::atomic<int> m_extractDone{0}; // files whose extraction has finished
   int m_extractTotal = 0;            // files to extract in this import
-  QString m_embedDetail;  // "Batch n/m", shown while indexing
+  ImportTally *m_tally = nullptr; // during processPDF(), for the progress
   ConfigManager *m_config = nullptr;
   // Extraction threads, sized for the memory (see extractThreadCount()).
   QThreadPool m_extractPool;

@@ -9,6 +9,8 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QMutexLocker>
+#include <QReadLocker>
+#include <QWriteLocker>
 #include <Sqlite3/sqlite3.h>
 #include <algorithm>
 #include <atomic>
@@ -67,10 +69,13 @@ bool SqliteVecManager::initialize(const QString &modelPath) {
 
   emit statusUpdated(tr("Loading embedding model: %1").arg(resolvedPath));
 
-  // All llama runtime + model/context setup is guarded by m_lock so that
-  // concurrent initialize()/embed()/shutdown() calls from worker threads
-  // cannot interleave on the same context.
+  // All llama runtime + model/context setup is guarded by m_modelLock
+  // (written) and m_lock so that concurrent initialize()/embed()/shutdown()
+  // calls from worker threads cannot interleave on the same context.
+  const QWriteLocker modelLocker(&m_modelLock);
   const QMutexLocker locker(&m_lock);
+  if (m_ready) // loaded by another thread meanwhile
+    return true;
 
   // Init llama backends once.  No common_init(): it calls
   // llama_log_set(common_log_default_callback), which would replace the
@@ -145,8 +150,12 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
     return {};
 
   // Serialize on the llama context. initialize() has already released the
-  // lock, so it is safe to re-lock here (QMutex is non-recursive but not held).
+  // locks, so it is safe to re-lock here (QMutex is non-recursive but not
+  // held).  m_modelLock first: the model stays loaded meanwhile.
+  const QReadLocker modelLocker(&m_modelLock);
   const QMutexLocker locker(&m_lock);
+  if (!m_llamaCtx)
+    return {};
 
   auto *ctx = m_llamaCtx;
   auto *vocab = llama_model_get_vocab(m_llamaModel);
@@ -244,7 +253,9 @@ QVector<float> SqliteVecManager::embed(const QStringList &texts,
 int SqliteVecManager::countTokens(const QString &text) {
   if (!m_ready && !initialize())
     return -1;
-  const QMutexLocker locker(&m_lock);
+  // The vocabulary only (no context): not m_lock, so the chunking of the
+  // extraction threads does not wait for embed() to finish its batch.
+  const QReadLocker modelLocker(&m_modelLock);
   if (!m_llamaModel)
     return -1;
   const auto tokens =
@@ -473,6 +484,7 @@ void SqliteVecManager::setLastError(const QString &error) {
 }
 
 void SqliteVecManager::shutdown() {
+  const QWriteLocker modelLocker(&m_modelLock);
   const QMutexLocker locker(&m_lock);
   if (m_llamaCtx) {
     llama_free(m_llamaCtx);
