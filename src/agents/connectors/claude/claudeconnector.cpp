@@ -167,12 +167,12 @@ void ClaudeConnection::handle(const QJsonObject &msg) {
         const QString separator = m_answer.isEmpty() ? QString() : QStringLiteral("\n\n");
         m_answer += separator + text;
         if (!m_stream)
-          emit event({Event::Kind::Text, separator + text, {}, {}});
+          emit agentEvent({Event::Kind::Text, separator + text, {}, {}});
       } else if (kind == "thinking") {
         if (!m_stream)
-          emit event({Event::Kind::Thought, block.value("thinking").toString(), {}, {}});
+          emit agentEvent({Event::Kind::Thought, block.value("thinking").toString(), {}, {}});
       } else if (kind == "tool_use") {
-        emit event({Event::Kind::ToolCall, block.value("name").toString(),
+        emit agentEvent({Event::Kind::ToolCall, block.value("name").toString(),
                     block.value("id").toString(), QStringLiteral("in_progress")});
       }
     }
@@ -182,23 +182,23 @@ void ClaudeConnection::handle(const QJsonObject &msg) {
     if (kind == "content_block_start" &&
         e.value("content_block").toObject().value("type").toString() == "text" &&
         m_streamed) {
-      emit event({Event::Kind::Text, QStringLiteral("\n\n"), {}, {}}); // same as m_answer
+      emit agentEvent({Event::Kind::Text, QStringLiteral("\n\n"), {}, {}}); // same as m_answer
     } else if (kind == "content_block_delta") {
       const QJsonObject delta = e.value("delta").toObject();
       const QString deltaType = delta.value("type").toString();
       if (deltaType == "text_delta") {
         const QString text = delta.value("text").toString();
         m_streamed = m_streamed || !text.isEmpty();
-        emit event({Event::Kind::Text, text, {}, {}});
+        emit agentEvent({Event::Kind::Text, text, {}, {}});
       } else if (deltaType == "thinking_delta") {
-        emit event({Event::Kind::Thought, delta.value("thinking").toString(), {}, {}});
+        emit agentEvent({Event::Kind::Thought, delta.value("thinking").toString(), {}, {}});
       }
     }
   } else if (type == "rate_limit_event") {
     const QJsonObject info = msg.value("rate_limit_info").toObject();
     if (info.value("status").toString() == "rejected") {
       m_notice = QCoreApplication::translate("Agents::ClaudeConnection", "Claude usage limit reached.");
-      emit event({Event::Kind::Notice, m_notice, {}, {}});
+      emit agentEvent({Event::Kind::Notice, m_notice, {}, {}});
     }
   } else if (type == "result") {
     const bool isError = msg.value("is_error").toBool();

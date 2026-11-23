@@ -449,7 +449,7 @@ void TestAgents::claudeStream() {
   o.stream = true;
   QVERIFY(openSync(*c, o, 20000));
   QStringList pieces;
-  connect(c.get(), &Connection::event, this, [&](const Event &e) {
+  connect(c.get(), &Connection::agentEvent, this, [&](const Event &e) {
     if (e.kind == Event::Kind::Text)
       pieces.append(e.text);
   });

@@ -345,7 +345,7 @@ PdfWorker::savePapers(const QList<ExtractionResult> &papers,
                            .arg(result.saved)
                            .arg(timer.elapsed());
 
-  if (auto r = db.exec("PRAGMA wal_checkpoint(TRUNCATE)"); !r)
+  if (auto r = db.checkpoint(); !r)
     qCritical() << "[PdfWorker] WAL checkpoint failed:" << r.error();
   return result;
 }

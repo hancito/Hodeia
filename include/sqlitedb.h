@@ -78,6 +78,9 @@ public:
 
   // Execute a statement that returns no rows (CREATE, INSERT, DELETE, UPDATE)
   std::expected<void, QString> exec(const QString &sql);
+  /// Write the WAL back into the database file and truncate it (after a
+  /// large write, so the -wal file does not stay large).
+  std::expected<void, QString> checkpoint();
 
   // Prepare a statement for repeated use
   SqliteStatement prepare(const QString &sql);

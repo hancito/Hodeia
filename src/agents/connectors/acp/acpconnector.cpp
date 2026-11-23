@@ -291,9 +291,9 @@ void AcpConnection::handle(const QJsonObject &msg) {
       const bool answer = kind == "agent_message_chunk";
       if (answer)
         m_answer += text;
-      emit event({answer ? Event::Kind::Text : Event::Kind::Thought, text, {}, {}});
+      emit agentEvent({answer ? Event::Kind::Text : Event::Kind::Thought, text, {}, {}});
     } else if (kind == "tool_call" || kind == "tool_call_update") {
-      emit event({Event::Kind::ToolCall, u.value("title").toString(),
+      emit agentEvent({Event::Kind::ToolCall, u.value("title").toString(),
                   u.value("toolCallId").toString(), u.value("status").toString()});
     }
   } else if (method == "session/request_permission" && msg.contains("id")) {

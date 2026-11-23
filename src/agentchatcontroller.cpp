@@ -354,7 +354,7 @@ void AgentChatController::startTurn(const QString &text) {
   m_connectionFor = m_currentId;
   m_pendingText = text;
   connect(c, &Agents::Connection::opened, this, &AgentChatController::onOpened);
-  connect(c, &Agents::Connection::event, this, &AgentChatController::onEvent);
+  connect(c, &Agents::Connection::agentEvent, this, &AgentChatController::onEvent);
   connect(c, &Agents::Connection::turnFinished, this, &AgentChatController::onTurnFinished);
   connect(c, &Agents::Connection::failed, this, &AgentChatController::onFailed);
 

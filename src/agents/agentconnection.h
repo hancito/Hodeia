@@ -99,7 +99,7 @@ public:
 
   /// Start the agent and open a session: opened(), or failed().
   virtual void open(const SessionOptions &options) = 0;
-  /// One turn, after opened() and one at a time: event()s, then
+  /// One turn, after opened() and one at a time: agentEvent()s, then
   /// turnFinished().  The agent keeps the conversation between turns.
   virtual void prompt(const Prompt &prompt) = 0;
   /// Stop the running turn: turnFinished() follows with Stop::Cancelled.
@@ -117,7 +117,7 @@ signals:
   void opened();
   /// The session could not be opened, or the agent stopped: no more turns.
   void failed(const QString &error);
-  void event(const Agents::Event &event);
+  void agentEvent(const Agents::Event &event);
   void turnFinished(const Agents::TurnResult &result);
 };
 

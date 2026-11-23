@@ -99,9 +99,9 @@ static bool loadTranslator(QGuiApplication &app, const QString &lang) {
 /// it and mirror Qt's message stream there via WriteConsoleW (bypasses C
 /// stdio buffering, so no freopen / filebuf rebinding needed).  Double-clicking
 /// the exe (no console) stays silent, so this is safe for both dev and release.
+#ifdef Q_OS_WIN
 static bool s_consoleAttached = false;
 static void consoleWrite(const QString &text) {
-#ifdef Q_OS_WIN
   if (!s_consoleAttached)
     return;
   HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -111,10 +111,8 @@ static void consoleWrite(const QString &text) {
   wide.push_back(L'\n');
   DWORD written = 0;
   WriteConsoleW(h, wide.c_str(), (DWORD)wide.size(), &written, nullptr);
-#else
-  (void)text;
-#endif
 }
+#endif
 
 /// Mirror a tagged line to both the attached console (if any) and the crash
 /// log file.  Used by the Qt and llama log sinks so diagnostics are captured

@@ -307,6 +307,9 @@ std::expected<void, QString> SqliteDb::transaction() {
 }
 std::expected<void, QString> SqliteDb::commit() { return exec("COMMIT"); }
 std::expected<void, QString> SqliteDb::rollback() { return exec("ROLLBACK"); }
+std::expected<void, QString> SqliteDb::checkpoint() {
+  return exec("PRAGMA wal_checkpoint(TRUNCATE)");
+}
 
 int64_t SqliteDb::lastInsertRowId() const {
   return m_db ? sqlite3_last_insert_rowid(m_db) : 0;

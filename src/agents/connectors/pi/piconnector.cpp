@@ -147,14 +147,14 @@ void PiConnection::handle(const QJsonObject &msg) {
         text += b.toObject().value("text").toString();
     m_answer += text;
     if (!text.isEmpty())
-      emit event({Event::Kind::Text, text, {}, {}});
+      emit agentEvent({Event::Kind::Text, text, {}, {}});
     if (message.value("stopReason").toString() == "error")
       m_error = message.value("errorMessage").toString();
   } else if (type == "tool_execution_start") {
-    emit event({Event::Kind::ToolCall, msg.value("toolName").toString(),
+    emit agentEvent({Event::Kind::ToolCall, msg.value("toolName").toString(),
                 msg.value("toolCallId").toString(), QStringLiteral("in_progress")});
   } else if (type == "auto_retry_start") {
-    emit event({Event::Kind::Notice, msg.value("errorMessage").toString(), {}, {}});
+    emit agentEvent({Event::Kind::Notice, msg.value("errorMessage").toString(), {}, {}});
   } else if (type == "agent_settled") {
     if (msg.value("aborted").toBool())
       finishTurn({TurnResult::Stop::Cancelled, m_answer, {}});
