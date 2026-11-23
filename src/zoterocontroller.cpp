@@ -223,13 +223,16 @@ void ZoteroController::apply(const Loaded &loaded) {
     error = r.error();
   if (auto r = repo.setStatus(plan.pendingIds, ZoteroStatus::Pending); !r)
     error = r.error();
+  if (auto r = repo.setStatus(plan.ignoredIds, ZoteroStatus::Ignored); !r)
+    error = r.error();
   if (auto r = repo.markRemoved(plan.removedIds, QDateTime::currentDateTimeUtc()); !r)
     error = r.error();
   if (!error.isEmpty())
     m_error = tr("Cannot update the project: %1").arg(error);
 
   qInfo() << "[Zotero]" << plan.store.size() << "stored," << plan.ingestedIds.size()
-          << "now in the project," << plan.removedIds.size() << "removed,"
+          << "now in the project," << plan.ignoredIds.size()
+          << "deleted from the project," << plan.removedIds.size() << "removed,"
           << plan.missing.size() << "not downloaded";
   m_missingCount = int(plan.missing.size());
   rebuildView();

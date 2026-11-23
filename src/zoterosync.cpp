@@ -103,11 +103,15 @@ Plan plan(const QList<ZoteroPdf> &followed, const QList<ZoteroItemRow> &known,
 
     if (k->status == ZoteroStatus::Pending && indexed.contains(hash))
       out.ingestedIds.append(k->id);
-    // Zotero holds a new file: propose it.  (Same file missing from the
-    // project: the user deleted the paper, it is not proposed again.)
-    else if (k->status == ZoteroStatus::Ingested && k->paperHash != hash &&
-             !indexed.contains(hash))
-      out.pendingIds.append(k->id);
+    else if (k->status == ZoteroStatus::Ingested && !indexed.contains(hash)) {
+      // Zotero holds a new file: propose it.  Same file missing from the
+      // project: the user deleted the paper; not proposed again, but listed
+      // with the ignored PDFs, from where it can be proposed again.
+      if (k->paperHash != hash)
+        out.pendingIds.append(k->id);
+      else
+        out.ignoredIds.append(k->id);
+    }
   }
 
   for (const ZoteroItemRow &r : known)
