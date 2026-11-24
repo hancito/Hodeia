@@ -138,7 +138,7 @@ StyledDialog {
                     StyledComboBox {
                         id: apiValue
                         Layout.fillWidth: true
-                        model: [qsTr("OpenAI-compatible"), qsTr("Anthropic"), qsTr("Agent (Claude Code, Qwen, Pi...)")]
+                        model: [qsTr("OpenAI-compatible"), qsTr("Anthropic"), qsTr("Agent (Claude Code, Codex, Qwen Code...)")]
                         onActivated: connectionVerified = false
                     }
                 }

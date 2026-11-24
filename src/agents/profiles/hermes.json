@@ -1,0 +1,20 @@
+{
+  "id": "hermes",
+  "name": "Hermes Agent",
+  "connector": "acp",
+  "command": "hermes -p hodeia acp",
+  "verified": true,
+  "install": "https://github.com/NousResearch/hermes-agent",
+  "login": "hermes setup",
+  "options": {
+    "setup": [
+      {
+        "unless": ["${program}", "profile", "show", "hodeia"],
+        "run": ["${program}", "profile", "create", "hodeia", "--clone", "--no-alias"]
+      },
+      {
+        "run": ["${program}", "-p", "hodeia", "config", "set", "platform_toolsets.acp", "[\"web\"]"]
+      }
+    ]
+  }
+}

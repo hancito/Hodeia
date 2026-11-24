@@ -8,5 +8,20 @@
   "login": "qwen, then /auth",
   "requires": [
     "node"
-  ]
+  ],
+  "env": {
+    "QWEN_CODE_SYSTEM_SETTINGS_PATH": "${stateDir}/settings.json"
+  },
+  "options": {
+    "files": {
+      "${stateDir}/settings.json": {
+        "tools": {
+          "core": ["web_fetch", "web_search", "tool_search"]
+        },
+        "permissions": {
+          "deny": ["run_shell_command", "write_file", "edit", "notebook_edit", "agent"]
+        }
+      }
+    }
+  }
 }

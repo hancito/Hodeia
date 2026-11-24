@@ -1,9 +1,0 @@
-{
-  "id": "pi",
-  "name": "Pi",
-  "connector": "pi",
-  "command": "pi",
-  "verified": true,
-  "install": "https://github.com/badlogic/pi-mono",
-  "login": "pi, then /login (or a provider in ~/.pi)"
-}

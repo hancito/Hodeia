@@ -87,7 +87,7 @@ void TestAgentChat::init() {
   qputenv("FAKE_ACP_LOG", m_log.toLocal8Bit());
   m_config = new ConfigManager;
   m_config->setAgentBackend("Fake Claude", "claude", "\"" + QString(FAKE_CLAUDE) + "\"");
-  m_config->setAgentBackend("Fake Pi", "pi", "\"" + QString(FAKE_PI) + "\"");
+  m_config->setAgentBackend("Fake Unknown", "nobody", "nobody");
   m_config->setAgentBackend("Fake ACP", "qwen", "\"" + QString(FAKE_ACP_AGENT) + "\"");
   m_embeddings = new SqliteVecManager(m_config);
   m_database = new DatabaseManager(m_config, *m_embeddings);
@@ -125,11 +125,13 @@ void TestAgentChat::conversation() {
   QCOMPARE(list[0].toMap().value("title").toString(), QString("Hello agent"));
   QCOMPARE(list[0].toMap().value("model").toString(), QString("haiku"));
 
-  // The agent gets HodeIA's MCP server, its tools allowed, nothing else.
+  // The agent gets HodeIA's MCP server and the web, those tools allowed,
+  // nothing else.
   const QStringList args = loggedArgs(m_log);
   QCOMPARE(args.at(args.indexOf("--model") + 1), QString("haiku"));
-  QCOMPARE(args.at(args.indexOf("--tools") + 1), QString(""));
+  QCOMPARE(args.at(args.indexOf("--tools") + 1), QString("WebSearch,WebFetch"));
   QVERIFY(args.at(args.indexOf("--allowedTools") + 1).contains("mcp__hodeia__search_library"));
+  QVERIFY(args.at(args.indexOf("--allowedTools") + 1).contains("WebFetch"));
   const QJsonObject mcp =
       QJsonDocument::fromJson(args.at(args.indexOf("--mcp-config") + 1).toUtf8()).object();
   QCOMPARE(mcp.value("mcpServers").toObject().value("hodeia").toObject().value("args").toArray()[0]
@@ -234,20 +236,21 @@ void TestAgentChat::errorsAndStop() {
   QCOMPARE(m_chat->messages().last().toMap().value("role").toString(), QString("error"));
 }
 
-// Only agents that can reach HodeIA's MCP server are offered (not Pi).
+// Only agents that can reach HodeIA's MCP server are offered (not an agent
+// whose profile is unknown, e.g. removed from the app).
 void TestAgentChat::backends() {
   QStringList names;
   for (const QVariant &b : m_chat->agentBackends())
     names << b.toMap().value("name").toString();
   QVERIFY(names.contains("Fake Claude"));
-  QVERIFY(!names.contains("Fake Pi"));
+  QVERIFY(!names.contains("Fake Unknown"));
 
   // The agent mode needs an active agent backend that reaches the MCP.
   QSignalSpy changed(m_chat, &AgentChatController::agentBackendsChanged);
   m_config->setActiveBackend("Fake Claude");
   QVERIFY(m_chat->agentAvailable());
   QVERIFY(!changed.isEmpty()); // QML re-reads it
-  m_config->setActiveBackend("Fake Pi");
+  m_config->setActiveBackend("Fake Unknown");
   QVERIFY(!m_chat->agentAvailable());
   m_config->setActiveBackend("Llama.cpp");
   QVERIFY(!m_chat->agentAvailable());

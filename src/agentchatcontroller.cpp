@@ -348,6 +348,7 @@ void AgentChatController::startTurn(const QString &text) {
   options.systemPrompt = systemPrompt(m_config->outputLanguage());
   options.model = m_model;
   options.tools = false;
+  options.web = true; // finding papers not in the library
   options.mcpServers = {hodeiaMcpServer()};
   for (const QString &tool : kTools)
     options.allowedTools.append(QString(kServer) + "/" + tool);

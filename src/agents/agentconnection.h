@@ -12,7 +12,7 @@
 #include <expected>
 
 /* The common ground of the agent connectors.  HodeIA talks to coding agents
-   (Claude Code, Qwen Code, Pi...) through one interface, Agents::Connection;
+   (Claude Code, Codex, Qwen Code...) through one interface, Agents::Connection;
    each connector (src/agents/connectors/<name>/) implements it for one way of
    talking to agents: ACP, or an agent's own command-line protocol.
 
@@ -54,6 +54,10 @@ struct SessionOptions {
   /// false (classic mode): no built-in tool and none of the user's settings
   /// (skills, CLAUDE.md...) when the agent lets us say so.
   bool tools = false;
+  /// With tools false: the agent may still search the web and read web
+  /// pages (mode agentique), its only built-in tools.  Nothing that runs
+  /// commands or writes files.
+  bool web = false;
   QList<McpServer> mcpServers;
   /// Tools of those servers the agent may use without asking (HodeIA's
   /// read-only tools): "<server>/<tool>".  Every other permission request
@@ -135,6 +139,10 @@ struct Profile {
   QString loginHint;      ///< how to log in, for error messages
   QStringList models;     ///< fixed model list, when the agent cannot list them
   QJsonObject options;    ///< connector-specific settings
+  /// Filled by the registry, for connectors that write files for the agent
+  /// (see AcpConnection's profile options):
+  QString stateDir;         ///< HodeIA's folder for this agent's files
+  QStringList guardCommand; ///< HodeIA's tool guard: program, arguments
 };
 
 /// A way of talking to agents.  One per folder of src/agents/connectors.

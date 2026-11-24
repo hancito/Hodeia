@@ -17,7 +17,7 @@ struct ActiveBackend {
     Local,     ///< llama.cpp on this machine
     OpenAi,    ///< remote OpenAI-compatible endpoint (/v1/chat/completions)
     Anthropic, ///< remote Anthropic Messages API (/v1/messages)
-    Agent,     ///< coding agent (Claude Code, Qwen Code, Pi...), see AgentBackend
+    Agent,     ///< coding agent (Claude Code, Codex, Qwen Code...), see AgentBackend
   };
   /// Local by default: nothing leaves the machine unless the settings say so.
   Kind kind = Kind::Local;

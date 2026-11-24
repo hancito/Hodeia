@@ -82,19 +82,19 @@ target_compile_definitions(tst_reindexer PRIVATE
 
 # The agent connectors and the Agent backend, against fake agents (no
 # Claude, no network): one fake per protocol.
-foreach(_fake fake_acp_agent fake_claude fake_pi)
+foreach(_fake fake_acp_agent fake_claude fake_codex)
   qt_add_executable(${_fake} ${_fake}.cpp)
   target_link_libraries(${_fake} PRIVATE Qt6::Core)
 endforeach()
 hodeia_add_test(tst_agents)
-add_dependencies(tst_agents fake_acp_agent fake_claude fake_pi)
+add_dependencies(tst_agents fake_acp_agent fake_claude fake_codex)
 target_compile_definitions(tst_agents PRIVATE
     FAKE_ACP_AGENT="$<TARGET_FILE:fake_acp_agent>"
     FAKE_CLAUDE="$<TARGET_FILE:fake_claude>"
-    FAKE_PI="$<TARGET_FILE:fake_pi>")
+    FAKE_CODEX="$<TARGET_FILE:fake_codex>"
+    CMAKE_PROGRAM="${CMAKE_COMMAND}")
 hodeia_add_test(tst_agentchat)
-add_dependencies(tst_agentchat fake_claude fake_pi fake_acp_agent)
+add_dependencies(tst_agentchat fake_claude fake_acp_agent)
 target_compile_definitions(tst_agentchat PRIVATE
     FAKE_ACP_AGENT="$<TARGET_FILE:fake_acp_agent>"
-    FAKE_CLAUDE="$<TARGET_FILE:fake_claude>"
-    FAKE_PI="$<TARGET_FILE:fake_pi>")
+    FAKE_CLAUDE="$<TARGET_FILE:fake_claude>")

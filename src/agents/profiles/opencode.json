@@ -1,9 +1,0 @@
-{
-  "id": "opencode",
-  "name": "OpenCode",
-  "connector": "acp",
-  "command": "opencode acp",
-  "verified": false,
-  "install": "https://opencode.ai",
-  "login": "opencode auth login"
-}

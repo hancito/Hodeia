@@ -1,13 +1,14 @@
 // Unit tests for the agent connectors (src/agents) and the Agent backend,
 // against fake agents (no Claude, no network): fake_acp_agent (ACP),
-// fake_claude (Claude Code stream-json), fake_pi (Pi RPC).
+// fake_claude (Claude Code stream-json), fake_codex (codex app-server).
 
 #include "acpconnector.h"
 #include "agentbackend.h"
+#include "agentguard.h"
 #include "agentregistry.h"
 #include "agentsync.h"
 #include "claudeconnector.h"
-#include "piconnector.h"
+#include "codexconnector.h"
 
 #include <QFile>
 #include <QJsonArray>
@@ -110,6 +111,11 @@ private slots:
   void acpCannotStart();
   void acpListModels();
   void acpPermissionAnswer();
+  void acpExpand();
+  void acpProfileFiles();
+  void acpSetup();
+  void acpSetupFails();
+  void guard();
 
   // Claude Code (stream-json)
   void claudeArguments();
@@ -119,12 +125,17 @@ private slots:
   void claudeCancelKills();
   void claudeStream();
 
-  // Pi (RPC)
-  void piArguments();
-  void piAnswer();
-  void piError();
-  void piCancel();
-  void piListModels();
+  // Codex (app-server)
+  void codexThreadParams();
+  void codexAnswer();
+  void codexStream();
+  void codexTwoMessages();
+  void codexError();
+  void codexCancel();
+  void codexCancelKills();
+  void codexRefusesApprovals();
+  void codexResume();
+  void codexListModels();
 
   // The Agent backend
   void backendPrompt();
@@ -158,16 +169,16 @@ void TestAgents::cleanup() {
 // One connector per folder of src/agents/connectors, and the app's profiles.
 void TestAgents::builtins() {
   const Registry &r = Registry::instance();
-  for (const char *id : {"acp", "claude", "pi"})
+  for (const char *id : {"acp", "claude", "codex"})
     QVERIFY2(r.connector(id), id);
-  for (const char *id : {"claude", "claude-acp", "qwen", "pi", "gemini", "antigravity"}) {
+  for (const char *id : {"claude", "codex", "qwen", "antigravity", "hermes"}) {
     const auto p = r.profile(id);
     QVERIFY2(p, id);
     QVERIFY2(r.connector(p->connector), id); // every profile has its connector
   }
   QCOMPARE(r.profile("claude")->connector, QString("claude"));
+  QCOMPARE(r.profile("codex")->connector, QString("codex"));
   QVERIFY(r.profile("qwen")->verified);
-  QVERIFY(!r.profile("gemini")->verified);
 }
 
 void TestAgents::parseProfile() {
@@ -369,6 +380,104 @@ void TestAgents::acpPermissionAnswer() {
                                             {"options", options}},
                                            {}),
            QString("no")); // classic mode: nothing allowed
+  // Reading the web: only with SessionOptions::web.
+  const QJsonObject fetch{{"title", "WebFetch"}, {"kind", "fetch"}};
+  QCOMPARE(ask(fetch), QString("no"));
+  QCOMPARE(AcpConnection::permissionAnswer({{"toolCall", fetch}, {"options", options}}, allowed, true),
+           QString("yes"));
+  QCOMPARE(AcpConnection::permissionAnswer(
+               {{"toolCall", QJsonObject{{"title", "rm -rf x"}, {"kind", "execute"}}},
+                {"options", options}},
+               allowed, true),
+           QString("no"));
+}
+
+void TestAgents::acpExpand() {
+  Profile p;
+  p.command = "\"/opt/my agent/hermes\" acp";
+  p.stateDir = "/state/hermes";
+  p.guardCommand = {"/opt/Hodeia App/Hodeia", "--agent-guard"};
+  const QJsonValue v = AcpConnection::expand(
+      QJsonObject{{"${stateDir}/a.json", QJsonArray{"${program}", "x ${workDir}"}},
+                  {"hook", "${guard} web_*"}},
+      p, "/work");
+  const QJsonObject o = v.toObject();
+  QCOMPARE(o.keys(), (QStringList{"/state/hermes/a.json", "hook"}));
+  QCOMPARE(o.value("/state/hermes/a.json").toArray(), (QJsonArray{"/opt/my agent/hermes", "x /work"}));
+  QCOMPARE(o.value("hook").toString(), QString("\"/opt/Hodeia App/Hodeia\" --agent-guard web_*"));
+}
+
+// The profile's files are written (placeholders replaced) before the agent
+// starts, and its env has the placeholders replaced too.
+void TestAgents::acpProfileFiles() {
+  Profile p = profile("acp", FAKE_ACP_AGENT);
+  p.stateDir = m_dir->filePath("state");
+  p.guardCommand = {"guard", "--agent-guard"};
+  p.env.insert("FAKE_SETTINGS", "${stateDir}/settings.json");
+  p.options["files"] = QJsonObject{
+      {"${stateDir}/settings.json", QJsonObject{{"deny", QJsonArray{"shell"}}}},
+      {"${workDir}/.agents/hooks.json", QJsonObject{{"command", "${guard} web"}}}};
+  QVERIFY(run(p, classic(m_dir->path()), "Hi"));
+  QFile settings(m_dir->filePath("state/settings.json"));
+  QVERIFY(settings.open(QIODevice::ReadOnly));
+  QCOMPARE(QJsonDocument::fromJson(settings.readAll()).object(),
+           (QJsonObject{{"deny", QJsonArray{"shell"}}}));
+  QFile hooks(m_dir->filePath(".agents/hooks.json"));
+  QVERIFY(hooks.open(QIODevice::ReadOnly));
+  QCOMPARE(QJsonDocument::fromJson(hooks.readAll()).object().value("command").toString(),
+           QString("guard --agent-guard web"));
+}
+
+// Setup: "unless" skips a step when it succeeds; done once per session.
+void TestAgents::acpSetup() {
+  Profile p = profile("acp", FAKE_ACP_AGENT);
+  p.id = "setup-test";
+  p.stateDir = m_dir->filePath("state");
+  const QString cmake = QString::fromLocal8Bit(CMAKE_PROGRAM);
+  p.options["setup"] = QJsonArray{
+      QJsonObject{{"unless", QJsonArray{cmake, "-E", "true"}},
+                  {"run", QJsonArray{cmake, "-E", "touch", "${stateDir}/skipped"}}},
+      QJsonObject{{"unless", QJsonArray{cmake, "-E", "false"}},
+                  {"run", QJsonArray{cmake, "-E", "touch", "${stateDir}/ran"}}},
+      QJsonObject{{"run", QJsonArray{cmake, "-E", "touch", "${stateDir}/always"}}}};
+  QDir().mkpath(p.stateDir);
+  QVERIFY(run(p, classic(m_dir->path()), "Hi"));
+  QVERIFY(!QFile::exists(m_dir->filePath("state/skipped")));
+  QVERIFY(QFile::exists(m_dir->filePath("state/ran")));
+  QVERIFY(QFile::exists(m_dir->filePath("state/always")));
+  QFile::remove(m_dir->filePath("state/always"));
+  QVERIFY(run(p, classic(m_dir->path()), "Hi")); // already done
+  QVERIFY(!QFile::exists(m_dir->filePath("state/always")));
+}
+
+// A setup that fails: the agent is not started, the error says why.
+void TestAgents::acpSetupFails() {
+  Profile p = profile("acp", FAKE_ACP_AGENT);
+  p.id = "setup-fails";
+  p.options["setup"] = QJsonArray{
+      QJsonObject{{"run", QJsonArray{QString::fromLocal8Bit(CMAKE_PROGRAM), "-E", "false"}}}};
+  const auto r = run(p, classic(m_dir->path()), "Hi");
+  QVERIFY(!r);
+  QVERIFY2(r.error().contains("Fake acp"), qPrintable(r.error()));
+  QVERIFY(loggedMessages(m_log).isEmpty()); // never started
+}
+
+void TestAgents::guard() {
+  const QStringList allowed{"search_web", "mcp_hodeia_*"};
+  const auto decide = [&](const QString &name) {
+    return guardDecision({{"toolCall", QJsonObject{{"name", name}}}}, allowed)
+        .value("decision").toString();
+  };
+  QCOMPARE(decide("search_web"), QString("allow"));
+  QCOMPARE(decide("mcp_hodeia_list_papers"), QString("allow"));
+  QCOMPARE(decide("run_command"), QString("deny"));
+  QCOMPARE(decide("write_file"), QString("deny"));
+  QCOMPARE(decide("search_web_x"), QString("deny")); // exact names
+  QCOMPARE(decide(""), QString("deny"));
+  QCOMPARE(guardDecision({{"tool_name", "search_web"}}, allowed).value("decision").toString(),
+           QString("allow"));
+  QVERIFY(guardDecision({{"toolCall", QJsonObject{{"name", "run_command"}}}}, allowed)
+              .value("reason").toString().contains("run_command"));
 }
 
 /* ── Claude Code ───────────────────────────────────────────────── */
@@ -382,6 +491,15 @@ void TestAgents::claudeArguments() {
   QCOMPARE(args.at(args.indexOf("--setting-sources") + 1), QString(""));
   QVERIFY(args.contains("--strict-mcp-config"));
   QVERIFY(!args.contains("--mcp-config"));
+  QVERIFY(!args.contains("--allowedTools"));
+
+  // The web, and only it, besides no tool.
+  SessionOptions web = classic("/tmp");
+  web.web = true;
+  args = ClaudeConnection::arguments(web);
+  QCOMPARE(args.at(args.indexOf("--tools") + 1), QString("WebSearch,WebFetch"));
+  QCOMPARE(args.at(args.indexOf("--allowedTools") + 1), QString("WebSearch,WebFetch"));
+  QCOMPARE(args.at(args.indexOf("--setting-sources") + 1), QString(""));
 
   SessionOptions agentic = classic("/tmp", "default");
   agentic.tools = true;
@@ -460,46 +578,164 @@ void TestAgents::claudeStream() {
   QVERIFY(loggedArgs(m_log).contains("--include-partial-messages"));
 }
 
-/* ── Pi ────────────────────────────────────────────────────────── */
+/* ── Codex ─────────────────────────────────────────────────────── */
 
-void TestAgents::piArguments() {
-  QStringList args = PiConnection::arguments(classic("/tmp", "UCL/Qwen3.8"));
-  QCOMPARE(args.mid(0, 3), (QStringList{"--mode", "rpc", "--no-session"}));
-  QCOMPARE(args.at(args.indexOf("--model") + 1), QString("UCL/Qwen3.8"));
-  for (const char *flag : {"--no-tools", "--no-extensions", "--no-skills",
-                           "--no-prompt-templates", "--no-context-files", "--no-mcp"})
-    QVERIFY2(args.contains(flag), flag);
+void TestAgents::codexThreadParams() {
+  SessionOptions o = classic("/tmp", "gpt-x");
+  QJsonObject p = CodexConnection::threadParams(o, {});
+  QCOMPARE(p.value("approvalPolicy").toString(), QString("never"));
+  QCOMPARE(p.value("sandbox").toString(), QString("read-only"));
+  QCOMPARE(p.value("baseInstructions").toString(), QString("SYSTEM PROMPT"));
+  QCOMPARE(p.value("model").toString(), QString("gpt-x"));
+  QJsonObject config = p.value("config").toObject();
+  QCOMPARE(config.value("features").toObject().value("shell_tool"), QJsonValue(false));
+  QCOMPARE(config.value("web_search").toString(), QString("disabled"));
+  o.web = true;
+  QCOMPARE(CodexConnection::threadParams(o, {}).value("config").toObject()
+               .value("web_search").toString(), QString("live"));
+  o.web = false;
+  QVERIFY(!config.contains("mcp_servers"));
+
+  // Agent mode: HodeIA's server, its allowed tools approved, the user's
+  // servers disabled.
+  o = classic("/tmp", "default");
+  o.tools = true;
+  o.mcpServers.append({"hodeia", "/opt/Hodeia", {"--mcp"}, {}});
+  o.allowedTools = {"hodeia/search_library", "hodeia/get_page", "other/x"};
+  p = CodexConnection::threadParams(o, {"mine"});
+  QVERIFY(!p.contains("model")); // "default": Codex's own
+  config = p.value("config").toObject();
+  QVERIFY(!config.contains("features"));
+  const QJsonObject servers = config.value("mcp_servers").toObject();
+  QCOMPARE(servers.value("mine").toObject(), (QJsonObject{{"enabled", false}}));
+  const QJsonObject hodeia = servers.value("hodeia").toObject();
+  QCOMPARE(hodeia.value("command").toString(), QString("/opt/Hodeia"));
+  QCOMPARE(hodeia.value("args").toArray(), QJsonArray{"--mcp"});
+  const QJsonObject tools = hodeia.value("tools").toObject();
+  QCOMPARE(tools.keys(), (QStringList{"get_page", "search_library"}));
+  QCOMPARE(tools.value("get_page").toObject().value("approval_mode").toString(), QString("approve"));
+
+  const QJsonArray input = CodexConnection::inputItems(
+      {PromptPart::textPart("Hi"), PromptPart::image("image/png", "QUJD")});
+  QCOMPARE(input.at(0).toObject(), (QJsonObject{{"type", "text"}, {"text", "Hi"}}));
+  QCOMPARE(input.at(1).toObject().value("url").toString(), QString("data:image/png;base64,QUJD"));
 }
 
-void TestAgents::piAnswer() {
-  const auto r = run(profile("pi", FAKE_PI), classic(m_dir->path()), "Hello Pi");
+void TestAgents::codexAnswer() {
+  const auto r = run(profile("codex", FAKE_CODEX), classic(m_dir->path()), "Hello Codex");
   QVERIFY2(r, r ? "" : qPrintable(r.error()));
   QCOMPARE(r->stop, TurnResult::Stop::EndTurn);
-  QCOMPARE(r->text, QString("Echo: Hello Pi"));
-  const QStringList args = loggedArgs(m_log);
-  QCOMPARE(args.at(args.indexOf("--system-prompt") + 1), QString("SYSTEM PROMPT"));
+  QCOMPARE(r->text, QString("Echo: Hello Codex"));
+  QCOMPARE(loggedArgs(m_log), QStringList{"app-server"});
+  // The user's MCP server (from config/read) is disabled for the thread.
+  const QJsonObject start = find(loggedMessages(m_log), "thread/start");
+  QCOMPARE(start.value("params").toObject().value("config").toObject()
+               .value("mcp_servers").toObject().value("user-server").toObject(),
+           (QJsonObject{{"enabled", false}}));
 }
 
-void TestAgents::piError() {
-  const auto r = run(profile("pi", FAKE_PI), classic(m_dir->path()), "ERROR");
+void TestAgents::codexStream() {
+  std::unique_ptr<Connection> c(Registry::instance().create(profile("codex", FAKE_CODEX)));
+  SessionOptions o = classic(m_dir->path());
+  o.stream = true;
+  QVERIFY(openSync(*c, o, 20000));
+  QStringList pieces;
+  connect(c.get(), &Connection::agentEvent, this, [&](const Event &e) {
+    if (e.kind == Event::Kind::Text)
+      pieces.append(e.text);
+  });
+  const TurnResult r = promptSync(*c, ask("Hello stream"), 20000);
+  QCOMPARE(r.text, QString("Echo: Hello stream"));
+  QVERIFY2(pieces.size() >= 3, qPrintable(pieces.join('|')));
+  QCOMPARE(pieces.join(""), r.text); // no doubled text from the completed item
+}
+
+// Messages before and after a tool call: separated by a blank line, with
+// or without streaming; the tool call is reported.
+void TestAgents::codexTwoMessages() {
+  for (const bool stream : {false, true}) {
+    std::unique_ptr<Connection> c(Registry::instance().create(profile("codex", FAKE_CODEX)));
+    SessionOptions o = classic(m_dir->path());
+    o.stream = stream;
+    QVERIFY(openSync(*c, o, 20000));
+    QString text;
+    QStringList tools;
+    connect(c.get(), &Connection::agentEvent, this, [&](const Event &e) {
+      if (e.kind == Event::Kind::Text)
+        text += e.text;
+      else if (e.kind == Event::Kind::ToolCall)
+        tools.append(e.text + " " + e.status);
+    });
+    const TurnResult r = promptSync(*c, ask("TWO"), 20000);
+    QCOMPARE(r.text, QString("First\n\nSecond"));
+    QCOMPARE(text, r.text);
+    QCOMPARE(tools, (QStringList{"hodeia/get_page in_progress", "hodeia/get_page completed"}));
+  }
+}
+
+void TestAgents::codexError() {
+  const auto r = run(profile("codex", FAKE_CODEX), classic(m_dir->path()), "ERROR");
   QVERIFY(r);
   QCOMPARE(r->stop, TurnResult::Stop::Error);
-  QCOMPARE(r->error, QString("provider is down"));
+  QCOMPARE(r->error, QString("usage limit reached"));
 }
 
-void TestAgents::piCancel() {
-  std::unique_ptr<Connection> c(Registry::instance().create(profile("pi", FAKE_PI)));
+void TestAgents::codexCancel() {
+  std::unique_ptr<Connection> c(Registry::instance().create(profile("codex", FAKE_CODEX)));
   QVERIFY(openSync(*c, classic(m_dir->path()), 20000));
   QTimer::singleShot(300, c.get(), [&]() { c->cancel(); });
   const TurnResult r = promptSync(*c, ask("SLOW"), 20000);
   QCOMPARE(r.stop, TurnResult::Stop::Cancelled);
   QCOMPARE(r.text, QString("Partial"));
+  const QJsonObject interrupt = find(loggedMessages(m_log), "turn/interrupt");
+  QCOMPARE(interrupt.value("params").toObject().value("turnId").toString(), QString("turn-1"));
 }
 
-void TestAgents::piListModels() {
-  const auto models = Registry::instance().connector("pi")->listModels(profile("pi", FAKE_PI));
+// A turn that ignores turn/interrupt: the process is killed.
+void TestAgents::codexCancelKills() {
+  std::unique_ptr<Connection> c(Registry::instance().create(profile("codex", FAKE_CODEX)));
+  QVERIFY(openSync(*c, classic(m_dir->path()), 20000));
+  QTimer::singleShot(300, c.get(), [&]() { c->cancel(); });
+  QElapsedTimer t;
+  t.start();
+  const TurnResult r = promptSync(*c, ask("HANG"), 30000);
+  QCOMPARE(r.stop, TurnResult::Stop::Cancelled);
+  QVERIFY(t.elapsed() < 15000);
+}
+
+void TestAgents::codexRefusesApprovals() {
+  const auto r = run(profile("codex", FAKE_CODEX), classic(m_dir->path()), "APPROVAL");
+  QVERIFY(r);
+  QCOMPARE(r->stop, TurnResult::Stop::EndTurn);
+  for (const QJsonObject &m : loggedMessages(m_log))
+    if (m.value("id").toInt() == 99 && !m.contains("method")) {
+      QCOMPARE(m.value("result").toObject().value("decision").toString(), QString("decline"));
+      return;
+    }
+  QFAIL("the approval request was not answered");
+}
+
+// A thread Codex knows is resumed; an unknown one gives a new thread.
+void TestAgents::codexResume() {
+  SessionOptions o = classic(m_dir->path());
+  o.resumeSessionId = "thread-9";
+  std::unique_ptr<Connection> c(Registry::instance().create(profile("codex", FAKE_CODEX)));
+  QVERIFY(openSync(*c, o, 20000));
+  QVERIFY(c->resumed());
+  QCOMPARE(c->sessionId(), QString("thread-9"));
+  c->close();
+
+  o.resumeSessionId = "missing";
+  c.reset(Registry::instance().create(profile("codex", FAKE_CODEX)));
+  QVERIFY(openSync(*c, o, 20000));
+  QVERIFY(!c->resumed());
+  QCOMPARE(c->sessionId(), QString("thread-1"));
+}
+
+void TestAgents::codexListModels() {
+  const auto models = Registry::instance().connector("codex")->listModels(profile("codex", FAKE_CODEX));
   QVERIFY2(models, models ? "" : qPrintable(models.error()));
-  QCOMPARE(*models, (QStringList{"P/m1", "P/m2"}));
+  QCOMPARE(*models, (QStringList{"default", "m1", "m2"})); // both pages, no hidden one
 }
 
 /* ── Agent backend ─────────────────────────────────────────────── */
@@ -554,7 +790,7 @@ void TestAgents::backendUnknownAgent() {
 void TestAgents::guessAgent() {
   QCOMPARE(AgentBackend::guessAgent("Claude Code"), QString("claude"));
   QCOMPARE(AgentBackend::guessAgent("Qwen"), QString("qwen"));
-  QCOMPARE(AgentBackend::guessAgent("my claude-acp"), QString("claude-acp"));
+  QCOMPARE(AgentBackend::guessAgent("My Codex"), QString("codex"));
   QCOMPARE(AgentBackend::guessAgent("Remote"), QString());
   const auto p = AgentBackend::profileOf({{"name", "Claude Code"}, {"api", "agent"}});
   QVERIFY(p);

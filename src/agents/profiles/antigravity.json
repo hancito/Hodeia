@@ -3,7 +3,27 @@
   "name": "Google Antigravity",
   "connector": "acp",
   "command": "agy acp",
-  "verified": false,
+  "verified": true,
   "install": "https://antigravity.google",
-  "login": "agy acp --login"
+  "login": "agy acp --login",
+  "options": {
+    "files": {
+      "${workDir}/.agents/hooks.json": {
+        "hodeia-guard": {
+          "PreToolUse": [
+            {
+              "matcher": "*",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "${guard} \"search_web,read_url_content,mcp_hodeia_*\"",
+                  "timeout": 15
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
 }

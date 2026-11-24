@@ -153,6 +153,7 @@ endif()
 # (no self-registration, which the linker would drop from this static lib).
 target_sources(HodeiaEngine PRIVATE
     agents/agentconnection.h
+    agents/agentguard.h agents/agentguard.cpp
     agents/agentprocess.h agents/agentprocess.cpp
     agents/agentregistry.h agents/agentregistry.cpp
     agents/agentsync.h agents/agentsync.cpp

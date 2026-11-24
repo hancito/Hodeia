@@ -5,6 +5,12 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QMutex>
+#include <QProcessEnvironment>
+#include <QSet>
+#include <QTemporaryDir>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <memory>
@@ -100,10 +106,27 @@ void AcpConnection::notify(const QString &method, const QJsonObject &params) {
 }
 
 QString AcpConnection::describe(const QJsonObject &error) const {
-  const QString message = error.value("message").toString();
+  const QString base = error.value("message").toString();
+  // The cause often hides in "data" behind a generic message ("Internal
+  // error"): {"message": "..."}, possibly the provider's own JSON error.
+  const QJsonValue data = error.value("data");
+  QString detail = data.isString() ? data.toString() : data.toObject().value("message").toString();
+  if (const QJsonDocument inner = QJsonDocument::fromJson(detail.toUtf8()); inner.isObject()) {
+    const QJsonObject o = inner.object();
+    const QJsonValue e = o.value("error");
+    const QString m = e.isObject() ? e.toObject().value("message").toString()
+                                   : (e.isString() ? e.toString() : o.value("message").toString());
+    if (!m.isEmpty())
+      detail = m;
+  }
+  QString message = base;
+  if (!detail.isEmpty() && detail != base)
+    message = base.isEmpty() ? detail : base + ": " + detail;
+  // Judged on the agent's own message: a provider detail may well mention
+  // an "account" or "auth" without the user being logged out.
   if (error.value("code").toInt() == kAuthRequired ||
-      message.contains("auth", Qt::CaseInsensitive) ||
-      message.contains("login", Qt::CaseInsensitive)) {
+      base.contains("auth", Qt::CaseInsensitive) ||
+      base.contains("login", Qt::CaseInsensitive)) {
     QString text = QCoreApplication::translate("Agents::AcpConnection", "%1 is not logged in.").arg(m_profile.name);
     if (!m_profile.loginHint.isEmpty())
       text += " " + QCoreApplication::translate("Agents::AcpConnection", "Log in with: %1").arg(m_profile.loginHint);
@@ -127,10 +150,137 @@ void AcpConnection::fail(const QString &error) {
   emit failed(error);
 }
 
+QJsonValue AcpConnection::expand(const QJsonValue &value, const Profile &profile,
+                                 const QString &workDir) {
+  if (value.isArray()) {
+    QJsonArray out;
+    for (const QJsonValue &v : value.toArray())
+      out.append(expand(v, profile, workDir));
+    return out;
+  }
+  if (value.isObject()) {
+    QJsonObject out;
+    const QJsonObject o = value.toObject();
+    for (auto it = o.begin(); it != o.end(); ++it)
+      out.insert(expand(it.key(), profile, workDir).toString(), expand(it.value(), profile, workDir));
+    return out;
+  }
+  if (!value.isString())
+    return value;
+  // A shell command line (hooks run through sh -c or cmd /c).
+  QStringList guard;
+  for (const QString &part : profile.guardCommand)
+    guard.append(part.contains(' ') ? '"' + part + '"' : part);
+  const QStringList command = AgentProcess::splitCommand(profile.command);
+  QString s = value.toString();
+  s.replace("${stateDir}", QDir::toNativeSeparators(profile.stateDir));
+  s.replace("${workDir}", QDir::toNativeSeparators(workDir));
+  s.replace("${program}", command.isEmpty() ? QString() : command.first());
+  s.replace("${guard}", guard.join(' '));
+  return s;
+}
+
+namespace {
+
+/// Setups done in this HodeIA session (all connections, all threads).
+QMutex s_setupMutex;
+QSet<QString> s_setupsDone;
+
+QString setupKey(const Profile &profile) {
+  return profile.id + '\n' + profile.command + '\n' +
+         QJsonDocument(profile.options.value("setup").toArray()).toJson(QJsonDocument::Compact);
+}
+
+} // namespace
+
 void AcpConnection::open(const SessionOptions &options) {
   m_options = options;
   m_failed = false;
-  if (!m_process.start(m_profile.command, {}, options.workDir, m_profile.env)) {
+  prepare();
+}
+
+void AcpConnection::prepare() {
+  // The files the profile asks for (settings, hooks), then its setup.
+  const QJsonObject files = m_profile.options.value("files").toObject();
+  for (auto it = files.begin(); it != files.end(); ++it) {
+    const QString path = expand(it.key(), m_profile, m_options.workDir).toString();
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+        file.write(QJsonDocument(expand(it.value(), m_profile, m_options.workDir).toObject())
+                       .toJson()) < 0) {
+      fail(QCoreApplication::translate("Agents::AcpConnection", "Could not write %1: %2")
+               .arg(QDir::toNativeSeparators(path), file.errorString()));
+      return;
+    }
+  }
+  {
+    QMutexLocker lock(&s_setupMutex);
+    if (s_setupsDone.contains(setupKey(m_profile))) {
+      lock.unlock();
+      startAgent();
+      return;
+    }
+  }
+  runSetup(0);
+}
+
+void AcpConnection::runSetup(int step) {
+  const QJsonArray steps = m_profile.options.value("setup").toArray();
+  if (step >= steps.size()) {
+    QMutexLocker lock(&s_setupMutex);
+    s_setupsDone.insert(setupKey(m_profile));
+    lock.unlock();
+    startAgent();
+    return;
+  }
+  const QJsonObject spec = expand(steps.at(step), m_profile, m_options.workDir).toObject();
+  // "unless" first, when there is one; then "run".
+  const bool checking = spec.contains("unless") && !m_setupChecked;
+  const QStringList argv = spec.value(checking ? "unless" : "run").toVariant().toStringList();
+  if (argv.isEmpty()) {
+    m_setupChecked = false;
+    runSetup(step + 1);
+    return;
+  }
+  m_setup = std::make_unique<QProcess>();
+  QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+  for (auto it = m_profile.env.cbegin(); it != m_profile.env.cend(); ++it)
+    env.insert(it.key(), expand(it.value(), m_profile, m_options.workDir).toString());
+  m_setup->setProcessEnvironment(env);
+  m_setup->setProcessChannelMode(QProcess::MergedChannels);
+  QProcess *process = m_setup.get();
+  connect(process, &QProcess::finished, this, [this, process, step, checking, argv](int code, QProcess::ExitStatus status) {
+    const bool ok = status == QProcess::NormalExit && code == 0;
+    const QString output = QString::fromLocal8Bit(process->readAll()).trimmed().right(600);
+    qInfo() << "[ACP] setup" << argv << "->" << code;
+    if (checking) {
+      m_setupChecked = !ok; // "unless" failed: now "run"
+      runSetup(ok ? step + 1 : step);
+    } else if (!ok) {
+      fail(QCoreApplication::translate("Agents::AcpConnection", "Preparing %1 failed (%2): %3")
+               .arg(m_profile.name, argv.join(' '), output));
+    } else {
+      m_setupChecked = false;
+      runSetup(step + 1);
+    }
+  }, Qt::QueuedConnection);
+  connect(process, &QProcess::errorOccurred, this, [this, process, argv](QProcess::ProcessError e) {
+    if (e != QProcess::FailedToStart)
+      return;
+    fail(startFailureMessage(m_profile, process->errorString()));
+  }, Qt::QueuedConnection);
+  process->start(argv.first(), argv.mid(1));
+}
+
+void AcpConnection::startAgent() {
+  if (m_failed)
+    return;
+  QMap<QString, QString> env;
+  for (auto it = m_profile.env.cbegin(); it != m_profile.env.cend(); ++it)
+    env.insert(it.key(), expand(it.value(), m_profile, m_options.workDir).toString());
+  const SessionOptions &options = m_options;
+  if (!m_process.start(m_profile.command, {}, options.workDir, env)) {
     const QString error = startFailureMessage(m_profile, m_process.lastError());
     fail(error);
     return;
@@ -261,6 +411,12 @@ void AcpConnection::cancel() {
 void AcpConnection::close() {
   m_failed = true; // no signal from here on
   m_pending.clear();
+  if (m_setup) {
+    m_setup->disconnect(this);
+    m_setup->kill();
+    m_setup->waitForFinished(2000);
+    m_setup.reset();
+  }
   m_process.stop();
 }
 
@@ -299,7 +455,7 @@ void AcpConnection::handle(const QJsonObject &msg) {
   } else if (method == "session/request_permission" && msg.contains("id")) {
     // Only HodeIA's own tools are allowed (mode agentique); the rest, and
     // everything in classic mode, is refused.
-    const QString optionId = permissionAnswer(params, m_options.allowedTools);
+    const QString optionId = permissionAnswer(params, m_options.allowedTools, m_options.web);
     const QJsonObject outcome =
         optionId.isEmpty() ? QJsonObject{{"outcome", "cancelled"}}
                            : QJsonObject{{"outcome", "selected"}, {"optionId", optionId}};
@@ -315,7 +471,7 @@ void AcpConnection::handle(const QJsonObject &msg) {
 }
 
 QString AcpConnection::permissionAnswer(const QJsonObject &params,
-                                       const QStringList &allowedTools) {
+                                       const QStringList &allowedTools, bool web) {
   // Agents name MCP tools differently ("mcp__hodeia__search_library",
   // "search_library (hodeia MCP Server)"...): the tool call is searched for
   // the server and the tool name.
@@ -324,7 +480,7 @@ QString AcpConnection::permissionAnswer(const QJsonObject &params,
                        QJsonDocument(call.value("rawInput").toObject()).toJson() + " " +
                        call.value("name").toString() + " " +
                        params.value("_meta").toVariant().toString();
-  bool allowed = false;
+  bool allowed = web && call.value("kind").toString() == "fetch";
   for (const QString &tool : allowedTools) {
     const QString server = tool.section('/', 0, 0), name = tool.section('/', 1);
     if (seen.contains(name) && (seen.contains(server, Qt::CaseInsensitive)))
@@ -346,7 +502,8 @@ std::expected<QStringList, QString> AcpConnector::listModels(const Profile &prof
     return profile.models;
   AcpConnection connection(profile);
   SessionOptions options;
-  options.workDir = QDir::tempPath();
+  const QTemporaryDir dir; // the profile's files may go in the work folder
+  options.workDir = dir.isValid() ? dir.path() : QDir::tempPath();
   if (auto r = openSync(connection, options, kOpenTimeoutMs); !r)
     return std::unexpected(r.error());
   QStringList models = connection.models();

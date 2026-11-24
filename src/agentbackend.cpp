@@ -134,7 +134,7 @@ QVariantList profiles() {
 
 QString guessAgent(const QString &backendName) {
   // The profile whose id appears in the name ("Claude Code" -> claude,
-  // "Qwen" -> qwen); the longest id wins ("claude-acp" over "claude").
+  // "Qwen" -> qwen); the longest id wins when several match.
   const QString name = backendName.toLower();
   QString best;
   for (const Agents::Profile &p : Agents::Registry::instance().profiles())

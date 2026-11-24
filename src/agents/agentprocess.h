@@ -31,7 +31,7 @@ QString runtimeUrl(const QString &runtime);
 QString startFailureMessage(const Profile &profile, const QString &processError);
 
 /// An agent process that speaks JSON, one object per line, on stdin/stdout
-/// (ACP, Claude's stream-json, Pi's RPC).  stderr is logged and its last
+/// (ACP, Claude's stream-json).  stderr is logged and its last
 /// lines kept for error messages.  Shared by the connectors.
 class AgentProcess : public QObject {
   Q_OBJECT

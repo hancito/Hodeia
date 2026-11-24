@@ -407,8 +407,8 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
     </message>
     <message>
         <location filename="../ui/BackendWindow.qml" line="141"/>
-        <source>Agent (Claude Code, Qwen, Pi...)</source>
-        <translation>Agent (Claude Code, Qwen, Pi…)</translation>
+        <source>Agent (Claude Code, Codex, Qwen Code...)</source>
+        <translation>Agent (Claude Code, Codex, Qwen Code…)</translation>
     </message>
     <message>
         <location filename="../ui/BackendWindow.qml" line="150"/>

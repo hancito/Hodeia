@@ -2,6 +2,7 @@
 
 #include "apppaths.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -27,6 +28,10 @@ const Registry &Registry::instance() {
       qWarning() << "[Agents] built-in profile not read:" << bad;
     for (const QString &bad : r.loadProfiles(AppPaths::dataDir() + "/Agents/profiles"))
       qWarning() << "[Agents] user profile not read:" << bad;
+    for (Profile &p : r.m_profiles) {
+      p.stateDir = AppPaths::dataDir() + "/Agents/state/" + p.id;
+      p.guardCommand = {QCoreApplication::applicationFilePath(), QStringLiteral("--agent-guard")};
+    }
     qInfo() << "[Agents]" << r.m_connectors.size() << "connectors,"
             << r.m_profiles.size() << "agent profiles";
     return r;

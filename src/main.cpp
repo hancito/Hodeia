@@ -14,6 +14,7 @@
 #include "summarythreadmanager.h"
 #include "thememanager.h"
 #include "agentchatcontroller.h"
+#include "agentguard.h"
 #include "reindexcontroller.h"
 #include "zoterocontroller.h"
 
@@ -361,6 +362,10 @@ static int runMcpServer(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
   if (hasArgument(argc, argv, "--mcp"))
     return runMcpServer(argc, argv);
+  // An agent's tool hook (see Agents::runGuard): no app, a quick answer.
+  for (int i = 1; i + 1 < argc; ++i)
+    if (std::strcmp(argv[i], "--agent-guard") == 0)
+      return Agents::runGuard(QString::fromLocal8Bit(argv[i + 1]));
 
 #ifdef Q_OS_LINUX
   // Native file dialogs through xdg-desktop-portal.  This is a

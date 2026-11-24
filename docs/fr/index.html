@@ -69,6 +69,7 @@
                     <a href="#features">Fonctionnalités</a>
                     <a href="#getting-started">Bien commencer</a>
                     <a href="#models">Modèles</a>
+                    <a href="#agent-mode">Mode agentique</a>
                     <a href="#download">Téléchargement</a>
                     <a href="#faq">FAQ</a>
                     <a href="https://github.com/hancito/Hodeia" class="gh">GitHub</a>
@@ -411,8 +412,98 @@
                 </div>
             </section>
 
+            <!-- Mode agentique -->
+            <section id="agent-mode" class="section alt">
+                <div class="container">
+                    <h2>Mode agentique</h2>
+                    <p class="section-lead">
+                        En mode agentique, vous conversez avec un agent de code installé sur votre ordinateur : il cherche lui-même dans votre bibliothèque, lit les résumés et les pages
+                        dont il a besoin, répond avec des citations et propose des pistes pour poursuivre la recherche. HodeIA ne fournit pas l'agent : vous l'installez et vous vous y
+                        connectez avec votre propre compte, puis HodeIA s'y branche. Aucune clé API à saisir dans HodeIA.
+                    </p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Installation</th>
+                                    <th>Connexion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Claude Code</td>
+                                    <td><a href="https://code.claude.com/docs/en/setup">Installateur natif</a></td>
+                                    <td><code>claude</code>, puis <code>/login</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Codex</td>
+                                    <td><code>npm install -g @openai/codex</code></td>
+                                    <td><code>codex login</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Antigravity</td>
+                                    <td><a href="https://antigravity.google">antigravity.google</a></td>
+                                    <td><code>agy</code>, puis connexion avec votre compte Google</td>
+                                </tr>
+                                <tr>
+                                    <td>Qwen Code</td>
+                                    <td><code>npm install -g @qwen-code/qwen-code</code></td>
+                                    <td><code>qwen</code>, puis <code>/auth</code></td>
+                                </tr>
+                                <tr>
+                                    <td>Hermes Agent</td>
+                                    <td><a href="https://github.com/NousResearch/hermes-agent">github.com/NousResearch/hermes-agent</a></td>
+                                    <td><code>hermes setup</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <ol class="steps">
+                        <li class="card">
+                            <h3>Installer et connecter l'agent</h3>
+                            <p>
+                                Installez l'agent de votre choix (tableau ci-dessus), puis lancez-le une fois dans un terminal pour vous connecter. Vérifiez qu'il répond avant de revenir à
+                                HodeIA : HodeIA utilise exactement cette installation, avec son abonnement et ses modèles.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Ajouter le backend</h3>
+                            <p>
+                                Ouvrez <strong>Modèles → Gérer les backends...</strong>, choisissez l'API <em>Agent</em>, puis votre agent dans la liste <strong>Agent</strong>
+                                (s'il n'est pas trouvé, HodeIA indique comment l'installer). Donnez un nom au backend et laissez la <strong>Commande</strong> vide, sauf si l'agent est
+                                installé hors du PATH. <strong>Vérifier la connexion</strong> démarre l'agent et liste ses modèles ; terminez avec <strong>Ajouter un backend</strong>.
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Le sélectionner</h3>
+                            <p>
+                                Choisissez ce backend dans <strong>Modèles → Backend</strong>, puis un modèle dans la liste <strong>Modèle actif</strong> (<em>default</em> laisse l'agent
+                                choisir).
+                            </p>
+                        </li>
+                        <li class="card">
+                            <h3>Converser</h3>
+                            <p>
+                                Ouvrez <strong>Interroger votre bibliothèque</strong> et activez <strong>Mode agentique</strong>. Cliquez sur <strong>Nouvelle conversation</strong>, posez votre
+                                question et <strong>Envoyer</strong>. Vous voyez la réponse s'écrire et les outils que l'agent appelle ; <strong>Arrêter</strong> interrompt la réponse. Les
+                                conversations sont conservées dans le projet et reprennent là où vous les avez laissées.
+                            </p>
+                        </li>
+                    </ol>
+                    <p class="note">
+                        L'agent travaille sur votre bibliothèque à travers les outils de HodeIA (recherche, liste des articles, résumés, pages, citations, enregistrement d'un
+                        résumé) et peut chercher sur le web, par exemple pour trouver des articles absents de votre bibliothèque. HodeIA lui interdit tout le reste (commandes,
+                        modification ou suppression de fichiers), même si les réglages de l'agent l'autorisent ailleurs ; pour Hermes Agent, HodeIA crée à cet effet un profil
+                        <code>hodeia</code> limité au web. En revanche, vos questions, ses recherches web et les passages qu'il lit sont envoyés au fournisseur de l'agent
+                        (Anthropic, OpenAI, Google...), selon les conditions de votre compte. Pour tout garder sur votre machine, configurez un agent comme Qwen Code ou Hermes Agent
+                        avec un modèle local.
+                    </p>
+                </div>
+            </section>
+
             <!-- Téléchargement -->
-            <section id="download" class="section alt">
+            <section id="download" class="section">
                 <div class="container">
                     <h2>Téléchargement <span class="version" data-release-version hidden></span></h2>
                     <div class="grid two">
@@ -441,7 +532,7 @@ makepkg -si</code></pre>
             </section>
 
             <!-- FAQ -->
-            <section id="faq" class="section">
+            <section id="faq" class="section alt">
                 <div class="container narrow">
                     <h2>Questions fréquentes</h2>
                     <details>
@@ -488,7 +579,7 @@ makepkg -si</code></pre>
             </section>
 
             <!-- Contribuer -->
-            <section id="contribute" class="section alt">
+            <section id="contribute" class="section">
                 <div class="container">
                     <h2>Contribuer</h2>
                     <p class="section-lead">HodeIA est un logiciel libre et les contributions sont les bienvenues.</p>

@@ -12,7 +12,7 @@
 #include <optional>
 
 /// The "Agent" backend: questions answered by a coding agent (Claude Code,
-/// Qwen Code, Pi...) through the agent connectors (src/agents), with the
+/// Codex, Qwen Code...) through the agent connectors (src/agents), with the
 /// user's own login to that agent.  Backend config: {"api": "agent",
 /// "agent": <profile id>, "url": <optional command that replaces the
 /// profile's>}; the model is one of the agent's.

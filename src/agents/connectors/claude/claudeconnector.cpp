@@ -48,18 +48,22 @@ QStringList ClaudeConnection::arguments(const SessionOptions &options) {
     args << "--model" << options.model;
   if (!options.systemPrompt.isEmpty())
     args << "--system-prompt" << options.systemPrompt;
+  // Classic mode: no built-in tool, or only the web ones; none of the
+  // user's settings (their permission rules could allow anything).
+  const QString webTools = QStringLiteral("WebSearch,WebFetch");
   if (!options.tools)
-    args << "--tools" << "" << "--setting-sources" << "";
+    args << "--tools" << (options.web ? webTools : QString()) << "--setting-sources" << "";
   if (!options.resumeSessionId.isEmpty())
     args << "--resume" << options.resumeSessionId;
   if (options.stream)
     args << "--include-partial-messages";
-  if (!options.allowedTools.isEmpty()) {
-    QStringList tools; // "server/tool" -> "mcp__server__tool"
-    for (const QString &t : options.allowedTools)
-      tools.append("mcp__" + t.section('/', 0, 0) + "__" + t.section('/', 1));
-    args << "--allowedTools" << tools.join(',');
-  }
+  QStringList allowed; // "server/tool" -> "mcp__server__tool"
+  for (const QString &t : options.allowedTools)
+    allowed.append("mcp__" + t.section('/', 0, 0) + "__" + t.section('/', 1));
+  if (options.web)
+    allowed << webTools.split(',');
+  if (!allowed.isEmpty())
+    args << "--allowedTools" << allowed.join(',');
   // Only the MCP servers given here, never the user's.  --mcp-config takes
   // several values: it comes last.
   args << "--strict-mcp-config";

@@ -1,0 +1,9 @@
+{
+  "id": "codex",
+  "name": "Codex",
+  "connector": "codex",
+  "command": "codex",
+  "verified": true,
+  "install": "https://developers.openai.com/codex/cli (npm install -g @openai/codex, or the standalone binary)",
+  "login": "codex login"
+}

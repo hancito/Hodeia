@@ -90,7 +90,7 @@ public:
   /// The agent profiles for the Backends window (see AgentBackend::profiles):
   /// the ones that can start on this computer first.
   Q_INVOKABLE QVariantList agentProfiles() const;
-  /// Check an agent backend (Claude Code, Qwen Code, Pi...) by listing its
+  /// Check an agent backend (Claude Code, Codex, Qwen Code...) by listing its
   /// models; on success it is saved as @p name and made active.  @p command
   /// replaces the profile's when not empty.  Emits modelsChecked().
   Q_INVOKABLE void checkAgentModels(const QString &name, const QString &agentId,

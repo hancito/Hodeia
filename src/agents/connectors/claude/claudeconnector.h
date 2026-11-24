@@ -15,7 +15,8 @@ namespace Agents {
 ///
 /// Classic mode: `--tools "" --setting-sources ""` (no tool, none of the
 /// user's settings) and HodeIA's `--system-prompt`: about 650 tokens of
-/// overhead.  Cancel: an "interrupt" control request, then the process is
+/// overhead.  With SessionOptions::web, `--tools "WebSearch,WebFetch"`,
+/// both allowed without asking.  Cancel: an "interrupt" control request, then the process is
 /// killed if the turn does not end within a few seconds.
 class ClaudeConnection : public Connection {
   Q_OBJECT
