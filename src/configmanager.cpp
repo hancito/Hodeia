@@ -260,32 +260,16 @@ void ConfigManager::setOpenAlexApiKey(const QString &key) {
   }
 }
 
-QString ConfigManager::visualMode() const {
-  switch (m_visualModeIndex) {
-  case 0:
-    return tr("Text only");
-  case 2:
-    return tr("Full (all pages)");
-  default:
-    return tr("Reduced (figures/tables)");
-  }
-}
-
 QStringList ConfigManager::visualModeList() const {
   return {tr("Text only"), tr("Reduced (figures/tables)"),
           tr("Full (all pages)")};
 }
 
-void ConfigManager::setVisualMode(const QString &mode) {
-  int idx;
-  if (mode == tr("Text only"))
-    idx = 0;
-  else if (mode == tr("Full (all pages)"))
-    idx = 2;
-  else
-    idx = 1;
-  if (m_visualModeIndex != idx) {
-    m_visualModeIndex = idx;
+void ConfigManager::setVisualMode(int mode) {
+  if (mode < 0 || mode > 2)
+    return;
+  if (m_visualModeIndex != mode) {
+    m_visualModeIndex = mode;
     emit visualModeChanged();
     saveConfig();
   }

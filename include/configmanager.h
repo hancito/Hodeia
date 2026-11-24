@@ -29,7 +29,8 @@ class ConfigManager : public QObject {
   Q_PROPERTY(QString openAlexApiKey READ openAlexApiKey WRITE setOpenAlexApiKey
                  NOTIFY openAlexApiKeyChanged)
   Q_PROPERTY(QStringList projectList READ projectList NOTIFY projectListChanged)
-  Q_PROPERTY(QString visualMode READ visualMode WRITE setVisualMode NOTIFY
+  /// VisualMode as an int: index in visualModeList().
+  Q_PROPERTY(int visualMode READ visualMode WRITE setVisualMode NOTIFY
                  visualModeChanged)
   Q_PROPERTY(
       QString language READ language WRITE setLanguage NOTIFY languageChanged)
@@ -65,7 +66,7 @@ public:
   QString activeModel() const { return m_activeModel; }
   QString openAlexApiKey() const { return m_openAlexApiKey; }
   QStringList projectList() const { return m_projectList; }
-  QString visualMode() const;
+  int visualMode() const { return m_visualModeIndex; }
   QString language() const;
   QString outputLanguage() const { return m_outputLanguage; }
   QVariantList outputLanguages() const;
@@ -86,13 +87,14 @@ public:
   Q_INVOKABLE void setActiveBackend(const QString &backend);
   Q_INVOKABLE void setActiveModel(const QString &model);
   void setOpenAlexApiKey(const QString &key);
-  void setVisualMode(const QString &mode);
+  void setVisualMode(int mode);
   void setLanguage(const QString &lang);
   void setOutputLanguage(const QString &language);
   void setQueryContextTokens(int tokens);
   void setZoteroDataDir(const QString &dir);
   void setZoteroPriority(bool priority);
   void setAgentMode(bool agentMode);
+  /// The visual modes' names, in the current language, by VisualMode.
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
   bool useVisualContext() const;

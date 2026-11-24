@@ -168,17 +168,14 @@ ToolBar {
         StyledComboBox {
             id: visualModeCombo
             Layout.preferredWidth: 220
-            Component.onCompleted: {
-                var saved = configManager.visualMode;
-                model = configManager.visualModeList();
-                currentIndex = model.indexOf(saved);
-                configManager.visualMode = saved;
+            // Rebuilt when the language changes: the names come from C++ tr(),
+            // so it follows Qt.uiLanguage, set once the catalog is loaded.
+            model: {
+                Qt.uiLanguage;
+                return configManager.visualModeList();
             }
-            onCurrentTextChanged: {
-                if (currentText !== "") {
-                    configManager.visualMode = currentText;
-                }
-            }
+            currentIndex: configManager.visualMode
+            onActivated: index => configManager.visualMode = index
         }
 
         ToolSeparator {}

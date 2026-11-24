@@ -470,6 +470,7 @@ int main(int argc, char *argv[]) {
                    &databaseManager, &DatabaseManager::reloadModels);
 
   QQmlApplicationEngine engine;
+  engine.setUiLanguage(configManager.language());
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
   engine.rootContext()->setContextProperty("configManager", &configManager);
   engine.rootContext()->setContextProperty("databaseManager", &databaseManager);
@@ -494,6 +495,9 @@ int main(int argc, char *argv[]) {
   QObject::connect(&configManager, &ConfigManager::languageChanged,
                    [&engine, &app, &configManager]() {
                      loadTranslator(app, configManager.language());
+                     // After the catalog: QML bindings see languageChanged
+                     // before this slot, so C++ tr() lists follow uiLanguage.
+                     engine.setUiLanguage(configManager.language());
                      engine.retranslate();
                    });
 
