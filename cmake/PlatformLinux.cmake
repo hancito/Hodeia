@@ -156,6 +156,16 @@ set(TESS_LEPTO_TARGETS hodeia_tesseract)
 # src/CMakeLists.txt so the target definitions stay in one place.
 set(HODEIA_SYSTEM_LIBS pthread dl m z png jpeg tiff)
 
+# MuPDF bundles its own libjpeg (IJG 10, JPEG_LIB_VERSION 100) in
+# libmupdf-third.a.  Exported from the executable, its jpeg_* symbols would
+# take the place of the system libjpeg (80) for every shared library loaded
+# later — Qt's JPEG plugin, libtiff — which then fail with "Wrong JPEG library
+# version: library is 100, caller expects 80" (JPEG encoding of page images
+# for the Anthropic API and the agents gave nothing).  Keep them local, with
+# MuPDF's own libjpeg memory hooks (jmemcust.o in libmupdf.a): the exe needs
+# to export nothing of MuPDF.
+set(HODEIA_LINK_OPTIONS "LINKER:--exclude-libs,libmupdf-third.a:libmupdf.a")
+
 # OpenMP (ggml-cpu)
 find_package(OpenMP QUIET)
 if(OpenMP_CXX_FOUND)

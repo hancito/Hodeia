@@ -101,6 +101,7 @@ private slots:
 
   // ACP
   void acpSessionParams();
+  void acpPromptImageLimit();
   void acpAnswer();
   void acpModelByConfigOption();
   void acpModelsStyle();
@@ -269,6 +270,26 @@ void TestAgents::acpSessionParams() {
   p = AcpConnection::sessionParams(o, meta, false);
   QVERIFY(!p.contains("_meta"));
   QVERIFY(!p.contains("systemPrompt"));
+}
+
+void TestAgents::acpPromptImageLimit() {
+  Prompt prompt{PromptPart::textPart("intro")};
+  for (int i = 0; i < 3; ++i) {
+    prompt.append(PromptPart::image("image/jpeg", "AAAA"));
+    prompt.append(PromptPart::textPart(QString("page %1").arg(i + 1)));
+  }
+  const auto count = [](const QJsonArray &blocks, const QString &type) {
+    return std::count_if(blocks.begin(), blocks.end(), [&](const QJsonValue &b) {
+      return b.toObject().value("type").toString() == type;
+    });
+  };
+  const QJsonArray all = AcpConnection::promptBlocks(prompt);
+  QCOMPARE(count(all, "image"), 3);
+  const QJsonArray capped = AcpConnection::promptBlocks(prompt, 2);
+  QCOMPARE(count(capped, "image"), 2);
+  QCOMPARE(count(capped, "text"), 4); // every page's text still goes
+  QCOMPARE(capped.last().toObject().value("text").toString(), QString("page 3"));
+  QCOMPARE(count(AcpConnection::promptBlocks(prompt, 0), "image"), 0);
 }
 
 void TestAgents::acpAnswer() {

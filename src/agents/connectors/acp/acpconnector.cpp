@@ -83,14 +83,21 @@ QJsonObject AcpConnection::sessionParams(const SessionOptions &options,
   return params;
 }
 
-QJsonArray AcpConnection::promptBlocks(const Prompt &prompt) {
+QJsonArray AcpConnection::promptBlocks(const Prompt &prompt, int maxImages) {
   QJsonArray blocks;
-  for (const PromptPart &part : prompt)
-    blocks.append(part.isImage()
-                      ? QJsonObject{{"type", "image"},
-                                    {"mimeType", part.mimeType},
-                                    {"data", QString::fromLatin1(part.base64)}}
-                      : QJsonObject{{"type", "text"}, {"text", part.text}});
+  int images = 0;
+  for (const PromptPart &part : prompt) {
+    if (!part.isImage()) {
+      blocks.append(QJsonObject{{"type", "text"}, {"text", part.text}});
+      continue;
+    }
+    if (maxImages >= 0 && images >= maxImages)
+      continue; // over the agent's limit: the page's text still goes
+    ++images;
+    blocks.append(QJsonObject{{"type", "image"},
+                              {"mimeType", part.mimeType},
+                              {"data", QString::fromLatin1(part.base64)}});
+  }
   return blocks;
 }
 
@@ -108,9 +115,18 @@ void AcpConnection::notify(const QString &method, const QJsonObject &params) {
 QString AcpConnection::describe(const QJsonObject &error) const {
   const QString base = error.value("message").toString();
   // The cause often hides in "data" behind a generic message ("Internal
-  // error"): {"message": "..."}, possibly the provider's own JSON error.
+  // error"): {"message": "..."} or, from the Python ACP SDK, {"details":
+  // "..."}, possibly the provider's own JSON error.
   const QJsonValue data = error.value("data");
-  QString detail = data.isString() ? data.toString() : data.toObject().value("message").toString();
+  QString detail;
+  if (data.isString()) {
+    detail = data.toString();
+  } else {
+    const QJsonObject d = data.toObject();
+    detail = d.value("message").toString();
+    if (detail.isEmpty())
+      detail = d.value("details").toString();
+  }
   if (const QJsonDocument inner = QJsonDocument::fromJson(detail.toUtf8()); inner.isObject()) {
     const QJsonObject o = inner.object();
     const QJsonValue e = o.value("error");
@@ -384,7 +400,7 @@ void AcpConnection::prompt(const Prompt &prompt) {
   }
   m_answer.clear();
   m_inTurn = true;
-  call("session/prompt", {{"sessionId", m_sessionId}, {"prompt", promptBlocks(full)}},
+  call("session/prompt", {{"sessionId", m_sessionId}, {"prompt", promptBlocks(full, m_profile.options.value("maxImages").toInt(-1))}},
        [this](const QJsonValue &result, const QJsonObject *e) {
          if (!m_inTurn)
            return;

@@ -223,6 +223,13 @@ target_link_libraries(HodeiaEngine
         ${LLAMA_LINK_LIBS}
 )
 
+# Platform link options for whatever links the engine (the app, the tests):
+# on Linux, MuPDF (and its bundled libjpeg) kept out of the dynamic symbol
+# table.
+if(HODEIA_LINK_OPTIONS)
+  target_link_options(HodeiaEngine INTERFACE ${HODEIA_LINK_OPTIONS})
+endif()
+
 # OCR (Tesseract/Leptonica): Linux/macOS link the in-tree static libs (set by
 # the platform cmake); Windows links the vcpkg targets.  pdfextractor.cpp
 # uses the OCR path on all platforms, so this must not be Windows-only.

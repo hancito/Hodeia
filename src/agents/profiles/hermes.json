@@ -7,6 +7,7 @@
   "install": "https://github.com/NousResearch/hermes-agent",
   "login": "hermes setup",
   "options": {
+    "maxImages": 10,
     "setup": [
       {
         "unless": ["${program}", "profile", "show", "hodeia"],

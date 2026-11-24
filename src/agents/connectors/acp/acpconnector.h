@@ -22,7 +22,10 @@ namespace Agents {
 ///                  settings, hooks...);
 ///   "setup":       [{"run": [program, args...], "unless": [...]}] commands
 ///                  run once per HodeIA session before the first start (not
-///                  when "unless" succeeds); a failure stops the opening.
+///                  when "unless" succeeds); a failure stops the opening;
+///   "maxImages":   the most images the agent takes in one prompt (Hermes
+///                  rejects more than 10); the first ones are kept, the
+///                  text of every page still goes.
 /// These locks keep an agent to the web and HodeIA's tools whatever its
 /// user's settings allow.  In "files", "setup" and the profile's "env",
 /// ${stateDir} (Profile::stateDir), ${workDir}, ${program} (the agent's
@@ -55,8 +58,9 @@ public:
   static QJsonObject sessionParams(const SessionOptions &options,
                                    const QJsonObject &sessionMeta,
                                    bool systemPromptSupported);
-  /// The ACP content blocks of a prompt.
-  static QJsonArray promptBlocks(const Prompt &prompt);
+  /// The ACP content blocks of a prompt, with at most `maxImages` images
+  /// (negative: no limit).
+  static QJsonArray promptBlocks(const Prompt &prompt, int maxImages = -1);
   /// The option to answer a permission request with: "allow_once" when the
   /// tool is one of `allowedTools` ("server/tool") or, with `web`, reads the
   /// web (kind "fetch"), else "reject_once"; empty for "cancelled" (tests).
