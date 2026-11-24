@@ -19,6 +19,7 @@ HodeIA helps you manage, summarize, and search through your collection of academ
 - **Summarize your papers**: Get a structured summary per paper — title, authors, journal, year, topics, research objective, methodology, key findings, limitations, and a citable abstract.
 - **References & citations**: After a paper is summarized, HodeIA pulls the works it cites and the works that cite it from [OpenAlex](https://openalex.org), formatted as APA-style bibliographies.
 - **Ask questions across your library**: Query all your papers in plain language and get a synthesized, academic-style answer with inline citations. The more papers you add, the better the answers.
+- **Agent mode**: Converse with a coding agent you installed yourself (Claude Code, Codex, Antigravity, Qwen Code or Hermes Agent). It searches your library through HodeIA's tools, answers with citations, can search the web for papers you do not have yet, and is kept away from everything else (no commands, no file changes).
 - **View papers visually**: Browse page-by-page thumbnails alongside the extracted text, the generated summary, and the references.
 - **Export summaries**: Export any summary — or a whole batch of them — to PDF.
 - **20+ themes**: Catppuccin, Dracula, Gruvbox, Nord, Monokai, GitHub, and more.
@@ -46,8 +47,10 @@ HodeIA can run models **locally** or against a **remote** endpoint — and you c
 | --------------------- | --------------------------------------------------------------- |
 | **Local (llama.cpp)** | Run GGUF models directly on your GPU (CUDA / Vulkan) or CPU     |
 | **Remote API**        | Connect to Ollama, LM Studio, or any OpenAI-compatible endpoint |
+| **Anthropic API**     | Claude models with your Anthropic API key                       |
+| **Agent**             | A coding agent installed on your computer, with your own login (see [Agent mode](#agent-mode)) |
 
-Everything is managed in the **Models** menu: add a GGUF model you downloaded with **Models → Add Local Model...**, or add a remote endpoint in **Models → Manage Backends...** by entering a name, URL, and (optionally) an API key, then select it in **Models → Backend**. The model in use is picked in the **Active Model** list of the toolbar.
+Everything is managed in the **Models** menu: add a GGUF model you downloaded with **Models → Add Local Model...**, or add a remote endpoint or an agent in **Models → Manage Backends...** (name, API, URL or agent, optional API key, then **Check Connection**), then select it in **Models → Backend**. The model in use is picked in the **Active Model** list of the toolbar.
 
 ### Getting models
 
@@ -65,6 +68,27 @@ HodeIA ships with a small **Qwen3.5-0.8B** model at _Q4_ so it works out of the 
 | [Gemma4-12B](https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/tree/main) | ~7 GB     | ~12 GB         | Best quality, 12 GB+ VRAM                              |
 
 > **Higher quantization = better quality, more memory.** Q4 is the sweet spot; if you have extra VRAM, Q5/Q6/Q8 of the same model will be more accurate. A CPU-only machine can run the 2B/4B models (slower). When in doubt, start with the bundled 0.8B model and step up as your hardware allows.
+
+### Agent mode
+
+In agent mode, a coding agent installed on your computer converses with you: it searches your library itself, reads the summaries and pages it needs, answers with citations and suggests ways to take the research further. HodeIA does not ship the agent: you install it and log in with your own account, then HodeIA connects to it directly (no adapter, no API key in HodeIA).
+
+| Agent        | Install                                                                 | Log in                     |
+| ------------ | ----------------------------------------------------------------------- | -------------------------- |
+| Claude Code  | [Native installer](https://code.claude.com/docs/en/setup)               | `claude`, then `/login`    |
+| Codex        | `npm install -g @openai/codex`                                          | `codex login`              |
+| Antigravity  | [antigravity.google](https://antigravity.google)                        | `agy`, then sign in        |
+| Qwen Code    | `npm install -g @qwen-code/qwen-code`                                   | `qwen`, then `/auth`       |
+| Hermes Agent | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | `hermes setup`           |
+
+1. Install the **command-line version** of the agent, even if you already use its app (Claude Desktop, the Codex app, the Antigravity IDE...): HodeIA starts the agent's command (`claude`, `codex`, `agy`, `qwen`, `hermes`), which the apps usually do not install. Log in and check that it answers in a terminal.
+2. **Models → Manage Backends...**: choose the *Agent* API and your agent, leave the command empty (unless the agent is outside the PATH), **Check Connection**, **Add Backend**.
+3. Select the backend in **Models → Backend** and a model in **Active Model** (*default* lets the agent choose).
+4. Open **Query your library**, turn on **Agent mode**, click **New Conversation**. Conversations are kept in the project and resume where you left them.
+
+**What the agent can do.** It uses HodeIA's library tools (search, list of papers, summaries, pages, citations, saving a summary) and can search the web, for instance to find papers that are not in your library. HodeIA forbids everything else (shell commands, changing or deleting files), even when the agent's own settings allow it elsewhere. For Hermes Agent, HodeIA creates a `hodeia` Hermes profile limited to the web for this. Your questions, the agent's web searches and the passages it reads go to the agent's provider, under the terms of your account; an agent such as Qwen Code or Hermes Agent set up with a local model keeps everything on your machine.
+
+**HodeIA as an MCP server.** The same library tools are available to any MCP client (Claude Desktop, an editor...): register the command `Hodeia --mcp` (stdio). It serves the project open in HodeIA.
 
 ### Optional: OpenAlex API key
 
@@ -146,9 +170,13 @@ HodeIA keeps everything in one data folder, organized by **project**. Each proje
 │   └── <project_name>/
 │       ├── <project_name>.db   # the project's data (summaries, etc.)
 │       └── IMG/                # page images (PNG)
-└── Models/
-    ├── Summarizers/           # chat models you use (GGUF files)
-    └── Embedders/             # the embedding model (bundled)
+├── Models/
+│   ├── Summarizers/           # chat models you use (GGUF files)
+│   └── Embedders/             # the embedding model (bundled)
+├── Agent/                     # the agents' working folder (agent mode)
+└── Agents/
+    ├── profiles/              # optional: your own agent profiles (JSON)
+    └── state/                 # files HodeIA writes for the agents (settings, hooks)
 ```
 
 > On Windows the data folder is `%APPDATA%\Hodeia` instead. Uninstalling HodeIA never touches it.

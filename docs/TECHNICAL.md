@@ -17,7 +17,8 @@ Hodeia is a C++/Qt 6 Quick application. The layers, top to bottom:
 ├─────────────────────────────────────────────────────────┤
 │              C++ Controllers (QQML-invokeable)          │
 │  EngineController │ SummaryController │ QueryController  │
-│  ConfigManager │ ThemeManager │ Helpers                 │
+│  AgentChatController │ ConfigManager │ ThemeManager     │
+│  Helpers                                                │
 │  OpenAlexClient │ CitationsModel                          │
 ├─────────────────────────────────────────────────────────┤
 │                  Worker Threads                         │
@@ -27,6 +28,8 @@ Hodeia is a C++/Qt 6 Quick application. The layers, top to bottom:
 │                 Backend Layer                           │
 │  LocalBackend (llama.cpp libcommon, llama.h)            │
 │  RemoteBackend (QNetworkAccessManager / OpenAI HTTP)    │
+│  AnthropicApi │ AgentBackend (agent connectors,         │
+│  src/agents: Claude │ Codex │ ACP, one process each)    │
 ├─────────────────────────────────────────────────────────┤
 │                 Extraction Layer                        │
 │  MuPDF (structured text + page rendering)               │
@@ -43,6 +46,8 @@ The three worker pipelines run off the GUI thread:
 - **Ingestion** — `EngineController` owns an `IngestionEngine` worker on a `QThread`; `QtConcurrent` parallelizes per-file hashing/extraction.
 - **Summarization** — `SummaryController` owns a `Summarizer` worker; it loads/unloads models around the LLM call.
 - **RAG query** — `QueryController` owns a `QueryWorker`; each query runs on its own thread.
+
+The agent mode (see [Agents & MCP](#agents--mcp)) runs no worker thread: `AgentChatController` drives an agent process asynchronously from the GUI thread, and the agent reaches the library through a second HodeIA process, `Hodeia --mcp`.
 
 `main.cpp` constructs the singletons, registers them on the QML context, and loads the `Hodeia` QML module. It also sets up crash/diagnostic logging, console mirroring, llama.cpp log capture, font registration, and translation loading (see [Logging & Diagnostics](#logging--diagnostics)).
 
@@ -148,6 +153,23 @@ Hodeia/
 │   ├── summaryformat.cpp           # PaperSummary: LLM JSON parsing (with repairs) and HTML rendering
 │   ├── pdfexport.cpp               # HTML → PDF rendering with MuPDF (fz_story, footer, ToUnicode fix)
 │   ├── textformat.cpp              # LLM output cleanup: LaTeX → Unicode, Markdown escaping
+│   ├── mcpserver.cpp  mcpstdio.cpp # MCP server (JSON-RPC over stdio) for `Hodeia --mcp`
+│   ├── mcplibrary.cpp              # The MCP library tools (search, list, summary, page, citations, save)
+│   ├── agentchatcontroller.cpp     # Agent mode: conversations with an agent (QML `agentChat`)
+│   ├── agentbackend.cpp            # "Agent" chat backend, agent profiles for QML, work folder
+│   ├── conversationrepository.cpp  # SQL of the Conversations tables
+│   ├── agents/                     # Agent connectors (no dependency on the rest of HodeIA)
+│   │   ├── agentconnection.h       #   Connection / Connector interfaces, SessionOptions, Profile
+│   │   ├── agentprocess.cpp        #   JSON-lines agent process, availability checks
+│   │   ├── agentregistry.cpp       #   connectors + profiles (built-in and user)
+│   │   ├── agentsync.cpp           #   openSync / promptSync for worker threads
+│   │   ├── agentguard.cpp          #   tool guard for agent hooks (`Hodeia --agent-guard`)
+│   │   ├── builtinconnectors.cpp.in#   generated list of the connector folders
+│   │   ├── connectors/
+│   │   │   ├── acp/                #   Agent Client Protocol (Qwen Code, Antigravity, Hermes)
+│   │   │   ├── claude/             #   Claude Code stream-json CLI
+│   │   │   └── codex/              #   `codex app-server` JSON-RPC
+│   │   └── profiles/*.json         #   built-in agent profiles (resources :/agents/profiles)
 │   └── hodeia.rc                   # Windows only: embeds the app icon in Hodeia.exe
 │
 ├── ui/                             # QML files
@@ -159,7 +181,9 @@ Hodeia/
 │   ├── QueryPane.qml               # Query input + response display
 │   ├── MyMenuBar.qml               # File menu (projects), Settings (themes, backends, models)
 │   ├── MyToolBar.qml               # Toolbar: import, model selector, query button
-│   ├── BackendWindow.qml           # Dialog: add / edit / remove remote backends
+│   ├── BackendWindow.qml           # Dialog: add / edit / remove backends (OpenAI, Anthropic, Agent)
+│   ├── ConversationListPane.qml    # Agent mode: list of conversations
+│   ├── ConversationPane.qml        # Agent mode: messages, tool steps, input
 │   ├── Colors.qml                  # Singleton: theme color properties
 │   ├── Fonts.qml                   # Singleton: font family names
 │   └── themes/                     # 19 JSON theme files
@@ -602,6 +626,56 @@ external/lib/
 
 ---
 
+## Agents & MCP
+
+### HodeIA as an MCP server
+
+`Hodeia --mcp` starts a headless `QCoreApplication` that speaks MCP over stdin/stdout (`McpServer` + `McpStdioTransport`); logs go to stderr and `Hodeia-mcp.log`, never to stdout. `McpLibrary` registers the tools: `search_library`, `list_papers`, `get_summary`, `get_page`, `get_citations` (read-only) and `save_summary` (the only write; it never replaces a summary unless asked). It follows the project open in HodeIA by reading `config.json` at every call, opens the project database as is (never created nor migrated) and loads the E5 embedder on the first search only. All SQL goes through the repositories, as in the app.
+
+### Agent mode
+
+`AgentChatController` (QML `agentChat`) holds one live `Agents::Connection` for the open conversation. Each session gets `SessionOptions` with HodeIA's system prompt, the `hodeia` MCP server (`Hodeia --mcp`), its tools pre-approved (`allowedTools`), `tools = false`, `web = true` and streaming. The agent's session id is stored with the conversation (`Conversations` table) and resumed when the conversation is reopened; when the agent cannot resume it, it gets the conversation so far as a transcript. The "Agent" chat backend (`AgentBackend`, used for summaries and classic queries) opens one session per request with `tools = false` and no web.
+
+### Connectors and profiles
+
+`src/agents` has no dependency on the rest of HodeIA (it could become a Qt plugin). A **connector** is one way of talking to agents; each folder of `src/agents/connectors/` defines `hodeia_connector_<folder>()`, and CMake generates the list (`builtinconnectors.cpp`):
+
+| Connector | Protocol | Agents |
+| --- | --- | --- |
+| `claude` | `claude -p --input-format stream-json --output-format stream-json` | Claude Code |
+| `codex`  | `codex app-server` (JSON-RPC: `initialize`, `thread/start`/`thread/resume`, `turn/start`, `turn/interrupt`, `model/list`) | Codex |
+| `acp`    | [Agent Client Protocol](https://agentclientprotocol.com) v1 over stdio | Qwen Code (`qwen --acp`), Antigravity (`agy acp`), Hermes Agent (`hermes -p hodeia acp`) |
+
+Every connector drives the agent the user installed, with the user's own login: no adapter, no npm package of ours. A **profile** (`src/agents/profiles/*.json`, or the user's `<data>/Agents/profiles/*.json`, which may add agents or override a built-in one) says how to start an agent: `id`, `name`, `connector`, `command`, `verified`, `install` and `login` hints, `requires` (runtimes such as `node`), `env`, `models` (a fixed list) and connector `options`. The registry also gives each profile a `stateDir` (`<data>/Agents/state/<id>`) and the guard command (`Hodeia --agent-guard`). A backend may override the command (the backend's "url" field).
+
+ACP profile options: `sessionMeta` (`_meta` of `session/new` in classic mode), `files` (`{path: JSON}` written before the agent starts) and `setup` (`[{"run": [...], "unless": [...]}]`, commands run once per HodeIA session, a failure stops the opening). In `files`, `setup` and `env`, `${stateDir}`, `${workDir}`, `${program}` and `${guard}` are replaced.
+
+### Locking the agents down
+
+In HodeIA an agent may only use HodeIA's MCP tools and, with `SessionOptions::web`, search the web and read web pages. Shell commands and file changes must be impossible **even when the user's own agent settings allow them** (a Qwen allow-list with `Bash(rm *)` is applied by Qwen without asking the client). Each agent is locked with its own mechanism:
+
+| Agent | Web | Everything else |
+| --- | --- | --- |
+| Claude Code | `--tools "WebSearch,WebFetch"`, both in `--allowedTools` | `--setting-sources ""` (the user's permission rules are not read), `--strict-mcp-config` |
+| Codex | `web_search = "live"` in the thread config | `sandbox: read-only`, `approvalPolicy: never`, shell/apps/plugins/skills features off, user MCP servers disabled, HodeIA's tools approved one by one (`approval_mode = "approve"`) |
+| Qwen Code | `tools.core = [web_fetch, web_search, tool_search]` | system settings written to `${stateDir}/settings.json` and passed with `QWEN_CODE_SYSTEM_SETTINGS_PATH` (highest precedence): `tools.core` allow-list, `permissions.deny` for shell, write, edit and sub-agents |
+| Antigravity | `search_web`, `read_url_content` | `${workDir}/.agents/hooks.json`: a `PreToolUse` hook on every tool runs `Hodeia --agent-guard "search_web,read_url_content,mcp_hodeia_*"`, which answers allow or deny (`Agents::guardDecision`) |
+| Hermes Agent | toolset `web` | setup creates a Hermes profile `hodeia` (`hermes profile create hodeia --clone`) with `platform_toolsets.acp = ["web"]`; the agent runs as `hermes -p hodeia acp` |
+
+On top of that, every connector refuses the permission requests it receives, except HodeIA's tools and (ACP, with `web`) tool calls of kind `fetch`.
+
+Known limits: the Hermes profile is cloned once (later changes to the user's main Hermes config do not follow it; `hermes profile delete hodeia -y` and HodeIA recreates it); a command overridden in the Backends window bypasses the Hermes profile; Codex can read local files (read-only sandbox); and the locks rely on each agent's own mechanisms, which a new agent version may change.
+
+### Adding an agent
+
+An agent that speaks ACP needs only a profile: a JSON file in `src/agents/profiles/` (built in) or `<data>/Agents/profiles/` (no rebuild), plus the options that lock it down. An agent with its own protocol needs a connector folder under `src/agents/connectors/<name>/` that implements `Connection` and `Connector` and defines `hodeia_connector_<name>()`.
+
+### Testing
+
+`tests/tst_agents` and `tests/tst_agentchat` run the connectors against fake agents, one per protocol (`fake_acp_agent`, `fake_claude`, `fake_codex`): arguments and session parameters, streaming, tool steps, errors, cancel (and kill when the agent ignores it), resume, model lists, profile files and setup, the tool guard. They cannot tell whether a new agent version still honours a lock: after a major agent update, or a change to the connectors or profiles, run each real agent in agent mode with (1) a web question and (2) an explicit request to delete a temporary file with any tool; the web must work and the file must survive.
+
+---
+
 ## Database Schema
 
 Each project is one SQLite file (`<project_name>.db`, WAL mode). Three tables plus the vector virtual table:
@@ -689,7 +763,8 @@ Located at the Qt `AppDataLocation` (Linux/macOS: `~/.local/share/Hodeia/config.
 
 - **`visualMode`** — `0` = Text only (default), `1` = Reduced (only pages with figures, vector graphics or tables), `2` = Full (all pages). (Legacy: an old `useVisualContext` boolean is still read and mapped to `0`/`1`.)
 - **`language`** — `"en"` (default) or `"fr"`. Changing it reloads the translator and re-loads the QML engine.
-- **`backendList`** — one object per backend; `Llama.cpp` is the local backend (empty `url`), the rest are remote (OpenAI-compatible) endpoints.
+- **`backendList`** — one object per backend; `Llama.cpp` is the local backend (empty `url`). The others have an `api`: `"openai"` (OpenAI-compatible endpoint), `"anthropic"`, or `"agent"` with `agent` (the profile id: `claude`, `codex`, `qwen`, `antigravity`, `hermes`) and an optional command in `url`.
+- **`agentMode`** — the last state of the **Agent mode** switch of the Query window.
 - RAG tuning (`topK`, `maxPages`) and the model temperature are also persisted by the config manager.
 
 Setters save to disk automatically on every change.
@@ -705,14 +780,18 @@ PDFs are only read at import, from their original location: they are neither cop
 │   └── <project_name>/
 │       ├── <project_name>.db        # SQLite database (WAL mode)
 │       └── IMG/                     # page images (<hash>_page_NNN.png)
-└── Models/
-    ├── Summarizers/
-    │   └── <model_name>/
-    │       ├── model.gguf
-    │       └── mmproj.gguf          # optional: vision projector
-    └── Embedders/
-        └── <model_name>/
-            └── model.gguf
+├── Models/
+│   ├── Summarizers/
+│   │   └── <model_name>/
+│   │       ├── model.gguf
+│   │       └── mmproj.gguf          # optional: vision projector
+│   └── Embedders/
+│       └── <model_name>/
+│           └── model.gguf
+├── Agent/                           # the agents' working directory (+ .agents/hooks.json for Antigravity)
+└── Agents/
+    ├── profiles/                    # user agent profiles (JSON), override the built-in ones
+    └── state/<agent id>/            # files written for an agent (Qwen system settings...)
 ```
 
 **Deleting projects** goes through `DatabaseManager::deleteProjects`. If the active project is among those deleted, it first closes the SQLite connection (an open `.db` and its `-wal`/`-shm` files cannot be deleted on Windows), refusing if a worker operation is in flight. It then removes the folders and reopens the new active project. A folder that cannot be fully removed is reported to the user and stays in the project list.
