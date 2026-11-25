@@ -11,14 +11,6 @@
 
 namespace Agents {
 
-QString promptText(const Prompt &prompt) {
-  QString text;
-  for (const PromptPart &part : prompt)
-    if (!part.isImage())
-      text += part.text;
-  return text;
-}
-
 const Registry &Registry::instance() {
   static const Registry registry = []() {
     Registry r;

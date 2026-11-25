@@ -12,13 +12,9 @@ namespace LocalPrompt {
 /// Images a payload carries, in prompt order (one per marker).
 std::vector<PageImage> collectImages(const PromptPayload &payload) {
   std::vector<PageImage> images;
-  if (!payload.pageBlocks.empty()) {
-    for (const auto &pb : payload.pageBlocks)
-      if (!pb.visualContext.data.empty())
-        images.push_back(pb.visualContext);
-  } else {
-    images = payload.visualContext; // legacy fallback
-  }
+  for (const auto &pb : payload.pageBlocks)
+    if (!pb.visualContext.data.empty())
+      images.push_back(pb.visualContext);
   return images;
 }
 
@@ -39,8 +35,7 @@ const QString &systemPrompt(const PromptPayload &payload, bool withImages) {
 ///                  emitted, so the model never sees a literal placeholder.
 /// \param maxChars  hard cap on prompt characters.  0 means "no cap" (used
 ///                  for token counting).  When set, the document body is
-///                  truncated on BOTH the pageBlocks and legacy textContext
-///                  paths so the counted prompt matches what gets fed to
+///                  truncated so the counted prompt matches what gets fed to
 ///                  inference.
 QString buildUserPrompt(const PromptPayload &payload, const QString &marker,
                         int32_t maxChars) {
@@ -57,43 +52,25 @@ QString buildUserPrompt(const PromptPayload &payload, const QString &marker,
   QString userPrompt =
       payload.userMessage + "\n\n" + Prompts::documentHeading() + "\n\n";
 
-  // ── Interleaved path (pageBlocks non-empty) ──
-  if (!payload.pageBlocks.empty()) {
-    for (const auto &pb : payload.pageBlocks) {
-      userPrompt += Prompts::pageHeading(pb.pageNumber) + "\n";
-      if (!marker.isEmpty() && !pb.visualContext.data.empty())
-        userPrompt += marker + "\n";
-      userPrompt += pb.text + "\n\n";
-      if (budget > 0 && userPrompt.length() > budget) {
-        userPrompt.truncate(budget);
-        // Never leave a partial media marker ("<__me") at the cut: it would
-        // reach the model as literal text.
-        for (qsizetype k = marker.length() - 1; k > 0; --k) {
-          if (userPrompt.endsWith(QStringView(marker).left(k))) {
-            userPrompt.chop(k);
-            break;
-          }
+  // Page by page: its image (marker) before its text.
+  for (const auto &pb : payload.pageBlocks) {
+    userPrompt += Prompts::pageHeading(pb.pageNumber) + "\n";
+    if (!marker.isEmpty() && !pb.visualContext.data.empty())
+      userPrompt += marker + "\n";
+    userPrompt += pb.text + "\n\n";
+    if (budget > 0 && userPrompt.length() > budget) {
+      userPrompt.truncate(budget);
+      // Never leave a partial media marker ("<__me") at the cut: it would
+      // reach the model as literal text.
+      for (qsizetype k = marker.length() - 1; k > 0; --k) {
+        if (userPrompt.endsWith(QStringView(marker).left(k))) {
+          userPrompt.chop(k);
+          break;
         }
-        userPrompt += "\n\n" + Prompts::truncatedMark();
-        break;
       }
+      userPrompt += "\n\n" + Prompts::truncatedMark();
+      break;
     }
-  }
-  // ── Legacy path (textContext + visualContext) ──
-  else {
-    if (!marker.isEmpty() && !payload.visualContext.empty()) {
-      userPrompt += Prompts::visualContextHeading() + "\n";
-      for (size_t i = 0; i < payload.visualContext.size(); ++i)
-        userPrompt += QString("Page %1: %2\n").arg(i + 1).arg(marker);
-      userPrompt += "\n";
-    }
-    // userMessage is already at the top of the prompt — don't repeat it.
-    userPrompt += Prompts::textContextHeading() + "\n\n";
-    QString ctx = payload.textContext;
-    if (budget > 0 && ctx.length() > budget) {
-      ctx = ctx.left(budget) + "\n\n" + Prompts::truncatedMark();
-    }
-    userPrompt += ctx;
   }
   return userPrompt;
 }

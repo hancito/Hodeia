@@ -44,13 +44,7 @@ public:
   QString columnText(int index) const;
   QByteArray columnBlob(int index) const;
   QDateTime columnDateTime(int index) const;
-  int columnType(int index) const;
-  int columnCount() const;
   bool columnIsNull(int index) const;
-
-  const char *columnTextRaw(int index) const;
-  const unsigned char *columnBlobRaw(int index) const;
-  int columnBytes(int index) const;
 
   bool isValid() const { return m_stmt != nullptr; }
 

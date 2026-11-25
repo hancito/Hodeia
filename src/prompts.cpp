@@ -244,10 +244,6 @@ QString documentHeading() { return QStringLiteral("## DOCUMENT"); }
 
 QString pageHeading(int page) { return QString("## Page %1").arg(page); }
 
-QString visualContextHeading() { return QStringLiteral("## VISUAL CONTEXT"); }
-
-QString textContextHeading() { return QStringLiteral("## TEXT CONTEXT"); }
-
 QString truncatedMark() { return QStringLiteral("... [truncated]"); }
 
 } // namespace Prompts

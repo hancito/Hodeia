@@ -36,7 +36,7 @@ bool RemoteBackend::isOllamaLocal() const {
 QJsonObject RemoteBackend::ollamaOptions() const {
   QJsonObject options;
   options["num_ctx"] = 256000;
-  options["num_predict"] = m_maxTokens;
+  options["num_predict"] = kMaxTokens;
   QJsonObject thinking;
   thinking["enabled"] = false;
   options["thinking"] = thinking;
@@ -89,27 +89,12 @@ QJsonObject RemoteBackend::textUserMessage(const QString &prompt) const {
   return msg;
 }
 
-QJsonObject
-RemoteBackend::visionUserMessage(const QString &prompt,
-                                 const std::vector<PageImage> &images) const {
-  QJsonArray contentParts;
-
-  QJsonObject textPart;
-  textPart["type"] = "text";
-  textPart["text"] = prompt;
-  contentParts.append(textPart);
-
-  for (const auto &img : images)
-    contentParts.append(imageToPart(img));
-
-  QJsonObject msg;
-  msg["role"] = "user";
-  msg["content"] = contentParts;
-  return msg;
-}
-
-QJsonObject RemoteBackend::imageToPart(const PageImage &img) const {
-  QImage image(img.data.data(), img.width, img.height, QImage::Format_RGB888);
+QJsonObject RemoteBackend::imageToPart(const PageImage &img) {
+  // PageImage rows are packed (width * 3 bytes): without bytesPerLine QImage
+  // expects 32-bit aligned rows and reads past the buffer, shearing the
+  // image, whenever width * 3 is not a multiple of 4.
+  QImage image(img.data.data(), img.width, img.height, img.width * 3,
+               QImage::Format_RGB888);
   image = image.copy();
 
   QByteArray pngData;
@@ -134,8 +119,8 @@ QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
   QJsonObject body;
   body["model"] = m_modelName;
   body["messages"] = messages;
-  body["temperature"] = m_temperature;
-  body["max_tokens"] = m_maxTokens;
+  body["temperature"] = kTemperature;
+  body["max_tokens"] = kMaxTokens;
   body["stream"] = false;
 
   if (m_forceJson) {
@@ -151,49 +136,7 @@ QJsonObject RemoteBackend::buildBody(const QJsonArray &messages) const {
   return body;
 }
 
-/* ── Public generate overloads ──────────────────────────────────── */
-
-void RemoteBackend::generate(const QString &systemPrompt,
-                             const QString &userPrompt) {
-  if (!isReady()) {
-    emit finished(QString(),
-                  tr("Backend not configured (URL or model missing)"));
-    return;
-  }
-  cancel();
-
-  QJsonArray messages;
-  if (!systemPrompt.isEmpty())
-    messages.append(systemMessage(systemPrompt));
-  messages.append(textUserMessage(userPrompt));
-
-  sendRequest(
-      buildRequest(buildCompletionUrl()),
-      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
-}
-
-void RemoteBackend::generate(const QString &systemPrompt,
-                             const QString &userPrompt,
-                             const std::vector<PageImage> &images) {
-  if (!isReady()) {
-    emit finished(QString(),
-                  tr("Backend not configured (URL or model missing)"));
-    return;
-  }
-  cancel();
-
-  qDebug() << "[RemoteBackend] Sending request with" << images.size()
-           << "image(s)";
-
-  QJsonArray messages;
-  if (!systemPrompt.isEmpty())
-    messages.append(systemMessage(systemPrompt));
-  messages.append(visionUserMessage(userPrompt, images));
-
-  sendRequest(
-      buildRequest(buildCompletionUrl()),
-      QJsonDocument(buildBody(messages)).toJson(QJsonDocument::Compact));
-}
+/* ── Generation ─────────────────────────────────────────────────── */
 
 void RemoteBackend::generateInterleaved(const QString &systemPrompt,
                                         const PromptPayload &payload,

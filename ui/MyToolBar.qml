@@ -212,6 +212,32 @@ ToolBar {
             }
             currentIndex: configManager.visualMode
             onActivated: index => configManager.visualMode = index
+            // Debug trace: the combo once showed "Text only" while the saved
+            // mode stayed Full after switching from a remote backend to the
+            // local one (not reproduced since).  Kept to catch it if it
+            // comes back; remove once the cause is known.
+            onCurrentIndexChanged: {
+                console.log("[TRACE visualMode] currentIndex ->", currentIndex,
+                            "| text:", currentText, "| config:", configManager.visualMode);
+                console.trace();
+            }
+            onModelChanged: console.log("[TRACE visualMode] model changed | count:", count,
+                                        "| index:", currentIndex, "| config:", configManager.visualMode)
+            onDisplayTextChanged: console.log("[TRACE visualMode] displayText ->", displayText,
+                                              "| index:", currentIndex, "| config:", configManager.visualMode)
+            onEnabledChanged: console.log("[TRACE visualMode] enabled ->", enabled)
+            Connections {
+                target: configManager
+                function onVisualModeChanged() {
+                    console.log("[TRACE visualMode] config ->", configManager.visualMode,
+                                "| combo index:", visualModeCombo.currentIndex);
+                }
+                function onActiveBackendChanged() {
+                    console.log("[TRACE visualMode] backend ->", configManager.activeBackend,
+                                "| combo index:", visualModeCombo.currentIndex,
+                                "| config:", configManager.visualMode);
+                }
+            }
         }
 
         ToolSeparator {}

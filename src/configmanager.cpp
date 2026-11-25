@@ -343,14 +343,6 @@ QVariantMap ConfigManager::backendConfig(const QString &name) const {
   return QVariantMap();
 }
 
-QStringList ConfigManager::backendNames() const {
-  QStringList names;
-  for (const auto &entry : m_backendList) {
-    names << entry.toMap().value("name").toString();
-  }
-  return names;
-}
-
 void ConfigManager::setBackend(const QString &name, const QString &url,
                                const QString &apiKey, const QString &api) {
   // Update existing entry
@@ -685,8 +677,6 @@ QString ConfigManager::modelsRoot() const {
   return AppPaths::modelsRoot();
 }
 
-QString ConfigManager::modelsPath() const { return modelsRoot(); }
-
 QString ConfigManager::embeddersPath() const {
   return AppPaths::embeddersPath();
 }
@@ -704,10 +694,6 @@ void ConfigManager::refreshProjectList() {
   projectsDir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
   m_projectList = projectsDir.entryList();
   emit projectListChanged();
-}
-
-QString ConfigManager::projectPath(const QString &projectName) const {
-  return projectsRoot() + "/" + projectName;
 }
 
 QString ConfigManager::projectDbPath(const QString &projectName) const {

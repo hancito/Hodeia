@@ -64,10 +64,6 @@ QString agentAssistantTurn(const QString &content);
 QString documentHeading();
 /// Heading of page `page` (1-based).
 QString pageHeading(int page);
-/// Headings of the images and of the text when they come apart (local
-/// models without interleaving).
-QString visualContextHeading();
-QString textContextHeading();
 /// Appended where a prompt was cut to fit.
 QString truncatedMark();
 

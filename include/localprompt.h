@@ -50,10 +50,7 @@ struct PromptPayload {
   /// not told about figures it never receives.  Empty = use systemPrompt.
   QString textOnlySystemPrompt;
   QString userMessage;
-  QString textContext;
-  std::vector<PageImage> visualContext; ///< raw RGB page images
-  std::vector<PageBlock> pageBlocks;    ///< interleaved page-by-page (takes
-                                        ///< precedence when non-empty)
+  std::vector<PageBlock> pageBlocks; ///< the document, page by page
 };
 
 /// Prompt assembly for the local backend, shared by the token count of the

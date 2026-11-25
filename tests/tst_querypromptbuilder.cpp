@@ -47,15 +47,12 @@ void TestQueryPrompt::textLayout() {
       "page 5 ===\nchunk one\n[---]\nchunk two\n[---]\n\n";
   const QString block2 = "=== PAGE CONTEXT [2] — Bull (1984) — Equilibrium, "
                          "page 1 ===\nother\n[---]\n\n";
-  QCOMPARE(p.textContext, block1 + "\n" + block2);
-
   QCOMPARE(p.pageBlocks.size(), size_t(2));
   QCOMPARE(p.pageBlocks[0].pageNumber, 1);
   QCOMPARE(p.pageBlocks[0].text, block1);
   QCOMPARE(p.pageBlocks[1].pageNumber, 2);
   QCOMPARE(p.pageBlocks[1].text, block2);
   QVERIFY(p.pageBlocks[0].visualContext.data.empty());
-  QVERIFY(p.visualContext.empty());
 
   QCOMPARE(p.userMessage,
            "Core Task Query: What is it?\n\n" + Prompts::queryReminder("en") +
@@ -85,12 +82,10 @@ void TestQueryPrompt::images() {
   QCOMPARE(p.pageBlocks[0].visualContext.width, 16);
   QCOMPARE(p.pageBlocks[0].visualContext.height, 8);
   QVERIFY(p.pageBlocks[1].visualContext.data.empty());
-  QCOMPARE(p.visualContext.size(), size_t(1));
 
   // Text mode: no image at all.
   p = QueryPrompt::build({withImage}, "Q", false);
   QVERIFY(p.pageBlocks[0].visualContext.data.empty());
-  QVERIFY(p.visualContext.empty());
 }
 
 QTEST_GUILESS_MAIN(TestQueryPrompt)

@@ -761,21 +761,24 @@ void TestAgents::codexListModels() {
 
 /* ── Agent backend ─────────────────────────────────────────────── */
 
-// The Anthropic layout, as prompt parts (text, then images).
+// The Anthropic layout, as prompt parts: the instructions, then per page
+// its image before its text.
 void TestAgents::backendPrompt() {
   PromptPayload p;
   p.userMessage = "Question?";
-  p.textContext = "CONTEXT";
-  PageImage img;
-  img.width = 16;
-  img.height = 16;
-  img.data.assign(16 * 16 * 3, 128);
-  p.visualContext.push_back(img);
+  PageBlock page;
+  page.pageNumber = 1;
+  page.text = "CONTEXT";
+  page.visualContext.width = 16;
+  page.visualContext.height = 16;
+  page.visualContext.data.assign(16 * 16 * 3, 128);
+  p.pageBlocks.push_back(page);
   const Prompt parts = AgentBackend::prompt(p);
-  QCOMPARE(parts.size(), 2);
-  QVERIFY(parts[0].text.startsWith("Question?") && parts[0].text.contains("CONTEXT"));
-  QVERIFY(parts[1].isImage() || parts[1].mimeType == "image/jpeg");
+  QCOMPARE(parts.size(), 3);
+  QVERIFY(parts[0].text.startsWith("Question?"));
+  QVERIFY(parts[1].isImage());
   QCOMPARE(parts[1].mimeType, QString("image/jpeg"));
+  QVERIFY(parts[2].text.contains("CONTEXT"));
 }
 
 // The built-in "claude" profile, its command replaced by the fake.

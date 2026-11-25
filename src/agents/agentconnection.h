@@ -36,9 +36,6 @@ struct PromptPart {
 };
 using Prompt = QList<PromptPart>;
 
-/// The text parts of a prompt, joined.
-QString promptText(const Prompt &prompt);
-
 /// A stdio MCP server given to the agent (mode agentique).
 struct McpServer {
   QString name;

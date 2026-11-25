@@ -78,7 +78,10 @@ void TestAnthropicApi::bodyTextOnly() {
   PromptPayload payload;
   payload.systemPrompt = "SYSTEM";
   payload.userMessage = "QUESTION";
-  payload.textContext = "CONTEXT";
+  PageBlock page;
+  page.pageNumber = 1;
+  page.text = "CONTEXT";
+  payload.pageBlocks.push_back(page);
 
   const QJsonObject body =
       AnthropicApi::buildBody(payload, "claude-haiku-5-5");
@@ -91,11 +94,15 @@ void TestAnthropicApi::bodyTextOnly() {
   QCOMPARE(messages.size(), 1);
   const QJsonObject user = messages[0].toObject();
   QCOMPARE(user["role"].toString(), QString("user"));
+  // The instructions, then the page: text only.
   const QJsonArray content = user["content"].toArray();
-  QCOMPARE(content.size(), 1);
+  QCOMPARE(content.size(), 2);
   QCOMPARE(content[0].toObject()["type"].toString(), QString("text"));
   QCOMPARE(content[0].toObject()["text"].toString(),
-           QString("QUESTION\n\nCONTEXT"));
+           QString("QUESTION\n\n## DOCUMENT\n\n"));
+  QCOMPARE(content[1].toObject()["type"].toString(), QString("text"));
+  QCOMPARE(content[1].toObject()["text"].toString(),
+           QString("## Page 1\nCONTEXT\n\n"));
 }
 
 void TestAnthropicApi::bodyPageBlocks() {

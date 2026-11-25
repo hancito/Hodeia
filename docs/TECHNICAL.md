@@ -81,7 +81,6 @@ Hodeia/
 ├── CMakeLists.txt                  # Slim build entry: project, Qt, platform routing
 ├── vcpkg.json                      # Windows dependency manifest (libmupdf, tesseract, vulkan-*)
 ├── vcpkg-overlay/                  # Overlay port: libmupdf built from local source
-├── resources.qrc                   # (legacy, unused — qt_add_resources uses explicit files)
 ├── NOTICE                          # Qt + third-party licensing notices
 ├── LICENSE                         # AGPL-3.0
 ├── README.md                       # User-facing README
@@ -209,9 +208,9 @@ Hodeia/
 │   └── Embedders/multilingual-e5-small-q8_0.gguf
 │
 ├── Fonts/                          # Custom application fonts
-│   ├── Google_Sans/
-│   ├── Google_Sans_Code/
-│   └── Outfit/
+│   ├── EB_Garamond/                # PDF export (static/, read by MuPDF)
+│   ├── Google_Sans/                # UI (variable font)
+│   └── Google_Sans_Code/           # monospace (variable font)
 │
 └── translations/                   # Qt Linguist catalogs
     └── hodeia_fr.ts                # French (English is the source language)

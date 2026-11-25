@@ -5,7 +5,6 @@
 
 #include <QDebug>
 #include <QImage>
-#include <QStringList>
 
 
 namespace QueryPrompt {
@@ -20,8 +19,8 @@ PromptPayload build(const QList<PageContext> &pages, const QString &question,
   PromptPayload payload;
   payload.systemPrompt = Prompts::querySystem(language);
 
-  // Build structured text context: one block per page.
-  QStringList blocks;
+  // One block per page.
+  int images = 0;
   for (int i = 0; i < pages.size(); ++i) {
     const PageContext &pc = pages[i];
     const QString src = MetadataResolver::paperLabel(pc).sourceForm();
@@ -34,7 +33,6 @@ PromptPayload build(const QList<PageContext> &pages, const QString &question,
       block += chunk + "\n[---]\n";
 
     block += "\n";
-    blocks.append(block);
 
     // Build PageBlock with image
     PageBlock pb;
@@ -45,19 +43,16 @@ PromptPayload build(const QList<PageContext> &pages, const QString &question,
       QImage img(pc.imageFile);
       if (!img.isNull()) {
         pb.visualContext = PageImage::forModel(img);
-        // Legacy (non-interleaved) multimodal path: reuse the decoded pixels
-        // instead of decoding the PNG a second time.
-        payload.visualContext.push_back(pb.visualContext);
+        ++images;
       }
     }
     payload.pageBlocks.push_back(std::move(pb));
   }
 
-  payload.textContext = blocks.join("\n");
   payload.userMessage = Prompts::queryUserMessage(question, language);
 
   if (useVisual)
-    qDebug() << "[QueryPrompt] Visual context —" << payload.visualContext.size()
+    qDebug() << "[QueryPrompt] Visual context —" << images
              << "image(s) loaded";
 
   return payload;

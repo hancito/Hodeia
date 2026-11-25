@@ -164,9 +164,8 @@ public:
            bool * /*cancelFlag: cancel() aborts the request instead*/) override {
     m_backend.setForceJson(options.forceJson);
 
-    // Images travel either with their page (interleaved) or in the legacy
-    // visualContext list.
-    bool hasImages = !payload.visualContext.empty();
+    // Images travel with their page.
+    bool hasImages = false;
     for (const auto &pb : payload.pageBlocks)
       if (!pb.visualContext.data.empty())
         hasImages = true;
@@ -204,16 +203,7 @@ public:
       timeout.start(options.timeoutMs);
     }
 
-    if (!payload.pageBlocks.empty()) {
-      m_backend.generateInterleaved(payload.systemPrompt, payload, hasImages);
-    } else if (payload.visualContext.empty()) {
-      m_backend.generate(payload.systemPrompt,
-                         payload.userMessage + "\n\n" + payload.textContext);
-    } else {
-      m_backend.generate(payload.systemPrompt,
-                         payload.userMessage + "\n\n" + payload.textContext,
-                         payload.visualContext);
-    }
+    m_backend.generateInterleaved(payload.systemPrompt, payload, hasImages);
 
     loop.exec(QEventLoop::ExcludeUserInputEvents);
     timeout.stop();

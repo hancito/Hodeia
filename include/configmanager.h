@@ -78,9 +78,6 @@ public:
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
 
-  /// Return the list of backend names (for UI dropdowns).
-  Q_INVOKABLE QStringList backendNames() const;
-
   // Setters (Will trigger auto-saving to disk)
   void setActiveThemeIndex(int index);
   void setLastProject(const QString &path);
@@ -127,19 +124,12 @@ public:
   std::expected<void, QString> deleteProjects(const QStringList &projectNames);
   // The project database must be closed first (its file is deleted).
   std::expected<void, QString> resetActiveProject();
-  Q_INVOKABLE QString projectPath(const QString &projectName) const;
   Q_INVOKABLE QString projectDbPath(const QString &projectName) const;
   Q_INVOKABLE QString projectImgPath(const QString &projectName) const;
   /// Delete the page images of the given papers.  Returns an empty string,
   /// or a user-facing message when some images could not be deleted.
   Q_INVOKABLE QString deleteImages(const QStringList &hashList,
                                 const QString &imgPath) const;
-
-  /// Return the list of absolute PNG paths for a given paper hash,
-  /// sorted by page number (e.g. hash_page_001.png, hash_page_002.png …).
-
-  /// Path to the Models directory (contains Embedders/ and Summarizers/).
-  Q_INVOKABLE QString modelsPath() const;
 
   /// Path to the Embedders subdirectory.
   Q_INVOKABLE QString embeddersPath() const;

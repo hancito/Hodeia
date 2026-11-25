@@ -57,23 +57,16 @@ static QJsonObject imageBlock(const PageImage &img) {
 }
 
 QJsonObject buildBody(const PromptPayload &payload, const QString &model) {
+  // Same layout as RemoteBackend::generateInterleaved: instructions, then
+  // per page its image (when any) before its text.
   QJsonArray content;
-  if (!payload.pageBlocks.empty()) {
-    // Same layout as RemoteBackend::generateInterleaved: instructions, then
-    // per page its image (when any) before its text.
-    content.append(textBlock(payload.userMessage + "\n\n" +
-                             Prompts::documentHeading() + "\n\n"));
-    for (const auto &pb : payload.pageBlocks) {
-      if (!pb.visualContext.data.empty())
-        content.append(imageBlock(pb.visualContext));
-      content.append(textBlock(
-          Prompts::pageHeading(pb.pageNumber) + "\n" + pb.text + "\n\n"));
-    }
-  } else {
-    content.append(
-        textBlock(payload.userMessage + "\n\n" + payload.textContext));
-    for (const auto &img : payload.visualContext)
-      content.append(imageBlock(img));
+  content.append(textBlock(payload.userMessage + "\n\n" +
+                           Prompts::documentHeading() + "\n\n"));
+  for (const auto &pb : payload.pageBlocks) {
+    if (!pb.visualContext.data.empty())
+      content.append(imageBlock(pb.visualContext));
+    content.append(textBlock(
+        Prompts::pageHeading(pb.pageNumber) + "\n" + pb.text + "\n\n"));
   }
 
   QJsonObject body{

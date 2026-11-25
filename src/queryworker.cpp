@@ -94,9 +94,8 @@ void QueryWorker::executeQuery(const QString &queryText, int contextTokens) {
   PromptPayload payload =
       QueryPrompt::build(pages, queryText, m_config->useVisualContext(),
                          m_config->outputLanguage());
-  qDebug() << "[QueryWorker] Prompt built — text context:"
-           << payload.textContext.length()
-           << "chars, visuals:" << payload.visualContext.size();
+  qDebug() << "[QueryWorker] Prompt built —" << payload.pageBlocks.size()
+           << "page(s)";
 
   // 4. Run inference
   m_backend = makeChatBackend(backend);
@@ -180,7 +179,6 @@ QueryWorker::generate(const PromptPayload &payload,
 }
 
 void QueryWorker::stop() {
-  m_stopping = true;
   // Signal cooperative cancellation to the in-flight local generation.
   // InferenceEngine::generate() polls this flag (and pumps the event loop
   // every 32 tokens so this slot can run) and stops at the next token

@@ -2,58 +2,7 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="fr-FR">
 <context>
-    <name>AcpClient</name>
-    <message>
-        <source>the agent stopped unexpectedly</source>
-        <translation type="vanished">l’agent s’est arrêté de façon inattendue</translation>
-    </message>
-    <message>
-        <source>the agent exited (code %1)</source>
-        <translation type="vanished">l’agent s’est terminé (code %1)</translation>
-    </message>
-    <message>
-        <source>No command to start the agent.</source>
-        <translation type="vanished">Aucune commande pour lancer l’agent.</translation>
-    </message>
-    <message>
-        <source>Cannot start &quot;%1&quot;: %2</source>
-        <translation type="vanished">Impossible de lancer « %1 » : %2</translation>
-    </message>
-    <message>
-        <source>the agent was stopped</source>
-        <translation type="vanished">l’agent a été arrêté</translation>
-    </message>
-    <message>
-        <source>the agent is not running</source>
-        <translation type="vanished">l’agent n’est pas lancé</translation>
-    </message>
-</context>
-<context>
     <name>AgentBackend</name>
-    <message>
-        <source>Claude Code is not logged in: run &quot;claude&quot; in a terminal and log in (/login), then try again.
-(%1)</source>
-        <translation type="vanished">Claude Code n’est pas connecté : lancez « claude » dans un terminal et connectez-vous (/login), puis réessayez.
-(%1)</translation>
-    </message>
-    <message>
-        <source>%1
-Install the agent with &quot;npm install -g @agentclientprotocol/claude-agent-acp&quot;, or set its command in the Backends window.</source>
-        <translation type="vanished">%1
-Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp », ou indiquez sa commande dans la fenêtre Backends.</translation>
-    </message>
-    <message>
-        <source>The agent did not start: %1</source>
-        <translation type="vanished">L’agent n’a pas démarré : %1</translation>
-    </message>
-    <message>
-        <source>no answer</source>
-        <translation type="vanished">pas de réponse</translation>
-    </message>
-    <message>
-        <source>The agent refused the model &quot;%1&quot;: %2</source>
-        <translation type="vanished">L’agent a refusé le modèle « %1 » : %2</translation>
-    </message>
     <message>
         <location filename="../src/agentbackend.cpp" line="35"/>
         <source>Unknown agent &quot;%1&quot;: choose one in the Backends window.</source>
@@ -80,17 +29,9 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation>Le backend « %1 » n’indique pas quel agent il utilise : choisissez de nouveau l’agent dans la fenêtre Backends et vérifiez la connexion.</translation>
     </message>
     <message>
-        <source>Unknown agent &quot;%1&quot;.</source>
-        <translation type="vanished">Agent inconnu « %1 ».</translation>
-    </message>
-    <message>
         <location filename="../src/agentbackend.cpp" line="175"/>
         <source>No connector &quot;%1&quot;.</source>
         <translation>Aucun connecteur « %1 ».</translation>
-    </message>
-    <message>
-        <source>The agent stopped without answering (%1).</source>
-        <translation type="vanished">L’agent s’est arrêté sans répondre (%1).</translation>
     </message>
 </context>
 <context>
@@ -121,73 +62,73 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation>Le backend d’agent « %1 » n’est pas disponible : vérifiez la fenêtre Backends.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="357"/>
+        <location filename="../src/agentchatcontroller.cpp" line="358"/>
         <source>Starting the agent...</source>
         <translation>Démarrage de l’agent…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="389"/>
+        <location filename="../src/agentchatcontroller.cpp" line="390"/>
         <source>Searching the library...</source>
         <translation>Recherche dans la bibliothèque…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="391"/>
+        <location filename="../src/agentchatcontroller.cpp" line="392"/>
         <source>Reading a page...</source>
         <translation>Lecture d’une page…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="393"/>
+        <location filename="../src/agentchatcontroller.cpp" line="394"/>
         <source>Reading a summary...</source>
         <translation>Lecture d’un résumé…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="395"/>
+        <location filename="../src/agentchatcontroller.cpp" line="396"/>
         <source>Listing the papers...</source>
         <translation>Liste des articles…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="397"/>
+        <location filename="../src/agentchatcontroller.cpp" line="398"/>
         <source>Looking at the citations...</source>
         <translation>Examen des citations…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="399"/>
+        <location filename="../src/agentchatcontroller.cpp" line="400"/>
         <source>Saving a summary...</source>
         <translation>Enregistrement d&apos;un résumé...</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="401"/>
+        <location filename="../src/agentchatcontroller.cpp" line="402"/>
         <source>Using %1...</source>
         <translation>Utilisation de %1…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="405"/>
+        <location filename="../src/agentchatcontroller.cpp" line="406"/>
         <source>Thinking...</source>
         <translation>Réflexion…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="408"/>
+        <location filename="../src/agentchatcontroller.cpp" line="409"/>
         <source>Writing the answer...</source>
         <translation>Rédaction de la réponse…</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="442"/>
+        <location filename="../src/agentchatcontroller.cpp" line="443"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="446"/>
+        <location filename="../src/agentchatcontroller.cpp" line="447"/>
         <source>(stopped)</source>
         <translation>(arrêté)</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="449"/>
-        <location filename="../src/agentchatcontroller.cpp" line="482"/>
+        <location filename="../src/agentchatcontroller.cpp" line="450"/>
+        <location filename="../src/agentchatcontroller.cpp" line="483"/>
         <source>Stopped before answering.</source>
         <translation>Arrêté avant de répondre.</translation>
     </message>
     <message>
-        <location filename="../src/agentchatcontroller.cpp" line="486"/>
+        <location filename="../src/agentchatcontroller.cpp" line="487"/>
         <source>Stopping...</source>
         <translation>Arrêt…</translation>
     </message>
@@ -203,41 +144,47 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
 <context>
     <name>Agents::AcpConnection</name>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="107"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="146"/>
         <source>%1 is not logged in.</source>
         <translation>%1 n’est pas connecté.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="109"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="148"/>
         <source>Log in with: %1</source>
         <translation>Connectez-vous avec : %1</translation>
     </message>
     <message>
-        <source>Install it with: %1</source>
-        <translation type="vanished">Installez-le avec : %1</translation>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="228"/>
+        <source>Could not write %1: %2</source>
+        <translation>Impossible d’écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="140"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="277"/>
+        <source>Preparing %1 failed (%2): %3</source>
+        <translation>La préparation de %1 a échoué (%2) : %3</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="306"/>
         <source>The agent did not start: %1</source>
         <translation>L’agent n’a pas démarré : %1</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="214"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="380"/>
         <source>The agent refused the model &quot;%1&quot;: %2</source>
         <translation>L’agent a refusé le modèle « %1 » : %2</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="227"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="393"/>
         <source>No open session.</source>
         <translation>Aucune session ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="249"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="415"/>
         <source>The agent declined the request.</source>
         <translation>L’agent a refusé la demande.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="258"/>
+        <location filename="../src/agents/connectors/acp/acpconnector.cpp" line="424"/>
         <source>Cancelled.</source>
         <translation>Annulé.</translation>
     </message>
@@ -288,51 +235,71 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation>L’agent a été arrêté.</translation>
     </message>
     <message>
-        <source>Install it with: %1</source>
-        <translation type="vanished">Installez-le avec : %1</translation>
-    </message>
-    <message>
-        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="117"/>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="121"/>
         <source>No open session.</source>
         <translation>Aucune session ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="200"/>
+        <location filename="../src/agents/connectors/claude/claudeconnector.cpp" line="204"/>
         <source>Claude usage limit reached.</source>
         <translation>Limite d’utilisation de Claude atteinte.</translation>
     </message>
 </context>
 <context>
-    <name>Agents::PiConnection</name>
+    <name>Agents::CodexConnection</name>
     <message>
-        <source>Install it with: %1</source>
-        <translation type="vanished">Installez-le avec : %1</translation>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="66"/>
+        <source>The agent was stopped.</source>
+        <translation>L’agent a été arrêté.</translation>
     </message>
     <message>
-        <location filename="../src/agents/connectors/pi/piconnector.cpp" line="91"/>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="172"/>
+        <source>Codex did not start: %1</source>
+        <translation>Codex n’a pas démarré : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="248"/>
         <source>No open session.</source>
         <translation>Aucune session ouverte.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="274"/>
+        <source>Cancelled.</source>
+        <translation>Annulé.</translation>
+    </message>
+    <message>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="396"/>
+        <source>The turn failed.</source>
+        <translation>Le tour a échoué.</translation>
+    </message>
+</context>
+<context>
+    <name>Agents::CodexConnector</name>
+    <message>
+        <location filename="../src/agents/connectors/codex/codexconnector.cpp" line="435"/>
+        <source>Codex did not answer.</source>
+        <translation>Codex n’a pas répondu.</translation>
     </message>
 </context>
 <context>
     <name>AnthropicApi</name>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="98"/>
+        <location filename="../src/anthropicapi.cpp" line="91"/>
         <source>HTTP error %1</source>
         <translation>Erreur HTTP %1</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="100"/>
+        <location filename="../src/anthropicapi.cpp" line="93"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d’analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="119"/>
+        <location filename="../src/anthropicapi.cpp" line="112"/>
         <source>The model declined the request (%1)</source>
         <translation>Le modèle a refusé la requête (%1)</translation>
     </message>
     <message>
-        <location filename="../src/anthropicapi.cpp" line="134"/>
+        <location filename="../src/anthropicapi.cpp" line="127"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
@@ -451,10 +418,6 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <translation>Utilise l’agent installé sur cet ordinateur, avec votre propre connexion. Laissez la commande vide pour utiliser la commande habituelle.</translation>
     </message>
     <message>
-        <source>Claude Code (ACP)</source>
-        <translation type="vanished">Claude Code (ACP)</translation>
-    </message>
-    <message>
         <location filename="../ui/BackendWindow.qml" line="191"/>
         <source>URL</source>
         <translation>URL</translation>
@@ -463,10 +426,6 @@ Installez l’agent avec « npm install -g @agentclientprotocol/claude-agent-acp
         <location filename="../ui/BackendWindow.qml" line="191"/>
         <source>Command</source>
         <translation>Commande</translation>
-    </message>
-    <message>
-        <source>Uses your Claude Code and its login (claude-agent-acp, Node.js 22 or later). Leave the command empty to use the default one.</source>
-        <translation type="vanished">Utilise votre Claude Code et sa connexion (claude-agent-acp, Node.js 22 ou plus). Laissez la commande vide pour utiliser celle par défaut.</translation>
     </message>
     <message>
         <location filename="../ui/BackendWindow.qml" line="219"/>
@@ -573,88 +532,83 @@ Check the free disk space and the permissions of this folder.</source>
 Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="266"/>
-        <location filename="../src/configmanager.cpp" line="275"/>
-        <location filename="../src/configmanager.cpp" line="281"/>
+        <location filename="../src/configmanager.cpp" line="264"/>
         <source>Text only</source>
         <translation>Texte uniquement</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="268"/>
-        <location filename="../src/configmanager.cpp" line="276"/>
-        <location filename="../src/configmanager.cpp" line="283"/>
+        <location filename="../src/configmanager.cpp" line="265"/>
         <source>Full (all pages)</source>
         <translation>Complet (toutes les pages)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="270"/>
-        <location filename="../src/configmanager.cpp" line="275"/>
+        <location filename="../src/configmanager.cpp" line="264"/>
         <source>Reduced (figures/tables)</source>
         <translation>Réduit (figures/tableaux)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="444"/>
-        <location filename="../src/configmanager.cpp" line="481"/>
+        <location filename="../src/configmanager.cpp" line="420"/>
+        <location filename="../src/configmanager.cpp" line="457"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="452"/>
+        <location filename="../src/configmanager.cpp" line="428"/>
         <source>Project already exists: %1</source>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="465"/>
+        <location filename="../src/configmanager.cpp" line="441"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="487"/>
+        <location filename="../src/configmanager.cpp" line="463"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="497"/>
+        <location filename="../src/configmanager.cpp" line="473"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="553"/>
+        <location filename="../src/configmanager.cpp" line="529"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="558"/>
+        <location filename="../src/configmanager.cpp" line="534"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="567"/>
+        <location filename="../src/configmanager.cpp" line="543"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="575"/>
+        <location filename="../src/configmanager.cpp" line="551"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="593"/>
+        <location filename="../src/configmanager.cpp" line="569"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="605"/>
+        <location filename="../src/configmanager.cpp" line="581"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="668"/>
+        <location filename="../src/configmanager.cpp" line="644"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="669"/>
+        <location filename="../src/configmanager.cpp" line="645"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -669,7 +623,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="763"/>
+        <location filename="../src/configmanager.cpp" line="733"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -738,18 +692,6 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>ConversationPane</name>
     <message>
-        <source>Agent</source>
-        <translation type="vanished">Agent</translation>
-    </message>
-    <message>
-        <source>Model (default)</source>
-        <translation type="vanished">Modèle (par défaut)</translation>
-    </message>
-    <message>
-        <source>No agent can search the library yet: add Claude Code (or another agent that supports MCP) in the Backends window.</source>
-        <translation type="vanished">Aucun agent ne peut encore chercher dans la bibliothèque : ajoutez Claude Code (ou un autre agent compatible MCP) dans la fenêtre Backends.</translation>
-    </message>
-    <message>
         <location filename="../ui/ConversationPane.qml" line="41"/>
         <source>New conversation with %1</source>
         <translation>Nouvelle conversation avec %1</translation>
@@ -783,22 +725,22 @@ L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;i
 <context>
     <name>DatabaseManager</name>
     <message>
-        <location filename="../src/database.cpp" line="56"/>
+        <location filename="../src/database.cpp" line="79"/>
         <source>No Project Database</source>
         <translation>Aucune base de projet</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="57"/>
+        <location filename="../src/database.cpp" line="80"/>
         <source>No active project could be opened. Create a project from the Project menu.</source>
         <translation>Aucun projet actif n&apos;a pu être ouvert. Créez un projet depuis le menu Projet.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="68"/>
+        <location filename="../src/database.cpp" line="91"/>
         <source>Project Database Unavailable</source>
         <translation>Base du projet indisponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="69"/>
+        <location filename="../src/database.cpp" line="92"/>
         <source>The database of project &quot;%1&quot; could not be opened, so the library is empty.
 
 %2
@@ -815,90 +757,76 @@ Check that the file exists and is not used by another program, or switch to anot
 Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programme, ou passez à un autre projet.</translation>
     </message>
     <message>
-        <source>Project Database Error</source>
-        <translation type="vanished">Erreur de la base du projet</translation>
-    </message>
-    <message>
-        <source>The project database could not be prepared; some features may not work.
-
-%1
-
-%2</source>
-        <translation type="vanished">La base de données du projet n&apos;a pas pu être préparée ; certaines fonctions risquent de ne pas marcher.
-
-%1
-
-%2</translation>
-    </message>
-    <message>
-        <location filename="../src/database.cpp" line="96"/>
+        <location filename="../src/database.cpp" line="119"/>
         <source>This project was saved by a newer version of HodeIA (database version %1; this version reads up to %2). Update HodeIA to open it.</source>
         <translation>Ce projet a été enregistré par une version plus récente de HodeIA (version de base %1 ; cette version lit jusqu&apos;à %2). Mettez HodeIA à jour pour l&apos;ouvrir.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="103"/>
+        <location filename="../src/database.cpp" line="126"/>
         <source>The project database needs an update, but the safety copy made before updating failed, so it was left unchanged: %1</source>
         <translation>La base du projet doit être mise à jour, mais la copie de sécurité préalable a échoué, elle n&apos;a donc pas été modifiée : %1</translation>
     </message>
     <message>
-        <source>The project database could not be updated to the new version; the failed step was undone. A copy from before the update is kept next to it.
-
-%1</source>
-        <translation type="vanished">La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée. Une copie d&apos;avant la mise à jour est conservée à côté.
-
-%1</translation>
-    </message>
-    <message>
-        <location filename="../src/database.cpp" line="109"/>
+        <location filename="../src/database.cpp" line="132"/>
         <source>The project database could not be updated to the new version; the failed step was undone.</source>
         <translation>La base du projet n&apos;a pas pu être mise à jour vers la nouvelle version ; l&apos;étape en échec a été annulée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="113"/>
+        <location filename="../src/database.cpp" line="136"/>
         <source>A copy from before the update is kept: %1</source>
         <translation>Une copie d&apos;avant la mise à jour est conservée : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="137"/>
-        <location filename="../src/database.cpp" line="224"/>
+        <location filename="../src/database.cpp" line="156"/>
+        <location filename="../src/database.cpp" line="265"/>
         <source>Cannot switch project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de changer de projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="152"/>
+        <location filename="../src/database.cpp" line="180"/>
         <source>The project database could not be opened: %1</source>
         <translation>La base de données du projet n&apos;a pas pu être ouverte : %1</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="175"/>
-        <location filename="../src/database.cpp" line="220"/>
-        <location filename="../src/database.cpp" line="253"/>
+        <location filename="../src/database.cpp" line="203"/>
+        <location filename="../src/database.cpp" line="260"/>
+        <location filename="../src/database.cpp" line="294"/>
         <source>No configuration available</source>
         <translation>Aucune configuration disponible</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="192"/>
+        <location filename="../src/database.cpp" line="213"/>
+        <source>Cannot delete the project &quot;%1&quot; while papers are being imported into it.</source>
+        <translation>Impossible de supprimer le projet « %1 » pendant que des articles y sont importés.</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="229"/>
         <source>Cannot delete the active project while an operation is in progress.</source>
         <translation>Impossible de supprimer le projet actif pendant qu&apos;une opération est en cours.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="255"/>
+        <location filename="../src/database.cpp" line="296"/>
+        <source>Cannot clear the project while papers are being imported into it.</source>
+        <translation>Impossible de vider le projet pendant que des articles y sont importés.</translation>
+    </message>
+    <message>
+        <location filename="../src/database.cpp" line="300"/>
         <source>Cannot clear the project while an operation (summary, query) is in progress. Try again once it has finished.</source>
         <translation>Impossible de vider le projet pendant une opération (résumé, requête). Réessayez une fois qu&apos;elle est terminée.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="294"/>
-        <location filename="../src/database.cpp" line="309"/>
+        <location filename="../src/database.cpp" line="349"/>
+        <location filename="../src/database.cpp" line="364"/>
         <source>The project database is not open.</source>
         <translation>La base de données du projet n&apos;est pas ouverte.</translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="298"/>
+        <location filename="../src/database.cpp" line="353"/>
         <source>The papers could not be deleted (database error).</source>
         <translation>Les articles n&apos;ont pas pu être supprimés (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="300"/>
+        <location filename="../src/database.cpp" line="355"/>
         <source>%n paper(s) could not be fully deleted: %1</source>
         <translation>
             <numerusform>%n article n&apos;a pas pu être entièrement supprimé : %1</numerusform>
@@ -906,12 +834,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         </translation>
     </message>
     <message>
-        <location filename="../src/database.cpp" line="317"/>
+        <location filename="../src/database.cpp" line="372"/>
         <source>The queries could not be deleted (database error).</source>
         <translation>Les requêtes n&apos;ont pas pu être supprimées (erreur de base de données).</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/database.cpp" line="321"/>
+        <location filename="../src/database.cpp" line="376"/>
         <source>%n query(ies) could not be deleted: %1</source>
         <translation>
             <numerusform>%n requête n&apos;a pas pu être supprimée : %1</numerusform>
@@ -943,10 +871,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>PDF</translation>
     </message>
     <message>
-        <source>Page</source>
-        <translation type="vanished">Page</translation>
-    </message>
-    <message>
         <location filename="../ui/DisplayPane.qml" line="444"/>
         <source>Previous page (←, Page Up)</source>
         <translation>Page précédente (←, Page préc.)</translation>
@@ -960,10 +884,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <location filename="../ui/DisplayPane.qml" line="151"/>
         <source>Zoom</source>
         <translation>Zoom</translation>
-    </message>
-    <message>
-        <source>Reset zoom</source>
-        <translation type="vanished">Réinitialiser le zoom</translation>
     </message>
     <message>
         <location filename="../ui/DisplayPane.qml" line="163"/>
@@ -1040,10 +960,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 </context>
 <context>
     <name>Helpers</name>
-    <message>
-        <source>Invalid parameters</source>
-        <translation type="vanished">Paramètres invalides</translation>
-    </message>
     <message>
         <location filename="../src/helpers.cpp" line="317"/>
         <source>URL is empty</source>
@@ -1127,14 +1043,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <location filename="../ui/IngestionDialog.qml" line="56"/>
         <source>Extracting text</source>
         <translation>Extraction du texte</translation>
-    </message>
-    <message>
-        <source>Indexing passages</source>
-        <translation type="vanished">Indexation des passages</translation>
-    </message>
-    <message>
-        <source>passages</source>
-        <translation type="vanished">passages</translation>
     </message>
     <message>
         <location filename="../ui/IngestionDialog.qml" line="65"/>
@@ -1345,10 +1253,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Créer</translation>
     </message>
     <message>
-        <source>Cancel</source>
-        <translation type="vanished">Annuler</translation>
-    </message>
-    <message>
         <location filename="../ui/Main.qml" line="211"/>
         <source>Project Already Exists</source>
         <translation>Le projet existe déjà</translation>
@@ -1367,14 +1271,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <location filename="../ui/Main.qml" line="110"/>
         <source>Cannot Open Query Window</source>
         <translation>Impossible d&apos;ouvrir la fenêtre de requêtes</translation>
-    </message>
-    <message>
-        <source>Clean Project</source>
-        <translation type="vanished">Nettoyer le projet</translation>
-    </message>
-    <message>
-        <source>Clean project &quot;%1&quot;? All files and data will be permanently removed.</source>
-        <translation type="vanished">Nettoyer le projet « %1 » ? Tous les fichiers et les données seront définitivement supprimés.</translation>
     </message>
     <message>
         <location filename="../ui/Main.qml" line="237"/>
@@ -1437,10 +1333,6 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Collez votre clé API...</translation>
     </message>
     <message>
-        <source>Indexing Failed</source>
-        <translation type="vanished">Échec de l&apos;indexation</translation>
-    </message>
-    <message>
         <location filename="../ui/Main.qml" line="535"/>
         <source>Add Local Model</source>
         <translation>Ajouter un modèle local</translation>
@@ -1471,20 +1363,12 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <source>Select a .gguf mmproj file...</source>
         <translation>Sélectionnez un fichier mmproj .gguf...</translation>
     </message>
-    <message>
-        <source>Optional — select a .gguf mmproj file...</source>
-        <translation type="vanished">Facultatif — sélectionnez un fichier mmproj .gguf...</translation>
-    </message>
-    <message>
-        <source>The mmproj file is optional. Leave empty to skip.</source>
-        <translation type="vanished">Le fichier mmproj est facultatif. Laisser vide pour passer.</translation>
-    </message>
     <message numerus="yes">
         <location filename="../ui/Main.qml" line="527"/>
-        <source>Zotero: %n new PDF(s) to import (Project &gt; Zotero...)</source>
+        <source>Zotero: %n new PDF(s) to import (Zotero button in the toolbar)</source>
         <translation>
-            <numerusform>Zotero : %n nouveau PDF à importer (Projet › Zotero…)</numerusform>
-            <numerusform>Zotero : %n nouveaux PDF à importer (Projet › Zotero…)</numerusform>
+            <numerusform>Zotero : %n nouveau PDF à importer (bouton Zotero de la barre d&apos;outils)</numerusform>
+            <numerusform>Zotero : %n nouveaux PDF à importer (bouton Zotero de la barre d&apos;outils)</numerusform>
         </translation>
     </message>
     <message>
@@ -1589,219 +1473,154 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
 <context>
     <name>MyMenuBar</name>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="234"/>
+        <location filename="../ui/MyMenuBar.qml" line="226"/>
         <source>Help</source>
         <translation>Aide</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="236"/>
+        <location filename="../ui/MyMenuBar.qml" line="228"/>
         <source>About HodeIA...</source>
         <translation>À propos de HodeIA...</translation>
     </message>
     <message>
-        <source>File</source>
-        <translation type="vanished">Fichier</translation>
-    </message>
-    <message>
-        <source>New Project</source>
-        <translation type="vanished">Nouveau projet</translation>
-    </message>
-    <message>
-        <source>Open Project...</source>
-        <translation type="vanished">Ouvrir un projet...</translation>
-    </message>
-    <message>
-        <source>Delete Project...</source>
-        <translation type="vanished">Supprimer un projet...</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyMenuBar.qml" line="112"/>
-        <location filename="../ui/MyMenuBar.qml" line="169"/>
+        <location filename="../ui/MyMenuBar.qml" line="104"/>
+        <location filename="../ui/MyMenuBar.qml" line="161"/>
         <source>Delete Selected</source>
         <translation>Supprimer la sélection</translation>
     </message>
     <message>
-        <source>Clean Project</source>
-        <translation type="vanished">Nettoyer le projet</translation>
-    </message>
-    <message>
-        <source>Exit</source>
-        <translation type="vanished">Quitter</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyMenuBar.qml" line="178"/>
+        <location filename="../ui/MyMenuBar.qml" line="170"/>
         <source>Settings</source>
         <translation>Paramètres</translation>
     </message>
     <message>
-        <source>Themes</source>
-        <translation type="vanished">Thèmes</translation>
-    </message>
-    <message>
-        <source>Languages</source>
-        <translation type="vanished">Langues</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyMenuBar.qml" line="61"/>
+        <location filename="../ui/MyMenuBar.qml" line="60"/>
         <source>Project</source>
         <translation>Projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="63"/>
+        <location filename="../ui/MyMenuBar.qml" line="62"/>
         <source>New Project...</source>
         <translation>Nouveau projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="67"/>
+        <location filename="../ui/MyMenuBar.qml" line="66"/>
         <source>Open Project</source>
         <translation>Ouvrir un projet</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="84"/>
-        <source>Zotero... (%1 new)</source>
-        <translation>Zotero… (%1 à importer)</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyMenuBar.qml" line="85"/>
-        <source>Zotero...</source>
-        <translation>Zotero…</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyMenuBar.qml" line="90"/>
+        <location filename="../ui/MyMenuBar.qml" line="82"/>
         <source>Clear Project Data...</source>
         <translation>Vider le projet...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="95"/>
+        <location filename="../ui/MyMenuBar.qml" line="87"/>
         <source>Delete Projects</source>
         <translation>Supprimer des projets</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="120"/>
+        <location filename="../ui/MyMenuBar.qml" line="112"/>
         <source>Quit</source>
         <translation>Quitter</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="126"/>
+        <location filename="../ui/MyMenuBar.qml" line="118"/>
         <source>Models</source>
         <translation>Modèles</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="143"/>
+        <location filename="../ui/MyMenuBar.qml" line="135"/>
         <source>Manage Backends...</source>
         <translation>Gérer les backends...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="148"/>
+        <location filename="../ui/MyMenuBar.qml" line="140"/>
         <source>Add Local Model...</source>
         <translation>Ajouter un modèle local...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="152"/>
+        <location filename="../ui/MyMenuBar.qml" line="144"/>
         <source>Delete Local Models</source>
         <translation>Supprimer des modèles locaux</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="180"/>
+        <location filename="../ui/MyMenuBar.qml" line="172"/>
         <source>Theme</source>
         <translation>Thème</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="197"/>
+        <location filename="../ui/MyMenuBar.qml" line="189"/>
         <source>Language</source>
         <translation>Langue</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="199"/>
+        <location filename="../ui/MyMenuBar.qml" line="191"/>
         <source>English</source>
         <translation>English</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="205"/>
+        <location filename="../ui/MyMenuBar.qml" line="197"/>
         <source>Français</source>
         <translation>Français</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="214"/>
+        <location filename="../ui/MyMenuBar.qml" line="206"/>
         <source>Answer Language</source>
         <translation>Langue des réponses</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="228"/>
+        <location filename="../ui/MyMenuBar.qml" line="220"/>
         <source>OpenAlex API Key...</source>
         <translation>Clé API OpenAlex...</translation>
     </message>
     <message>
-        <location filename="../ui/MyMenuBar.qml" line="128"/>
+        <location filename="../ui/MyMenuBar.qml" line="120"/>
         <source>Backend</source>
         <translation>Backend</translation>
-    </message>
-    <message>
-        <source>Add Backend...</source>
-        <translation type="vanished">Ajouter un backend...</translation>
-    </message>
-    <message>
-        <source>Change Backend</source>
-        <translation type="vanished">Changer de backend</translation>
-    </message>
-    <message>
-        <source>Local Models</source>
-        <translation type="vanished">Modèles locaux</translation>
-    </message>
-    <message>
-        <source>Add Model...</source>
-        <translation type="vanished">Ajouter un modèle...</translation>
-    </message>
-    <message>
-        <source>OpenAlex API key</source>
-        <translation type="vanished">Clé API OpenAlex</translation>
     </message>
 </context>
 <context>
     <name>MyToolBar</name>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="34"/>
+        <location filename="../ui/MyToolBar.qml" line="35"/>
         <source>Select PDF files</source>
         <translation>Sélectionner des fichiers PDF</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="51"/>
+        <location filename="../ui/MyToolBar.qml" line="52"/>
         <source>Select a folder containing PDFs</source>
         <translation>Sélectionner un dossier contenant des PDF</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="130"/>
+        <location filename="../ui/MyToolBar.qml" line="131"/>
         <source>Add a file</source>
         <translation>Ajouter un fichier</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="144"/>
+        <location filename="../ui/MyToolBar.qml" line="145"/>
         <source>Add a folder</source>
         <translation>Ajouter un dossier</translation>
     </message>
-    <message>
-        <source>Ingesting...</source>
-        <translation type="vanished">Importation...</translation>
+    <message numerus="yes">
+        <location filename="../ui/MyToolBar.qml" line="160"/>
+        <source>Zotero (%n new PDF(s))</source>
+        <translation>
+            <numerusform>Zotero (%n nouveau PDF)</numerusform>
+            <numerusform>Zotero (%n nouveaux PDF)</numerusform>
+        </translation>
     </message>
     <message>
-        <source>Elapsed Time: %1h %2m</source>
-        <translation type="vanished">Temps écoulé : %1h %2m</translation>
+        <location filename="../ui/MyToolBar.qml" line="161"/>
+        <source>Zotero</source>
+        <translation>Zotero</translation>
     </message>
     <message>
-        <source>Elapsed Time: %1m %2s</source>
-        <translation type="vanished">Temps écoulé : %1m %2s</translation>
-    </message>
-    <message>
-        <source>Elapsed Time: %1s</source>
-        <translation type="vanished">Temps écoulé : %1s</translation>
-    </message>
-    <message>
-        <location filename="../ui/MyToolBar.qml" line="156"/>
+        <location filename="../ui/MyToolBar.qml" line="192"/>
         <source>Active Model</source>
         <translation>Modèle actif</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="191"/>
+        <location filename="../ui/MyToolBar.qml" line="224"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>
@@ -1876,24 +1695,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
 <context>
     <name>PdfWorker</name>
     <message>
-        <source>Text Recognition Unavailable</source>
-        <translation type="vanished">Reconnaissance de texte indisponible</translation>
-    </message>
-    <message>
-        <source>The OCR engine could not start, so scanned pages (images without text) cannot be read. Papers with selectable text are not affected.
-
-The language data may be missing from:
-%1
-
-Reinstalling HodeIA should fix it.</source>
-        <translation type="vanished">Le moteur OCR n&apos;a pas pu démarrer : les pages numérisées (images sans texte) ne peuvent pas être lues. Les articles dont le texte est sélectionnable ne sont pas concernés.
-
-Les données de langue manquent peut-être dans :
-%1
-
-Réinstaller HodeIA devrait corriger le problème.</translation>
-    </message>
-    <message>
         <location filename="../src/ingestionengine.cpp" line="31"/>
         <source>%1/%2 passages</source>
         <translation>%1/%2 passages</translation>
@@ -1912,10 +1713,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <location filename="../src/ingestionengine.cpp" line="146"/>
         <source>Ingestion cancelled</source>
         <translation>Importation annulée</translation>
-    </message>
-    <message>
-        <source>Extracting %1-%2/%3</source>
-        <translation type="vanished">Extraction %1-%2/%3</translation>
     </message>
     <message>
         <location filename="../src/ingestionengine.cpp" line="68"/>
@@ -1939,10 +1736,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <location filename="../src/ingestionengine.cpp" line="208"/>
         <source>Embedding %1 chunks...</source>
         <translation>Embedding de %1 fragments...</translation>
-    </message>
-    <message>
-        <source>Batch %1/%2</source>
-        <translation type="vanished">Lot %1/%2</translation>
     </message>
     <message numerus="yes">
         <location filename="../src/ingestionengine.cpp" line="248"/>
@@ -2030,37 +1823,9 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Échec de l&apos;import</translation>
     </message>
     <message>
-        <source>invalid path</source>
-        <translation type="vanished">chemin invalide</translation>
-    </message>
-    <message>
-        <source>PDF reader initialisation failed</source>
-        <translation type="vanished">échec de l&apos;initialisation du lecteur PDF</translation>
-    </message>
-    <message>
-        <source>the file cannot be opened (damaged or not a PDF?)</source>
-        <translation type="vanished">le fichier ne peut pas être ouvert (endommagé ou pas un PDF ?)</translation>
-    </message>
-    <message>
-        <source>the pages cannot be read (damaged file?)</source>
-        <translation type="vanished">les pages ne peuvent pas être lues (fichier endommagé ?)</translation>
-    </message>
-    <message>
         <location filename="../src/ingestionengine.cpp" line="110"/>
         <source>%1 — page %2/%3</source>
         <translation>%1 — page %2/%3</translation>
-    </message>
-    <message>
-        <source>These papers could not be indexed for search and were not added:</source>
-        <translation type="vanished">Ces articles n&apos;ont pas pu être indexés pour la recherche et n&apos;ont pas été ajoutés :</translation>
-    </message>
-    <message>
-        <source>The embedding model could not process their text. See the log for details, then add the files again.</source>
-        <translation type="vanished">Le modèle d&apos;embedding n&apos;a pas pu traiter leur texte. Consultez le journal pour plus de détails, puis ajoutez de nouveau les fichiers.</translation>
-    </message>
-    <message>
-        <source>Warning: embedding model not loaded, skipping vector storage</source>
-        <translation type="vanished">Attention : modèle d&apos;embedding non chargé, stockage vectoriel ignoré</translation>
     </message>
     <message>
         <location filename="../src/ingestionengine.cpp" line="188"/>
@@ -2126,10 +1891,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <source>%1 · truncated</source>
         <translation>%1 · tronqué</translation>
     </message>
-    <message>
-        <source>Export</source>
-        <translation type="vanished">Exporter</translation>
-    </message>
 </context>
 <context>
     <name>QueryWorker</name>
@@ -2154,52 +1915,44 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Impossible de chercher dans la bibliothèque : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="108"/>
+        <location filename="../src/queryworker.cpp" line="107"/>
         <source>Query cancelled</source>
         <translation>Requête annulée</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="114"/>
+        <location filename="../src/queryworker.cpp" line="113"/>
         <source>Empty response from model</source>
         <translation>Réponse vide du modèle</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="133"/>
+        <location filename="../src/queryworker.cpp" line="132"/>
         <source>The answer could not be saved in the history: %1</source>
         <translation>La réponse n&apos;a pas pu être enregistrée dans l&apos;historique : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="170"/>
+        <location filename="../src/queryworker.cpp" line="169"/>
         <source>No model file found for &quot;%1&quot;</source>
         <translation>Aucun fichier de modèle trouvé pour « %1 »</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="172"/>
+        <location filename="../src/queryworker.cpp" line="171"/>
         <source>Failed to load model: %1</source>
         <translation>Échec du chargement du modèle : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="174"/>
+        <location filename="../src/queryworker.cpp" line="173"/>
         <source>Remote request timed out after %1 minutes</source>
         <translation>La requête distante a expiré après %1 minutes</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="179"/>
+        <location filename="../src/queryworker.cpp" line="178"/>
         <source>Remote request failed: %1</source>
         <translation>Échec de la requête distante : %1</translation>
     </message>
     <message>
-        <location filename="../src/queryworker.cpp" line="205"/>
+        <location filename="../src/queryworker.cpp" line="203"/>
         <source>the project database is not open</source>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
-    </message>
-    <message>
-        <source>database error (prepare failed)</source>
-        <translation type="vanished">erreur de base de données (préparation échouée)</translation>
-    </message>
-    <message>
-        <source>Sources Consulted</source>
-        <translation type="vanished">Sources consultées</translation>
     </message>
 </context>
 <context>
@@ -2255,10 +2008,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <source>No queries selected</source>
-        <translation type="vanished">Aucune requête sélectionnée</translation>
-    </message>
-    <message>
         <location filename="../ui/RagDbPane.qml" line="258"/>
         <source>Delete Queries</source>
         <translation>Supprimer les requêtes</translation>
@@ -2280,14 +2029,6 @@ Réinstaller HodeIA devrait corriger le problème.</translation>
         <location filename="../ui/RagWindow.qml" line="10"/>
         <source>HodeIA</source>
         <translation>HodeIA</translation>
-    </message>
-    <message>
-        <source>Questions</source>
-        <translation type="vanished">Questions</translation>
-    </message>
-    <message>
-        <source>Conversation with an Agent</source>
-        <translation type="vanished">Conversation avec un agent</translation>
     </message>
     <message>
         <location filename="../ui/RagWindow.qml" line="50"/>
@@ -2374,29 +2115,27 @@ Nouvel essai au prochain démarrage.</translation>
         <translation>Envoi de la requête vers %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="160"/>
-        <location filename="../src/remotebackend.cpp" line="180"/>
-        <location filename="../src/remotebackend.cpp" line="203"/>
+        <location filename="../src/remotebackend.cpp" line="142"/>
         <source>Backend not configured (URL or model missing)</source>
         <translation>Backend non configuré (URL ou modèle manquant)</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="317"/>
+        <location filename="../src/remotebackend.cpp" line="256"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d&apos;analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="327"/>
+        <location filename="../src/remotebackend.cpp" line="266"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="346"/>
+        <location filename="../src/remotebackend.cpp" line="285"/>
         <source>Empty content in response</source>
         <translation>Contenu vide dans la réponse</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="350"/>
+        <location filename="../src/remotebackend.cpp" line="289"/>
         <source>Response received (%1 chars)</source>
         <translation>Réponse reçue (%1 caractères)</translation>
     </message>
@@ -2484,14 +2223,6 @@ Nouvel essai au prochain démarrage.</translation>
         <translation>la base de données du projet n&apos;est pas ouverte</translation>
     </message>
     <message>
-        <source>database error (prepare failed)</source>
-        <translation type="vanished">erreur de base de données (préparation échouée)</translation>
-    </message>
-    <message>
-        <source>Empty response</source>
-        <translation type="vanished">Réponse vide</translation>
-    </message>
-    <message>
         <location filename="../src/summarizer.cpp" line="109"/>
         <source>Summary generated and saved (%1 chars)</source>
         <translation>Résumé généré et enregistré (%1 caractères)</translation>
@@ -2546,10 +2277,6 @@ Nouvel essai au prochain démarrage.</translation>
         <location filename="../ui/SummaryDbPane.qml" line="241"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
-    </message>
-    <message>
-        <source>No papers selected</source>
-        <translation type="vanished">Aucun article sélectionné</translation>
     </message>
     <message>
         <location filename="../ui/SummaryDbPane.qml" line="60"/>

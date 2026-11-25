@@ -162,29 +162,8 @@ QDateTime SqliteStatement::columnDateTime(int index) const {
       QString::fromUtf8(reinterpret_cast<const char *>(text)), Qt::ISODate);
 }
 
-int SqliteStatement::columnType(int index) const {
-  return sqlite3_column_type(m_stmt, index);
-}
-
-int SqliteStatement::columnCount() const {
-  return sqlite3_column_count(m_stmt);
-}
-
 bool SqliteStatement::columnIsNull(int index) const {
   return sqlite3_column_type(m_stmt, index) == SQLITE_NULL;
-}
-
-const char *SqliteStatement::columnTextRaw(int index) const {
-  const unsigned char *text = sqlite3_column_text(m_stmt, index);
-  return reinterpret_cast<const char *>(text);
-}
-
-const unsigned char *SqliteStatement::columnBlobRaw(int index) const {
-  return static_cast<const unsigned char *>(sqlite3_column_blob(m_stmt, index));
-}
-
-int SqliteStatement::columnBytes(int index) const {
-  return sqlite3_column_bytes(m_stmt, index);
 }
 
 /* ── SqliteDb ────────────────────────────────────────────────── */
