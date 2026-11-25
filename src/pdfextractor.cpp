@@ -158,16 +158,23 @@ private:
 };
 
 /// Text of a page by OCR, empty if it cannot be read.
-QString extractTextWithOcr(OcrEngine &ocr, fz_context *ctx, fz_document *doc,
-                           int pageNum) {
+QString extractTextWithOcr(OcrEngine &ocr, fz_context *ctx, fz_page *page) {
   tesseract::TessBaseAPI *api = ocr.api();
   if (!api)
     return QString();
 
-  // Render at 300 DPI grayscale — optimal quality/speed trade-off.
-  fz_matrix ctm = fz_scale(300.0f / 72.0f, 300.0f / 72.0f);
-  fz_pixmap *pix = fz_new_pixmap_from_page_number(ctx, doc, pageNum, ctm,
-                                                  fz_device_gray(ctx), 0);
+  // Render at 300 DPI grayscale — optimal quality/speed trade-off.  In its
+  // own fz_try, before any Qt object of this function exists: a MuPDF error
+  // must not jump over C++ destructors.
+  const fz_matrix ctm = fz_scale(300.0f / 72.0f, 300.0f / 72.0f);
+  fz_pixmap *volatile pix = nullptr;
+  fz_try(ctx) {
+    pix = fz_new_pixmap_from_page(ctx, page, ctm, fz_device_gray(ctx), 0);
+  }
+  fz_catch(ctx) {
+    qWarning() << "[OCR] page rendering failed:" << fz_caught_message(ctx);
+    return QString();
+  }
   if (!pix)
     return QString();
 
@@ -489,7 +496,9 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
     return result;
   }
 
-  fz_try(ctx) { doc = fz_open_document(ctx, localPath.toUtf8().constData()); }
+  // Built outside fz_try: a MuPDF error would jump over its destructor.
+  const QByteArray pathUtf8 = localPath.toUtf8();
+  fz_try(ctx) { doc = fz_open_document(ctx, pathUtf8.constData()); }
   fz_catch(ctx) {
     fz_drop_context(ctx);
     result.error = tr("the file cannot be opened (damaged or not a PDF?)");
@@ -526,10 +535,16 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
     if (progress)
       progress(result.fileName, i + 1, pageCount);
 
-    fz_page *page = nullptr;
-    fz_stext_page *textPage = nullptr;
-    fz_device *dev = nullptr;
-    fz_pixmap *pix = nullptr;
+    // fz_try is setjmp/longjmp: a MuPDF error jumps straight to fz_catch.
+    // So only MuPDF calls run inside it, on these volatile pointers (a
+    // non-volatile local changed after setjmp is indeterminate after the
+    // jump); everything Qt (strings, images, OCR) runs after, outside it,
+    // where no jump can skip its destructors.
+    fz_page *volatile page = nullptr;
+    fz_stext_page *volatile textPage = nullptr;
+    fz_device *volatile dev = nullptr;
+    fz_pixmap *volatile pix = nullptr;
+    volatile bool loaded = false;
 
     // Per-page metadata
     PageMetadata pageMeta;
@@ -558,6 +573,7 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
       dev = fz_new_stext_device(ctx, textPage, &opts);
       fz_run_page(ctx, page, dev, fz_identity, nullptr);
       fz_close_device(ctx, dev);
+      fz_drop_device(ctx, dev);
       dev = nullptr;
 
       fz_segment_stext_page(ctx, textPage);
@@ -569,65 +585,74 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
       fz_table_hunt(ctx, textPage, &huntOpts);
 
       // ------------------------------------------------------------------
-      // 1b. Detect figures, vector graphics, and tables
+      // 2. Page image (kPageImageDpi, RGB), from the page already loaded
       // ------------------------------------------------------------------
-      {
-        fz_stext_page_block_iterator it =
-            fz_stext_page_block_iterator_begin_dfs(textPage);
-        while (!fz_stext_page_block_iterator_eod_dfs(it)) {
-          fz_stext_block *block = it.block;
-          if (block && block->type == FZ_STEXT_BLOCK_IMAGE) {
+      pix = fz_new_pixmap_from_page(ctx, page, ctm, fz_device_rgb(ctx), 0);
+      loaded = true;
+    }
+    fz_catch(ctx) {
+      qWarning() << "[PdfExtractor] Error extracting page" << i + 1 << ":"
+                 << fz_caught_message(ctx);
+    }
+
+    if (loaded) {
+      // ------------------------------------------------------------------
+      // 1b. Detect figures, vector graphics, and tables (plain traversal)
+      // ------------------------------------------------------------------
+      fz_stext_page_block_iterator it =
+          fz_stext_page_block_iterator_begin_dfs(textPage);
+      while (!fz_stext_page_block_iterator_eod_dfs(it)) {
+        fz_stext_block *block = it.block;
+        if (block && block->type == FZ_STEXT_BLOCK_IMAGE) {
+          pageMeta.figureCount++;
+          pageMeta.hasFigure = true;
+        }
+        if (block && block->type == FZ_STEXT_BLOCK_VECTOR) {
+          // Vector blocks: lines, curves, rects drawn as paths.
+          // These represent charts, graphs, diagrams, decorative elements.
+          // Filter out tiny vectors (underlines, diacritics, rules) by bbox.
+          fz_rect vb = block->bbox;
+          float area = (vb.x1 - vb.x0) * (vb.y1 - vb.y0);
+          if (area > 500) { // > ~22x22 pts — meaningful graphic
+            pageMeta.hasVectorGraphics = true;
+            // Count vector graphics as figures too.
             pageMeta.figureCount++;
             pageMeta.hasFigure = true;
           }
-          if (block && block->type == FZ_STEXT_BLOCK_VECTOR) {
-            // Vector blocks: lines, curves, rects drawn as paths.
-            // These represent charts, graphs, diagrams, decorative elements.
-            // Filter out tiny vectors (underlines, diacritics, rules) by bbox.
-            fz_rect vb = block->bbox;
-            float area = (vb.x1 - vb.x0) * (vb.y1 - vb.y0);
-            if (area > 500) { // > ~22x22 pts — meaningful graphic
-              pageMeta.hasVectorGraphics = true;
-              // Count vector graphics as figures too.
-              pageMeta.figureCount++;
-              pageMeta.hasFigure = true;
-            }
-          }
-          if (block && block->type == FZ_STEXT_BLOCK_GRID) {
-            // fz_table_hunt creates GRID blocks for any aligned text structure.
-            // This includes real tables but also justified text that looks
-            // column-aligned. The caller (LLM) decides if it's meaningful.
-            fz_stext_grid_info *grid = block->u.b.info;
-            if (grid && grid->w >= 2 && grid->h >= 2) {
-              int contentCells = 0;
-              for (int g = 0; g < grid->w * grid->h; ++g) {
-                if (grid->info[g].flags & FZ_STEXT_GRID_FULL)
-                  contentCells++;
-              }
-              if (contentCells >= 4) {
-                pageMeta.hasTable = true;
-              }
-            }
-          }
-          it = fz_stext_page_block_iterator_next_dfs(it);
         }
+        if (block && block->type == FZ_STEXT_BLOCK_GRID) {
+          // fz_table_hunt creates GRID blocks for any aligned text structure.
+          // This includes real tables but also justified text that looks
+          // column-aligned. The caller (LLM) decides if it's meaningful.
+          fz_stext_grid_info *grid = block->u.b.info;
+          if (grid && grid->w >= 2 && grid->h >= 2) {
+            int contentCells = 0;
+            for (int g = 0; g < grid->w * grid->h; ++g) {
+              if (grid->info[g].flags & FZ_STEXT_GRID_FULL)
+                contentCells++;
+            }
+            if (contentCells >= 4) {
+              pageMeta.hasTable = true;
+            }
+          }
+        }
+        it = fz_stext_page_block_iterator_next_dfs(it);
       }
 
       // ------------------------------------------------------------------
-      // 2. Page image (kPageImageDpi, RGB)
+      // 2b. Save the page image
       // ------------------------------------------------------------------
-      // From the page already loaded (not reloaded by its number).
-      pix = fz_new_pixmap_from_page(ctx, page, ctm, fz_device_rgb(ctx), 0);
-      // Over MuPDF's buffer, no copy: saved before the pixmap is dropped.
-      const QImage img(pix->samples, pix->w, pix->h, pix->stride,
-                       QImage::Format_RGB888);
-
-      QString fileName = QString("%1_page_%2.png")
-                             .arg(result.paperHash)
-                             .arg(i + 1, 3, 10, QChar('0'));
-      if (!img.save(QDir(imgPath).filePath(fileName), "PNG",
-                    kPagePngQuality)) {
-        qCritical() << "[PdfExtractor] Failed to save thumbnail:" << i + 1;
+      {
+        // Over MuPDF's buffer, no copy: saved before the pixmap is dropped.
+        const QImage img(pix->samples, pix->w, pix->h, pix->stride,
+                         QImage::Format_RGB888);
+        const QString fileName = QString("%1_page_%2.png")
+                                     .arg(result.paperHash)
+                                     .arg(i + 1, 3, 10, QChar('0'));
+        if (!img.save(QDir(imgPath).filePath(fileName), "PNG",
+                      kPagePngQuality)) {
+          qCritical() << "[PdfExtractor] Failed to save thumbnail:" << i + 1;
+        }
       }
       fz_drop_pixmap(ctx, pix);
       pix = nullptr;
@@ -645,7 +670,7 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
                         .arg(pageTextStr.trimmed().length());
         QElapsedTimer ocrTimer;
         ocrTimer.start();
-        pageTextStr = extractTextWithOcr(ocr, ctx, doc, i);
+        pageTextStr = extractTextWithOcr(ocr, ctx, page);
         ocrMs += ocrTimer.elapsed();
         pageMeta.ocrChars = pageTextStr.length();
         qDebug() << QString("[OCR] page %1/%2: %4 chars produced")
@@ -668,17 +693,16 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
         pageMap.push_back(i);
       fullText.append(pageTextStr);
     }
-    fz_always(ctx) {
-      if (pix)
-        fz_drop_pixmap(ctx, pix);
-      if (dev)
-        fz_drop_device(ctx, dev);
-      if (textPage)
-        fz_drop_stext_page(ctx, textPage);
-      if (page)
-        fz_drop_page(ctx, page);
-    }
-    fz_catch(ctx) { qWarning() << "[PdfExtractor] Error extracting page" << i; }
+
+    // The fz_drop_* functions do not throw.
+    if (pix)
+      fz_drop_pixmap(ctx, pix);
+    if (dev)
+      fz_drop_device(ctx, dev);
+    if (textPage)
+      fz_drop_stext_page(ctx, textPage);
+    if (page)
+      fz_drop_page(ctx, page);
 
     // Store page metadata (outside fz_try/fz_catch so it always runs)
     result.pageMetadata.append(pageMeta);

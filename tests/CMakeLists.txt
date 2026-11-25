@@ -48,6 +48,11 @@ hodeia_add_test(tst_projectstore)
 hodeia_add_test(tst_database)
 hodeia_add_test(tst_libraryrepository)
 hodeia_add_test(tst_ingestionpipeline)
+hodeia_add_test(tst_pdfextractor)
+# The OCR fallback reads tessdata/ next to the executable, as for the app.
+add_custom_command(TARGET tst_pdfextractor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        ${CMAKE_SOURCE_DIR}/Resources/tessdata $<TARGET_FILE_DIR:tst_pdfextractor>/tessdata)
 hodeia_add_test(tst_conversationrepository)
 hodeia_add_test(tst_citationrepository)
 hodeia_add_test(tst_systemmemory)
