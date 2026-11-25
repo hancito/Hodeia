@@ -1,4 +1,5 @@
 #include "pdfexport.h"
+#include "mupdfcontext.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -287,7 +288,9 @@ QString writeHtml(const QString &html, const QString &destPath) {
   GlyphTextMap clusters;
   std::vector<std::pair<fz_font *, QByteArray>> toUnicodeFixes;
 
-  fz_context *ctx = fz_new_context(nullptr, nullptr, FZ_STORE_DEFAULT);
+  // Shares the lock MuPDF needs with a running import (see MuPdfContext).
+  const MuPdfContext context(FZ_STORE_DEFAULT);
+  fz_context *ctx = context.get();
   if (!ctx) {
     qCritical() << "[PDF] Cannot create MuPDF context";
     return QString();
@@ -392,7 +395,6 @@ QString writeHtml(const QString &html, const QString &destPath) {
   fz_drop_story(ctx, story);
   fz_drop_buffer(ctx, buf);
   fz_drop_archive(ctx, fonts);
-  fz_drop_context(ctx);
 
   if (!ok) {
     QFile::remove(path); // don't leave a truncated file behind

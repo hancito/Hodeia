@@ -11,6 +11,75 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <thread>
+#include <vector>
+
+namespace {
+
+// A 96x96 JPEG 2000 image (opj_compress), as found in many scanned papers.
+const char kJp2Base64[] =
+    "AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAYAAAAGAA"
+    "Aw8HAAAAAAAPY29scgEAAAAAABAAAAHpanAyY/9P/1EALwAAAAAAYAAAAGAAAAAAAAAAAAAAAGAA"
+    "AABgAAAAAAAAAAAAAw8BAQ8BAQ8BAf9SAAwAAAABAQUEBAAB/1wAE0CAiIiQiIiQiIiQiIiQiIiQ"
+    "/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAABYgAB/5PP/Cgg"
+    "COwrQmAAAAPf+IB4DLi0Jxe3Uvh71PFRhUxH/3iwkATMSUWx+JYSig6B3kZKpJBfD4Ch/0GCQAy7"
+    "rugDdKyJf6H/QIJADj1cdAG6VIt/gKD/YAHANknEOCuCGYKnjkfkUmOg/2ABgDehyDgrghmCp7bx"
+    "v4Cgf4GghCAqjtGgcAAA/omFEI7K7FqptVpkUw/V0j+gf4FQhAqqTtGgcAAA/omFEC5YGQ8A1Uqs"
+    "gKA/kgDKnEqiM/k4kgAAYQfbiEs1U723gGEQM+HSd4pabIr/f6A/kZDKluqSM/k4kgAAYQfbiEvG"
+    "FC8Q6WNpU1dngKAfsXDxfQCqLIPuI4gAAYSEBMbCQl6t5AAwkJdycwAYSDuDWEg6J++ZOmzQn/Q4"
+    "sq6foB+xYPF8qqksg+4jiAABhIQExsJCXq3kADCQl3JzABhIO4NYSDqUV1qKrXIOxh/x/9k=";
+
+/// A PDF whose pages each draw their own JPEG 2000 image (/JPXDecode) under
+/// a line of text (long enough to skip the OCR fallback).
+QByteArray jpxPdf(int pages) {
+  const QByteArray jp2 = QByteArray::fromBase64(kJp2Base64);
+  QList<QByteArray> objects; // object n is objects[n - 1]
+  objects << "<< /Type /Catalog /Pages 2 0 R >>" << QByteArray()
+          << "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  QByteArray kids;
+  for (int i = 0; i < pages; ++i) {
+    const int image = objects.size() + 1;
+    objects << "<< /Type /XObject /Subtype /Image /Width 96 /Height 96 "
+               "/Filter /JPXDecode /Length " +
+                   QByteArray::number(jp2.size()) + " >>\nstream\n" + jp2 +
+                   "\nendstream";
+    // Short lines: text past the page edge is clipped away.
+    const QByteArray content =
+        "q 200 0 0 200 50 40 cm /Im0 Do Q BT /F1 7 Tf 9 TL 10 285 Td (Page " +
+        QByteArray::number(i + 1) + " of a paper) Tj" +
+        QByteArray(" T* (with a JPEG 2000 figure below it.) Tj").repeated(4) +
+        " ET";
+    objects << "<< /Length " + QByteArray::number(content.size()) +
+                   " >>\nstream\n" + content + "\nendstream";
+    const int page = objects.size() + 1;
+    objects << "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] "
+               "/Resources << /Font << /F1 3 0 R >> /XObject << /Im0 " +
+                   QByteArray::number(image) + " 0 R >> >> /Contents " +
+                   QByteArray::number(image + 1) + " 0 R >>";
+    kids += QByteArray::number(page) + " 0 R ";
+  }
+  objects[1] = "<< /Type /Pages /Kids [" + kids + "] /Count " +
+               QByteArray::number(pages) + " >>";
+
+  QByteArray pdf = "%PDF-1.5\n";
+  QList<qsizetype> offsets;
+  for (int n = 0; n < objects.size(); ++n) {
+    offsets << pdf.size();
+    pdf += QByteArray::number(n + 1) + " 0 obj\n" + objects[n] + "\nendobj\n";
+  }
+  const qsizetype xref = pdf.size();
+  pdf += "xref\n0 " + QByteArray::number(objects.size() + 1) +
+         "\n0000000000 65535 f \n";
+  for (qsizetype off : offsets)
+    pdf += QByteArray::number(off).rightJustified(10, '0') + " 00000 n \n";
+  pdf += "trailer\n<< /Size " + QByteArray::number(objects.size() + 1) +
+         " /Root 1 0 R >>\nstartxref\n" + QByteArray::number(xref) +
+         "\n%%EOF\n";
+  return pdf;
+}
+
+} // namespace
+
 class TestPdfExtractor : public QObject {
   Q_OBJECT
 
@@ -19,6 +88,7 @@ private slots:
   void pageWithoutText();
   void damagedFile();
   void truncatedFile();
+  void parallelJpxImages();
 
 private:
   QString writePdf(const QString &name, const QStringList &pages,
@@ -143,6 +213,38 @@ void TestPdfExtractor::truncatedFile() {
   const ExtractionResult r = extract(cut);
   if (r.error.isEmpty())
     QCOMPARE(r.pageMetadata.size(), r.pageCount); // one entry per page
+}
+
+// Several files with JPEG 2000 images read at once, as the import's
+// extraction threads do.  MuPDF's JPX decoder keeps its context in a global
+// guarded by a lock every context must share: without it, one thread's
+// context was reset under another (crash in fz_free).
+void TestPdfExtractor::parallelJpxImages() {
+  constexpr int kFiles = 6, kPages = 12;
+  QStringList paths;
+  for (int f = 0; f < kFiles; ++f) {
+    const QString path = m_dir.filePath(QString("jpx%1.pdf").arg(f));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    // A different trailing comment per file: a different hash, so the
+    // threads do not write the same page images.
+    file.write(jpxPdf(kPages) + "% file " + QByteArray::number(f) + "\n");
+    file.close();
+    paths << path;
+  }
+  std::vector<ExtractionResult> results(kFiles);
+  std::vector<std::thread> threads;
+  for (int f = 0; f < kFiles; ++f)
+    threads.emplace_back(
+        [this, &results, &paths, f] { results[f] = extract(paths[f]); });
+  for (std::thread &t : threads)
+    t.join();
+  for (const ExtractionResult &r : results) {
+    QVERIFY2(r.error.isEmpty(), qPrintable(r.error));
+    QCOMPARE(r.pageCount, kPages);
+    QVERIFY(r.pageMetadata[0].hasFigure); // the image was decoded
+    QVERIFY(!r.pageMetadata[0].isScanned);
+  }
 }
 
 QTEST_MAIN(TestPdfExtractor)

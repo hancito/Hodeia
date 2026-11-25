@@ -1,4 +1,5 @@
 #include "pdfextractor.h"
+#include "mupdfcontext.h"
 #include "notifier.h"
 #include "sqlitevec.h"
 
@@ -480,10 +481,12 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
     return result;
   }
 
-  fz_context *ctx = nullptr;
+  // Shares the lock MuPDF needs across the extraction threads (see
+  // MuPdfContext); dropped when this function returns.
+  const MuPdfContext context(kMuPdfStoreBytes);
+  fz_context *ctx = context.get();
   fz_document *doc = nullptr;
 
-  ctx = fz_new_context(nullptr, nullptr, kMuPdfStoreBytes);
   if (!ctx) {
     result.error = tr("PDF reader initialisation failed");
     return result;
@@ -491,7 +494,6 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
 
   fz_try(ctx) { fz_register_document_handlers(ctx); }
   fz_catch(ctx) {
-    fz_drop_context(ctx);
     result.error = tr("PDF reader initialisation failed");
     return result;
   }
@@ -500,7 +502,6 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
   const QByteArray pathUtf8 = localPath.toUtf8();
   fz_try(ctx) { doc = fz_open_document(ctx, pathUtf8.constData()); }
   fz_catch(ctx) {
-    fz_drop_context(ctx);
     result.error = tr("the file cannot be opened (damaged or not a PDF?)");
     return result;
   }
@@ -512,7 +513,6 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
   fz_try(ctx) { pageCount = fz_count_pages(ctx, doc); }
   fz_catch(ctx) {
     fz_drop_document(ctx, doc);
-    fz_drop_context(ctx);
     result.error = tr("the pages cannot be read (damaged file?)");
     return result;
   }
@@ -740,7 +740,6 @@ ExtractionResult PdfExtractor::extract(const IngestionJob &job,
                            .arg(result.chunks.size());
 
   fz_drop_document(ctx, doc);
-  fz_drop_context(ctx);
 
   return result;
 }
