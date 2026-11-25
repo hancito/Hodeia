@@ -22,6 +22,7 @@ ToolBar {
 
     // ── Properties migrated from LeftPane ──
     signal openRagWindow
+    signal openZotero
     property var statusBarLabel: null
     property bool busy: false
 
@@ -148,6 +149,41 @@ ToolBar {
             icon.height: 32
             icon.source: "qrc:/Resources/folder-open.svg"
             onClicked: pdfFolderDialog.open()
+        }
+
+        // Zotero connector: followed collections and new PDFs to import
+        StyledButton {
+            id: zoterobtn
+            flat: true
+            enabled: !toolBar.busy
+            toolTip: zoteroController.proposals.length > 0
+                     ? qsTr("Zotero (%n new PDF(s))", "", zoteroController.proposals.length)
+                     : qsTr("Zotero")
+            display: AbstractButton.IconOnly
+            padding: 4
+            icon.width: 32
+            icon.height: 32
+            icon.source: "qrc:/Resources/zotero.svg"
+            onClicked: toolBar.openZotero()
+
+            // Badge: number of new Zotero PDFs waiting to be imported or ignored.
+            Rectangle {
+                visible: zoteroController.proposals.length > 0
+                anchors.top: parent.top
+                anchors.right: parent.right
+                width: Math.max(height, badgeLabel.implicitWidth + 6)
+                height: badgeLabel.implicitHeight + 2
+                radius: height / 2
+                color: Colors.red
+                Label {
+                    id: badgeLabel
+                    anchors.centerIn: parent
+                    text: zoteroController.proposals.length
+                    color: Colors.base
+                    font.pixelSize: 10
+                    font.bold: true
+                }
+            }
         }
 
         ToolSeparator {}

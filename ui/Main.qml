@@ -77,12 +77,12 @@ ThemedWindow {
         onRequestDeleteModels: deleteModelDialog.open()
         onRequestOpenAlexApiKey: openAlexKeyDialog.open()
         onRequestAbout: aboutDialog.open()
-        onRequestZotero: zoteroDialog.open()
     }
 
     header: MyToolBar {
         id: toolBarContainer
         statusBarLabel: footerLabel
+        onOpenZotero: zoteroDialog.open()
 
         onOpenRagWindow: {
             // Check if the window instance already exists and is valid
@@ -524,7 +524,7 @@ ThemedWindow {
         target: zoteroController
         function onNewProposals(count) {
             if (!zoteroDialog.opened)
-                footerLabel.text = qsTr("Zotero: %n new PDF(s) to import (Project > Zotero...)", "", count);
+                footerLabel.text = qsTr("Zotero: %n new PDF(s) to import (Zotero button in the toolbar)", "", count);
         }
     }
 

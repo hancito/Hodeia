@@ -12,7 +12,6 @@ MenuBar {
     signal requestDeleteModels
     signal requestOpenAlexApiKey
     signal requestAbout
-    signal requestZotero
 
     // ── Bar ──────────────────────────────────────────────────────────────
 
@@ -77,13 +76,6 @@ MenuBar {
                     }
                 }
             }
-        }
-        StyledMenuSeparator {}
-        StyledMenuItem {
-            text: zoteroController.proposals.length > 0
-                  ? qsTr("Zotero... (%1 new)").arg(zoteroController.proposals.length)
-                  : qsTr("Zotero...")
-            onTriggered: menuBar.requestZotero()
         }
         StyledMenuSeparator {}
         StyledMenuItem {

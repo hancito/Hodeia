@@ -366,7 +366,7 @@ set(_RES_FILES
     refresh.svg save.svg share-square.svg trash-can.svg circle-check.svg
     circle-xmark.svg arrow-circle-left.svg arrow-circle-right.svg
     magnifying-glass-plus.svg magnifying-glass-minus.svg arrow-rotate-back.svg
-    file-pdf-solid-full.svg file-pdf-regular-full.svg)
+    file-pdf-solid-full.svg file-pdf-regular-full.svg zotero.svg)
 foreach(_f ${_RES_FILES})
   set_source_files_properties(${CMAKE_SOURCE_DIR}/Resources/${_f}
       PROPERTIES QT_RESOURCE_ALIAS "Resources/${_f}")
@@ -398,6 +398,7 @@ qt_add_resources(Hodeia "resources"
         ${CMAKE_SOURCE_DIR}/Resources/arrow-rotate-back.svg
         ${CMAKE_SOURCE_DIR}/Resources/file-pdf-solid-full.svg
         ${CMAKE_SOURCE_DIR}/Resources/file-pdf-regular-full.svg
+        ${CMAKE_SOURCE_DIR}/Resources/zotero.svg
 )
 
 # Link HodeiaEngine + Qt GUI components

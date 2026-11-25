@@ -17,5 +17,6 @@
         <file>Resources/trash-can.svg</file>
         <file>Resources/file-pdf-solid-full.svg</file>
         <file>Resources/file-pdf-regular-full.svg</file>
+        <file>Resources/zotero.svg</file>
     </qresource>
 </RCC>
