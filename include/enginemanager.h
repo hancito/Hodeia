@@ -35,6 +35,9 @@ signals:
   /// End-of-import summary for a message window (see PdfWorker::report).
   void ingestionReport(const QString &title, const QString &message,
                        bool isError);
+  /// The project database the import writes to, when it starts; empty
+  /// once its thread has stopped (nothing more is written).
+  void ingestionTargetChanged(const QString &dbPath);
 
 private:
   void releaseAndReloadModel();

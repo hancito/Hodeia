@@ -11,6 +11,29 @@
 #include <QJsonObject>
 #include <expected>
 
+namespace {
+
+/// The write lock on the shared connection, taken without waiting: false
+/// while a worker operation holds it for reading.
+class ConnectionCloseLock {
+public:
+  explicit ConnectionCloseLock(QReadWriteLock &lock)
+      : m_lock(lock), m_locked(lock.tryLockForWrite()) {}
+  ~ConnectionCloseLock() {
+    if (m_locked)
+      m_lock.unlock();
+  }
+  ConnectionCloseLock(const ConnectionCloseLock &) = delete;
+  ConnectionCloseLock &operator=(const ConnectionCloseLock &) = delete;
+  explicit operator bool() const { return m_locked; }
+
+private:
+  QReadWriteLock &m_lock;
+  bool m_locked;
+};
+
+} // namespace
+
 DatabaseManager::DatabaseManager(ConfigManager *config,
                                  SqliteVecManager &embeddings, QObject *parent)
     : QObject(parent), m_config(config), m_summaryModel(new SummaryModel(this)),
@@ -121,21 +144,26 @@ QString DatabaseManager::databasePath() const { return m_dbPath; }
 
 std::expected<void, QString>
 DatabaseManager::switchDatabase(const QString &dbPath) {
-  if (dbPath.isEmpty()) {
-    qWarning() << "Empty database path";
-    return std::unexpected("Empty database path");
-  }
-
   // Refuse to close the connection while a worker thread is mid-statement on
   // it — that would run the worker's in-flight prepare/step/finalize on a
   // closed handle (use-after-close). The caller should retry once the
   // current operation finishes.
-  if (m_opsInFlight.loadRelaxed() > 0) {
+  const ConnectionCloseLock lock(m_connectionLock);
+  if (!lock) {
     qWarning() << "[Database] switchDatabase refused — a worker operation "
                   "is in flight. Retry when it completes.";
     return std::unexpected(
         tr("Cannot switch project while an operation (summary, query) is in "
            "progress. Try again once it has finished."));
+  }
+  return switchDatabaseLocked(dbPath);
+}
+
+std::expected<void, QString>
+DatabaseManager::switchDatabaseLocked(const QString &dbPath) {
+  if (dbPath.isEmpty()) {
+    qWarning() << "Empty database path";
+    return std::unexpected("Empty database path");
   }
 
   const QString previousPath = m_dbPath;
@@ -177,21 +205,33 @@ QString DatabaseManager::deleteProjects(const QStringList &projectNames) {
   const QString active = m_config->lastProject().trimmed();
   bool deletingActive = false;
   for (const QString &name : projectNames) {
-    if (name.trimmed() == active) {
-      deletingActive = true;
-      break;
+    // An import writes to its project through its own connection: deleting
+    // the files under it would lose its papers or leave a stray database.
+    if (isIngestingInto(m_config->projectDbPath(name.trimmed()))) {
+      qWarning() << "[Database] deleteProjects refused — an import is "
+                    "writing to" << name;
+      return tr("Cannot delete the project \"%1\" while papers are being "
+                "imported into it.")
+          .arg(name.trimmed());
     }
+    if (name.trimmed() == active)
+      deletingActive = true;
   }
 
-  if (deletingActive) {
-    // Same guard as switchDatabase(): never close the connection under a
-    // worker that is mid-statement on it.
-    if (m_opsInFlight.loadRelaxed() > 0) {
+  // Same guard as switchDatabase(): never close the connection under a
+  // worker that is mid-statement on it.  Held until the new active project
+  // is open.
+  const ConnectionCloseLock lock(m_connectionLock);
+  if (deletingActive || !m_db.isOpen()) {
+    if (!lock) {
       qWarning() << "[Database] deleteProjects refused — a worker operation "
                     "is in flight.";
       return tr("Cannot delete the active project while an operation is in "
                 "progress.");
     }
+  }
+
+  if (deletingActive) {
     // Release the .db (and its -wal/-shm files) so they can be deleted,
     // including the connections of background work (direct connections:
     // they are closed when this returns).
@@ -205,7 +245,7 @@ QString DatabaseManager::deleteProjects(const QStringList &projectNames) {
   // was deleted, or the same one again if its deletion failed.
   if (deletingActive || !m_db.isOpen()) {
     auto switchResult =
-        switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+        switchDatabaseLocked(m_config->projectDbPath(m_config->lastProject()));
     if (!switchResult)
       return result ? switchResult.error()
                     : result.error() + "\n" + switchResult.error();
@@ -220,7 +260,8 @@ QString DatabaseManager::activateProject(
     return tr("No configuration available");
   // Checked before touching the configuration, so a refused switch leaves
   // the active project unchanged.
-  if (m_opsInFlight.loadRelaxed() > 0)
+  const ConnectionCloseLock lock(m_connectionLock);
+  if (!lock)
     return tr("Cannot switch project while an operation (summary, query) is "
               "in progress. Try again once it has finished.");
 
@@ -230,7 +271,7 @@ QString DatabaseManager::activateProject(
     return result.error();
 
   auto switchResult =
-      switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+      switchDatabaseLocked(m_config->projectDbPath(m_config->lastProject()));
   if (!switchResult) {
     m_config->setLastProject(previous); // switchDatabase reopened it
     return switchResult.error();
@@ -251,29 +292,43 @@ QString DatabaseManager::switchProject(const QString &projectName) {
 QString DatabaseManager::clearActiveProject() {
   if (!m_config)
     return tr("No configuration available");
-  if (m_opsInFlight.loadRelaxed() > 0)
+  if (isIngestingInto(m_config->projectDbPath(m_config->lastProject())))
+    return tr("Cannot clear the project while papers are being imported "
+              "into it.");
+  const ConnectionCloseLock lock(m_connectionLock);
+  if (!lock)
     return tr("Cannot clear the project while an operation (summary, query) "
               "is in progress. Try again once it has finished.");
 
-  // Release the .db (and its -wal/-shm files) so they can be deleted.
+  // Release the .db (and its -wal/-shm files) so they can be deleted,
+  // including the connections of background work (direct connections:
+  // they are closed when this returns).
+  emit databaseClosing();
   m_db.close();
   const auto result = m_config->resetActiveProject();
 
   // Reopen the (now empty, or untouched on failure) project database.
   m_dbPath.clear(); // nothing to fall back to: the file was just recreated
   auto switchResult =
-      switchDatabase(m_config->projectDbPath(m_config->lastProject()));
+      switchDatabaseLocked(m_config->projectDbPath(m_config->lastProject()));
   if (!switchResult)
     return result ? switchResult.error()
                   : result.error() + "\n" + switchResult.error();
   return result ? QString() : result.error();
 }
 
-void DatabaseManager::beginDbOperation() {
-  m_opsInFlight.fetchAndAddOrdered(1);
+void DatabaseManager::beginDbOperation() { m_connectionLock.lockForRead(); }
+
+void DatabaseManager::endDbOperation() { m_connectionLock.unlock(); }
+
+void DatabaseManager::setIngestionTarget(const QString &dbPath) {
+  m_ingestionTarget = dbPath;
 }
 
-void DatabaseManager::endDbOperation() { m_opsInFlight.fetchAndAddOrdered(-1); }
+bool DatabaseManager::isIngestingInto(const QString &dbPath) const {
+  return !m_ingestionTarget.isEmpty() &&
+         QDir::cleanPath(m_ingestionTarget) == QDir::cleanPath(dbPath);
+}
 
 void DatabaseManager::setOpenAlexClient(OpenAlexClient *client) {
   m_openAlexClient = client;

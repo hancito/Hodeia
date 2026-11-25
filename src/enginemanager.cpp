@@ -82,8 +82,10 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
             // if stopEngine() is called again (e.g. from the destructor).
             // Only if they still point at this run — a stale handler from a
             // previous run must not clobber a newer run's thread/worker.
-            if (m_thread == thisThread)
+            if (m_thread == thisThread) {
               m_thread = nullptr;
+              emit ingestionTargetChanged(QString());
+            }
             if (m_worker == thisWorker)
               m_worker = nullptr;
           });
@@ -107,6 +109,7 @@ void EngineController::startEngine(const QList<QUrl> &pdfFiles,
           &EngineController::releaseAndReloadModel, Qt::QueuedConnection);
 
   qInfo() << "[EngineController] Starting worker thread";
+  emit ingestionTargetChanged(db);
   thisThread->start();
 }
 
@@ -124,6 +127,7 @@ void EngineController::stopEngine() {
   // The lambda above also nullifies these when the thread finishes naturally.
   m_worker = nullptr;
   m_thread = nullptr;
+  emit ingestionTargetChanged(QString());
 }
 
 void EngineController::cancelEngine() {

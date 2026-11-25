@@ -6,8 +6,8 @@
 #include "sqlitevec.h"
 #include "summary.h"
 #include "summaryproxymodel.h"
-#include <QAtomicInt>
 #include <QObject>
+#include <QReadWriteLock>
 #include <QTimer>
 #include <expected>
 #include <functional>
@@ -65,12 +65,19 @@ public:
   Q_INVOKABLE QString removeByHashes(const QStringList &hashes);
   Q_INVOKABLE QString removeQueriesByIds(const QVariantList &ids);
 
-  // Begin/end a worker operation that uses the shared SQLite connection.
-  // switchDatabase() refuses to close the connection while any operation is
-  // in flight, so a worker's in-flight statement cannot run on a closed
-  // handle (use-after-close).
+  // Begin/end a worker operation that uses the shared SQLite connection
+  // (a read lock on m_connectionLock, taken and released on the same
+  // thread).  Closing the connection takes the write lock without waiting:
+  // it is refused while an operation is in flight, and an operation that
+  // begins during a switch waits for it to end.  So a worker's statement
+  // never runs on a closed handle (use-after-close).
   void beginDbOperation();
   void endDbOperation();
+
+  // The project database an import is writing to through its own
+  // connection (empty when no import runs).  That project cannot be
+  // deleted or cleared meanwhile.
+  void setIngestionTarget(const QString &dbPath);
 
 signals:
   // Emitted after switchDatabase() opened a new project DB.
@@ -91,6 +98,10 @@ private:
   /// Open a project database through ProjectStore (schema migrations);
   /// a user-facing message on failure.
   std::expected<void, QString> openProjectDb(const QString &path);
+  /// switchDatabase() once m_connectionLock is held for writing.
+  std::expected<void, QString> switchDatabaseLocked(const QString &dbPath);
+  /// Whether an import is writing to @p dbPath.
+  bool isIngestingInto(const QString &dbPath) const;
   /// Every few seconds: reload the models when another process wrote
   /// summaries (cheap when nothing changed: PRAGMA data_version).
   void checkExternalChanges();
@@ -105,7 +116,8 @@ private:
   QueryProxyModel *m_queryProxyModel = nullptr;
   SqliteVecManager &m_vecManager;
   OpenAlexClient *m_openAlexClient = nullptr;
-  QAtomicInt m_opsInFlight{0};
+  QReadWriteLock m_connectionLock;
+  QString m_ingestionTarget;
   QTimer *m_externalWatch = nullptr;
   int64_t m_dataVersion = -1;  ///< at the last check
   QString m_summariesSignature; ///< at the last reload

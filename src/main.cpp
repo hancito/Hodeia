@@ -425,6 +425,9 @@ int main(int argc, char *argv[]) {
 
   // Create the PDF ingestion worker
   EngineController engineController(&configManager, &embeddings);
+  // The project an import writes to cannot be deleted or cleared meanwhile.
+  QObject::connect(&engineController, &EngineController::ingestionTargetChanged,
+                   &databaseManager, &DatabaseManager::setIngestionTarget);
 
   // Create the Summarizer (orchestrates local/remote backends)
   SummaryController summaryController(&configManager, &databaseManager);
