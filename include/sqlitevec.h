@@ -72,7 +72,7 @@ signals:
 private:
   struct llama_context *m_llamaCtx = nullptr;
   struct llama_model *m_llamaModel = nullptr;
-  bool m_ready = false;
+  std::atomic<bool> m_ready{false}; ///< read without m_lock (fast path)
   int m_dim = 0;
   int m_maxTokens = 0;
   ConfigManager *m_config = nullptr;

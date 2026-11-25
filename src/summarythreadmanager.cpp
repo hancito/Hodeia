@@ -7,7 +7,16 @@ SummaryController::SummaryController(ConfigManager *config,
                                      DatabaseManager *database, QObject *parent)
     : QObject(parent), m_database(database), m_config(config) {}
 
-SummaryController::~SummaryController() { stopSummarize(); }
+SummaryController::~SummaryController() {
+  stopSummarize();
+  // The worker uses the configuration and the database, destroyed after
+  // this controller: wait until it has stopped (at the next token, or once
+  // the cancelled request returns).
+  if (m_thread && !m_thread->wait(5000)) {
+    qWarning() << "[SummaryController] The summary is still stopping; waiting";
+    m_thread->wait();
+  }
+}
 
 void SummaryController::startSummarize(const QStringList &hashes) {
   // Clean up any leftover objects from a previous run
@@ -86,14 +95,9 @@ void SummaryController::stopSummarize() {
 
   // Post stop() into the worker's event loop so it runs in the correct
   // thread (the same thread that owns m_chatBackend / m_remoteBackend).
-  // The worker emits stopped() after cleanup, which quits the thread
-  // (connected in startSummarize).
+  // Not waiting here: the GUI would freeze until the worker stops.  The
+  // thread quits once summarizePapers() returns (allFinished):
+  //   - remote: the cancelled request returns, the paper loop stops;
+  //   - local: generation stops at the next token boundary.
   QMetaObject::invokeMethod(m_worker, "stop", Qt::QueuedConnection);
-
-  // Wait for the thread to finish (up to 3s).
-  // The thread will quit when:
-  //   - remote: cancelled request finishes → loop exits → stopped() → quit
-  //   - local: current paper finishes → loop sees m_stopping → stopped() → quit
-  if (m_thread->isRunning())
-    m_thread->wait(3000);
 }

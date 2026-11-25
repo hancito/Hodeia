@@ -12,8 +12,8 @@ struct common_chat_prompt;
 /// Used to pass image data from the UI layer to the inference engine without
 /// allocating intermediate Qt image objects on the C API boundary.
 struct PageImage {
-  int width;
-  int height;
+  int width = 0;
+  int height = 0;
   std::vector<unsigned char> data; ///< RGB888, width*height*3 bytes
 
   /// Build a PageImage by COPYING the pixels out of a QImage so the result
@@ -35,7 +35,7 @@ struct PageImage {
 /// One page: OCR text paired with an optional rendered page image.
 /// Used to build interleaved prompts: <--image--> <--text--> per page.
 struct PageBlock {
-  int pageNumber;          ///< 1-based page number
+  int pageNumber = 0;      ///< 1-based page number
   QString text;            ///< OCR text for this page
   PageImage visualContext; ///< page image (empty data = no image)
 };

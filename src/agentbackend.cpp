@@ -59,6 +59,13 @@ public:
         return QString();
       return fail(opened.error());
     }
+    // Stopped while the agent was starting, once its session existed (ACP:
+    // cancel() then has nothing to interrupt and opening goes on): do not
+    // send the prompt.
+    if (m_cancelled) {
+      connection->close();
+      return QString();
+    }
     qDebug() << "[AgentBackend]" << m_profile->id << "session ready in"
              << timer.elapsed() << "ms | model:" << (m_model.isEmpty() ? "default" : m_model);
 
@@ -84,6 +91,9 @@ public:
     }
   }
 
+  // Runs on the worker thread, inside the event loop that openSync() /
+  // promptSync() pump (the worker's stop() slot is queued to it): never
+  // concurrently with generate().
   void cancel() override {
     m_cancelled = true;
     if (m_connection)

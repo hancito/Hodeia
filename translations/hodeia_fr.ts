@@ -14,22 +14,22 @@
         <translation>Aucun connecteur « %1 » pour l’agent %2.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="79"/>
+        <location filename="../src/agentbackend.cpp" line="86"/>
         <source>The agent failed.</source>
         <translation>L’agent a échoué.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="81"/>
+        <location filename="../src/agentbackend.cpp" line="88"/>
         <source>The agent declined the request.</source>
         <translation>L’agent a refusé la demande.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="167"/>
+        <location filename="../src/agentbackend.cpp" line="177"/>
         <source>The backend &quot;%1&quot; does not say which agent it uses: choose the agent again in the Backends window and check the connection.</source>
         <translation>Le backend « %1 » n’indique pas quel agent il utilise : choisissez de nouveau l’agent dans la fenêtre Backends et vérifiez la connexion.</translation>
     </message>
     <message>
-        <location filename="../src/agentbackend.cpp" line="175"/>
+        <location filename="../src/agentbackend.cpp" line="185"/>
         <source>No connector &quot;%1&quot;.</source>
         <translation>Aucun connecteur « %1 ».</translation>
     </message>
@@ -548,7 +548,7 @@ Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
     </message>
     <message>
         <location filename="../src/configmanager.cpp" line="420"/>
-        <location filename="../src/configmanager.cpp" line="457"/>
+        <location filename="../src/configmanager.cpp" line="460"/>
         <source>Project name is empty</source>
         <translation>Le nom du projet est vide</translation>
     </message>
@@ -558,57 +558,67 @@ Vérifiez l&apos;espace disque libre et les droits de ce dossier.</translation>
         <translation>Le projet existe déjà : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="441"/>
+        <location filename="../src/configmanager.cpp" line="435"/>
+        <source>Failed to create the project folder: %1</source>
+        <translation>Impossible de créer le dossier du projet : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="444"/>
         <source>Failed to create database file: %1</source>
         <translation>Échec de la création du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="463"/>
+        <location filename="../src/configmanager.cpp" line="466"/>
         <source>Project does not exist: %1</source>
         <translation>Le projet n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="473"/>
+        <location filename="../src/configmanager.cpp" line="476"/>
         <source>No project names provided</source>
         <translation>Aucun nom de projet fourni</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="529"/>
+        <location filename="../src/configmanager.cpp" line="532"/>
         <source>Could not fully delete project(s): %1. A file may still be in use.</source>
         <translation>Impossible de supprimer entièrement le(s) projet(s) : %1. Un fichier est peut-être encore utilisé.</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="534"/>
+        <location filename="../src/configmanager.cpp" line="537"/>
         <source>No projects were deleted (none existed)</source>
         <translation>Aucun projet n&apos;a été supprimé (aucun n&apos;existait)</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="543"/>
+        <location filename="../src/configmanager.cpp" line="546"/>
         <source>No active project to reset</source>
         <translation>Aucun projet actif à réinitialiser</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="551"/>
+        <location filename="../src/configmanager.cpp" line="554"/>
         <source>Active project directory does not exist: %1</source>
         <translation>Le répertoire du projet actif n&apos;existe pas : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="569"/>
+        <location filename="../src/configmanager.cpp" line="572"/>
         <source>Some files could not be deleted (still in use?): %1</source>
         <translation>Certains fichiers n&apos;ont pas pu être supprimés (encore utilisés ?) : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="581"/>
+        <location filename="../src/configmanager.cpp" line="579"/>
+        <source>Failed to recreate the image folder: %1</source>
+        <translation>Impossible de recréer le dossier des images : %1</translation>
+    </message>
+    <message>
+        <location filename="../src/configmanager.cpp" line="588"/>
         <source>Failed to recreate database file: %1</source>
         <translation>Échec de la recréation du fichier de base de données : %1</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="644"/>
+        <location filename="../src/configmanager.cpp" line="653"/>
         <source>Bundled Models Not Installed</source>
         <translation>Modèles fournis non installés</translation>
     </message>
     <message>
-        <location filename="../src/configmanager.cpp" line="645"/>
+        <location filename="../src/configmanager.cpp" line="654"/>
         <source>Some models shipped with HodeIA could not be copied to:
 %1
 
@@ -623,7 +633,7 @@ Indexing or summarizing may not work until they are. Check the free disk space, 
 L&apos;indexation ou les résumés risquent de ne pas fonctionner tant qu&apos;ils ne le sont pas. Vérifiez l&apos;espace disque libre, puis redémarrez HodeIA.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/configmanager.cpp" line="733"/>
+        <location filename="../src/configmanager.cpp" line="742"/>
         <source>%n page image(s) could not be deleted (still in use?). They only take disk space.</source>
         <translation>
             <numerusform>%n image de page n&apos;a pas pu être supprimée (encore utilisée ?). Elle occupe seulement de l&apos;espace disque.</numerusform>
@@ -797,7 +807,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
     <message>
         <location filename="../src/database.cpp" line="213"/>
         <source>Cannot delete the project &quot;%1&quot; while papers are being imported into it.</source>
-        <translation>Impossible de supprimer le projet « %1 » pendant que des articles y sont importés.</translation>
+        <translation>Impossible de supprimer le projet «&#xa0;%1&#xa0;» pendant que des articles y sont importés.</translation>
     </message>
     <message>
         <location filename="../src/database.cpp" line="229"/>
@@ -1620,7 +1630,7 @@ Vérifiez que le fichier existe et n&apos;est pas utilisé par un autre programm
         <translation>Modèle actif</translation>
     </message>
     <message>
-        <location filename="../ui/MyToolBar.qml" line="224"/>
+        <location filename="../ui/MyToolBar.qml" line="250"/>
         <source>Query your library</source>
         <translation>Interroger votre bibliothèque</translation>
     </message>
@@ -2115,27 +2125,27 @@ Nouvel essai au prochain démarrage.</translation>
         <translation>Envoi de la requête vers %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="142"/>
+        <location filename="../src/remotebackend.cpp" line="146"/>
         <source>Backend not configured (URL or model missing)</source>
         <translation>Backend non configuré (URL ou modèle manquant)</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="256"/>
+        <location filename="../src/remotebackend.cpp" line="260"/>
         <source>JSON parse error: %1</source>
         <translation>Erreur d&apos;analyse JSON : %1</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="266"/>
+        <location filename="../src/remotebackend.cpp" line="270"/>
         <source>Empty response from server</source>
         <translation>Réponse vide du serveur</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="285"/>
+        <location filename="../src/remotebackend.cpp" line="289"/>
         <source>Empty content in response</source>
         <translation>Contenu vide dans la réponse</translation>
     </message>
     <message>
-        <location filename="../src/remotebackend.cpp" line="289"/>
+        <location filename="../src/remotebackend.cpp" line="293"/>
         <source>Response received (%1 chars)</source>
         <translation>Réponse reçue (%1 caractères)</translation>
     </message>

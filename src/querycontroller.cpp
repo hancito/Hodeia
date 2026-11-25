@@ -8,7 +8,16 @@ QueryController::QueryController(ConfigManager *config,
                                  DatabaseManager *database, QObject *parent)
     : QObject(parent), m_database(database), m_config(config) {}
 
-QueryController::~QueryController() { stopQuery(); }
+QueryController::~QueryController() {
+  stopQuery();
+  // The worker uses the configuration and the database, destroyed after
+  // this controller: wait until it has stopped (at the next token, or once
+  // the cancelled request returns).
+  if (m_thread && !m_thread->wait(5000)) {
+    qWarning() << "[QueryController] The query is still stopping; waiting";
+    m_thread->wait();
+  }
+}
 
 QVariantMap QueryController::contextInfo(int contextTokens) const {
   const ContextBudget budget =
@@ -108,8 +117,8 @@ void QueryController::stopQuery() {
   if (!m_worker || !m_thread)
     return;
 
+  // Not waiting here: the GUI would freeze until the worker stops.  The
+  // worker emits stopped() and its thread quits; the cleanup is connected
+  // to QThread::finished (startQuery).
   QMetaObject::invokeMethod(m_worker, "stop", Qt::QueuedConnection);
-
-  if (m_thread->isRunning())
-    m_thread->wait(3000);
 }

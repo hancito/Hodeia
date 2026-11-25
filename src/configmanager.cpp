@@ -429,8 +429,11 @@ ConfigManager::createProject(const QString &projectName) {
   }
 
   QDir rootDir;
-  rootDir.mkpath(projectDir);
-  rootDir.mkpath(projectDir + "/IMG");
+  if (!rootDir.mkpath(projectDir + "/IMG")) {
+    qWarning() << "Failed to create project folder:" << projectDir;
+    return std::unexpected{
+        tr("Failed to create the project folder: %1").arg(projectDir)};
+  }
 
   // Create project database file
   QString dbPath = projectDir + "/" + projectName.trimmed() + ".db";
@@ -570,7 +573,11 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
             .arg(notRemoved.join(", "))};
 
   // Recreate subdirectories
-  dir.mkpath(projectDir + "/IMG");
+  if (!dir.mkpath(projectDir + "/IMG")) {
+    qWarning() << "Failed to recreate the image folder of" << projectDir;
+    return std::unexpected{
+        tr("Failed to recreate the image folder: %1").arg(projectDir + "/IMG")};
+  }
 
   // Recreate empty database
   QString dbPath = projectDir + "/" + name + ".db";
@@ -590,8 +597,10 @@ std::expected<void, QString> ConfigManager::resetActiveProject() {
 void ConfigManager::ensureModelsDirectory() {
   QDir modelsDir(modelsRoot());
   if (!modelsDir.exists()) {
-    modelsDir.mkpath("Embedders");
-    modelsDir.mkpath("Summarizers");
+    for (const char *sub : {"Embedders", "Summarizers"})
+      if (!modelsDir.mkpath(sub))
+        qWarning() << "Failed to create the models folder:"
+                   << modelsDir.filePath(sub);
   }
 }
 
