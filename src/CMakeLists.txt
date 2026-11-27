@@ -70,6 +70,7 @@ add_library(HodeiaEngine STATIC
     ../include/systemmemory.h
     ../include/helpers.h
     ../include/notifier.h
+    ../include/updatechecker.h
     ../include/pdfexport.h
     ../include/summaryformat.h
     ../include/textformat.h
@@ -129,6 +130,7 @@ add_library(HodeiaEngine STATIC
     querycontroller.cpp
     helpers.cpp
     notifier.cpp
+    updatechecker.cpp
     pdfexport.cpp
     summaryformat.cpp
     textformat.cpp

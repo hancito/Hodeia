@@ -38,9 +38,7 @@ MenuBar {
         background: Rectangle {
             implicitHeight: 24
             radius: Style.radiusSmall
-            color: barItem.opened ? Style.tint(Colors.primary, 0.15)
-                 : barItem.highlighted || barItem.hovered ? Style.tint(Colors.text, 0.08)
-                 : "transparent"
+            color: barItem.opened ? Style.tint(Colors.primary, 0.15) : barItem.highlighted || barItem.hovered ? Style.tint(Colors.text, 0.08) : "transparent"
         }
     }
 
@@ -93,9 +91,7 @@ MenuBar {
                     isChecked: menuBar.mainWin.selectedProjects.includes(modelData)
                     onClicked: {
                         const sel = menuBar.mainWin.selectedProjects;
-                        menuBar.mainWin.selectedProjects = sel.includes(modelData)
-                            ? sel.filter(p => p !== modelData)
-                            : sel.concat([modelData]);
+                        menuBar.mainWin.selectedProjects = sel.includes(modelData) ? sel.filter(p => p !== modelData) : sel.concat([modelData]);
                     }
                 }
             }
@@ -150,9 +146,7 @@ MenuBar {
                     isChecked: menuBar.mainWin.selectedModels.includes(modelData)
                     onClicked: {
                         const sel = menuBar.mainWin.selectedModels;
-                        menuBar.mainWin.selectedModels = sel.includes(modelData)
-                            ? sel.filter(p => p !== modelData)
-                            : sel.concat([modelData]);
+                        menuBar.mainWin.selectedModels = sel.includes(modelData) ? sel.filter(p => p !== modelData) : sel.concat([modelData]);
                     }
                 }
             }
@@ -227,6 +221,19 @@ MenuBar {
         StyledMenuItem {
             text: qsTr("About HodeIA...")
             onTriggered: menuBar.requestAbout()
+        }
+        StyledMenuSeparator {}
+        // The answer (new version, up to date, failure) is shown by Main.qml.
+        StyledMenuItem {
+            text: updateChecker.checking ? qsTr("Checking for Updates...") : qsTr("Check for Updates...")
+            enabled: !updateChecker.checking
+            onTriggered: updateChecker.check(false)
+        }
+        StyledMenuItem {
+            text: qsTr("Check for Updates at Startup")
+            checkable: true
+            checked: configManager.checkUpdatesAtStartup
+            onTriggered: configManager.checkUpdatesAtStartup = checked
         }
     }
 }

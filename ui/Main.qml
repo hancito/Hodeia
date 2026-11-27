@@ -25,6 +25,11 @@ ThemedWindow {
         for (let i = 0; i < pending.length; i++)
             messageBox.show(pending[i].title, pending[i].message, pending[i].isError);
 
+        // A new release on GitHub?  Quiet unless there is one (and the user
+        // did not skip it).
+        if (configManager.checkUpdatesAtStartup)
+            updateChecker.check(true);
+
         // Load the QML file as a component
         windowComponent = Qt.createComponent("RagWindow.qml");
 
@@ -482,6 +487,98 @@ ThemedWindow {
                 color: Colors.overlay1
                 wrapMode: Text.WordWrap
             }
+        }
+    }
+
+    // A newer release on GitHub: its version and notes, and the release page
+    // (installer, Linux packages) opened in the browser.  Nothing is
+    // downloaded by the app.
+    StyledDialog {
+        id: updateDialog
+        property string version
+        property string url
+        property string notes
+
+        anchors.centerIn: parent
+        width: 560
+        title: qsTr("Update Available")
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 12
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("HodeIA %1 is available (you have %2).").arg(updateDialog.version).arg(updateChecker.currentVersion)
+                font.weight: Font.Bold
+                wrapMode: Text.WordWrap
+            }
+
+            ScrollView {
+                id: notesView
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(notesLabel.implicitHeight, 320)
+                visible: updateDialog.notes !== ""
+                contentWidth: availableWidth
+                Label {
+                    id: notesLabel
+                    width: notesView.availableWidth
+                    text: updateDialog.notes
+                    textFormat: Text.MarkdownText
+                    wrapMode: Text.WordWrap
+                    linkColor: Colors.primary
+                    onLinkActivated: link => Qt.openUrlExternally(link)
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Download it from the release page, then install it over this version. Your projects and settings are kept.")
+                color: Colors.overlay1
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        footer: DialogButtonBox {
+            alignment: Qt.AlignRight
+            spacing: 8
+            padding: 16
+            topPadding: 4
+            background: Item {}
+            StyledButton {
+                text: qsTr("Skip This Version")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+                onClicked: configManager.skippedUpdateVersion = updateDialog.version
+            }
+            StyledButton {
+                text: qsTr("Later")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            StyledButton {
+                text: qsTr("Download")
+                emphasized: true
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+        }
+        onAccepted: Qt.openUrlExternally(updateDialog.url)
+    }
+
+    Connections {
+        target: updateChecker
+        function onUpdateAvailable(version, url, notes, silent) {
+            // The startup check respects "Skip This Version"; asking does not.
+            if (silent && version === configManager.skippedUpdateVersion)
+                return;
+            updateDialog.version = version;
+            updateDialog.url = url;
+            updateDialog.notes = notes;
+            updateDialog.open();
+        }
+        function onUpToDate(version) {
+            messageBox.showInfo(qsTr("No Update Available"), qsTr("HodeIA %1 is the latest version.").arg(version));
+        }
+        function onCheckFailed(error) {
+            messageBox.showError(qsTr("Cannot Check for Updates"), error);
         }
     }
 

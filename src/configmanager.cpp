@@ -100,6 +100,8 @@ void ConfigManager::loadConfig() {
     m_zoteroDataDir = obj.value("zoteroDataDir").toString();
     m_zoteroPriority = obj.value("zoteroPriority").toBool(false);
     m_agentMode = obj.value("agentMode").toBool(false);
+    m_checkUpdatesAtStartup = obj.value("checkUpdatesAtStartup").toBool(true);
+    m_skippedUpdateVersion = obj.value("skippedUpdateVersion").toString();
     // Support string "visualMode", old int "visualMode", and legacy
     // "useVisualContext" bool.
     if (obj.contains("visualMode")) {
@@ -159,6 +161,8 @@ void ConfigManager::saveConfig() {
   obj["zoteroDataDir"] = m_zoteroDataDir;
   obj["zoteroPriority"] = m_zoteroPriority;
   obj["agentMode"] = m_agentMode;
+  obj["checkUpdatesAtStartup"] = m_checkUpdatesAtStartup;
+  obj["skippedUpdateVersion"] = m_skippedUpdateVersion;
 
   // Save backend list as JSON array of objects, every key kept: besides
   // name, url and api_key, "api" ("openai", "anthropic", "agent"), and for
@@ -245,6 +249,22 @@ void ConfigManager::setAgentMode(bool agentMode) {
   if (m_agentMode != agentMode) {
     m_agentMode = agentMode;
     emit agentModeChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setCheckUpdatesAtStartup(bool check) {
+  if (m_checkUpdatesAtStartup != check) {
+    m_checkUpdatesAtStartup = check;
+    emit checkUpdatesAtStartupChanged();
+    saveConfig();
+  }
+}
+
+void ConfigManager::setSkippedUpdateVersion(const QString &version) {
+  if (m_skippedUpdateVersion != version) {
+    m_skippedUpdateVersion = version;
+    emit skippedUpdateVersionChanged();
     saveConfig();
   }
 }

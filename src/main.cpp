@@ -9,6 +9,7 @@
 #include "mcpstdio.h"
 #include "mtmd-helper.h"
 #include "notifier.h"
+#include "updatechecker.h"
 #include "openalex.h"
 #include "querycontroller.h"
 #include "summarythreadmanager.h"
@@ -472,6 +473,9 @@ int main(int argc, char *argv[]) {
   QObject::connect(&configManager, &ConfigManager::zoteroPriorityChanged,
                    &databaseManager, &DatabaseManager::reloadModels);
 
+  // New releases on GitHub (Help > Check for Updates, and at startup).
+  UpdateChecker updateChecker(QStringLiteral(HODEIA_VERSION));
+
   QQmlApplicationEngine engine;
   engine.setUiLanguage(configManager.language());
   engine.rootContext()->setContextProperty("themeManager", &themeManager);
@@ -489,6 +493,7 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("reindexController",
                                            &reindexController);
   engine.rootContext()->setContextProperty("agentChat", &agentChat);
+  engine.rootContext()->setContextProperty("updateChecker", &updateChecker);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);

@@ -53,6 +53,13 @@ class ConfigManager : public QObject {
   /// The query window opens in the agent mode (when the active backend is
   /// an agent): the user's last choice of the switch.
   Q_PROPERTY(bool agentMode READ agentMode WRITE setAgentMode NOTIFY agentModeChanged)
+  /// Look for a new HodeIA release on GitHub at startup.
+  Q_PROPERTY(bool checkUpdatesAtStartup READ checkUpdatesAtStartup WRITE
+                 setCheckUpdatesAtStartup NOTIFY checkUpdatesAtStartupChanged)
+  /// The release the user chose to skip: the startup check stays quiet about
+  /// it (a later one is offered again).
+  Q_PROPERTY(QString skippedUpdateVersion READ skippedUpdateVersion WRITE
+                 setSkippedUpdateVersion NOTIFY skippedUpdateVersionChanged)
 
 public:
   explicit ConfigManager(QObject *parent = nullptr);
@@ -74,6 +81,8 @@ public:
   QString zoteroDataDir() const { return m_zoteroDataDir; }
   bool zoteroPriority() const { return m_zoteroPriority; }
   bool agentMode() const { return m_agentMode; }
+  bool checkUpdatesAtStartup() const { return m_checkUpdatesAtStartup; }
+  QString skippedUpdateVersion() const { return m_skippedUpdateVersion; }
 
   /// Look up a backend entry by name.  Returns an empty object if not found.
   Q_INVOKABLE QVariantMap backendConfig(const QString &name) const;
@@ -91,6 +100,8 @@ public:
   void setZoteroDataDir(const QString &dir);
   void setZoteroPriority(bool priority);
   void setAgentMode(bool agentMode);
+  void setCheckUpdatesAtStartup(bool check);
+  void setSkippedUpdateVersion(const QString &version);
   /// The visual modes' names, in the current language, by VisualMode.
   Q_INVOKABLE QStringList visualModeList() const;
   VisualMode visualModeEnum() const;
@@ -153,6 +164,8 @@ signals:
   void zoteroDataDirChanged();
   void zoteroPriorityChanged();
   void agentModeChanged();
+  void checkUpdatesAtStartupChanged();
+  void skippedUpdateVersionChanged();
   void backendListChanged();
 
   void visualModeChanged();
@@ -196,4 +209,6 @@ private:
   QString m_zoteroDataDir;
   bool m_zoteroPriority = false;
   bool m_agentMode = false;
+  bool m_checkUpdatesAtStartup = true;
+  QString m_skippedUpdateVersion;
 };
